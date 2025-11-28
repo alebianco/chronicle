@@ -39,6 +39,7 @@ Comprehensive documentation is available in the [docs/](./docs) folder:
  - **[Adding Features](./docs/06-adding-features.md)** - Guide for new development
  - **[Visual Guide](./docs/07-visual-guide.md)** - Architecture diagrams
  - **[Glossary](./docs/08-glossary.md)** - Terms and concepts
+ - **[Project Analysis & Tasks](./docs/09-project-analysis-and-tasks.md)** - ⚠️ Technical debt and improvement roadmap
 
 These docs are written for developers who may not be experts in Kotlin or Android development.
 

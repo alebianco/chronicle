@@ -12,6 +12,7 @@ Welcome to the Chronicle Audiobook Player documentation. This guide will help yo
 6. **[Adding New Features](./06-adding-features.md)** - Guide for implementing new functionality
 7. **[Visual Architecture Guide](./07-visual-guide.md)** - Diagrams and visual representations
 8. **[Glossary](./08-glossary.md)** - Terms and concepts explained
+9. **[Project Analysis & Tasks](./09-project-analysis-and-tasks.md)** - ⚠️ Technical debt, issues, and improvement roadmap
 
 ## Quick Start
 
