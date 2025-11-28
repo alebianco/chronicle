@@ -51,332 +51,332 @@ import kotlin.collections.LinkedHashMap
  * For more information, see res/xml/allowed_media_browser_callers.xml.
  */
 class PackageValidator(
-    context: Context,
-    @XmlRes xmlResId: Int,
+  context: Context,
+  @XmlRes xmlResId: Int,
 ) {
-    private val context: Context
-    private val packageManager: PackageManager
+  private val context: Context
+  private val packageManager: PackageManager
 
-    private val certificateWhitelist: Map<String, KnownCallerInfo>
-    private val platformSignature: String
+  private val certificateWhitelist: Map<String, KnownCallerInfo>
+  private val platformSignature: String
 
-    private val callerChecked = mutableMapOf<String, Pair<Int, Boolean>>()
+  private val callerChecked = mutableMapOf<String, Pair<Int, Boolean>>()
 
-    init {
-        val parser = context.resources.getXml(xmlResId)
-        this.context = context.applicationContext
-        this.packageManager = this.context.packageManager
+  init {
+    val parser = context.resources.getXml(xmlResId)
+    this.context = context.applicationContext
+    this.packageManager = this.context.packageManager
 
-        certificateWhitelist = buildCertificateWhitelist(parser)
-        platformSignature = getSystemSignature()
+    certificateWhitelist = buildCertificateWhitelist(parser)
+    platformSignature = getSystemSignature()
+  }
+
+  /**
+   * Checks whether the caller attempting to connect to a [MediaBrowserServiceCompat] is known.
+   * See [MediaPlayerService.onGetRoot] for where this is utilized.
+   *
+   * @param callingPackage The package name of the caller.
+   * @param callingUid The user id of the caller.
+   * @return `true` if the caller is known, `false` otherwise.
+   */
+  fun isKnownCaller(
+    callingPackage: String,
+    callingUid: Int,
+  ): Boolean {
+    Timber.i("Package name: $callingPackage, calling uid: $callingUid")
+    // If the caller has already been checked, return the previous result here.
+    val (checkedUid, checkResult) = callerChecked[callingPackage] ?: Pair(0, false)
+    if (checkedUid == callingUid) {
+      return checkResult
     }
 
     /**
-     * Checks whether the caller attempting to connect to a [MediaBrowserServiceCompat] is known.
-     * See [MediaPlayerService.onGetRoot] for where this is utilized.
+     * Because some of these checks can be slow, we save the results in [callerChecked] after
+     * this code is run.
      *
-     * @param callingPackage The package name of the caller.
-     * @param callingUid The user id of the caller.
-     * @return `true` if the caller is known, `false` otherwise.
+     * In particular, there's little reason to recompute the calling package's certificate
+     * signature (SHA-256) each call.
+     *
+     * This is safe to do as we know the UID matches the package's UID (from the check above),
+     * and app UIDs are set at install time. Additionally, a package name + UID is guaranteed to
+     * be constant until a reboot. (After a reboot then a previously assigned UID could be
+     * reassigned.)
+     *
+     * Build the caller info for the rest of the checks here.
      */
-    fun isKnownCaller(
-        callingPackage: String,
-        callingUid: Int,
-    ): Boolean {
-        Timber.i("Package name: $callingPackage, calling uid: $callingUid")
-        // If the caller has already been checked, return the previous result here.
-        val (checkedUid, checkResult) = callerChecked[callingPackage] ?: Pair(0, false)
-        if (checkedUid == callingUid) {
-            return checkResult
-        }
+    val callerPackageInfo =
+      buildCallerInfo(callingPackage)
+        ?: throw IllegalStateException("Caller wasn't found in the system?")
 
+    // Verify that things aren't ... broken. (This test should always pass.)
+    if (callerPackageInfo.uid != callingUid) {
+      throw IllegalStateException("Caller's package UID doesn't match caller's actual UID?")
+    }
+
+    val callerSignature = callerPackageInfo.signature
+    val isPackageInWhitelist =
+      certificateWhitelist[callingPackage]?.signatures?.first {
+        it.signature == callerSignature
+      } != null
+
+    val isCallerKnown =
+      when {
+        // If it's our own app making the call, allow it.
+        callingUid == Process.myUid() -> true
+        // If it's one of the apps on the whitelist, allow it.
+        isPackageInWhitelist -> true
+        // If the system is making the call, allow it.
+        callingUid == Process.SYSTEM_UID -> true
+        // If the app was signed by the same certificate as the platform itself, also allow it.
+        callerSignature == platformSignature -> true
         /**
-         * Because some of these checks can be slow, we save the results in [callerChecked] after
-         * this code is run.
-         *
-         * In particular, there's little reason to recompute the calling package's certificate
-         * signature (SHA-256) each call.
-         *
-         * This is safe to do as we know the UID matches the package's UID (from the check above),
-         * and app UIDs are set at install time. Additionally, a package name + UID is guaranteed to
-         * be constant until a reboot. (After a reboot then a previously assigned UID could be
-         * reassigned.)
-         *
-         * Build the caller info for the rest of the checks here.
+         * [MEDIA_CONTENT_CONTROL] permission is only available to system applications, and
+         * while it isn't required to allow these apps to connect to a
+         * [MediaBrowserServiceCompat], allowing this ensures optimal compatibility with apps
+         * such as Android TV and the Google Assistant.
          */
-        val callerPackageInfo =
-            buildCallerInfo(callingPackage)
-                ?: throw IllegalStateException("Caller wasn't found in the system?")
+        callerPackageInfo.permissions.contains(MEDIA_CONTENT_CONTROL) -> true
+        /**
+         * This last permission can be specifically granted to apps, and, in addition to
+         * allowing them to retrieve notifications, it also allows them to connect to an
+         * active [MediaSessionCompat].
+         * As with the above, it's not required to allow apps holding this permission to
+         * connect to your [MediaBrowserServiceCompat], but it does allow easy comparability
+         * with apps such as Wear OS.
+         */
+        callerPackageInfo.permissions.contains(BIND_NOTIFICATION_LISTENER_SERVICE) -> true
+        // If none of the previous checks succeeded, then the caller is unrecognized.
+        else -> false
+      }
 
-        // Verify that things aren't ... broken. (This test should always pass.)
-        if (callerPackageInfo.uid != callingUid) {
-            throw IllegalStateException("Caller's package UID doesn't match caller's actual UID?")
-        }
+    if (!isCallerKnown) {
+      logUnknownCaller(callerPackageInfo)
+    }
 
-        val callerSignature = callerPackageInfo.signature
-        val isPackageInWhitelist =
-            certificateWhitelist[callingPackage]?.signatures?.first {
-                it.signature == callerSignature
-            } != null
+    // Save our work for next time.
+    callerChecked[callingPackage] = Pair(callingUid, isCallerKnown)
+    Timber.i("Is known caller? $isCallerKnown")
+    return isCallerKnown
+  }
 
-        val isCallerKnown =
-            when {
-                // If it's our own app making the call, allow it.
-                callingUid == Process.myUid() -> true
-                // If it's one of the apps on the whitelist, allow it.
-                isPackageInWhitelist -> true
-                // If the system is making the call, allow it.
-                callingUid == Process.SYSTEM_UID -> true
-                // If the app was signed by the same certificate as the platform itself, also allow it.
-                callerSignature == platformSignature -> true
-                /**
-                 * [MEDIA_CONTENT_CONTROL] permission is only available to system applications, and
-                 * while it isn't required to allow these apps to connect to a
-                 * [MediaBrowserServiceCompat], allowing this ensures optimal compatibility with apps
-                 * such as Android TV and the Google Assistant.
-                 */
-                callerPackageInfo.permissions.contains(MEDIA_CONTENT_CONTROL) -> true
-                /**
-                 * This last permission can be specifically granted to apps, and, in addition to
-                 * allowing them to retrieve notifications, it also allows them to connect to an
-                 * active [MediaSessionCompat].
-                 * As with the above, it's not required to allow apps holding this permission to
-                 * connect to your [MediaBrowserServiceCompat], but it does allow easy comparability
-                 * with apps such as Wear OS.
-                 */
-                callerPackageInfo.permissions.contains(BIND_NOTIFICATION_LISTENER_SERVICE) -> true
-                // If none of the previous checks succeeded, then the caller is unrecognized.
-                else -> false
+  /**
+   * Logs an info level message with details of how to add a caller to the allowed callers list
+   * when the app is debuggable.
+   */
+  private fun logUnknownCaller(callerPackageInfo: CallerPackageInfo) {
+    if (BuildConfig.DEBUG && callerPackageInfo.signature != null) {
+      Timber.i("Unknown caller attempting to load media: ${callerPackageInfo.packageName}")
+    }
+  }
+
+  /**
+   * Builds a [CallerPackageInfo] for a given package that can be used for all the
+   * various checks that are performed before allowing an app to connect to a
+   * [MediaBrowserServiceCompat].
+   */
+  private fun buildCallerInfo(callingPackage: String): CallerPackageInfo? {
+    val packageInfo = getPackageInfo(callingPackage) ?: return null
+
+    val appName = packageInfo.applicationInfo.loadLabel(packageManager).toString()
+    val uid = packageInfo.applicationInfo.uid
+    val signature = getSignature(packageInfo)
+
+    val requestedPermissions = packageInfo.requestedPermissions
+    val permissionFlags = packageInfo.requestedPermissionsFlags
+    val activePermissions = mutableSetOf<String>()
+    requestedPermissions?.forEachIndexed { index, permission ->
+      if (permissionFlags[index] and REQUESTED_PERMISSION_GRANTED != 0) {
+        activePermissions += permission
+      }
+    }
+
+    return CallerPackageInfo(appName, callingPackage, uid, signature, activePermissions.toSet())
+  }
+
+  /**
+   * Looks up the [PackageInfo] for a package name.
+   * This requests both the signatures (for checking if an app is on the whitelist) and
+   * the app's permissions, which allow for more flexibility in the whitelist.
+   *
+   * @return [PackageInfo] for the package name or null if it's not found.
+   */
+  private fun getPackageInfo(callingPackage: String): PackageInfo? =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      packageManager.getPackageInfo(
+        callingPackage,
+        PackageManager.PackageInfoFlags.of(
+          (PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES).toLong(),
+        ),
+      )
+    } else {
+      @Suppress("DEPRECATION")
+      packageManager.getPackageInfo(
+        callingPackage,
+        PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES,
+      )
+    }
+
+  /**
+   * Gets the signature of a given package's [PackageInfo].
+   *
+   * The "signature" is a SHA-256 hash of the public key of the signing certificate used by
+   * the app.
+   *
+   * If the app is not found, or if the app does not have exactly one signature, this method
+   * returns `null` as the signature.
+   */
+  private fun getSignature(packageInfo: PackageInfo): String? {
+    val signatures =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val signingInfo = packageInfo.signingInfo ?: return null
+        val signingSignatures =
+          if (signingInfo.hasMultipleSigners()) {
+            signingInfo.apkContentsSigners
+          } else {
+            signingInfo.signingCertificateHistory
+          }
+        signingSignatures ?: emptyArray()
+      } else {
+        @Suppress("DEPRECATION")
+        packageInfo.signatures
+      }
+
+    if (signatures == null || signatures.size != 1) {
+      // Security best practices dictate that an app should be signed with exactly one (1)
+      // signature. Because of this, if there are multiple signatures, reject it.
+      return null
+    }
+
+    val certificate = signatures[0].toByteArray()
+    return getSignatureSha256(certificate)
+  }
+
+  private fun buildCertificateWhitelist(parser: XmlResourceParser): Map<String, KnownCallerInfo> {
+    val certificateWhitelist = LinkedHashMap<String, KnownCallerInfo>()
+    try {
+      var eventType = parser.next()
+      while (eventType != XmlResourceParser.END_DOCUMENT) {
+        if (eventType == XmlResourceParser.START_TAG) {
+          val callerInfo =
+            when (parser.name) {
+              "signing_certificate" -> parseV1Tag(parser)
+              "signature" -> parseV2Tag(parser)
+              else -> null
             }
 
-        if (!isCallerKnown) {
-            logUnknownCaller(callerPackageInfo)
-        }
-
-        // Save our work for next time.
-        callerChecked[callingPackage] = Pair(callingUid, isCallerKnown)
-        Timber.i("Is known caller? $isCallerKnown")
-        return isCallerKnown
-    }
-
-    /**
-     * Logs an info level message with details of how to add a caller to the allowed callers list
-     * when the app is debuggable.
-     */
-    private fun logUnknownCaller(callerPackageInfo: CallerPackageInfo) {
-        if (BuildConfig.DEBUG && callerPackageInfo.signature != null) {
-            Timber.i("Unknown caller attempting to load media: ${callerPackageInfo.packageName}")
-        }
-    }
-
-    /**
-     * Builds a [CallerPackageInfo] for a given package that can be used for all the
-     * various checks that are performed before allowing an app to connect to a
-     * [MediaBrowserServiceCompat].
-     */
-    private fun buildCallerInfo(callingPackage: String): CallerPackageInfo? {
-        val packageInfo = getPackageInfo(callingPackage) ?: return null
-
-        val appName = packageInfo.applicationInfo.loadLabel(packageManager).toString()
-        val uid = packageInfo.applicationInfo.uid
-        val signature = getSignature(packageInfo)
-
-        val requestedPermissions = packageInfo.requestedPermissions
-        val permissionFlags = packageInfo.requestedPermissionsFlags
-        val activePermissions = mutableSetOf<String>()
-        requestedPermissions?.forEachIndexed { index, permission ->
-            if (permissionFlags[index] and REQUESTED_PERMISSION_GRANTED != 0) {
-                activePermissions += permission
-            }
-        }
-
-        return CallerPackageInfo(appName, callingPackage, uid, signature, activePermissions.toSet())
-    }
-
-    /**
-     * Looks up the [PackageInfo] for a package name.
-     * This requests both the signatures (for checking if an app is on the whitelist) and
-     * the app's permissions, which allow for more flexibility in the whitelist.
-     *
-     * @return [PackageInfo] for the package name or null if it's not found.
-     */
-    private fun getPackageInfo(callingPackage: String): PackageInfo? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager.getPackageInfo(
-                callingPackage,
-                PackageManager.PackageInfoFlags.of(
-                    (PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES).toLong(),
-                ),
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            packageManager.getPackageInfo(
-                callingPackage,
-                PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES,
-            )
-        }
-
-    /**
-     * Gets the signature of a given package's [PackageInfo].
-     *
-     * The "signature" is a SHA-256 hash of the public key of the signing certificate used by
-     * the app.
-     *
-     * If the app is not found, or if the app does not have exactly one signature, this method
-     * returns `null` as the signature.
-     */
-    private fun getSignature(packageInfo: PackageInfo): String? {
-        val signatures =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val signingInfo = packageInfo.signingInfo ?: return null
-                val signingSignatures =
-                    if (signingInfo.hasMultipleSigners()) {
-                        signingInfo.apkContentsSigners
-                    } else {
-                        signingInfo.signingCertificateHistory
-                    }
-                signingSignatures ?: emptyArray()
+          callerInfo?.let { info ->
+            val packageName = info.packageName
+            val existingCallerInfo = certificateWhitelist[packageName]
+            if (existingCallerInfo != null) {
+              existingCallerInfo.signatures += callerInfo.signatures
             } else {
-                @Suppress("DEPRECATION")
-                packageInfo.signatures
+              certificateWhitelist[packageName] = callerInfo
             }
-
-        if (signatures == null || signatures.size != 1) {
-            // Security best practices dictate that an app should be signed with exactly one (1)
-            // signature. Because of this, if there are multiple signatures, reject it.
-            return null
+          }
         }
 
-        val certificate = signatures[0].toByteArray()
-        return getSignatureSha256(certificate)
+        eventType = parser.next()
+      }
+    } catch (xmlException: XmlPullParserException) {
+      Timber.e(xmlException, "Could not read allowed callers from XML.")
+    } catch (ioException: IOException) {
+      Timber.e(ioException, "Could not read allowed callers from XML.")
     }
 
-    private fun buildCertificateWhitelist(parser: XmlResourceParser): Map<String, KnownCallerInfo> {
-        val certificateWhitelist = LinkedHashMap<String, KnownCallerInfo>()
-        try {
-            var eventType = parser.next()
-            while (eventType != XmlResourceParser.END_DOCUMENT) {
-                if (eventType == XmlResourceParser.START_TAG) {
-                    val callerInfo =
-                        when (parser.name) {
-                            "signing_certificate" -> parseV1Tag(parser)
-                            "signature" -> parseV2Tag(parser)
-                            else -> null
-                        }
+    return certificateWhitelist
+  }
 
-                    callerInfo?.let { info ->
-                        val packageName = info.packageName
-                        val existingCallerInfo = certificateWhitelist[packageName]
-                        if (existingCallerInfo != null) {
-                            existingCallerInfo.signatures += callerInfo.signatures
-                        } else {
-                            certificateWhitelist[packageName] = callerInfo
-                        }
-                    }
-                }
+  /**
+   * Parses a v1 format tag. See allowed_media_browser_callers.xml for more details.
+   */
+  private fun parseV1Tag(parser: XmlResourceParser): KnownCallerInfo {
+    val name = parser.getAttributeValue(null, "name")
+    val packageName = parser.getAttributeValue(null, "package")
+    val isRelease = parser.getAttributeBooleanValue(null, "release", false)
+    val certificate = parser.nextText().replace(WHITESPACE_REGEX, "")
+    val signature = getSignatureSha256(certificate)
 
-                eventType = parser.next()
-            }
-        } catch (xmlException: XmlPullParserException) {
-            Timber.e(xmlException, "Could not read allowed callers from XML.")
-        } catch (ioException: IOException) {
-            Timber.e(ioException, "Could not read allowed callers from XML.")
-        }
+    val callerSignature = KnownSignature(signature, isRelease)
+    return KnownCallerInfo(name, packageName, mutableSetOf(callerSignature))
+  }
 
-        return certificateWhitelist
+  /**
+   * Parses a v2 format tag. See allowed_media_browser_callers.xml for more details.
+   */
+  private fun parseV2Tag(parser: XmlResourceParser): KnownCallerInfo {
+    val name = parser.getAttributeValue(null, "name")
+    val packageName = parser.getAttributeValue(null, "package")
+
+    val callerSignatures = mutableSetOf<KnownSignature>()
+    var eventType = parser.next()
+    while (eventType != XmlResourceParser.END_TAG) {
+      val isRelease = parser.getAttributeBooleanValue(null, "release", false)
+      val signature = parser.nextText().replace(WHITESPACE_REGEX, "").lowercase()
+      callerSignatures += KnownSignature(signature, isRelease)
+
+      eventType = parser.next()
     }
 
-    /**
-     * Parses a v1 format tag. See allowed_media_browser_callers.xml for more details.
-     */
-    private fun parseV1Tag(parser: XmlResourceParser): KnownCallerInfo {
-        val name = parser.getAttributeValue(null, "name")
-        val packageName = parser.getAttributeValue(null, "package")
-        val isRelease = parser.getAttributeBooleanValue(null, "release", false)
-        val certificate = parser.nextText().replace(WHITESPACE_REGEX, "")
-        val signature = getSignatureSha256(certificate)
+    return KnownCallerInfo(name, packageName, callerSignatures)
+  }
 
-        val callerSignature = KnownSignature(signature, isRelease)
-        return KnownCallerInfo(name, packageName, mutableSetOf(callerSignature))
+  /**
+   * Finds the Android platform signing key signature. This key is never null.
+   */
+  private fun getSystemSignature(): String =
+    getPackageInfo(ANDROID_PLATFORM)?.let { platformInfo ->
+      getSignature(platformInfo)
+    } ?: throw IllegalStateException("Platform signature not found")
+
+  /**
+   * Creates a SHA-256 signature given a Base64 encoded certificate.
+   */
+  private fun getSignatureSha256(certificate: String): String {
+    return getSignatureSha256(Base64.decode(certificate, Base64.DEFAULT))
+  }
+
+  /**
+   * Creates a SHA-256 signature given a certificate byte array.
+   */
+  private fun getSignatureSha256(certificate: ByteArray): String {
+    val md: MessageDigest
+    try {
+      md = MessageDigest.getInstance("SHA256")
+    } catch (noSuchAlgorithmException: NoSuchAlgorithmException) {
+      Timber.e("No such algorithm: $noSuchAlgorithmException")
+      throw RuntimeException("Could not find SHA256 hash algorithm", noSuchAlgorithmException)
     }
+    md.update(certificate)
 
-    /**
-     * Parses a v2 format tag. See allowed_media_browser_callers.xml for more details.
-     */
-    private fun parseV2Tag(parser: XmlResourceParser): KnownCallerInfo {
-        val name = parser.getAttributeValue(null, "name")
-        val packageName = parser.getAttributeValue(null, "package")
+    // This code takes the byte array generated by `md.digest()` and joins each of the bytes
+    // to a string, applying the string format `%02x` on each digit before it's appended, with
+    // a colon (':') between each of the items.
+    // For example: input=[0,2,4,6,8,10,12], output="00:02:04:06:08:0a:0c"
+    return md.digest().joinToString(":") { String.format("%02x", it) }
+  }
 
-        val callerSignatures = mutableSetOf<KnownSignature>()
-        var eventType = parser.next()
-        while (eventType != XmlResourceParser.END_TAG) {
-            val isRelease = parser.getAttributeBooleanValue(null, "release", false)
-            val signature = parser.nextText().replace(WHITESPACE_REGEX, "").lowercase()
-            callerSignatures += KnownSignature(signature, isRelease)
+  private data class KnownCallerInfo(
+    internal val name: String,
+    internal val packageName: String,
+    internal val signatures: MutableSet<KnownSignature>,
+  )
 
-            eventType = parser.next()
-        }
+  private data class KnownSignature(
+    internal val signature: String,
+    internal val release: Boolean,
+  )
 
-        return KnownCallerInfo(name, packageName, callerSignatures)
-    }
-
-    /**
-     * Finds the Android platform signing key signature. This key is never null.
-     */
-    private fun getSystemSignature(): String =
-        getPackageInfo(ANDROID_PLATFORM)?.let { platformInfo ->
-            getSignature(platformInfo)
-        } ?: throw IllegalStateException("Platform signature not found")
-
-    /**
-     * Creates a SHA-256 signature given a Base64 encoded certificate.
-     */
-    private fun getSignatureSha256(certificate: String): String {
-        return getSignatureSha256(Base64.decode(certificate, Base64.DEFAULT))
-    }
-
-    /**
-     * Creates a SHA-256 signature given a certificate byte array.
-     */
-    private fun getSignatureSha256(certificate: ByteArray): String {
-        val md: MessageDigest
-        try {
-            md = MessageDigest.getInstance("SHA256")
-        } catch (noSuchAlgorithmException: NoSuchAlgorithmException) {
-            Timber.e("No such algorithm: $noSuchAlgorithmException")
-            throw RuntimeException("Could not find SHA256 hash algorithm", noSuchAlgorithmException)
-        }
-        md.update(certificate)
-
-        // This code takes the byte array generated by `md.digest()` and joins each of the bytes
-        // to a string, applying the string format `%02x` on each digit before it's appended, with
-        // a colon (':') between each of the items.
-        // For example: input=[0,2,4,6,8,10,12], output="00:02:04:06:08:0a:0c"
-        return md.digest().joinToString(":") { String.format("%02x", it) }
-    }
-
-    private data class KnownCallerInfo(
-        internal val name: String,
-        internal val packageName: String,
-        internal val signatures: MutableSet<KnownSignature>,
-    )
-
-    private data class KnownSignature(
-        internal val signature: String,
-        internal val release: Boolean,
-    )
-
-    /**
-     * Convenience class to hold all of the information about an app that's being checked
-     * to see if it's a known caller.
-     */
-    private data class CallerPackageInfo(
-        internal val name: String,
-        internal val packageName: String,
-        internal val uid: Int,
-        internal val signature: String?,
-        internal val permissions: Set<String>,
-    )
+  /**
+   * Convenience class to hold all of the information about an app that's being checked
+   * to see if it's a known caller.
+   */
+  private data class CallerPackageInfo(
+    internal val name: String,
+    internal val packageName: String,
+    internal val uid: Int,
+    internal val signature: String?,
+    internal val permissions: Set<String>,
+  )
 }
 
 private const val ANDROID_PLATFORM = "android"

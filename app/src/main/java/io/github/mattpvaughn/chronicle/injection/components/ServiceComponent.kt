@@ -20,43 +20,43 @@ import kotlinx.coroutines.CoroutineScope
 @ServiceScope
 @Component(dependencies = [AppComponent::class], modules = [ServiceModule::class])
 interface ServiceComponent {
-    fun progressUpdater(): ProgressUpdater
+  fun progressUpdater(): ProgressUpdater
 
-    fun exoPlayer(): ExoPlayer
+  fun exoPlayer(): ExoPlayer
 
-    fun mediaSession(): MediaSessionCompat
+  fun mediaSession(): MediaSessionCompat
 
-    fun pendingIntent(): PendingIntent
+  fun pendingIntent(): PendingIntent
 
-    fun sleepTimer(): SleepTimer
+  fun sleepTimer(): SleepTimer
 
-    fun localBroadcastManager(): LocalBroadcastManager
+  fun localBroadcastManager(): LocalBroadcastManager
 
-    fun notificationManager(): NotificationManagerCompat
+  fun notificationManager(): NotificationManagerCompat
 
-    fun notificationBuilder(): NotificationBuilder
+  fun notificationBuilder(): NotificationBuilder
 
-    fun becomingNoisyReceiver(): BecomingNoisyReceiver
+  fun becomingNoisyReceiver(): BecomingNoisyReceiver
 
-    fun mediaSessionCallback(): AudiobookMediaSessionCallback
+  fun mediaSessionCallback(): AudiobookMediaSessionCallback
 
-    fun mediaSource(): PlexMediaRepository
+  fun mediaSource(): PlexMediaRepository
 
-    fun serviceScope(): CoroutineScope
+  fun serviceScope(): CoroutineScope
 
-    fun serviceController(): ServiceController
+  fun serviceController(): ServiceController
 
-    fun plexDataSourceFactory(): DefaultHttpDataSource.Factory
+  fun plexDataSourceFactory(): DefaultHttpDataSource.Factory
 
-    fun packageValidator(): PackageValidator
+  fun packageValidator(): PackageValidator
 
-    fun foregroundServiceController(): ForegroundServiceController
+  fun foregroundServiceController(): ForegroundServiceController
 
-    fun trackListManager(): TrackListStateManager
+  fun trackListManager(): TrackListStateManager
 
-    fun mediaController(): MediaControllerCompat
+  fun mediaController(): MediaControllerCompat
 
-    fun plexMediaSource(): PlexMediaSource
+  fun plexMediaSource(): PlexMediaSource
 
-    fun inject(mediaPlayerService: MediaPlayerService)
+  fun inject(mediaPlayerService: MediaPlayerService)
 }

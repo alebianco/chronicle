@@ -5,5 +5,5 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class MediaProvider(
-    @Json(name = "Feature") val feature: List<Feature> = emptyList(),
+  @Json(name = "Feature") val feature: List<Feature> = emptyList(),
 )

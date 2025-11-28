@@ -38,219 +38,219 @@ import javax.inject.Inject
 
 /** TODO: refactor search to reuse code from Library + Home fragments */
 class CollectionsFragment : Fragment() {
-    companion object {
-        fun newInstance() = CollectionsFragment()
+  companion object {
+    fun newInstance() = CollectionsFragment()
+  }
+
+  @Inject
+  lateinit var viewModelFactory: CollectionsViewModel.Factory
+
+  private val viewModel: CollectionsViewModel by lazy {
+    ViewModelProvider(this, viewModelFactory).get(CollectionsViewModel::class.java)
+  }
+
+  @Inject
+  lateinit var prefsRepo: PrefsRepo
+
+  @Inject
+  lateinit var navigator: Navigator
+
+  @Inject
+  lateinit var plexConfig: PlexConfig
+
+  var adapter: CollectionsAdapter? = null
+
+  override fun onCreateView(
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?,
+  ): View {
+    Timber.i("Lib frag view create")
+    val binding = FragmentCollectionsBinding.inflate(inflater, container, false)
+    binding.lifecycleOwner = viewLifecycleOwner
+    binding.viewModel = viewModel
+    binding.plexConfig = plexConfig
+
+    adapter =
+      CollectionsAdapter(
+        prefsRepo.libraryBookViewStyle,
+        true,
+        prefsRepo.bookCoverStyle == BOOK_COVER_STYLE_SQUARE,
+        object : CollectionClick {
+          override fun onClick(collection: Collection) {
+            openCollectionDetails(collection)
+          }
+        },
+      ).apply {
+        stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
+      }
+
+    binding.collectionsGrid.adapter = adapter
+
+    viewModel.collections.observe(viewLifecycleOwner) { collections ->
+      // Adapter is always non-null between view creation and view destruction
+      if (adapter == null) {
+        return@observe
+      }
+
+      // If there are no previous books, submit normally
+      if (adapter!!.currentList.isEmpty()) {
+        Timber.i("Updating book list: no previous books")
+        adapter!!.submitList(collections)
+        return@observe
+      }
+
+      // Sometimes [books] will be the same as [adapter.currentList] so don't do any
+      // submission/diffing if that's the case
+      //
+      // Check if the new list differs from the current. We really should be using a normal
+      // RecyclerView.Adapter and not a ListAdapter for this, as ListAdapter only provides
+      // access to an immutable copy of a list, not the list itself.
+      //
+      // This operation is worst case O(n), which is bad for users with huge libraries
+      lifecycleScope.launch {
+        val isNewList =
+          withContext(Dispatchers.IO) {
+            val currentList = adapter?.currentList ?: return@withContext true
+            if (collections.size != currentList.size) {
+              Timber.i("Updating: different size!")
+              return@withContext true
+            }
+            // compare lists by id, faster than doing a full .equals() comparison
+            for (index in collections.indices) {
+              if (collections[index].id != currentList[index].id) {
+                Timber.i("Updating: different ids!")
+                return@withContext true
+              }
+            }
+            return@withContext false
+          }
+        if (isNewList) {
+          // submit an empty list to force a scroll-to-top, then when it is done, submit
+          // the real list
+          Timber.i("Updating book list: scroll to top")
+          adapter!!.submitList(null) { adapter?.submitList(collections) }
+        }
+      }
     }
 
-    @Inject
-    lateinit var viewModelFactory: CollectionsViewModel.Factory
-
-    private val viewModel: CollectionsViewModel by lazy {
-        ViewModelProvider(this, viewModelFactory).get(CollectionsViewModel::class.java)
+    plexConfig.isConnected.observe(viewLifecycleOwner) { isConnected ->
+      adapter?.setServerConnected(isConnected)
     }
 
-    @Inject
-    lateinit var prefsRepo: PrefsRepo
-
-    @Inject
-    lateinit var navigator: Navigator
-
-    @Inject
-    lateinit var plexConfig: PlexConfig
-
-    var adapter: CollectionsAdapter? = null
-
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View {
-        Timber.i("Lib frag view create")
-        val binding = FragmentCollectionsBinding.inflate(inflater, container, false)
-        binding.lifecycleOwner = viewLifecycleOwner
-        binding.viewModel = viewModel
-        binding.plexConfig = plexConfig
-
-        adapter =
-            CollectionsAdapter(
-                prefsRepo.libraryBookViewStyle,
-                true,
-                prefsRepo.bookCoverStyle == BOOK_COVER_STYLE_SQUARE,
-                object : CollectionClick {
-                    override fun onClick(collection: Collection) {
-                        openCollectionDetails(collection)
-                    }
-                },
-            ).apply {
-                stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
-            }
-
-        binding.collectionsGrid.adapter = adapter
-
-        viewModel.collections.observe(viewLifecycleOwner) { collections ->
-            // Adapter is always non-null between view creation and view destruction
-            if (adapter == null) {
-                return@observe
-            }
-
-            // If there are no previous books, submit normally
-            if (adapter!!.currentList.isEmpty()) {
-                Timber.i("Updating book list: no previous books")
-                adapter!!.submitList(collections)
-                return@observe
-            }
-
-            // Sometimes [books] will be the same as [adapter.currentList] so don't do any
-            // submission/diffing if that's the case
-            //
-            // Check if the new list differs from the current. We really should be using a normal
-            // RecyclerView.Adapter and not a ListAdapter for this, as ListAdapter only provides
-            // access to an immutable copy of a list, not the list itself.
-            //
-            // This operation is worst case O(n), which is bad for users with huge libraries
-            lifecycleScope.launch {
-                val isNewList =
-                    withContext(Dispatchers.IO) {
-                        val currentList = adapter?.currentList ?: return@withContext true
-                        if (collections.size != currentList.size) {
-                            Timber.i("Updating: different size!")
-                            return@withContext true
-                        }
-                        // compare lists by id, faster than doing a full .equals() comparison
-                        for (index in collections.indices) {
-                            if (collections[index].id != currentList[index].id) {
-                                Timber.i("Updating: different ids!")
-                                return@withContext true
-                            }
-                        }
-                        return@withContext false
-                    }
-                if (isNewList) {
-                    // submit an empty list to force a scroll-to-top, then when it is done, submit
-                    // the real list
-                    Timber.i("Updating book list: scroll to top")
-                    adapter!!.submitList(null) { adapter?.submitList(collections) }
-                }
-            }
+    viewModel.viewStyle.observe(viewLifecycleOwner) { style ->
+      Timber.i("View style is: $style")
+      val isGrid =
+        when (style) {
+          VIEW_STYLE_COVER_GRID -> true
+          VIEW_STYLE_DETAILS_LIST, VIEW_STYLE_TEXT_LIST -> false
+          else -> throw IllegalStateException("Unknown view style")
         }
-
-        plexConfig.isConnected.observe(viewLifecycleOwner) { isConnected ->
-            adapter?.setServerConnected(isConnected)
+      binding.collectionsGrid.layoutManager =
+        if (isGrid) {
+          GridLayoutManager(requireContext(), 3)
+        } else {
+          LinearLayoutManager(requireContext())
         }
+      adapter!!.viewStyle = style
+    }
+    binding.searchResultsList.adapter =
+      AudiobookSearchAdapter(
+        object : LibraryFragment.AudiobookClick {
+          override fun onClick(audiobook: Audiobook) {
+            openAudiobookDetails(audiobook)
+          }
+        },
+      )
 
-        viewModel.viewStyle.observe(viewLifecycleOwner) { style ->
-            Timber.i("View style is: $style")
-            val isGrid =
-                when (style) {
-                    VIEW_STYLE_COVER_GRID -> true
-                    VIEW_STYLE_DETAILS_LIST, VIEW_STYLE_TEXT_LIST -> false
-                    else -> throw IllegalStateException("Unknown view style")
-                }
-            binding.collectionsGrid.layoutManager =
-                if (isGrid) {
-                    GridLayoutManager(requireContext(), 3)
-                } else {
-                    LinearLayoutManager(requireContext())
-                }
-            adapter!!.viewStyle = style
-        }
-        binding.searchResultsList.adapter =
-            AudiobookSearchAdapter(
-                object : LibraryFragment.AudiobookClick {
-                    override fun onClick(audiobook: Audiobook) {
-                        openAudiobookDetails(audiobook)
-                    }
-                },
-            )
+    binding.swipeToRefresh.setOnRefreshListener {
+      viewModel.refreshData()
+    }
 
-        binding.swipeToRefresh.setOnRefreshListener {
-            viewModel.refreshData()
-        }
+    viewModel.isRefreshing.observe(viewLifecycleOwner) {
+      binding.swipeToRefresh.isRefreshing = it
+    }
 
-        viewModel.isRefreshing.observe(viewLifecycleOwner) {
-            binding.swipeToRefresh.isRefreshing = it
-        }
+    viewModel.messageForUser.observe(viewLifecycleOwner) {
+      if (!it.hasBeenHandled) {
+        Toast.makeText(context, it.getContentIfNotHandled(), LENGTH_SHORT).show()
+      }
+    }
 
-        viewModel.messageForUser.observe(viewLifecycleOwner) {
-            if (!it.hasBeenHandled) {
-                Toast.makeText(context, it.getContentIfNotHandled(), LENGTH_SHORT).show()
-            }
-        }
+    (activity as AppCompatActivity).setSupportActionBar(binding.toolbar)
 
-        (activity as AppCompatActivity).setSupportActionBar(binding.toolbar)
+    val menuHost: MenuHost = requireActivity()
+    menuHost.addMenuProvider(
+      object : MenuProvider {
+        override fun onCreateMenu(
+          menu: Menu,
+          menuInflater: MenuInflater,
+        ) {
+          menuInflater.inflate(R.menu.collections_menu, menu)
+          val searchView = menu.findItem(R.id.search).actionView as SearchView
+          val searchItem = menu.findItem(R.id.search)
 
-        val menuHost: MenuHost = requireActivity()
-        menuHost.addMenuProvider(
-            object : MenuProvider {
-                override fun onCreateMenu(
-                    menu: Menu,
-                    menuInflater: MenuInflater,
-                ) {
-                    menuInflater.inflate(R.menu.collections_menu, menu)
-                    val searchView = menu.findItem(R.id.search).actionView as SearchView
-                    val searchItem = menu.findItem(R.id.search)
+          searchItem.setOnActionExpandListener(
+            object : MenuItem.OnActionExpandListener {
+              override fun onMenuItemActionExpand(item: MenuItem): Boolean {
+                viewModel.setSearchActive(true)
+                return true
+              }
 
-                    searchItem.setOnActionExpandListener(
-                        object : MenuItem.OnActionExpandListener {
-                            override fun onMenuItemActionExpand(item: MenuItem): Boolean {
-                                viewModel.setSearchActive(true)
-                                return true
-                            }
-
-                            override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
-                                viewModel.setSearchActive(false)
-                                return true
-                            }
-                        },
-                    )
-
-                    searchView.setOnQueryTextListener(
-                        object : SearchView.OnQueryTextListener {
-                            override fun onQueryTextSubmit(query: String?): Boolean {
-                                return true
-                            }
-
-                            override fun onQueryTextChange(newText: String?): Boolean {
-                                if (newText != null) {
-                                    viewModel.search(newText)
-                                }
-                                return true
-                            }
-                        },
-                    )
-                }
-
-                override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-                    return menuItem.itemId == R.id.search
-                }
+              override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+                viewModel.setSearchActive(false)
+                return true
+              }
             },
-            viewLifecycleOwner,
-            Lifecycle.State.RESUMED,
-        )
+          )
 
-        return binding.root
-    }
+          searchView.setOnQueryTextListener(
+            object : SearchView.OnQueryTextListener {
+              override fun onQueryTextSubmit(query: String?): Boolean {
+                return true
+              }
 
-    private fun openCollectionDetails(collection: Collection) {
-        navigator.showCollectionDetails(collection.id)
-    }
+              override fun onQueryTextChange(newText: String?): Boolean {
+                if (newText != null) {
+                  viewModel.search(newText)
+                }
+                return true
+              }
+            },
+          )
+        }
 
-    private fun openAudiobookDetails(audiobook: Audiobook) {
-        navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
-    }
+        override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+          return menuItem.itemId == R.id.search
+        }
+      },
+      viewLifecycleOwner,
+      Lifecycle.State.RESUMED,
+    )
 
-    override fun onAttach(context: Context) {
-        (activity as MainActivity).activityComponent!!.inject(this)
-        super.onAttach(context)
-        Timber.i("Reattached!")
-    }
+    return binding.root
+  }
 
-    override fun onDestroyView() {
-        adapter = null
-        super.onDestroyView()
-    }
+  private fun openCollectionDetails(collection: Collection) {
+    navigator.showCollectionDetails(collection.id)
+  }
 
-    interface CollectionClick {
-        fun onClick(collection: Collection)
-    }
+  private fun openAudiobookDetails(audiobook: Audiobook) {
+    navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
+  }
+
+  override fun onAttach(context: Context) {
+    (activity as MainActivity).activityComponent!!.inject(this)
+    super.onAttach(context)
+    Timber.i("Reattached!")
+  }
+
+  override fun onDestroyView() {
+    adapter = null
+    super.onDestroyView()
+  }
+
+  interface CollectionClick {
+    fun onClick(collection: Collection)
+  }
 }

@@ -18,46 +18,46 @@ import timber.log.Timber
 
 @Module
 class ActivityModule(private val activity: AppCompatActivity) {
-    @Provides
-    @ActivityScope
-    fun activity(): AppCompatActivity = activity
+  @Provides
+  @ActivityScope
+  fun activity(): AppCompatActivity = activity
 
-    @Provides
-    @ActivityScope
-    fun coroutineScope(): CoroutineScope = activity.lifecycleScope
+  @Provides
+  @ActivityScope
+  fun coroutineScope(): CoroutineScope = activity.lifecycleScope
 
-    @Provides
-    @ActivityScope
-    fun fragmentManager(): FragmentManager = activity.supportFragmentManager
+  @Provides
+  @ActivityScope
+  fun fragmentManager(): FragmentManager = activity.supportFragmentManager
 
-    @Provides
-    @ActivityScope
-    fun provideProgressUpdater(progressUpdater: SimpleProgressUpdater): ProgressUpdater = progressUpdater
+  @Provides
+  @ActivityScope
+  fun provideProgressUpdater(progressUpdater: SimpleProgressUpdater): ProgressUpdater = progressUpdater
 
-    @Provides
-    @ActivityScope
-    fun provideBroadcastManager(): LocalBroadcastManager =
-        LocalBroadcastManager.getInstance(
-            activity,
-        )
+  @Provides
+  @ActivityScope
+  fun provideBroadcastManager(): LocalBroadcastManager =
+    LocalBroadcastManager.getInstance(
+      activity,
+    )
 
-    @Provides
-    @ActivityScope
-    fun mediaServiceConnection(): MediaServiceConnection {
-        val conn =
-            MediaServiceConnection(
-                activity.applicationContext,
-                ComponentName(activity.applicationContext, MediaPlayerService::class.java),
-            )
-        val doesServiceExist =
-            ServiceUtils.isServiceRunning(
-                activity.applicationContext,
-                MediaPlayerService::class.java,
-            )
-        Timber.i("Connecting to existing service? $doesServiceExist")
-        if (doesServiceExist) {
-            conn.connect()
-        }
-        return conn
+  @Provides
+  @ActivityScope
+  fun mediaServiceConnection(): MediaServiceConnection {
+    val conn =
+      MediaServiceConnection(
+        activity.applicationContext,
+        ComponentName(activity.applicationContext, MediaPlayerService::class.java),
+      )
+    val doesServiceExist =
+      ServiceUtils.isServiceRunning(
+        activity.applicationContext,
+        MediaPlayerService::class.java,
+      )
+    Timber.i("Connecting to existing service? $doesServiceExist")
+    if (doesServiceExist) {
+      conn.connect()
     }
+    return conn
+  }
 }

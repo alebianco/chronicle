@@ -17,75 +17,75 @@ import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseServerBin
 import javax.inject.Inject
 
 class ChooseServerFragment : Fragment() {
-    companion object {
-        @JvmStatic
-        fun newInstance() = ChooseServerFragment()
+  companion object {
+    @JvmStatic
+    fun newInstance() = ChooseServerFragment()
 
-        const val TAG = "Choose server fragment"
-    }
+    const val TAG = "Choose server fragment"
+  }
 
-    @Inject
-    lateinit var viewModelFactory: ChooseServerViewModel.Factory
-    private lateinit var viewModel: ChooseServerViewModel
+  @Inject
+  lateinit var viewModelFactory: ChooseServerViewModel.Factory
+  private lateinit var viewModel: ChooseServerViewModel
 
-    private lateinit var serverAdapter: ServerListAdapter
+  private lateinit var serverAdapter: ServerListAdapter
 
-    override fun onAttach(context: Context) {
-        ((activity as Activity).application as ChronicleApplication)
-            .appComponent
-            .inject(this)
-        super.onAttach(context)
-    }
+  override fun onAttach(context: Context) {
+    ((activity as Activity).application as ChronicleApplication)
+      .appComponent
+      .inject(this)
+    super.onAttach(context)
+  }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View? {
-        super.onCreate(savedInstanceState)
+  override fun onCreateView(
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?,
+  ): View? {
+    super.onCreate(savedInstanceState)
 
-        val binding = OnboardingPlexChooseServerBinding.inflate(inflater, container, false)
-        binding.lifecycleOwner = viewLifecycleOwner
+    val binding = OnboardingPlexChooseServerBinding.inflate(inflater, container, false)
+    binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel =
-            ViewModelProvider(
-                viewModelStore,
-                viewModelFactory,
-            ).get(ChooseServerViewModel::class.java)
+    viewModel =
+      ViewModelProvider(
+        viewModelStore,
+        viewModelFactory,
+      ).get(ChooseServerViewModel::class.java)
 
-        serverAdapter =
-            ServerListAdapter(
-                ServerClickListener { serverModel ->
-                    viewModel.chooseServer(serverModel)
-                },
-            )
+    serverAdapter =
+      ServerListAdapter(
+        ServerClickListener { serverModel ->
+          viewModel.chooseServer(serverModel)
+        },
+      )
 
-        binding.serverList.adapter = serverAdapter
+    binding.serverList.adapter = serverAdapter
 
-        viewModel.servers.observe(
-            viewLifecycleOwner,
-            Observer { servers ->
-                servers?.let {
-                    serverAdapter.submitList(it)
-                }
-            },
-        )
+    viewModel.servers.observe(
+      viewLifecycleOwner,
+      Observer { servers ->
+        servers?.let {
+          serverAdapter.submitList(it)
+        }
+      },
+    )
 
-        viewModel.userMessage.observe(
-            viewLifecycleOwner,
-            Observer {
-                if (it.hasBeenHandled) {
-                    return@Observer
-                }
-                Toast.makeText(requireContext(), it.getContentIfNotHandled(), LENGTH_SHORT).show()
-            },
-        )
+    viewModel.userMessage.observe(
+      viewLifecycleOwner,
+      Observer {
+        if (it.hasBeenHandled) {
+          return@Observer
+        }
+        Toast.makeText(requireContext(), it.getContentIfNotHandled(), LENGTH_SHORT).show()
+      },
+    )
 
-        binding.chooseServerViewModel = viewModel
-        return binding.root
-    }
+    binding.chooseServerViewModel = viewModel
+    return binding.root
+  }
 }
 
 class ServerClickListener(val clickListener: (serverModel: ServerModel) -> Unit) {
-    fun onClick(server: ServerModel) = clickListener(server)
+  fun onClick(server: ServerModel) = clickListener(server)
 }

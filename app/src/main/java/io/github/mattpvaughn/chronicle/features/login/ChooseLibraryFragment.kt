@@ -20,84 +20,84 @@ import timber.log.Timber
 import javax.inject.Inject
 
 class ChooseLibraryFragment : Fragment() {
-    companion object {
-        @JvmStatic
-        fun newInstance() = ChooseLibraryFragment()
+  companion object {
+    @JvmStatic
+    fun newInstance() = ChooseLibraryFragment()
 
-        const val TAG = "choose library fragment"
-    }
+    const val TAG = "choose library fragment"
+  }
 
-    @Inject
-    lateinit var viewModelFactory: ChooseLibraryViewModel.Factory
+  @Inject
+  lateinit var viewModelFactory: ChooseLibraryViewModel.Factory
 
-    private lateinit var viewModel: ChooseLibraryViewModel
+  private lateinit var viewModel: ChooseLibraryViewModel
 
-    private lateinit var libraryAdapter: LibraryListAdapter
+  private lateinit var libraryAdapter: LibraryListAdapter
 
-    @Inject
-    lateinit var plexConfig: PlexConfig
+  @Inject
+  lateinit var plexConfig: PlexConfig
 
-    @Inject
-    lateinit var plexPrefs: PlexPrefsRepo
+  @Inject
+  lateinit var plexPrefs: PlexPrefsRepo
 
-    @Inject
-    lateinit var plexLoginRepo: IPlexLoginRepo
+  @Inject
+  lateinit var plexLoginRepo: IPlexLoginRepo
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View? {
-        ((activity as Activity).application as ChronicleApplication).appComponent.inject(this)
-        super.onCreate(savedInstanceState)
+  override fun onCreateView(
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?,
+  ): View? {
+    ((activity as Activity).application as ChronicleApplication).appComponent.inject(this)
+    super.onCreate(savedInstanceState)
 
-        val binding = OnboardingPlexChooseLibraryBinding.inflate(inflater, container, false)
-        binding.lifecycleOwner = viewLifecycleOwner
+    val binding = OnboardingPlexChooseLibraryBinding.inflate(inflater, container, false)
+    binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel =
-            ViewModelProvider(
-                viewModelStore,
-                viewModelFactory,
-            ).get(ChooseLibraryViewModel::class.java)
+    viewModel =
+      ViewModelProvider(
+        viewModelStore,
+        viewModelFactory,
+      ).get(ChooseLibraryViewModel::class.java)
 
-        binding.chooseLibraryViewModel = viewModel
+    binding.chooseLibraryViewModel = viewModel
 
-        libraryAdapter =
-            LibraryListAdapter(
-                LibraryClickListener { library ->
-                    Timber.i("Library name: $library")
-                    plexLoginRepo.chooseLibrary(library)
-                },
-            )
+    libraryAdapter =
+      LibraryListAdapter(
+        LibraryClickListener { library ->
+          Timber.i("Library name: $library")
+          plexLoginRepo.chooseLibrary(library)
+        },
+      )
 
-        binding.libraryList.adapter = libraryAdapter
+    binding.libraryList.adapter = libraryAdapter
 
-        viewModel.userMessage.observe(
-            viewLifecycleOwner,
-            Observer { message: Event<String> ->
-                if (!message.hasBeenHandled) {
-                    Toast.makeText(
-                        context,
-                        message.getContentIfNotHandled(),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            },
-        )
+    viewModel.userMessage.observe(
+      viewLifecycleOwner,
+      Observer { message: Event<String> ->
+        if (!message.hasBeenHandled) {
+          Toast.makeText(
+            context,
+            message.getContentIfNotHandled(),
+            Toast.LENGTH_SHORT,
+          ).show()
+        }
+      },
+    )
 
-        viewModel.libraries.observe(
-            viewLifecycleOwner,
-            Observer { libraries ->
-                libraries?.apply {
-                    libraryAdapter.submitList(this)
-                }
-            },
-        )
+    viewModel.libraries.observe(
+      viewLifecycleOwner,
+      Observer { libraries ->
+        libraries?.apply {
+          libraryAdapter.submitList(this)
+        }
+      },
+    )
 
-        return binding.root
-    }
+    return binding.root
+  }
 }
 
 class LibraryClickListener(val clickListener: (plexLibrary: PlexLibrary) -> Unit) {
-    fun onClick(plexLibrary: PlexLibrary) = clickListener(plexLibrary)
+  fun onClick(plexLibrary: PlexLibrary) = clickListener(plexLibrary)
 }

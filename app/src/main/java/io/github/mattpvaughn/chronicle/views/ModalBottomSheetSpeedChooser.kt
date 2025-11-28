@@ -19,74 +19,74 @@ import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
 class ModalBottomSheetSpeedChooser : BottomSheetDialogFragment() {
-    private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+  private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
-    @Inject
-    lateinit var prefs: PrefsRepo
+  @Inject
+  lateinit var prefs: PrefsRepo
 
-    override fun onAttach(context: Context) {
-        (requireActivity() as MainActivity).activityComponent!!.inject(this)
-        super.onAttach(context)
-    }
+  override fun onAttach(context: Context) {
+    (requireActivity() as MainActivity).activityComponent!!.inject(this)
+    super.onAttach(context)
+  }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View {
-        val binding = ModalBottomSheetSpeedChooserBinding.inflate(inflater, container, false)
-        binding.speed = prefs.playbackSpeed
+  override fun onCreateView(
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?,
+  ): View {
+    val binding = ModalBottomSheetSpeedChooserBinding.inflate(inflater, container, false)
+    binding.speed = prefs.playbackSpeed
 
-        binding.speedSlider.addOnSliderTouchListener(
-            object : Slider.OnSliderTouchListener {
-                override fun onStartTrackingTouch(slider: Slider) {}
+    binding.speedSlider.addOnSliderTouchListener(
+      object : Slider.OnSliderTouchListener {
+        override fun onStartTrackingTouch(slider: Slider) {}
 
-                override fun onStopTrackingTouch(slider: Slider) {
-                    prefs.playbackSpeed = slider.value
-                }
-            },
-        )
-
-        binding.speedSlider.setLabelFormatter { value: Float ->
-            String.format("%.2f", value) + "x"
+        override fun onStopTrackingTouch(slider: Slider) {
+          prefs.playbackSpeed = slider.value
         }
+      },
+    )
 
-        binding.speedPresets.setOnCheckedStateChangeListener { group: ChipGroup, checkedId ->
-            Timber.w("setOnCheckedStateChangeListener: $group | $checkedId")
-            val speed =
-                when (group.findViewById<Chip>(checkedId.first()).tag as String) {
-                    // Note: tag="@string/xxx" ends up turning into a string and
-                    // can't be reference as an R.id.xxx
-                    "1.0x" -> 1.0f
-                    "1.2x" -> 1.2f
-                    "1.5x" -> 1.5f
-                    "2.0x" -> 2.0f
-                    else -> 1.0f
-                }
-            prefs.playbackSpeed = speed
-            binding.speedSlider.value = speed
+    binding.speedSlider.setLabelFormatter { value: Float ->
+      String.format("%.2f", value) + "x"
+    }
+
+    binding.speedPresets.setOnCheckedStateChangeListener { group: ChipGroup, checkedId ->
+      Timber.w("setOnCheckedStateChangeListener: $group | $checkedId")
+      val speed =
+        when (group.findViewById<Chip>(checkedId.first()).tag as String) {
+          // Note: tag="@string/xxx" ends up turning into a string and
+          // can't be reference as an R.id.xxx
+          "1.0x" -> 1.0f
+          "1.2x" -> 1.2f
+          "1.5x" -> 1.5f
+          "2.0x" -> 2.0f
+          else -> 1.0f
         }
-
-        prefsListener =
-            SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == PrefsRepo.KEY_PLAYBACK_SPEED) {
-                    binding.speed = prefs.playbackSpeed
-                }
-            }.apply {
-                prefs.registerPrefsListener(this)
-            }
-
-        return binding.root
+      prefs.playbackSpeed = speed
+      binding.speedSlider.value = speed
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        prefsListener?.let {
-            prefs.unregisterPrefsListener(it)
+    prefsListener =
+      SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == PrefsRepo.KEY_PLAYBACK_SPEED) {
+          binding.speed = prefs.playbackSpeed
         }
-    }
+      }.apply {
+        prefs.registerPrefsListener(this)
+      }
 
-    companion object {
-        const val TAG = "ModalBottomSheetSpeedChooser"
+    return binding.root
+  }
+
+  override fun onDestroyView() {
+    super.onDestroyView()
+    prefsListener?.let {
+      prefs.unregisterPrefsListener(it)
     }
+  }
+
+  companion object {
+    const val TAG = "ModalBottomSheetSpeedChooser"
+  }
 }

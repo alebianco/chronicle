@@ -24,67 +24,67 @@ import javax.inject.Singleton
 @Singleton
 @Component(modules = [AppModule::class])
 interface AppComponent {
-    fun applicationContext(): Context
+  fun applicationContext(): Context
 
-    fun internalFilesDir(): File
+  fun internalFilesDir(): File
 
-    fun externalDeviceDirs(): List<File>
+  fun externalDeviceDirs(): List<File>
 
-    fun sharedPrefs(): SharedPreferences
+  fun sharedPrefs(): SharedPreferences
 
-    fun trackDao(): TrackDao
+  fun trackDao(): TrackDao
 
-    fun bookDao(): BookDao
+  fun bookDao(): BookDao
 
-    fun collectionsDao(): CollectionsDao
+  fun collectionsDao(): CollectionsDao
 
-    fun moshi(): Moshi
+  fun moshi(): Moshi
 
-    fun plexLoginRepo(): IPlexLoginRepo
+  fun plexLoginRepo(): IPlexLoginRepo
 
-    fun plexPrefs(): PlexPrefsRepo
+  fun plexPrefs(): PlexPrefsRepo
 
-    fun prefsRepo(): PrefsRepo
+  fun prefsRepo(): PrefsRepo
 
-    fun trackRepo(): ITrackRepository
+  fun trackRepo(): ITrackRepository
 
-    fun librarySyncRepo(): LibrarySyncRepository
+  fun librarySyncRepo(): LibrarySyncRepository
 
-    fun collectionsRepo(): CollectionsRepository
+  fun collectionsRepo(): CollectionsRepository
 
-    fun bookRepo(): IBookRepository
+  fun bookRepo(): IBookRepository
 
-    fun bookRepos(): BookRepository
+  fun bookRepos(): BookRepository
 
-    fun workManager(): WorkManager
+  fun workManager(): WorkManager
 
-    fun unhandledExceptionHandler(): CoroutineExceptionHandler
+  fun unhandledExceptionHandler(): CoroutineExceptionHandler
 
-    fun plexConfig(): PlexConfig
+  fun plexConfig(): PlexConfig
 
-    fun plexLoginService(): PlexLoginService
+  fun plexLoginService(): PlexLoginService
 
-    fun plexMediaService(): PlexMediaService
+  fun plexMediaService(): PlexMediaService
 
-    fun cachedFileManager(): ICachedFileManager
+  fun cachedFileManager(): ICachedFileManager
 
-    fun currentlyPlaying(): CurrentlyPlaying
+  fun currentlyPlaying(): CurrentlyPlaying
 
-    fun fetch(): Fetch
+  fun fetch(): Fetch
 
-    fun frescoConfig(): ImagePipelineConfig
+  fun frescoConfig(): ImagePipelineConfig
 
-    //    fun plexMediaSource(): PlexMediaSource
-    fun billingManager(): ChronicleBillingManager
+  //    fun plexMediaSource(): PlexMediaSource
+  fun billingManager(): ChronicleBillingManager
 
-    // Inject
-    fun inject(chronicleApplication: ChronicleApplication)
+  // Inject
+  fun inject(chronicleApplication: ChronicleApplication)
 
-    fun inject(loginFragment: LoginFragment)
+  fun inject(loginFragment: LoginFragment)
 
-    fun inject(chooseLibraryFragment: ChooseLibraryFragment)
+  fun inject(chooseLibraryFragment: ChooseLibraryFragment)
 
-    fun inject(chooseUserFragment: ChooseUserFragment)
+  fun inject(chooseUserFragment: ChooseUserFragment)
 
-    fun inject(chooseServerActivity: ChooseServerFragment)
+  fun inject(chooseServerActivity: ChooseServerFragment)
 }

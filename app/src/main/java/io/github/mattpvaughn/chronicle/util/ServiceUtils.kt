@@ -6,18 +6,18 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Static functions for tracking service state within the app process. */
 object ServiceUtils {
-    private val runningServices = ConcurrentHashMap<Class<*>, Boolean>()
+  private val runningServices = ConcurrentHashMap<Class<*>, Boolean>()
 
-    fun notifyServiceStarted(service: Service) {
-        runningServices[service::class.java] = true
-    }
+  fun notifyServiceStarted(service: Service) {
+    runningServices[service::class.java] = true
+  }
 
-    fun notifyServiceStopped(service: Service) {
-        runningServices.remove(service::class.java)
-    }
+  fun notifyServiceStopped(service: Service) {
+    runningServices.remove(service::class.java)
+  }
 
-    fun isServiceRunning(
-        @Suppress("UNUSED_PARAMETER") context: Context,
-        serviceClass: Class<*>,
-    ): Boolean = runningServices[serviceClass] == true
+  fun isServiceRunning(
+    @Suppress("UNUSED_PARAMETER") context: Context,
+    serviceClass: Class<*>,
+  ): Boolean = runningServices[serviceClass] == true
 }

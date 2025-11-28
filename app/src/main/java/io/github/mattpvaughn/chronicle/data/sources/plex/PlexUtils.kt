@@ -5,8 +5,8 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
  * identifier [machineIdentifier]
  */
 fun getMediaItemUri(
-    machineIdentifier: String,
-    mediaId: String,
+  machineIdentifier: String,
+  mediaId: String,
 ): String {
-    return "server://$machineIdentifier/com.plexapp.plugins.library/library/metadata/$mediaId"
+  return "server://$machineIdentifier/com.plexapp.plugins.library/library/metadata/$mediaId"
 }

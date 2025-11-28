@@ -22,49 +22,49 @@ import org.junit.Rule
 import org.junit.Test
 
 class OnboardingActivityTest {
-    @get:Rule
-    var activityRule =
-        ActivityTestRule(
-            OnboardingActivity::class.java,
-            // initialTouchMode
-            true,
-            false,
-        )
+  @get:Rule
+  var activityRule =
+    ActivityTestRule(
+      OnboardingActivity::class.java,
+      // initialTouchMode
+      true,
+      false,
+    )
 
-    private lateinit var component: UITestAppComponent
+  private lateinit var component: UITestAppComponent
 
-    @Before
-    fun exposeDependencies() {
-        val instrumentation: Instrumentation = InstrumentationRegistry.getInstrumentation()
-        val app = instrumentation.targetContext.applicationContext as TestChronicleApplication
-        component = app.appComponent as UITestAppComponent
+  @Before
+  fun exposeDependencies() {
+    val instrumentation: Instrumentation = InstrumentationRegistry.getInstrumentation()
+    val app = instrumentation.targetContext.applicationContext as TestChronicleApplication
+    component = app.appComponent as UITestAppComponent
+  }
+
+  @ExperimentalCoroutinesApi
+  @Test
+  fun testNormalLoginFlow_noCredentialsStored() =
+    runBlockingTest {
+      activityRule.launchActivity(null)
+
+      onView(withId(R.id.plex_login_title)).check(matches(ViewMatchers.isDisplayed()))
+
+      onView(withId(R.id.username)).perform(typeText(VALID_USERNAME))
+      onView(withId(R.id.password)).perform(typeText(VALID_PASSWORD))
+
+      onView(withId(R.id.login)).check(matches(isEnabled()))
+      onView(withId(R.id.login)).perform(click())
+
+      // Ensure we navigate to chooseServerActivity
+      onView(withId(R.id.choose_server_title)).check(matches(ViewMatchers.isDisplayed()))
     }
 
-    @ExperimentalCoroutinesApi
-    @Test
-    fun testNormalLoginFlow_noCredentialsStored() =
-        runBlockingTest {
-            activityRule.launchActivity(null)
+  @Test
+  fun testLoginFlow_authTokenStored() {
+    component.plexPrefs().putAuthToken("VALID AUTH TOKEN")
 
-            onView(withId(R.id.plex_login_title)).check(matches(ViewMatchers.isDisplayed()))
+    activityRule.launchActivity(null)
 
-            onView(withId(R.id.username)).perform(typeText(VALID_USERNAME))
-            onView(withId(R.id.password)).perform(typeText(VALID_PASSWORD))
-
-            onView(withId(R.id.login)).check(matches(isEnabled()))
-            onView(withId(R.id.login)).perform(click())
-
-            // Ensure we navigate to chooseServerActivity
-            onView(withId(R.id.choose_server_title)).check(matches(ViewMatchers.isDisplayed()))
-        }
-
-    @Test
-    fun testLoginFlow_authTokenStored() {
-        component.plexPrefs().putAuthToken("VALID AUTH TOKEN")
-
-        activityRule.launchActivity(null)
-
-        // Ensure we navigate to MainActivity
-        onView(withId(R.id.choose_server_title)).check(matches(ViewMatchers.isDisplayed()))
-    }
+    // Ensure we navigate to MainActivity
+    onView(withId(R.id.choose_server_title)).check(matches(ViewMatchers.isDisplayed()))
+  }
 }

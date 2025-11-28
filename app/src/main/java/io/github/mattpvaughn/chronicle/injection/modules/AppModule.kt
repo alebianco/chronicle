@@ -38,226 +38,226 @@ import javax.inject.Singleton
 
 @Module
 class AppModule(private val app: Application) {
-    companion object {
-        const val OKHTTP_CLIENT_MEDIA = "Media"
-        const val OKHTTP_CLIENT_LOGIN = "Login"
+  companion object {
+    const val OKHTTP_CLIENT_MEDIA = "Media"
+    const val OKHTTP_CLIENT_LOGIN = "Login"
+  }
+
+  @Provides
+  @Singleton
+  fun provideContext(): Context = app.applicationContext
+
+  @Provides
+  @Singleton
+  fun provideSharedPrefs(): SharedPreferences = app.getSharedPreferences(APP_NAME, MODE_PRIVATE)
+
+  @Provides
+  @Singleton
+  fun providePlexPrefsRepo(prefsImpl: SharedPreferencesPlexPrefsRepo): PlexPrefsRepo = prefsImpl
+
+  @Provides
+  @Singleton
+  fun providePrefsRepo(prefsImpl: SharedPreferencesPrefsRepo): PrefsRepo = prefsImpl
+
+  @Provides
+  @Singleton
+  fun provideTrackDao(): TrackDao = getTrackDatabase(app.applicationContext).trackDao
+
+  @Provides
+  @Singleton
+  fun provideTrackRepo(trackRepository: TrackRepository): ITrackRepository = trackRepository
+
+  @Provides
+  @Singleton
+  fun provideBookDao(): BookDao = getBookDatabase(app.applicationContext).bookDao
+
+  @Provides
+  @Singleton
+  fun provideBookRepo(bookRepository: BookRepository): IBookRepository = bookRepository
+
+  @Provides
+  @Singleton
+  fun provideCollectionsDao(): CollectionsDao =
+    getCollectionsDatabase(
+      app.applicationContext,
+    ).collectionsDao
+
+  @Provides
+  @Singleton
+  fun provideInternalDeviceDirs(): File = app.applicationContext.filesDir
+
+  @Provides
+  @Singleton
+  fun provideExternalDeviceDirs(): List<File> =
+    ContextCompat.getExternalFilesDirs(
+      app.applicationContext,
+      null,
+    ).toList()
+
+  @Provides
+  @Singleton
+  fun loginRepo(plexLoginRepo: PlexLoginRepo): IPlexLoginRepo = plexLoginRepo
+
+  @Provides
+  @Singleton
+  fun workManager(): WorkManager = WorkManager.getInstance(app)
+
+  @Provides
+  @Singleton
+  fun fetchConfig(
+    appContext: Context,
+    @Named(OKHTTP_CLIENT_MEDIA) okHttpClient: OkHttpClient,
+  ): FetchConfiguration =
+    FetchConfiguration.Builder(appContext)
+      .setDownloadConcurrentLimit(3)
+      .createDownloadFileOnEnqueue(false)
+      .enableAutoStart(false)
+      .setAutoRetryMaxAttempts(1)
+      // TODO: this was broken when I set up Fetch, maybe figure it out at some point?
+//            .setHttpDownloader(OkHttpDownloader(okHttpClient))
+      .enableLogging(true)
+      .build()
+
+  @Provides
+  @Singleton
+  fun fetch(fetchConfig: FetchConfiguration): Fetch = Fetch.Impl.getInstance(fetchConfig)
+
+  @Provides
+  @Singleton
+  fun loggingInterceptor() =
+    if (LOG_NETWORK_REQUESTS) {
+      HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
+    } else {
+      HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.NONE)
     }
 
-    @Provides
-    @Singleton
-    fun provideContext(): Context = app.applicationContext
+  @Provides
+  @Singleton
+  @Named(OKHTTP_CLIENT_MEDIA)
+  fun mediaOkHttpClient(
+    plexConfig: PlexConfig,
+    loggingInterceptor: HttpLoggingInterceptor,
+  ): OkHttpClient =
+    OkHttpClient.Builder()
+      .connectTimeout(15, TimeUnit.SECONDS)
+      .writeTimeout(15, TimeUnit.SECONDS)
+      .readTimeout(15, TimeUnit.SECONDS)
+      .protocols(listOf(Protocol.HTTP_1_1, Protocol.QUIC))
+      .addInterceptor(plexConfig.plexMediaInterceptor)
+      .addInterceptor(loggingInterceptor)
+      .build()
 
-    @Provides
-    @Singleton
-    fun provideSharedPrefs(): SharedPreferences = app.getSharedPreferences(APP_NAME, MODE_PRIVATE)
+  @Provides
+  @Singleton
+  @Named(OKHTTP_CLIENT_LOGIN)
+  fun loginOkHttpClient(
+    plexConfig: PlexConfig,
+    loggingInterceptor: HttpLoggingInterceptor,
+  ): OkHttpClient =
+    OkHttpClient.Builder()
+      .connectTimeout(15, TimeUnit.SECONDS)
+      .writeTimeout(15, TimeUnit.SECONDS)
+      .readTimeout(15, TimeUnit.SECONDS)
+      .addInterceptor(plexConfig.plexLoginInterceptor)
+      .addInterceptor(loggingInterceptor)
+      .build()
 
-    @Provides
-    @Singleton
-    fun providePlexPrefsRepo(prefsImpl: SharedPreferencesPlexPrefsRepo): PlexPrefsRepo = prefsImpl
+  @Provides
+  @Named(OKHTTP_CLIENT_MEDIA)
+  @Singleton
+  fun mediaRetrofit(
+    @Named(OKHTTP_CLIENT_MEDIA) okHttpClient: OkHttpClient,
+    moshi: Moshi,
+  ): Retrofit =
+    Retrofit.Builder()
+      .addConverterFactory(MoshiConverterFactory.create(moshi))
+      .client(okHttpClient)
+      .baseUrl(PLACEHOLDER_URL) // this will be replaced by PlexInterceptor as needed
+      .build()
 
-    @Provides
-    @Singleton
-    fun providePrefsRepo(prefsImpl: SharedPreferencesPrefsRepo): PrefsRepo = prefsImpl
+  @Provides
+  @Named(OKHTTP_CLIENT_LOGIN)
+  @Singleton
+  fun loginRetrofit(
+    @Named(OKHTTP_CLIENT_LOGIN) okHttpClient: OkHttpClient,
+    moshi: Moshi,
+  ): Retrofit =
+    Retrofit.Builder()
+      .addConverterFactory(MoshiConverterFactory.create(moshi))
+      .client(okHttpClient)
+      .baseUrl(PLACEHOLDER_URL) // this will be replaced by PlexInterceptor as needed
+      .build()
 
-    @Provides
-    @Singleton
-    fun provideTrackDao(): TrackDao = getTrackDatabase(app.applicationContext).trackDao
+  @Provides
+  @Singleton
+  fun moshi(): Moshi =
+    Moshi.Builder()
+      // Use Kotlin reflection adapter for Moshi since codegen is disabled
+      .add(KotlinJsonAdapterFactory())
+      .build()
 
-    @Provides
-    @Singleton
-    fun provideTrackRepo(trackRepository: TrackRepository): ITrackRepository = trackRepository
+  @Provides
+  @Singleton
+  fun plexMediaService(
+    @Named(OKHTTP_CLIENT_MEDIA) mediaRetrofit: Retrofit,
+  ): PlexMediaService = mediaRetrofit.create(PlexMediaService::class.java)
 
-    @Provides
-    @Singleton
-    fun provideBookDao(): BookDao = getBookDatabase(app.applicationContext).bookDao
+  @Provides
+  @Singleton
+  fun plexLoginService(
+    @Named(OKHTTP_CLIENT_LOGIN) loginRetrofit: Retrofit,
+  ): PlexLoginService = loginRetrofit.create(PlexLoginService::class.java)
 
-    @Provides
-    @Singleton
-    fun provideBookRepo(bookRepository: BookRepository): IBookRepository = bookRepository
+  @Provides
+  @Singleton
+  fun exceptionHandler(): CoroutineExceptionHandler =
+    CoroutineExceptionHandler { _, e ->
+      Timber.e("Caught unhandled exception! $e")
+    }
 
-    @Provides
-    @Singleton
-    fun provideCollectionsDao(): CollectionsDao =
-        getCollectionsDatabase(
-            app.applicationContext,
-        ).collectionsDao
+  @Provides
+  @Singleton
+  fun provideCachedFileManager(cacheManager: CachedFileManager): ICachedFileManager = cacheManager
 
-    @Provides
-    @Singleton
-    fun provideInternalDeviceDirs(): File = app.applicationContext.filesDir
+  @Provides
+  @Singleton
+  fun provideCurrentlyPlaying(): CurrentlyPlaying = CurrentlyPlayingSingleton()
 
-    @Provides
-    @Singleton
-    fun provideExternalDeviceDirs(): List<File> =
-        ContextCompat.getExternalFilesDirs(
-            app.applicationContext,
-            null,
-        ).toList()
-
-    @Provides
-    @Singleton
-    fun loginRepo(plexLoginRepo: PlexLoginRepo): IPlexLoginRepo = plexLoginRepo
-
-    @Provides
-    @Singleton
-    fun workManager(): WorkManager = WorkManager.getInstance(app)
-
-    @Provides
-    @Singleton
-    fun fetchConfig(
-        appContext: Context,
-        @Named(OKHTTP_CLIENT_MEDIA) okHttpClient: OkHttpClient,
-    ): FetchConfiguration =
-        FetchConfiguration.Builder(appContext)
-            .setDownloadConcurrentLimit(3)
-            .createDownloadFileOnEnqueue(false)
-            .enableAutoStart(false)
-            .setAutoRetryMaxAttempts(1)
-            // TODO: this was broken when I set up Fetch, maybe figure it out at some point?
-//            .setHttpDownloader(OkHttpDownloader(okHttpClient))
-            .enableLogging(true)
-            .build()
-
-    @Provides
-    @Singleton
-    fun fetch(fetchConfig: FetchConfiguration): Fetch = Fetch.Impl.getInstance(fetchConfig)
-
-    @Provides
-    @Singleton
-    fun loggingInterceptor() =
-        if (LOG_NETWORK_REQUESTS) {
-            HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
-        } else {
-            HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.NONE)
-        }
-
-    @Provides
-    @Singleton
+  @Provides
+  @Singleton
+  fun frescoConfig(
     @Named(OKHTTP_CLIENT_MEDIA)
-    fun mediaOkHttpClient(
-        plexConfig: PlexConfig,
-        loggingInterceptor: HttpLoggingInterceptor,
-    ): OkHttpClient =
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .protocols(listOf(Protocol.HTTP_1_1, Protocol.QUIC))
-            .addInterceptor(plexConfig.plexMediaInterceptor)
-            .addInterceptor(loggingInterceptor)
-            .build()
+    okHttpClient: OkHttpClient,
+  ) = OkHttpImagePipelineConfigFactory
+    .newBuilder(app, okHttpClient)
+    .setCacheKeyFactory(
+      object : DefaultCacheKeyFactory() {
+        override fun getEncodedCacheKey(
+          request: ImageRequest,
+          sourceUri: Uri,
+          callerContext: Any?,
+        ): CacheKey = UrlQueryCacheKey(sourceUri)
 
-    @Provides
-    @Singleton
-    @Named(OKHTTP_CLIENT_LOGIN)
-    fun loginOkHttpClient(
-        plexConfig: PlexConfig,
-        loggingInterceptor: HttpLoggingInterceptor,
-    ): OkHttpClient =
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .addInterceptor(plexConfig.plexLoginInterceptor)
-            .addInterceptor(loggingInterceptor)
-            .build()
+        override fun getEncodedCacheKey(
+          request: ImageRequest,
+          callerContext: Any?,
+        ): CacheKey = UrlQueryCacheKey(request.sourceUri)
 
-    @Provides
-    @Named(OKHTTP_CLIENT_MEDIA)
-    @Singleton
-    fun mediaRetrofit(
-        @Named(OKHTTP_CLIENT_MEDIA) okHttpClient: OkHttpClient,
-        moshi: Moshi,
-    ): Retrofit =
-        Retrofit.Builder()
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .client(okHttpClient)
-            .baseUrl(PLACEHOLDER_URL) // this will be replaced by PlexInterceptor as needed
-            .build()
+        override fun getBitmapCacheKey(
+          request: ImageRequest,
+          callerContext: Any?,
+        ): CacheKey = UrlQueryCacheKey(request.sourceUri)
 
-    @Provides
-    @Named(OKHTTP_CLIENT_LOGIN)
-    @Singleton
-    fun loginRetrofit(
-        @Named(OKHTTP_CLIENT_LOGIN) okHttpClient: OkHttpClient,
-        moshi: Moshi,
-    ): Retrofit =
-        Retrofit.Builder()
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .client(okHttpClient)
-            .baseUrl(PLACEHOLDER_URL) // this will be replaced by PlexInterceptor as needed
-            .build()
+        override fun getPostprocessedBitmapCacheKey(
+          request: ImageRequest,
+          callerContext: Any?,
+        ): CacheKey = UrlQueryCacheKey(request.sourceUri)
 
-    @Provides
-    @Singleton
-    fun moshi(): Moshi =
-        Moshi.Builder()
-            // Use Kotlin reflection adapter for Moshi since codegen is disabled
-            .add(KotlinJsonAdapterFactory())
-            .build()
-
-    @Provides
-    @Singleton
-    fun plexMediaService(
-        @Named(OKHTTP_CLIENT_MEDIA) mediaRetrofit: Retrofit,
-    ): PlexMediaService = mediaRetrofit.create(PlexMediaService::class.java)
-
-    @Provides
-    @Singleton
-    fun plexLoginService(
-        @Named(OKHTTP_CLIENT_LOGIN) loginRetrofit: Retrofit,
-    ): PlexLoginService = loginRetrofit.create(PlexLoginService::class.java)
-
-    @Provides
-    @Singleton
-    fun exceptionHandler(): CoroutineExceptionHandler =
-        CoroutineExceptionHandler { _, e ->
-            Timber.e("Caught unhandled exception! $e")
+        protected override fun getCacheKeySourceUri(sourceUri: Uri): Uri {
+          return sourceUri.query?.toUri() ?: "".toUri()
         }
-
-    @Provides
-    @Singleton
-    fun provideCachedFileManager(cacheManager: CachedFileManager): ICachedFileManager = cacheManager
-
-    @Provides
-    @Singleton
-    fun provideCurrentlyPlaying(): CurrentlyPlaying = CurrentlyPlayingSingleton()
-
-    @Provides
-    @Singleton
-    fun frescoConfig(
-        @Named(OKHTTP_CLIENT_MEDIA)
-        okHttpClient: OkHttpClient,
-    ) = OkHttpImagePipelineConfigFactory
-        .newBuilder(app, okHttpClient)
-        .setCacheKeyFactory(
-            object : DefaultCacheKeyFactory() {
-                override fun getEncodedCacheKey(
-                    request: ImageRequest,
-                    sourceUri: Uri,
-                    callerContext: Any?,
-                ): CacheKey = UrlQueryCacheKey(sourceUri)
-
-                override fun getEncodedCacheKey(
-                    request: ImageRequest,
-                    callerContext: Any?,
-                ): CacheKey = UrlQueryCacheKey(request.sourceUri)
-
-                override fun getBitmapCacheKey(
-                    request: ImageRequest,
-                    callerContext: Any?,
-                ): CacheKey = UrlQueryCacheKey(request.sourceUri)
-
-                override fun getPostprocessedBitmapCacheKey(
-                    request: ImageRequest,
-                    callerContext: Any?,
-                ): CacheKey = UrlQueryCacheKey(request.sourceUri)
-
-                protected override fun getCacheKeySourceUri(sourceUri: Uri): Uri {
-                    return sourceUri.query?.toUri() ?: "".toUri()
-                }
-            },
-        )
+      },
+    )
 //        .setRequestListeners(
 //            if (BuildConfig.DEBUG) {
 //                Collections.singleton(
@@ -286,5 +286,5 @@ class AppModule(private val app: Application) {
 //                emptySet()
 //            },
 //        )
-        .build()
+    .build()
 }

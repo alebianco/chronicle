@@ -24,37 +24,37 @@ import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
 @ActivityScope
 @Component(dependencies = [AppComponent::class], modules = [ActivityModule::class])
 interface ActivityComponent {
-    fun navigator(): Navigator
+  fun navigator(): Navigator
 
-    fun progressUpdater(): ProgressUpdater
+  fun progressUpdater(): ProgressUpdater
 
-    fun localBroadcastManager(): LocalBroadcastManager
+  fun localBroadcastManager(): LocalBroadcastManager
 
-    fun mediaServiceConnection(): MediaServiceConnection
+  fun mediaServiceConnection(): MediaServiceConnection
 
-    fun mainActivityViewModelFactory(): MainActivityViewModel.Factory
+  fun mainActivityViewModelFactory(): MainActivityViewModel.Factory
 
-    fun currentPlayingViewModelFactory(): CurrentlyPlayingViewModel.Factory
+  fun currentPlayingViewModelFactory(): CurrentlyPlayingViewModel.Factory
 
-    fun audiobookDetailsViewModelFactory(): AudiobookDetailsViewModel.Factory
+  fun audiobookDetailsViewModelFactory(): AudiobookDetailsViewModel.Factory
 
-    fun settingsViewModelFactory(): SettingsViewModel.Factory
+  fun settingsViewModelFactory(): SettingsViewModel.Factory
 
-    fun inject(activity: MainActivity)
+  fun inject(activity: MainActivity)
 
-    fun inject(libraryFragment: LibraryFragment)
+  fun inject(libraryFragment: LibraryFragment)
 
-    fun inject(detailsFragment: AudiobookDetailsFragment)
+  fun inject(detailsFragment: AudiobookDetailsFragment)
 
-    fun inject(homeFragment: HomeFragment)
+  fun inject(homeFragment: HomeFragment)
 
-    fun inject(settingsFragment: SettingsFragment)
+  fun inject(settingsFragment: SettingsFragment)
 
-    fun inject(collectionsFragment: CollectionsFragment)
+  fun inject(collectionsFragment: CollectionsFragment)
 
-    fun inject(collectionDetailsFragment: CollectionDetailsFragment)
+  fun inject(collectionDetailsFragment: CollectionDetailsFragment)
 
-    fun inject(currentlyPlayingFragment: CurrentlyPlayingFragment)
+  fun inject(currentlyPlayingFragment: CurrentlyPlayingFragment)
 
-    fun inject(modalBottomSheetSpeedChooser: ModalBottomSheetSpeedChooser)
+  fun inject(modalBottomSheetSpeedChooser: ModalBottomSheetSpeedChooser)
 }

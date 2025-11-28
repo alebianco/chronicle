@@ -8,13 +8,13 @@ import com.squareup.moshi.JsonClass
  */
 @JsonClass(generateAdapter = true)
 data class PlexServer(
-    val name: String = "",
-    val provides: String = "",
-    val connections: List<Connection> = emptyList(),
-    val clientIdentifier: String = "",
-    val accessToken: String? = "",
-    // assume owned server as this is probably more common
-    val owned: Boolean = true,
+  val name: String = "",
+  val provides: String = "",
+  val connections: List<Connection> = emptyList(),
+  val clientIdentifier: String = "",
+  val accessToken: String? = "",
+  // assume owned server as this is probably more common
+  val owned: Boolean = true,
 )
 
 @JsonClass(generateAdapter = true)

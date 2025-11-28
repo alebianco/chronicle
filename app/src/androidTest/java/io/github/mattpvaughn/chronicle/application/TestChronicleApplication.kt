@@ -8,9 +8,9 @@ import javax.inject.Singleton
 
 @Singleton
 class TestChronicleApplication : ChronicleApplication() {
-    override fun initializeComponent(): AppComponent {
-        Timber.i("Test chronicle application component")
-        return DaggerUITestAppComponent.builder()
-            .uITestAppModule(UITestAppModule(applicationContext)).build()
-    }
+  override fun initializeComponent(): AppComponent {
+    Timber.i("Test chronicle application component")
+    return DaggerUITestAppComponent.builder()
+      .uITestAppModule(UITestAppModule(applicationContext)).build()
+  }
 }

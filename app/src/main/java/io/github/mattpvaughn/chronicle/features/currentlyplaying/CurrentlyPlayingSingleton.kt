@@ -13,21 +13,21 @@ import javax.inject.Singleton
  */
 @ExperimentalCoroutinesApi
 interface CurrentlyPlaying {
-    val book: StateFlow<Audiobook>
-    val track: StateFlow<MediaItemTrack>
-    val chapter: StateFlow<Chapter>
+  val book: StateFlow<Audiobook>
+  val track: StateFlow<MediaItemTrack>
+  val chapter: StateFlow<Chapter>
 
-    fun setOnChapterChangeListener(listener: OnChapterChangeListener)
+  fun setOnChapterChangeListener(listener: OnChapterChangeListener)
 
-    fun update(
-        track: MediaItemTrack,
-        book: Audiobook,
-        tracks: List<MediaItemTrack>,
-    )
+  fun update(
+    track: MediaItemTrack,
+    book: Audiobook,
+    tracks: List<MediaItemTrack>,
+  )
 }
 
 interface OnChapterChangeListener {
-    fun onChapterChange(chapter: Chapter)
+  fun onChapterChange(chapter: Chapter)
 }
 
 /**
@@ -37,50 +37,50 @@ interface OnChapterChangeListener {
 @ExperimentalCoroutinesApi
 @Singleton
 class CurrentlyPlayingSingleton : CurrentlyPlaying {
-    override val book = MutableStateFlow(EMPTY_AUDIOBOOK)
-    override val track = MutableStateFlow(EMPTY_TRACK)
-    override val chapter = MutableStateFlow(EMPTY_CHAPTER)
+  override val book = MutableStateFlow(EMPTY_AUDIOBOOK)
+  override val track = MutableStateFlow(EMPTY_TRACK)
+  override val chapter = MutableStateFlow(EMPTY_CHAPTER)
 
-    private var tracks: List<MediaItemTrack> = emptyList()
-    private var chapters: List<Chapter> = emptyList()
+  private var tracks: List<MediaItemTrack> = emptyList()
+  private var chapters: List<Chapter> = emptyList()
 
-    private var listener: OnChapterChangeListener? = null
+  private var listener: OnChapterChangeListener? = null
 
-    override fun setOnChapterChangeListener(listener: OnChapterChangeListener) {
-        this.listener = listener
+  override fun setOnChapterChangeListener(listener: OnChapterChangeListener) {
+    this.listener = listener
+  }
+
+  override fun update(
+    track: MediaItemTrack,
+    book: Audiobook,
+    tracks: List<MediaItemTrack>,
+  ) {
+    this.book.value = book
+    this.track.value = track
+
+    this.tracks = tracks
+
+    this.chapters =
+      if (book.chapters.isNotEmpty()) {
+        book.chapters
+      } else {
+        tracks.asChapterList()
+      }
+
+    if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
+      val chapter = chapters.getChapterAt(track.id.toLong(), track.progress)
+      if (this.chapter.value != chapter) {
+        this.chapter.value = chapter
+        listener?.onChapterChange(chapter)
+      }
     }
 
-    override fun update(
-        track: MediaItemTrack,
-        book: Audiobook,
-        tracks: List<MediaItemTrack>,
-    ) {
-        this.book.value = book
-        this.track.value = track
+    printDebug()
+  }
 
-        this.tracks = tracks
-
-        this.chapters =
-            if (book.chapters.isNotEmpty()) {
-                book.chapters
-            } else {
-                tracks.asChapterList()
-            }
-
-        if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
-            val chapter = chapters.getChapterAt(track.id.toLong(), track.progress)
-            if (this.chapter.value != chapter) {
-                this.chapter.value = chapter
-                listener?.onChapterChange(chapter)
-            }
-        }
-
-        printDebug()
-    }
-
-    private fun printDebug() {
-        Timber.i(
-            "Currently Playing: track=${track.value.title}, index=${track.value.index}/${tracks.size}",
-        )
-    }
+  private fun printDebug() {
+    Timber.i(
+      "Currently Playing: track=${track.value.title}, index=${track.value.index}/${tracks.size}",
+    )
+  }
 }

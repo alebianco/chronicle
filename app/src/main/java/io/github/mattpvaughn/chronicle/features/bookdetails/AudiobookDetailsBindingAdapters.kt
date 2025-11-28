@@ -14,34 +14,34 @@ import timber.log.Timber
 
 @BindingAdapter("chapterList")
 fun bindChapterList(
-    recyclerView: RecyclerView,
-    chapters: List<Chapter>?,
+  recyclerView: RecyclerView,
+  chapters: List<Chapter>?,
 ) {
-    val adapter = recyclerView.adapter as ChapterListAdapter
-    adapter.submitChapters(chapters ?: emptyList())
+  val adapter = recyclerView.adapter as ChapterListAdapter
+  adapter.submitChapters(chapters ?: emptyList())
 }
 
 @BindingAdapter("android:src")
 fun bindImageDrawableSource(
-    imageView: ImageView,
-    @DrawableRes drawableRes: Int,
+  imageView: ImageView,
+  @DrawableRes drawableRes: Int,
 ) {
-    imageView.setImageResource(drawableRes)
+  imageView.setImageResource(drawableRes)
 }
 
 @BindingAdapter("tint")
 fun bindTintResource(
-    imageView: ImageView,
-    @ColorRes colorRes: Int,
+  imageView: ImageView,
+  @ColorRes colorRes: Int,
 ) {
-    if (colorRes != 0) {
-        try {
-            imageView.setColorFilter(
-                ContextCompat.getColor(imageView.context, colorRes),
-                PorterDuff.Mode.SRC_IN,
-            )
-        } catch (rnf: NotFoundException) {
-            Timber.e("Could not bind tint with res: 0x${colorRes.toHexString()}")
-        }
+  if (colorRes != 0) {
+    try {
+      imageView.setColorFilter(
+        ContextCompat.getColor(imageView.context, colorRes),
+        PorterDuff.Mode.SRC_IN,
+      )
+    } catch (rnf: NotFoundException) {
+      Timber.e("Could not bind tint with res: 0x${colorRes.toHexString()}")
     }
+  }
 }

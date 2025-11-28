@@ -29,55 +29,55 @@ import org.junit.Test
 @ObsoleteCoroutinesApi
 @ExperimentalCoroutinesApi
 class AudiobookDetailsViewModelTest {
-    @get:Rule
-    val instantTaskExecutorRule = InstantTaskExecutorRule()
+  @get:Rule
+  val instantTaskExecutorRule = InstantTaskExecutorRule()
 
-    @RelaxedMockK
-    lateinit var mockMediaController: MediaControllerCompat
+  @RelaxedMockK
+  lateinit var mockMediaController: MediaControllerCompat
 
-    @RelaxedMockK
-    lateinit var mockMediaServiceConnection: MediaServiceConnection
+  @RelaxedMockK
+  lateinit var mockMediaServiceConnection: MediaServiceConnection
 
-    @RelaxedMockK
-    lateinit var mockPlexPrefsRepo: PlexPrefsRepo
+  @RelaxedMockK
+  lateinit var mockPlexPrefsRepo: PlexPrefsRepo
 
-    @RelaxedMockK
-    lateinit var mockCachedFileManager: CachedFileManager
+  @RelaxedMockK
+  lateinit var mockCachedFileManager: CachedFileManager
 
-    @RelaxedMockK
-    private lateinit var mockProgressUpdater: ProgressUpdater
+  @RelaxedMockK
+  private lateinit var mockProgressUpdater: ProgressUpdater
 
-    @MockK
-    private lateinit var mockBookRepository: IBookRepository
+  @MockK
+  private lateinit var mockBookRepository: IBookRepository
 
-    @MockK
-    private lateinit var mockTrackRepository: ITrackRepository
+  @MockK
+  private lateinit var mockTrackRepository: ITrackRepository
 
-    private val mainThreadSurrogate = newSingleThreadContext("UI thread")
+  private val mainThreadSurrogate = newSingleThreadContext("UI thread")
 
-    @Before
-    fun setUp() {
-        Dispatchers.setMain(mainThreadSurrogate)
+  @Before
+  fun setUp() {
+    Dispatchers.setMain(mainThreadSurrogate)
 
-        // Mock android.util.Log statically b/c not Android system stuff not automatically mocked
-        // for unit tests
-        mockkStatic(Log::class)
-        every { Log.v(any(), any()) } returns 0
-        every { Log.d(any(), any()) } returns 0
-        every { Log.i(any(), any()) } returns 0
-        every { Log.e(any(), any()) } returns 0
+    // Mock android.util.Log statically b/c not Android system stuff not automatically mocked
+    // for unit tests
+    mockkStatic(Log::class)
+    every { Log.v(any(), any()) } returns 0
+    every { Log.d(any(), any()) } returns 0
+    every { Log.i(any(), any()) } returns 0
+    every { Log.e(any(), any()) } returns 0
 
-        MockKAnnotations.init(this)
-    }
+    MockKAnnotations.init(this)
+  }
 
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain() // reset main dispatcher to the original Main dispatcher
-        mainThreadSurrogate.close()
-    }
+  @After
+  fun tearDown() {
+    Dispatchers.resetMain() // reset main dispatcher to the original Main dispatcher
+    mainThreadSurrogate.close()
+  }
 
-    @Test
-    fun testPlay_transportControlsCalled() {
+  @Test
+  fun testPlay_transportControlsCalled() {
 //        val randomIdAudiobook = defaultAudiobook.copy(id = Random.nextInt(until = 10000))
 //        val viewModel = createViewModel(audiobook = randomIdAudiobook)
 
@@ -89,10 +89,10 @@ class AudiobookDetailsViewModelTest {
 //                any()
 //            )
 //        }
-    }
+  }
 
-    @Test
-    fun testJumpToTrack_transportControlsCalled() {
+  @Test
+  fun testJumpToTrack_transportControlsCalled() {
 //        val randomIdAudiobook = defaultAudiobook.copy(id = Random.nextInt(until = 10000))
 //        val correspondingTrackList =
 //            defaultTrackList.map { it.copy(parentKey = randomIdAudiobook.id) }
@@ -107,14 +107,14 @@ class AudiobookDetailsViewModelTest {
 //                any()
 //            )
 //        }
-    }
+  }
 
-    @Test
-    fun testOnCacheButtonClick_TracksNotLoadedAudiobookNotCached() {
+  @Test
+  fun testOnCacheButtonClick_TracksNotLoadedAudiobookNotCached() {
 //        val audiobook = defaultAudiobook.copy(isCached = false)
 //        val viewModel = createViewModel(audiobook = audiobook, tracks = emptyList())
 
-        // Attach an observer so cacheStatus emits events
+    // Attach an observer so cacheStatus emits events
 //        val cacheStatus = viewModel.cacheStatus
 //        cacheStatus.observeForever { }
 //        viewModel.onCacheButtonClick()
@@ -124,10 +124,10 @@ class AudiobookDetailsViewModelTest {
 //            `is`(CACHING)
 //        )
 //        verify { mockCachedFileManager.downloadTracks(emptyList()) }
-    }
+  }
 
-    @Test
-    fun testOnCacheButtonClick_TracksNotLoadedAudiobookCached() {
+  @Test
+  fun testOnCacheButtonClick_TracksNotLoadedAudiobookCached() {
 //        val audiobook = defaultAudiobook.copy(isCached = true)
 //        val viewModel = spyk(createViewModel(audiobook = audiobook, tracks = emptyList()))
 
@@ -142,12 +142,12 @@ class AudiobookDetailsViewModelTest {
 //        )
 //        verify(exactly = 0) { mockCachedFileManager.downloadTracks(any()) }
 //        assertThat(viewModel.showBottomSheet.getOrAwaitValue(), `is`(true))
-    }
+  }
 
-    @Test
-    fun testOnCacheButtonClick_WhileCaching() {
+  @Test
+  fun testOnCacheButtonClick_WhileCaching() {
 //        val uncachedAudiobook = defaultAudiobook.copy(isCached = false)
-        val uncachedTracks = defaultTrackList.map { it.copy(cached = false) }
+    val uncachedTracks = defaultTrackList.map { it.copy(cached = false) }
 //        val viewModel =
 //            spyk(createViewModel(audiobook = uncachedAudiobook, tracks = uncachedTracks))
 //
@@ -167,13 +167,13 @@ class AudiobookDetailsViewModelTest {
 //        )
 //        verify(exactly = 1) { mockCachedFileManager.downloadTracks(any()) }
 //        verify(exactly = 1) { mockCachedFileManager.cancelCaching() }
-    }
+  }
 
-    //    private val defaultAudiobook = Audiobook(id = 22)
-    private val defaultTrackList = listOf(MediaItemTrack(parentKey = 22))
+  //    private val defaultAudiobook = Audiobook(id = 22)
+  private val defaultTrackList = listOf(MediaItemTrack(parentKey = 22))
 
-    // Create a ViewModel with optional audiobook and track list info, where the repos only emit
-    // the provided tracks and audiobooks
+  // Create a ViewModel with optional audiobook and track list info, where the repos only emit
+  // the provided tracks and audiobooks
 //    private fun createViewModel(
 //        bookRepository: IBookRepository = mockBookRepository,
 //        trackRepository: ITrackRepository = mockTrackRepository,

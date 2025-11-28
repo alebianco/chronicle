@@ -29,100 +29,100 @@ import io.github.mattpvaughn.chronicle.views.getString
 import javax.inject.Inject
 
 class SettingsFragment : Fragment() {
-    @Inject
-    lateinit var viewModelFactory: SettingsViewModel.Factory
+  @Inject
+  lateinit var viewModelFactory: SettingsViewModel.Factory
 
-    @Inject
-    lateinit var mediaServiceConnection: MediaServiceConnection
+  @Inject
+  lateinit var mediaServiceConnection: MediaServiceConnection
 
-    @Inject
-    lateinit var navigator: Navigator
+  @Inject
+  lateinit var navigator: Navigator
 
-    @Inject
-    lateinit var plexLoginRepo: IPlexLoginRepo
+  @Inject
+  lateinit var plexLoginRepo: IPlexLoginRepo
 
-    @Inject
-    lateinit var chronicleBillingManager: ChronicleBillingManager
+  @Inject
+  lateinit var chronicleBillingManager: ChronicleBillingManager
 
-    @Inject
-    lateinit var cachedFileManager: ICachedFileManager
+  @Inject
+  lateinit var cachedFileManager: ICachedFileManager
 
-    @Inject
-    lateinit var trackRepository: ITrackRepository
+  @Inject
+  lateinit var trackRepository: ITrackRepository
 
-    @Inject
-    lateinit var bookRepository: IBookRepository
+  @Inject
+  lateinit var bookRepository: IBookRepository
 
-    @Inject
-    lateinit var prefsRepo: PrefsRepo
+  @Inject
+  lateinit var prefsRepo: PrefsRepo
 
-    @Inject
-    lateinit var plexPrefsRepo: PlexPrefsRepo
+  @Inject
+  lateinit var plexPrefsRepo: PlexPrefsRepo
 
-    @Inject
-    lateinit var plexConfig: PlexConfig
+  @Inject
+  lateinit var plexConfig: PlexConfig
 
-    companion object {
-        @JvmStatic
-        fun newInstance() = SettingsFragment()
-    }
+  companion object {
+    @JvmStatic
+    fun newInstance() = SettingsFragment()
+  }
 
-    override fun onAttach(context: Context) {
-        (requireActivity() as MainActivity).activityComponent!!.inject(this)
-        super.onAttach(context)
-    }
+  override fun onAttach(context: Context) {
+    (requireActivity() as MainActivity).activityComponent!!.inject(this)
+    super.onAttach(context)
+  }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View? {
-        val binding = FragmentSettingsBinding.inflate(inflater, container, false)
-        val viewModel = ViewModelProvider(this, viewModelFactory).get(SettingsViewModel::class.java)
+  override fun onCreateView(
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?,
+  ): View? {
+    val binding = FragmentSettingsBinding.inflate(inflater, container, false)
+    val viewModel = ViewModelProvider(this, viewModelFactory).get(SettingsViewModel::class.java)
 
-        binding.viewModel = viewModel
-        binding.lifecycleOwner = viewLifecycleOwner
+    binding.viewModel = viewModel
+    binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel.messageForUser.observe(
-            viewLifecycleOwner,
-            Observer { message ->
-                if (!message.hasBeenHandled) {
-                    val formattableString = message.getContentIfNotHandled()
-                    Toast.makeText(
-                        context,
-                        resources.getString(formattableString),
-                        Toast.LENGTH_SHORT,
-                    )
-                        .show()
-                }
-            },
-        )
-
-        viewModel.upgradeToPremium.observeEvent(viewLifecycleOwner) {
-            chronicleBillingManager.launchBillingFlow(requireActivity())
+    viewModel.messageForUser.observe(
+      viewLifecycleOwner,
+      Observer { message ->
+        if (!message.hasBeenHandled) {
+          val formattableString = message.getContentIfNotHandled()
+          Toast.makeText(
+            context,
+            resources.getString(formattableString),
+            Toast.LENGTH_SHORT,
+          )
+            .show()
         }
+      },
+    )
 
-        viewModel.webLink.observe(
-            viewLifecycleOwner,
-            Observer {
-                if (!it.hasBeenHandled) {
-                    startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(it.getContentIfNotHandled())),
-                    )
-                }
-            },
-        )
-
-        viewModel.showLicenseActivity.observe(
-            viewLifecycleOwner,
-            Observer {
-                if (it) {
-                    startActivity(Intent(context, OssLicensesMenuActivity::class.java))
-                    viewModel.setShowLicenseActivity(false)
-                }
-            },
-        )
-
-        return binding.root
+    viewModel.upgradeToPremium.observeEvent(viewLifecycleOwner) {
+      chronicleBillingManager.launchBillingFlow(requireActivity())
     }
+
+    viewModel.webLink.observe(
+      viewLifecycleOwner,
+      Observer {
+        if (!it.hasBeenHandled) {
+          startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(it.getContentIfNotHandled())),
+          )
+        }
+      },
+    )
+
+    viewModel.showLicenseActivity.observe(
+      viewLifecycleOwner,
+      Observer {
+        if (it) {
+          startActivity(Intent(context, OssLicensesMenuActivity::class.java))
+          viewModel.setShowLicenseActivity(false)
+        }
+      },
+    )
+
+    return binding.root
+  }
 }

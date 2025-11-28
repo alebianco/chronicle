@@ -6,8 +6,8 @@ import io.github.mattpvaughn.chronicle.data.model.toMediaMetadata
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 
 fun buildPlaylist(
-    tracks: List<MediaItemTrack>,
-    plexConfig: PlexConfig,
+  tracks: List<MediaItemTrack>,
+  plexConfig: PlexConfig,
 ): List<MediaMetadataCompat> {
-    return tracks.map { track -> track.toMediaMetadata(plexConfig) }
+  return tracks.map { track -> track.toMediaMetadata(plexConfig) }
 }

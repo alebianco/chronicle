@@ -10,22 +10,22 @@ private const val CHAPTER_DATABASE_NAME = "chapter_db"
 private lateinit var INSTANCE: ChapterDatabase
 
 fun getChapterDatabase(context: Context): ChapterDatabase {
-    synchronized(ChapterDatabase::class.java) {
-        if (!::INSTANCE.isInitialized) {
-            INSTANCE =
-                Room.databaseBuilder(
-                    context.applicationContext,
-                    ChapterDatabase::class.java,
-                    CHAPTER_DATABASE_NAME,
-                ).addMigrations().build()
-        }
+  synchronized(ChapterDatabase::class.java) {
+    if (!::INSTANCE.isInitialized) {
+      INSTANCE =
+        Room.databaseBuilder(
+          context.applicationContext,
+          ChapterDatabase::class.java,
+          CHAPTER_DATABASE_NAME,
+        ).addMigrations().build()
     }
-    return INSTANCE
+  }
+  return INSTANCE
 }
 
 @Database(entities = [Chapter::class], version = 1, exportSchema = false)
 abstract class ChapterDatabase : RoomDatabase() {
-    abstract val chapterDao: ChapterDao
+  abstract val chapterDao: ChapterDao
 }
 
 /**
@@ -36,24 +36,24 @@ abstract class ChapterDatabase : RoomDatabase() {
  */
 @Dao
 interface ChapterDao {
-    @Query("SELECT * FROM Chapter ORDER BY discNumber, `index`")
-    fun getAllRows(): LiveData<List<Chapter>>
+  @Query("SELECT * FROM Chapter ORDER BY discNumber, `index`")
+  fun getAllRows(): LiveData<List<Chapter>>
 
-    @Query("SELECT * FROM Chapter")
-    fun getChapters(): List<Chapter>
+  @Query("SELECT * FROM Chapter")
+  fun getChapters(): List<Chapter>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertAll(rows: List<Chapter>)
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  fun insertAll(rows: List<Chapter>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun update(chapter: Chapter)
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  fun update(chapter: Chapter)
 
-    @Query("UPDATE Chapter SET downloaded = :cached WHERE id = :chapterId")
-    fun updateCachedStatus(
-        chapterId: Int,
-        cached: Boolean,
-    )
+  @Query("UPDATE Chapter SET downloaded = :cached WHERE id = :chapterId")
+  fun updateCachedStatus(
+    chapterId: Int,
+    cached: Boolean,
+  )
 
-    @Query("DELETE FROM Chapter WHERE id IN (:chaptersToRemove)")
-    fun removeAll(chaptersToRemove: List<Long>): Int
+  @Query("DELETE FROM Chapter WHERE id IN (:chaptersToRemove)")
+  fun removeAll(chaptersToRemove: List<Long>): Int
 }

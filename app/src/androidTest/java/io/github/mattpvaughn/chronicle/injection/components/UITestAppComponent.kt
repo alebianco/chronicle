@@ -8,6 +8,6 @@ import javax.inject.Singleton
 @Component(modules = [UITestAppModule::class])
 @Singleton
 interface UITestAppComponent : AppComponent {
-    // Inject
-    fun inject(loginActivityTest: OnboardingActivityTest)
+  // Inject
+  fun inject(loginActivityTest: OnboardingActivityTest)
 }

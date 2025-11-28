@@ -4,8 +4,8 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class OAuthResponse(
-    val id: Long,
-    val clientIdentifier: String,
-    val code: String,
-    val authToken: String? = null,
+  val id: Long,
+  val clientIdentifier: String,
+  val code: String,
+  val authToken: String? = null,
 )

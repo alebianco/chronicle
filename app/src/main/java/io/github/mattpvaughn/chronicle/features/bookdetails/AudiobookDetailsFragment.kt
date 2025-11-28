@@ -31,86 +31,86 @@ import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
 class AudiobookDetailsFragment : Fragment() {
-    companion object {
-        fun newInstance() = AudiobookDetailsFragment()
+  companion object {
+    fun newInstance() = AudiobookDetailsFragment()
 
-        const val TAG = "details tag"
-        const val ARG_AUDIOBOOK_ID = "audiobook_id"
-        const val ARG_AUDIOBOOK_TITLE = "ARG_AUDIOBOOK_TITLE"
-        const val ARG_IS_AUDIOBOOK_CACHED = "is_audiobook_cached"
-    }
+    const val TAG = "details tag"
+    const val ARG_AUDIOBOOK_ID = "audiobook_id"
+    const val ARG_AUDIOBOOK_TITLE = "ARG_AUDIOBOOK_TITLE"
+    const val ARG_IS_AUDIOBOOK_CACHED = "is_audiobook_cached"
+  }
 
-    @Inject
-    lateinit var prefsRepo: PrefsRepo
+  @Inject
+  lateinit var prefsRepo: PrefsRepo
 
-    @Inject
-    lateinit var navigator: Navigator
+  @Inject
+  lateinit var navigator: Navigator
 
-    @Inject
-    lateinit var trackRepository: ITrackRepository
+  @Inject
+  lateinit var trackRepository: ITrackRepository
 
-    @Inject
-    lateinit var bookRepository: IBookRepository
+  @Inject
+  lateinit var bookRepository: IBookRepository
 
-    @Inject
-    lateinit var plexConfig: PlexConfig
+  @Inject
+  lateinit var plexConfig: PlexConfig
 
-    @Inject
-    lateinit var mediaServiceConnection: MediaServiceConnection
+  @Inject
+  lateinit var mediaServiceConnection: MediaServiceConnection
 
-    @Inject
-    lateinit var viewModelFactory: AudiobookDetailsViewModel.Factory
+  @Inject
+  lateinit var viewModelFactory: AudiobookDetailsViewModel.Factory
 
-    lateinit var viewModel: AudiobookDetailsViewModel
+  lateinit var viewModel: AudiobookDetailsViewModel
 
-    override fun onAttach(context: Context) {
-        (requireActivity() as MainActivity).activityComponent!!.inject(this)
-        Timber.i("AudiobookDetailsFragment onAttach()")
-        super.onAttach(context)
-    }
+  override fun onAttach(context: Context) {
+    (requireActivity() as MainActivity).activityComponent!!.inject(this)
+    Timber.i("AudiobookDetailsFragment onAttach()")
+    super.onAttach(context)
+  }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View? {
-        Timber.i("AudiobookDetailsFragment onCreateView()")
+  override fun onCreateView(
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?,
+  ): View? {
+    Timber.i("AudiobookDetailsFragment onCreateView()")
 
-        val binding = FragmentAudiobookDetailsBinding.inflate(inflater, container, false)
+    val binding = FragmentAudiobookDetailsBinding.inflate(inflater, container, false)
 
-        val inputId = requireArguments().getInt(ARG_AUDIOBOOK_ID)
-        val bookTitle = requireArguments().getString(ARG_AUDIOBOOK_TITLE) ?: ""
-        val inputCached = requireArguments().getBoolean(ARG_IS_AUDIOBOOK_CACHED)
+    val inputId = requireArguments().getInt(ARG_AUDIOBOOK_ID)
+    val bookTitle = requireArguments().getString(ARG_AUDIOBOOK_TITLE) ?: ""
+    val inputCached = requireArguments().getBoolean(ARG_IS_AUDIOBOOK_CACHED)
 
-        viewModelFactory.inputAudiobook =
-            Audiobook(
-                id = inputId,
-                title = bookTitle,
-                source = MediaSource.NO_SOURCE_FOUND,
-                isCached = inputCached,
+    viewModelFactory.inputAudiobook =
+      Audiobook(
+        id = inputId,
+        title = bookTitle,
+        source = MediaSource.NO_SOURCE_FOUND,
+        isCached = inputCached,
+      )
+    viewModel =
+      ViewModelProvider(this, viewModelFactory)[AudiobookDetailsViewModel::class.java]
+
+    binding.viewModel = viewModel
+    binding.lifecycleOwner = viewLifecycleOwner
+    binding.plexConfig = plexConfig
+
+    val adapter =
+      ChapterListAdapter(
+        object : TrackClickListener {
+          override fun onClick(chapter: Chapter) {
+            Timber.i("Starting chapter with name: ${chapter.title}")
+            viewModel.jumpToChapter(
+              offset = chapter.startTimeOffset,
+              trackId = chapter.trackId,
             )
-        viewModel =
-            ViewModelProvider(this, viewModelFactory)[AudiobookDetailsViewModel::class.java]
+          }
+        },
+      )
+    binding.tracks.adapter = adapter
 
-        binding.viewModel = viewModel
-        binding.lifecycleOwner = viewLifecycleOwner
-        binding.plexConfig = plexConfig
-
-        val adapter =
-            ChapterListAdapter(
-                object : TrackClickListener {
-                    override fun onClick(chapter: Chapter) {
-                        Timber.i("Starting chapter with name: ${chapter.title}")
-                        viewModel.jumpToChapter(
-                            offset = chapter.startTimeOffset,
-                            trackId = chapter.trackId,
-                        )
-                    }
-                },
-            )
-        binding.tracks.adapter = adapter
-
-        // TODO casting
+    // TODO casting
 //        val menu = binding.detailsToolbar.menu
 //        val mediaRouteButton = menu.findItem(R.id.media_route_menu_item).actionView
 //
@@ -128,82 +128,82 @@ class AudiobookDetailsFragment : Fragment() {
 //            }
 //        }
 
-        (activity as AppCompatActivity).setSupportActionBar(binding.detailsToolbar)
-        binding.detailsToolbar.title = null
+    (activity as AppCompatActivity).setSupportActionBar(binding.detailsToolbar)
+    binding.detailsToolbar.title = null
 
-        binding.detailsToolbar.setNavigationOnClickListener {
-            requireActivity().onBackPressed()
+    binding.detailsToolbar.setNavigationOnClickListener {
+      requireActivity().onBackPressed()
+    }
+
+    viewModel.messageForUser.observeEvent(viewLifecycleOwner) { message ->
+      Toast.makeText(context, message.format(resources), LENGTH_SHORT).show()
+    }
+
+    viewModel.activeChapter.observe(viewLifecycleOwner) { chapter ->
+      Timber.i(
+        "Updating current chapter: (${chapter.trackId}, ${chapter.discNumber}, ${chapter.index})",
+      )
+      adapter.updateCurrentChapter(
+        trackId = chapter.trackId,
+        discNumber = chapter.discNumber,
+        chapterIndex = chapter.index,
+      )
+    }
+
+    viewModel.forceSyncInProgress.observe(viewLifecycleOwner) { isSyncing ->
+      val syncMenuItem = binding.detailsToolbar.menu.findItem(R.id.force_sync)
+      val syncIcon = syncMenuItem.icon
+      if (syncIcon is AnimatedVectorDrawable) {
+        if (isSyncing) syncIcon.start() else syncIcon.stop()
+      }
+    }
+
+    viewModel.isWatchedIcon.observe(viewLifecycleOwner) { icon ->
+      Timber.d("isWatchedIcon.observe called")
+      binding.detailsToolbar.menu.findItem(R.id.toggle_watched).setIcon(icon)
+    }
+
+    return binding.root
+  }
+
+  override fun onViewCreated(
+    view: View,
+    savedInstanceState: Bundle?,
+  ) {
+    super.onViewCreated(view, savedInstanceState)
+
+    val menuHost: MenuHost = requireActivity()
+    menuHost.addMenuProvider(
+      object : MenuProvider {
+        override fun onCreateMenu(
+          menu: Menu,
+          menuInflater: MenuInflater,
+        ) {
+          menuInflater.inflate(R.menu.audiobook_details_menu, menu)
         }
 
-        viewModel.messageForUser.observeEvent(viewLifecycleOwner) { message ->
-            Toast.makeText(context, message.format(resources), LENGTH_SHORT).show()
-        }
-
-        viewModel.activeChapter.observe(viewLifecycleOwner) { chapter ->
-            Timber.i(
-                "Updating current chapter: (${chapter.trackId}, ${chapter.discNumber}, ${chapter.index})",
-            )
-            adapter.updateCurrentChapter(
-                trackId = chapter.trackId,
-                discNumber = chapter.discNumber,
-                chapterIndex = chapter.index,
-            )
-        }
-
-        viewModel.forceSyncInProgress.observe(viewLifecycleOwner) { isSyncing ->
-            val syncMenuItem = binding.detailsToolbar.menu.findItem(R.id.force_sync)
-            val syncIcon = syncMenuItem.icon
-            if (syncIcon is AnimatedVectorDrawable) {
-                if (isSyncing) syncIcon.start() else syncIcon.stop()
+        override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+          return when (menuItem.itemId) {
+            R.id.toggle_watched -> {
+              viewModel.toggleWatched()
+              true
             }
+
+            R.id.force_sync -> {
+              viewModel.forceSyncBook(hasUserConfirmation = false)
+              true
+            }
+
+            else -> false
+          }
         }
+      },
+      viewLifecycleOwner,
+      Lifecycle.State.RESUMED,
+    )
+  }
 
-        viewModel.isWatchedIcon.observe(viewLifecycleOwner) { icon ->
-            Timber.d("isWatchedIcon.observe called")
-            binding.detailsToolbar.menu.findItem(R.id.toggle_watched).setIcon(icon)
-        }
-
-        return binding.root
-    }
-
-    override fun onViewCreated(
-        view: View,
-        savedInstanceState: Bundle?,
-    ) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val menuHost: MenuHost = requireActivity()
-        menuHost.addMenuProvider(
-            object : MenuProvider {
-                override fun onCreateMenu(
-                    menu: Menu,
-                    menuInflater: MenuInflater,
-                ) {
-                    menuInflater.inflate(R.menu.audiobook_details_menu, menu)
-                }
-
-                override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-                    return when (menuItem.itemId) {
-                        R.id.toggle_watched -> {
-                            viewModel.toggleWatched()
-                            true
-                        }
-
-                        R.id.force_sync -> {
-                            viewModel.forceSyncBook(hasUserConfirmation = false)
-                            true
-                        }
-
-                        else -> false
-                    }
-                }
-            },
-            viewLifecycleOwner,
-            Lifecycle.State.RESUMED,
-        )
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-    }
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+  }
 }

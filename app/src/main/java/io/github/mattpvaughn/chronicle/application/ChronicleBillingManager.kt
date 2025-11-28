@@ -15,21 +15,21 @@ import javax.inject.Singleton
  */
 @Singleton
 class ChronicleBillingManager
-    @Inject
-    constructor(
-        applicationContext: Context,
-        private val prefsRepo: PrefsRepo,
-    ) {
-        fun launchBillingFlow(activity: Activity) {
-            iapConnector.purchase(activity, PREMIUM_IAP_SKU)
-        }
+  @Inject
+  constructor(
+    applicationContext: Context,
+    private val prefsRepo: PrefsRepo,
+  ) {
+    fun launchBillingFlow(activity: Activity) {
+      iapConnector.purchase(activity, PREMIUM_IAP_SKU)
+    }
 
-        private val iapConnector =
-            IapConnector(
-                context = applicationContext,
-                nonConsumableKeys = listOf(PREMIUM_IAP_SKU),
-                enableLogging = true,
-            )
+    private val iapConnector =
+      IapConnector(
+        context = applicationContext,
+        nonConsumableKeys = listOf(PREMIUM_IAP_SKU),
+        enableLogging = true,
+      )
             /*.apply {
                 addPurchaseListener(
                     object : PurchaseServiceListener {
@@ -47,4 +47,4 @@ class ChronicleBillingManager
                     },
                 )
             }*/
-    }
+  }

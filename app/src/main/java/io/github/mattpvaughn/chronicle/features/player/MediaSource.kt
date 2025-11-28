@@ -26,26 +26,26 @@ import androidx.annotation.IntDef
  * this is a convient interface to have on sources.
  */
 interface MediaSource : Iterable<MediaMetadataCompat> {
-    /**
-     * Begins loading the data for this music source.
-     */
-    suspend fun load()
+  /**
+   * Begins loading the data for this music source.
+   */
+  suspend fun load()
 
-    /**
-     * Method which will perform a given action after this [MediaPlayerService] is ready to be used.
-     *
-     * @param performAction A lambda expression to be called with a boolean parameter when
-     * the source is ready. `true` indicates the source was successfully prepared, `false`
-     * indicates an error occurred.
-     */
-    fun whenReady(performAction: (Boolean) -> Unit): Boolean
+  /**
+   * Method which will perform a given action after this [MediaPlayerService] is ready to be used.
+   *
+   * @param performAction A lambda expression to be called with a boolean parameter when
+   * the source is ready. `true` indicates the source was successfully prepared, `false`
+   * indicates an error occurred.
+   */
+  fun whenReady(performAction: (Boolean) -> Unit): Boolean
 }
 
 @IntDef(
-    STATE_CREATED,
-    STATE_INITIALIZING,
-    STATE_INITIALIZED,
-    STATE_ERROR,
+  STATE_CREATED,
+  STATE_INITIALIZING,
+  STATE_INITIALIZED,
+  STATE_ERROR,
 )
 @Retention(AnnotationRetention.SOURCE)
 annotation class State
@@ -74,38 +74,38 @@ const val STATE_ERROR = 4
  * Base class for music sources in UAMP.
  */
 abstract class AbstractMediaSource : MediaSource {
-    @State
-    var state: Int = STATE_CREATED
-        set(value) {
-            if (value == STATE_INITIALIZED || value == STATE_ERROR) {
-                synchronized(onReadyListeners) {
-                    field = value
-                    onReadyListeners.forEach { listener ->
-                        listener(state == STATE_INITIALIZED)
-                    }
-                }
-            } else {
-                field = value
-            }
+  @State
+  var state: Int = STATE_CREATED
+    set(value) {
+      if (value == STATE_INITIALIZED || value == STATE_ERROR) {
+        synchronized(onReadyListeners) {
+          field = value
+          onReadyListeners.forEach { listener ->
+            listener(state == STATE_INITIALIZED)
+          }
         }
+      } else {
+        field = value
+      }
+    }
 
-    private val onReadyListeners = mutableListOf<(Boolean) -> Unit>()
+  private val onReadyListeners = mutableListOf<(Boolean) -> Unit>()
 
-    /**
-     * Performs an action when this MusicSource is ready.
-     *
-     * This method is *not* threadsafe. Ensure actions and state changes are only performed
-     * on a single thread.
-     */
-    override fun whenReady(performAction: (Boolean) -> Unit): Boolean =
-        when (state) {
-            STATE_CREATED, STATE_INITIALIZING -> {
-                onReadyListeners += performAction
-                false
-            }
-            else -> {
-                performAction(state != STATE_ERROR)
-                true
-            }
-        }
+  /**
+   * Performs an action when this MusicSource is ready.
+   *
+   * This method is *not* threadsafe. Ensure actions and state changes are only performed
+   * on a single thread.
+   */
+  override fun whenReady(performAction: (Boolean) -> Unit): Boolean =
+    when (state) {
+      STATE_CREATED, STATE_INITIALIZING -> {
+        onReadyListeners += performAction
+        false
+      }
+      else -> {
+        performAction(state != STATE_ERROR)
+        true
+      }
+    }
 }
