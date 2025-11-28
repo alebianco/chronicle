@@ -26,6 +26,22 @@ The best Android Audiobook Player for Plex. Stream or download audiobooks hosted
  - [Plex Audiobook Guide](https://github.com/seanap/Plex-Audiobook-Guide)
  - [Chronicle subreddit](https://www.reddit.com/r/ChronicleApp/)
 
+### Documentation
+
+Comprehensive documentation is available in the [docs/](./docs) folder:
+
+ - **[Documentation Index](./docs/README.md)** - Start here for an overview
+ - **[Project Overview](./docs/01-project-overview.md)** - What Chronicle does
+ - **[Architecture](./docs/02-architecture.md)** - MVVM, Dagger, and design patterns
+ - **[Project Structure](./docs/03-project-structure.md)** - How the code is organized
+ - **[Key Components](./docs/04-key-components.md)** - Important classes explained
+ - **[Data Flow](./docs/05-data-flow.md)** - How data moves through the app
+ - **[Adding Features](./docs/06-adding-features.md)** - Guide for new development
+ - **[Visual Guide](./docs/07-visual-guide.md)** - Architecture diagrams
+ - **[Glossary](./docs/08-glossary.md)** - Terms and concepts
+
+These docs are written for developers who may not be experts in Kotlin or Android development.
+
 ### Developer Notes
 
 #### Ktlint
