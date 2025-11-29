@@ -3,7 +3,7 @@
 Purpose: Help coding agents work efficiently and keep builds green. These instructions are general (not task-specific) and fit within 2 pages.
 
 ## Project Snapshot
-- Android app in Kotlin, single module `:app` (minSdk 27, targetSdk 36).
+- Android app in Kotlin, single module `:app` (minSdk 27, targetSdk 34).
 - Architecture: MVVM + Repository + Room + Retrofit/OkHttp + Dagger 2 (KSP) + ExoPlayer + LiveData/Coroutines + Data Binding.
 - Entry points: `application/ChronicleApplication.kt`, `application/MainActivity.kt`, features under `features/`.
 - Dependency Injection: `injection/components/*`, `injection/modules/*`, scopes in `injection/scopes/*`.
@@ -102,4 +102,3 @@ Purpose: Help coding agents work efficiently and keep builds green. These instru
 ## Do/Don’t Quick Reference
 - Do: use DI, coroutines, LiveData, Room migrations, Navigator, ViewModel factories, strings.xml.
 - Don’t: instantiate singletons manually, access DB from UI, hardcode strings, block main thread, control ExoPlayer from UI.
-

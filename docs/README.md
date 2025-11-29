@@ -42,3 +42,30 @@ If you're new to the project, we recommend reading the documentation in order:
 - **Networking**: Retrofit + OkHttp
 - **Image Loading**: Fresco & Glide
 
+## Android 14 Compatibility (API 34)
+
+- Foreground services:
+  - Declared types: `mediaPlayback` for `MediaPlayerService`, `dataSync` for WorkManager foreground service.
+  - Manifest: `app/src/main/AndroidManifest.xml` has `android:foregroundServiceType` set.
+- Notifications:
+  - `POST_NOTIFICATIONS` declared; runtime request required on API 33+.
+  - Channels are created in `application/ChronicleApplication.kt`.
+- Exact alarms:
+  - Not used; no `SCHEDULE_EXACT_ALARM` present.
+- Media permissions:
+  - No `READ_MEDIA_AUDIO` declared; app primarily streams/handles app-scoped downloads.
+
+## Quick Commands
+
+```zsh
+./gradlew ktlintCheck
+./gradlew assembleDebug
+./gradlew lintDebug
+```
+
+## Testing Notes
+
+Run manual tests on API 27/30/31/33/34 focusing on:
+- Playback and media notification persistence
+- Downloads via WorkManager (foreground notification visible)
+- Notification permission denied path (no crash)

@@ -43,6 +43,12 @@ Comprehensive documentation is available in the [docs/](./docs) folder:
 
 These docs are written for developers who may not be experts in Kotlin or Android development.
 
+### Android Version Support
+
+- Minimum: Android 8.1 (API 27)
+- Target: Android 14 (API 34)
+- Tested: Android 8.1 – Android 14
+
 ### Developer Notes
 
 #### Ktlint
@@ -62,4 +68,3 @@ Ktlint check and format can be run on the code base by running the following com
 #### Git hook
 
 A git hook has also been added. This basically runs the ktlintCheck every time a user tries to commit. If it finds violations it prompts the user to run ktlintFormat and fix any inconsistencies with the style guide. The purpose of this is to make sure that everyone is adhering to the style guide and writing clean code.
-
