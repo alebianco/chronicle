@@ -3,6 +3,8 @@ applyTo: "docs/**/*.md"
 ---
 # Documentation Writing Instructions
 
+> Authority note: repo-wide agent instructions live in [`/CLAUDE.md`](../CLAUDE.md) (single source of truth). This file only adds *style guidance for writing files under `docs/`* and must never contradict it.
+
 Purpose: Guide coding agents to write clear, concise documentation with visual aids. Keep docs accurate and beginner-friendly.
 
 ## Core Principles

@@ -1,0 +1,21 @@
+project_name: "Chronicle Unabridged"
+task_prefix: "cu"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "In Review", "Done"]
+labels: []
+date_format: yyyy-mm-dd
+max_column_width: 24
+zero_padded_ids: 0
+auto_commit: false
+remote_operations: false
+filesystem_only: false
+check_active_branches: true
+active_branch_days: 30
+bypass_git_hooks: false
+auto_open_browser: true
+default_port: 6420
+definition_of_done:
+  - "Verify loop green (./gradlew ktlintFormat ktlintCheck testDebugUnitTest assembleDebug lintDebug)"
+  - "Tests added/extended for touched repos/ViewModels/sync/download logic"
+  - "Self-review pass done (CLAUDE.md definition of done)"
+  - "Docs synced in same change (task file / backlog/docs/reference / CLAUDE.md)"

@@ -41,3 +41,9 @@ Desktop.ini
 ehthumbs.db
 Icon?
 Thumbs.db
+
+# Superpowers working scratch — never committed.
+# plans/ and specs/ are drafting output; their durable content is redirected into
+# backlog/ instead (execution plans -> the task's ## Implementation Plan; design
+# specs -> a backlog/decisions/ record or the task description). See CLAUDE.md §Workflow.
+docs/superpowers/

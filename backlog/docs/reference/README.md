@@ -12,7 +12,8 @@ Welcome to the Chronicle Audiobook Player documentation. This guide will help yo
 6. **[Adding New Features](./06-adding-features.md)** - Guide for implementing new functionality
 7. **[Visual Architecture Guide](./07-visual-guide.md)** - Diagrams and visual representations
 8. **[Glossary](./08-glossary.md)** - Terms and concepts explained
-9. **[Project Analysis & Tasks](./09-project-analysis-and-tasks.md)** - ⚠️ Technical debt, issues, and improvement roadmap
+
+Technical debt and the improvement roadmap now live as tracked tasks in [`../../tasks/`](../../tasks/) (analysis in [`../analysis/`](../analysis/)); the old `09-project-analysis-and-tasks.md` was dissolved into them.
 
 ## Quick Start
 
@@ -27,8 +28,8 @@ If you're new to the project, we recommend reading the documentation in order:
 
 ## Getting Help
 
-- Check the [main README](../README.md) for build instructions
-- Review [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines
+- Check the [main README](../../../README.md) for build instructions
+- Review [CONTRIBUTING.md](../../../CONTRIBUTING.md) for contribution guidelines
 - See existing code examples in the `features/` directory
 
 ## Key Technologies
