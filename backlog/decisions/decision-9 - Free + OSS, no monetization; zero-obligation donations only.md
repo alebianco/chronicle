@@ -2,7 +2,7 @@
 id: decision-9
 title: Free + OSS, no monetization; zero-obligation donations only
 date: '2026-07-13'
-status: accepted
+status: superseded-by-decision-15
 ---
 
 ## Context
@@ -12,6 +12,12 @@ Commercial-viability study (COMMERCIAL_VIABILITY_REPORT §0/§4/§6): owner has 
 ## Decision
 
 Stay free + GPLv3. Add GitHub Sponsors/Ko-fi with no tiers, no promised perks, treated as occasional income. Keep IAP plumbing dormant (reaffirms [[decision-4]]). Revisit ONLY if ALL of: >=~5k MAU; R4 differentiators shipped and ahead of Epilogue; owner willing to run a P.IVA; employer/CCNL cleared — then a EUR 5.99-7.99 one-time unlock on a new Play listing, F-Droid stays free.
+
+## Superseded (2026-08-30)
+
+[[decision-15]] withdraws the donation allowance and the revisit triggers below. No monetary
+compensation of any kind, from any source, permanently. The context and reasoning here are kept
+for the record; the decision itself no longer holds.
 
 ## Consequences
 

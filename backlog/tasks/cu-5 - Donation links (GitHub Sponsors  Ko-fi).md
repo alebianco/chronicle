@@ -1,7 +1,7 @@
 ---
 id: cu-5
-title: Donation links (GitHub Sponsors / Ko-fi)
-status: In Progress
+title: Attribution and credits (donation links struck)
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R0, governance]
@@ -35,21 +35,19 @@ regardless of what is decided about donations:
 No new Activity or layout was added: a full About screen would be DataBinding work that cu-58 has to
 convert straight afterwards. The bottom-chooser reuses what exists.
 
-### Blocked: donation links
+### Donation links: struck, not deferred
 
-The first acceptance criterion cannot be met without owner input. Three open questions:
+Owner decision 2026-08-30, recorded as [[decision-15]]: **no donations and no monetary compensation of
+any kind, anywhere** — including never selling the app on any store. This supersedes D9's
+"zero-obligation donations only" and withdraws its revisit triggers.
 
-1. **The URLs.** A GitHub Sponsors handle and/or Ko-fi page. These must not be guessed — a wrong
-   donation link in a shipped app sends real money to a stranger.
-2. **Whether to ship one at all.** D9 permits "zero-obligation donations only". Deciding to ship *no*
-   donation link is a legitimate reading, in which case this becomes docs-only and the criterion should
-   be struck rather than met.
-3. **Placement.** Settings entry (consistent with the rest), README only, or both.
+So the first acceptance criterion is **struck rather than met**. There is nothing left to build here:
+the correct implementation of "add donation links" is to add none.
 
-When the URLs arrive the remaining work is small: one `PreferenceModel` beside Credits plus a README
-line, with no tiers, perks, or reward language per D9 / CVR §5.2.
+Follow-up: the code still contains premium gating that is now provably false advertising in reverse —
+it claims playback speed and offline downloads are paid features. See [[cu-60]].
 
 ## Acceptance Criteria
 
-- [ ] Links live with zero obligations stated — **blocked: needs donation URLs from owner, or a decision not to ship any**
+- [x] ~~Links live with zero obligations stated~~ — **struck by [[decision-15]]**: no donations, ever
 - [x] About screen credits upstream and influences — Credits entry added; fork identity corrected
