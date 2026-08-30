@@ -7,11 +7,13 @@
     <color name="textSecondary">#9EE3D5EB</color>
     <color name="textActive">#00B8D4</color>
     <color name="textActiveSecondary">#9E81E8F7</color>
-    <color name="textError">#FF4444</color>
+    <!-- Material Red A100. #FF4444 measured 3.81:1 on colorPrimary, below the
+         WCAG-AA 4.5:1 floor; this is 5.69:1 there and 7.52:1 on colorPrimaryDark. -->
+    <color name="textError">#FF8A80</color>
     <color name="icon">@color/textPrimary</color>
     <color name="iconActive">@color/colorAccent</color>
     <color name="iconDisabled">@color/textSecondary</color>
-    <color name="iconFailed">#FF4444</color>
+    <color name="iconFailed">@color/textError</color>
     <color name="sleepTimerCountdownOverlayColor">#A8121212</color>
 
     <!-- For audiobook grid id -->

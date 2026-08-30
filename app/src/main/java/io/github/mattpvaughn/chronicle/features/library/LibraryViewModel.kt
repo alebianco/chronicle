@@ -22,6 +22,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_D
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_PLAYS
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_TITLE
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_YEAR
+import io.github.mattpvaughn.chronicle.data.model.BookSortComparators
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.CACHED
@@ -139,8 +140,13 @@ class LibraryViewModel(
               val descMultiplier = if (desc) 1 else -1
               return@Comparator descMultiplier *
                 when (key) {
-                  SORT_KEY_AUTHOR -> book1.author.compareTo(book2.author)
-                  SORT_KEY_TITLE -> book1.titleSort.compareTo(book2.titleSort)
+                  // Surname-first, so "Brandon Sanderson" files under S (#21).
+                  SORT_KEY_AUTHOR ->
+                    BookSortComparators.authorSortKey(book1.author)
+                      .compareTo(BookSortComparators.authorSortKey(book2.author))
+                  // Natural ordering, so "Book 2" precedes "Book 10" (#21).
+                  SORT_KEY_TITLE ->
+                    BookSortComparators.compareTitlesNaturally(book1.titleSort, book2.titleSort)
                   SORT_KEY_PLAYS -> book2.viewedLeafCount.compareTo(book1.viewedLeafCount)
                   SORT_KEY_DURATION -> book2.duration.compareTo(book1.duration)
                   // Note: Reverse order for timestamps, because most recent should be at the top
