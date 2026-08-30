@@ -9,7 +9,7 @@ plugins {
 
 android {
   namespace = "io.github.mattpvaughn.chronicle"
-  compileSdk = 34
+  compileSdk = 36
 
   lint {
     abortOnError = false
@@ -21,7 +21,7 @@ android {
   defaultConfig {
     applicationId = "io.github.mattpvaughn.chronicle"
     minSdk = 27
-    targetSdk = 34
+    targetSdk = 36
     versionCode = 27
     versionName = "0.55.0"
 

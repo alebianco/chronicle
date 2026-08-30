@@ -177,15 +177,22 @@ class PackageValidator(
   private fun buildCallerInfo(callingPackage: String): CallerPackageInfo? {
     val packageInfo = getPackageInfo(callingPackage) ?: return null
 
-    val appName = packageInfo.applicationInfo.loadLabel(packageManager).toString()
-    val uid = packageInfo.applicationInfo.uid
+    // SDK 36 annotates these as nullable. A caller with no ApplicationInfo
+    // cannot be identified, so it must not be trusted — return null rather than
+    // fabricating a CallerPackageInfo for it.
+    val applicationInfo = packageInfo.applicationInfo ?: return null
+    val appName = applicationInfo.loadLabel(packageManager).toString()
+    val uid = applicationInfo.uid
     val signature = getSignature(packageInfo)
 
     val requestedPermissions = packageInfo.requestedPermissions
     val permissionFlags = packageInfo.requestedPermissionsFlags
     val activePermissions = mutableSetOf<String>()
     requestedPermissions?.forEachIndexed { index, permission ->
-      if (permissionFlags[index] and REQUESTED_PERMISSION_GRANTED != 0) {
+      // Guard the index: the two arrays are parallel but both nullable, and a
+      // shorter flags array would throw rather than simply skipping a permission.
+      val flags = permissionFlags?.getOrNull(index) ?: return@forEachIndexed
+      if (flags and REQUESTED_PERMISSION_GRANTED != 0) {
         activePermissions += permission
       }
     }
