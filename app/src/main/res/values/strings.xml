@@ -233,10 +233,11 @@
     <string name="settings_category_etc">Etc</string>
     <string name="settings_licenses_title">Licenses</string>
     <string name="settings_licenses_explanation">Open source libraries used by Chronicle</string>
-    <string name="settings_subreddit_title">reddit.com/r/ChronicleApp</string>
-    <string name="settings_subreddit_explanation">Share bug reports, request features, and learn what\'s coming next in Chronicle</string>
-    <string name="settings_github_title">github.com/mattttvaughn/chronicle</string>
-    <string name="settings_github_explanation">Chronicle is open source!</string>
+    <string name="settings_github_title">github.com/alebianco/chronicle</string>
+    <string name="settings_github_explanation">Chronicle Unabridged is free and open source (GPLv3). Report an issue or read the code here.</string>
+    <string name="settings_credits_title">Credits</string>
+    <string name="settings_credits_explanation">Built on the work of others</string>
+    <string name="settings_credits_body">Chronicle was created by Matt Vaughn (@mattttvaughn), who built and open-sourced the original app — the playback engine, Plex integration, Android Auto and the offline downloader are all his work. Chronicle Unabridged is a friendly fork of that project and remains GPLv3, as he released it.\n\nThe Chronicle Epilogue fork by fabiogermann is an actively-maintained continuation whose fixes are a reference for this one. Its name, logo and branding are its own and are not used here.\n\nThe Plex Audiobook Guide community (seanap) documented the tagging conventions that make audiobooks work on Plex at all.\n\nDesign influences are credited in the project documentation; no assets are copied.</string>
     <string name="settings_clear_downloads_warning">This will delete your downloaded files. Continue?</string>
     <string name="settings_shake_to_snooze_title">Shake to snooze</string>
     <string name="settings_shake_to_snooze_explanation">Shaking device will snooze sleep timer by 5 minutes</string>

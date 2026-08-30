@@ -848,17 +848,9 @@ class SettingsViewModel(
           PreferenceType.TITLE,
           FormattableString.from(R.string.settings_category_etc),
         ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_subreddit_title),
-          explanation = FormattableString.from(R.string.settings_subreddit_explanation),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                _webLink.postEvent("https://www.reddit.com/r/ChronicleApp")
-              }
-            },
-        ),
+        // The r/ChronicleApp subreddit belongs to the upstream project, not this
+        // fork; pointing users there for support would send them somewhere that
+        // cannot help them. Replaced with a credits entry (D12 rule 4).
         PreferenceModel(
           type = PreferenceType.CLICKABLE,
           title = FormattableString.from(R.string.settings_github_title),
@@ -866,7 +858,28 @@ class SettingsViewModel(
           click =
             object : PreferenceClick {
               override fun onClick() {
-                _webLink.postEvent("https://github.com/mattttvaughn/chronicle")
+                _webLink.postEvent("https://github.com/alebianco/chronicle")
+              }
+            },
+        ),
+        PreferenceModel(
+          type = PreferenceType.CLICKABLE,
+          title = FormattableString.from(R.string.settings_credits_title),
+          explanation = FormattableString.from(R.string.settings_credits_explanation),
+          click =
+            object : PreferenceClick {
+              override fun onClick() {
+                showOptionsMenu(
+                  options = listOf(FormattableString.from(R.string.settings_credits_body)),
+                  title = FormattableString.from(R.string.settings_credits_title),
+                  listener =
+                    object : BottomChooserItemListener() {
+                      override fun onItemClicked(formattableString: FormattableString) {
+                        // Informational only — dismissing is the only action.
+                        _bottomChooserState.postValue(EMPTY_BOTTOM_CHOOSER)
+                      }
+                    },
+                )
               }
             },
         ),
