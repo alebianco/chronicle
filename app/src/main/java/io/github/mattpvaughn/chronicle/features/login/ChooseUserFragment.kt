@@ -10,10 +10,12 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
+import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
@@ -81,7 +83,6 @@ class ChooseUserFragment : Fragment() {
     super.onCreate(savedInstanceState)
 
     val tempBinding = OnboardingPlexChooseUserBinding.inflate(inflater, container, false)
-    tempBinding.lifecycleOwner = viewLifecycleOwner
 
     viewModel =
       ViewModelProvider(
@@ -98,6 +99,26 @@ class ChooseUserFragment : Fragment() {
     tempBinding.userList.adapter = userListAdapter
 
     tempBinding.pinEdittext.addTextChangedListener(pinListener)
+    tempBinding.refresh.setOnClickListener { viewModel.refresh() }
+    tempBinding.pinSubmit.setOnClickListener { viewModel.submitPin() }
+
+    // Was `viewModel.showPin ? ... : ...` on the two container layouts.
+    viewModel.showPin.observe(viewLifecycleOwner) { showPin ->
+      tempBinding.userChooser.isVisible = showPin != true
+      tempBinding.pinChooser.isVisible = showPin == true
+    }
+
+    // Was three `app:loadingStatus` bindings on the user list.
+    viewModel.usersLoadingStatus.observe(viewLifecycleOwner) { status ->
+      tempBinding.userList.isVisible = status == LoadingStatus.DONE
+      tempBinding.noUsersFound.isVisible = status == LoadingStatus.ERROR
+      tempBinding.loadingIcon.isVisible = status == LoadingStatus.LOADING
+    }
+
+    viewModel.pinLoadingStatus.observe(viewLifecycleOwner) { status ->
+      tempBinding.pinLoadingIcon.isVisible = status == LoadingStatus.LOADING
+      tempBinding.pinSubmit.isVisible = status != LoadingStatus.LOADING
+    }
 
     viewModel.userMessage.observe(viewLifecycleOwner) {
       if (!it.hasBeenHandled) {
@@ -129,7 +150,6 @@ class ChooseUserFragment : Fragment() {
         },
     )
 
-    tempBinding.viewModel = viewModel
     binding = tempBinding
     return tempBinding.root
   }

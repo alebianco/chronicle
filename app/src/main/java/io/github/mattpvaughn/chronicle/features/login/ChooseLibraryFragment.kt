@@ -6,10 +6,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
+import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -52,15 +54,12 @@ class ChooseLibraryFragment : Fragment() {
     super.onCreate(savedInstanceState)
 
     val binding = OnboardingPlexChooseLibraryBinding.inflate(inflater, container, false)
-    binding.lifecycleOwner = viewLifecycleOwner
 
     viewModel =
       ViewModelProvider(
         viewModelStore,
         viewModelFactory,
       ).get(ChooseLibraryViewModel::class.java)
-
-    binding.chooseLibraryViewModel = viewModel
 
     libraryAdapter =
       LibraryListAdapter(
@@ -71,6 +70,14 @@ class ChooseLibraryFragment : Fragment() {
       )
 
     binding.libraryList.adapter = libraryAdapter
+    binding.refresh.setOnClickListener { viewModel.refresh() }
+
+    // Was three `app:loadingStatus` bindings in XML, one per view type.
+    viewModel.loadingStatus.observe(viewLifecycleOwner) { status ->
+      binding.libraryList.isVisible = status == LoadingStatus.DONE
+      binding.noLibrariesFound.isVisible = status == LoadingStatus.ERROR
+      binding.loadingIcon.isVisible = status == LoadingStatus.LOADING
+    }
 
     viewModel.userMessage.observe(
       viewLifecycleOwner,
