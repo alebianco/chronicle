@@ -2,9 +2,11 @@ package io.github.mattpvaughn.chronicle.features.library
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_DETAILS_LIST
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_TEXT_LIST
@@ -12,6 +14,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.databinding.GridItemAudiobookBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookTextOnlyBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookWithDetailsBinding
+import io.github.mattpvaughn.chronicle.views.bindImageRounded
 
 class AudiobookAdapter(
   initialViewStyle: String,
@@ -97,12 +100,25 @@ class AudiobookAdapter(
       audiobookClick: LibraryFragment.AudiobookClick,
       serverConnected: Boolean,
     ) {
-      binding.isSquare = isSquare
-      binding.audiobook = audiobook
-      binding.isVertical = isVertical
-      binding.audiobookClick = audiobookClick
-      binding.serverConnected = serverConnected
-      binding.executePendingBindings()
+      // Was binding expressions in grid_item_audiobook.xml.
+      setSquareAspectRatio(binding.gridItemRoot, isSquare)
+      overrideWidth(
+        binding.gridItemRoot,
+        if (isVertical) {
+          binding.root.resources.getDimension(R.dimen.audiobook_match_parent)
+        } else {
+          binding.root.resources.getDimension(R.dimen.audiobook_item_width)
+        },
+      )
+      binding.gridItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
+      binding.title.text = audiobook.title
+      binding.author.text = audiobook.author
+      binding.bookCoverImg.contentDescription = audiobook.title
+      bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected)
+      binding.notPlayedDogEar.isVisible = audiobook.viewCount == 0L && audiobook.progress == 0L
+      binding.bookProgress.max = audiobook.duration.toInt()
+      binding.bookProgress.progress = audiobook.progress.toInt()
+      binding.bookProgress.isVisible = audiobook.progress > 0L
     }
 
     companion object {
