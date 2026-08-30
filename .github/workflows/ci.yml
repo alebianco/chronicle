@@ -1,3 +1,9 @@
+# Thin wrapper around ./verify.sh — the gate of record (decision-12 rule 6).
+#
+# Deliberately minimal and free of GitHub-specific logic beyond checkout,
+# JDK setup, caching and artifact upload, so this project can move to another
+# forge (GitLab CI, Woodpecker, Forgejo) by rewriting ~30 lines and calling the
+# same script. Do not encode build rules here — put them in verify.sh or Gradle.
 name: CI
 
 on:
@@ -6,16 +12,10 @@ on:
   pull_request:
     branches: [ main, master, develop ]
   workflow_dispatch:
-    inputs:
-      run_instrumented_tests:
-        description: 'Run instrumented tests'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
-  lint:
-    name: Lint
+  verify:
+    name: Verify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -37,161 +37,45 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Grant execute permissions
+        run: chmod +x gradlew verify.sh coverage-ratchet.sh
 
-      - name: Run Ktlint
-        run: ./gradlew ktlintCheck
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Run verify.sh
+        run: ./verify.sh
 
       - name: Upload debug APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
 
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Run unit tests
-        run: ./gradlew testDebugUnitTest
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
+      - name: Upload unit test results
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: |
             app/build/reports/tests/
             app/build/test-results/
+          if-no-files-found: warn
 
-  instrumented-test:
-    name: Instrumented Tests
-    runs-on: ubuntu-latest
-    if: github.event.inputs.run_instrumented_tests == 'true' || (github.event_name == 'push' && contains(fromJson('["main", "master"]'), github.ref_name))
-    strategy:
-      matrix:
-        api-level: [27, 30]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Cache AVD
-        uses: actions/cache@v4
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ matrix.api-level }}
-
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: ${{ matrix.api-level }}
-          target: google_apis
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Run instrumented tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: ${{ matrix.api-level }}
-          target: google_apis
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest
-
-      - name: Upload instrumented test results
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage report
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: instrumented-test-results-api-${{ matrix.api-level }}
-          path: |
-            app/build/reports/androidTests/
-            app/build/outputs/androidTest-results/ 
+          name: coverage-report
+          path: app/build/reports/jacoco/jacocoTestReport/
+          if-no-files-found: warn
+
+      - name: Report coverage in job summary
+        if: always()
+        run: |
+          if [ -f coverage-baseline.txt ]; then
+            echo "### Coverage" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Instruction coverage baseline: **$(cat coverage-baseline.txt)%**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Full HTML report is in the \`coverage-report\` artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi

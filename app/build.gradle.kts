@@ -4,6 +4,7 @@ plugins {
   id("kotlin-parcelize")
   id("kotlin-kapt")
   id("com.google.android.gms.oss-licenses-plugin")
+  jacoco
 }
 
 android {
@@ -28,6 +29,10 @@ android {
   }
 
   buildTypes {
+    debug {
+      // Required for JaCoCo to emit execution data from unit tests.
+      enableUnitTestCoverage = true
+    }
     release {
       isMinifyEnabled = true
       isShrinkResources = true
@@ -136,6 +141,69 @@ dependencies {
   androidTestImplementation(libs.androidx.test.ext.junit.ktx)
 }
 
+// Instrumented tests are QUARANTINED, not merely disabled: the sources under
+// app/src/androidTest no longer compile. They target an `OnboardingActivity` and
+// string resources that ceased to exist when onboarding was refactored into
+// Fragments (LoginFragment/ChooseServerFragment/ChooseUserFragment/
+// ChooseLibraryFragment) in 9e89270. Removing this block yields ~15 unresolved
+// references, not a passing suite.
+//
+// They are kept in-tree as the raw material for the rewrite (see backlog task
+// cu-54, "Rebuild instrumented tests on Gradle Managed Devices"). Until that
+// lands, THERE IS NO INSTRUMENTED COVERAGE — do not claim any.
 tasks.matching { it.name.contains("DebugAndroidTest") && !it.name.contains("Lint") }.configureEach {
   enabled = false
+}
+
+jacoco {
+  toolVersion = "0.8.12"
+}
+
+// Generated code would otherwise dominate the coverage number and make it
+// meaningless: databinding, Dagger factories/injectors, and Room _Impl classes
+// are machine-written and not ours to test.
+val coverageExclusions =
+  listOf(
+    "**/R.class",
+    "**/R$*.class",
+    "**/BR.*",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    "**/databinding/**",
+    "**/android/databinding/**",
+    "**/androidx/databinding/**",
+    "**/*_MembersInjector*.*",
+    "**/*_Factory*.*",
+    "**/Dagger*Component*.*",
+    "**/*Module_*Factory*.*",
+    "**/*_Impl*.*",
+    "**/*_Provide*Factory*.*",
+  )
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+  dependsOn("testDebugUnitTest")
+  group = "verification"
+  description = "Generates JaCoCo coverage report for the debug unit tests."
+
+  reports {
+    xml.required.set(true)
+    html.required.set(true)
+  }
+
+  classDirectories.setFrom(
+    files(
+      fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
+        exclude(coverageExclusions)
+      },
+      fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) {
+        exclude(coverageExclusions)
+      },
+    ),
+  )
+  sourceDirectories.setFrom(files("$projectDir/src/main/java"))
+  executionData.setFrom(
+    fileTree(layout.buildDirectory) {
+      include("**/*.exec", "**/*.ec")
+    },
+  )
 }

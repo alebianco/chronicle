@@ -17,12 +17,16 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Verify loop (run before claiming anything is done)
 
 ```bash
-./gradlew ktlintFormat ktlintCheck testDebugUnitTest assembleDebug lintDebug
+./verify.sh            # the full gate: ktlint, unit tests, coverage ratchet, debug APK, lint
+./verify.sh --quick    # inner loop while iterating: ktlint + unit tests + coverage only
+./verify.sh --format   # runs ktlintFormat first, then the full gate
 ```
 
-- Green = ktlint clean + unit tests pass + debug APK builds + lint passes. That is the definition of "the build is fine" — nothing less.
+- `verify.sh` **is** the definition of "the build is fine" (D12 rule 6) — not CI, not a forge's required checks. CI is a thin wrapper that calls this same script, so the gate is identical on a laptop and on any forge.
+- Green = ktlint clean + unit tests pass + coverage did not regress + debug APK builds + lint passes. Nothing less.
+- **Coverage ratchet**: `coverage-ratchet.sh` compares JaCoCo instruction coverage against the committed `coverage-baseline.txt` and fails on a drop; a rise ratchets the baseline up (commit the change). Baseline is deliberately a plain file in git so every movement is reviewable in a diff. To lower it on purpose: `./coverage-ratchet.sh --update`, and justify it in the commit message.
 - Release builds: `./test_release_build.sh` (R8/ProGuard smoke test; see CONTRIBUTING.md "Release Builds & ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (Moshi models, Room entities), or dependencies.
-- **Instrumented tests are currently dead**: `DebugAndroidTest` tasks are force-disabled in `app/build.gradle.kts` (search `DebugAndroidTest`), so the CI emulator job is a no-op. Do not claim instrumented coverage. Fixing this is task cu-3.
+- **Instrumented tests are quarantined, not just disabled**: the sources in `app/src/androidTest` no longer compile — they target an `OnboardingActivity` and strings removed when onboarding became Fragments (`9e89270`). `DebugAndroidTest` tasks are force-disabled in `app/build.gradle.kts`; the fake CI emulator job was deleted in cu-3. **There is no instrumented coverage — never claim any.** Rebuilding the suite is task cu-54.
 
 ## Project snapshot (truthful as of 2026-07-13 — verify against build files if in doubt)
 
@@ -30,7 +34,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - MVVM + Repository · Dagger 2 (hand-rolled components) · Room **2.7.0-alpha12 — alpha in production, never bump casually, always write migrations** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 1.3.0 (ExoPlayer + MediaSession + Cast) · LiveData + DataBinding (no Compose) · Fetch2 for downloads.
 - **KAPT, not KSP** (`kotlin-kapt` in `app/build.gradle.kts`) — migration is task cu-8. Any doc claiming KSP is wrong.
 - Tests: 2 unit-test files (`app/src/test/...`), ~7 androidTest files (disabled, see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
-- CI: `.github/workflows/ci.yml` — ktlintCheck, assembleDebug (+APK artifact), testDebugUnitTest (+results artifact), emulator matrix (currently no-op).
+- CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
 
