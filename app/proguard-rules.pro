@@ -49,10 +49,14 @@
 -keepclassmembers,allowshrinking,allowobfuscation interface * {
     @retrofit2.http.* <methods>;
 }
--keep class retrofit2.** { *; }
-# Service interfaces (adjust paths if different)
--keep interface io.github.mattpvaughn.chronicle.data.sources.plex.PlexService { *; }
--keep interface io.github.mattpvaughn.chronicle.data.sources.plex.** { *; }
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+# Retrofit reads annotations off the service interfaces reflectively; the
+# implementations behind them do not need keeping.
+# Note: there is no `PlexService` interface despite the file name — PlexService.kt
+# declares PlexLoginService and PlexMediaService. The old rule kept a phantom class.
+-keep interface io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService { *; }
+-keep interface io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService { *; }
 
 # ============= Moshi =============
 -keep class com.squareup.moshi.** { *; }
@@ -84,8 +88,8 @@
 -keepclasseswithmembernames class * { @javax.inject.Inject <init>(...); }
 
 # ============= Media3 / ExoPlayer =============
--keep class androidx.media3.** { *; }
--keep interface androidx.media3.** { *; }
+# Media3 ships its own consumer ProGuard rules; a blanket keep here pinned ~700
+# extractor/renderer classes that R8 can otherwise strip per-format.
 -dontwarn androidx.media3.**
 -keep class android.support.v4.media.** { *; }
 -keep interface android.support.v4.media.** { *; }
@@ -114,14 +118,15 @@
 -keep class com.bumptech.glide.load.data.ParcelFileDescriptorRewinder$InternalRewinder { *** rewind(); }
 
 # ============= Kotlin & Coroutines =============
--keep class kotlin.** { *; }
+# A blanket `-keep class kotlin.** { *; }` pinned ~1845 kotlin.reflect.jvm.internal
+# classes that nothing here reflects over. Keep only the metadata R8 and Moshi
+# actually read.
 -keep class kotlin.Metadata { *; }
 -dontwarn kotlin.**
 -keepclassmembers class **$WhenMappings { <fields>; }
 -keepclassmembers class kotlin.Metadata { public <methods>; }
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--keep class kotlinx.coroutines.** { *; }
 -dontwarn kotlinx.coroutines.**
 -keep class com.github.michaelbull.result.** { *; }
 
@@ -145,10 +150,14 @@
 -keep class * extends androidx.lifecycle.AndroidViewModel { <init>(...); }
 -keep class * extends androidx.lifecycle.ViewModelProvider$Factory { <init>(...); }
 -keep class **$Factory { <init>(...); }
--keep class * extends androidx.fragment.app.Fragment { *; }
--keep class io.github.mattpvaughn.chronicle.views.** { *; }
--keep class io.github.mattpvaughn.chronicle.features.** { *; }
--keep class io.github.mattpvaughn.chronicle.data.model.** { *; }
+# Fragments are instantiated by name by the framework, so their no-arg
+# constructor must survive — but their members need not.
+-keep class * extends androidx.fragment.app.Fragment { <init>(...); }
+# Custom views are inflated from XML by name, with the (Context, AttributeSet)
+# constructor.
+-keep class * extends android.view.View { <init>(android.content.Context, android.util.AttributeSet); }
+# data.model is kept by the Room section above; blanket keeps on features.** and
+# views.** exempted 572 app classes from R8 for no reason.
 
 # ============= WorkManager =============
 -keep class * extends androidx.work.Worker
