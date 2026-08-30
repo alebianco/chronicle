@@ -58,7 +58,12 @@ class PackageValidator(
   private val packageManager: PackageManager
 
   private val certificateWhitelist: Map<String, KnownCallerInfo>
-  private val platformSignature: String
+
+  /**
+   * Signature of the Android platform itself, used to admit system-signed callers.
+   * Null when it cannot be read — see [getSystemSignature].
+   */
+  private val platformSignature: String?
 
   private val callerChecked = mutableMapOf<String, Pair<Int, Boolean>>()
 
@@ -128,7 +133,9 @@ class PackageValidator(
         // If the system is making the call, allow it.
         callingUid == Process.SYSTEM_UID -> true
         // If the app was signed by the same certificate as the platform itself, also allow it.
-        callerSignature == platformSignature -> true
+        // Guard against null: with no platform signature this allowance is simply
+        // unavailable, and must not admit a caller whose signature is also null.
+        platformSignature != null && callerSignature == platformSignature -> true
         /**
          * [MEDIA_CONTENT_CONTROL] permission is only available to system applications, and
          * while it isn't required to allow these apps to connect to a
@@ -328,12 +335,25 @@ class PackageValidator(
   }
 
   /**
-   * Finds the Android platform signing key signature. This key is never null.
+   * Signature of the `android` platform package, or null if it cannot be read.
+   *
+   * This used to throw. That was disproportionate: the platform signature only
+   * admits *additional* system-signed callers to the media browser, so its
+   * absence should disable that one allowance — not take down
+   * [MediaPlayerService], and with it all playback, at construction.
+   *
+   * It is absent on emulator images with no platform signature, which made
+   * playback impossible to verify on an emulator at all (cu-61). Whether any
+   * real device can reach this is unproven, but a hard crash for an Android Auto
+   * allowlist is the wrong failure mode either way.
    */
-  private fun getSystemSignature(): String =
+  private fun getSystemSignature(): String? =
     getPackageInfo(ANDROID_PLATFORM)?.let { platformInfo ->
       getSignature(platformInfo)
-    } ?: throw IllegalStateException("Platform signature not found")
+    } ?: run {
+      Timber.w("Platform signature not found; system-signed callers will not be auto-admitted")
+      null
+    }
 
   /**
    * Creates a SHA-256 signature given a Base64 encoded certificate.
