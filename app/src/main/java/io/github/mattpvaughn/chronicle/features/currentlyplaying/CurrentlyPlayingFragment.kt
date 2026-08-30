@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
 import android.content.Context
 import android.content.IntentFilter
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.LayoutInflater
@@ -9,10 +10,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
+import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.material.slider.Slider
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
 import io.github.mattpvaughn.chronicle.data.model.Chapter
@@ -23,6 +27,8 @@ import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
+import io.github.mattpvaughn.chronicle.views.bindImageRounded
+import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
@@ -80,9 +86,113 @@ class CurrentlyPlayingFragment : Fragment() {
       Toast.makeText(context, message, LENGTH_SHORT).show()
     }
 
-    binding.viewModel = viewModel
-    binding.plexConfig = plexConfig
-    binding.lifecycleOwner = viewLifecycleOwner
+    // Was 29 binding expressions in fragment_currently_playing.xml.
+    binding.skipToPrevious.setOnClickListener { viewModel.skipToPrevious() }
+    binding.rewindButton.setOnClickListener { viewModel.skipBackwards() }
+    binding.detailsPausePlay.setOnClickListener { viewModel.play() }
+    binding.skipForwardButton.setOnClickListener { viewModel.skipForwards() }
+    binding.skipToNext.setOnClickListener { viewModel.skipToNext() }
+    binding.changeSpeedButton.setOnClickListener { viewModel.showPlaybackSpeedChooser() }
+    binding.sleepTimerButton.setOnClickListener { viewModel.showSleepTimerOptions() }
+
+    viewModel.jumpBackwardsIcon.observe(viewLifecycleOwner) {
+      binding.rewindButton.setImageResource(it)
+    }
+    viewModel.jumpForwardsIcon.observe(viewLifecycleOwner) {
+      binding.skipForwardButton.setImageResource(it)
+    }
+    viewModel.isPlaying.observe(viewLifecycleOwner) { playing ->
+      binding.detailsPausePlay.setImageResource(
+        if (playing == true) {
+          R.drawable.ic_pause_button_large_colored
+        } else {
+          R.drawable.ic_play_button_large_colored
+        },
+      )
+    }
+    viewModel.playbackSpeedString.observe(viewLifecycleOwner) {
+      binding.changeSpeedButton.text = it
+    }
+    viewModel.isSleepTimerActive.observe(viewLifecycleOwner) { active ->
+      binding.sleepTimerButton.imageTintList =
+        ColorStateList.valueOf(
+          ContextCompat.getColor(
+            requireContext(),
+            if (active == true) R.color.iconActive else R.color.icon,
+          ),
+        )
+      binding.sleepTimerCountdown.isVisible = active == true
+    }
+    viewModel.sleepTimerTimeRemainingString.observe(viewLifecycleOwner) {
+      binding.sleepTimerCountdown.text = it
+    }
+
+    // The slider falls back to track values when there is no chapter. valueTo
+    // must be set before value: Material's Slider throws if value falls outside
+    // the current range, which DataBinding handled internally.
+    fun refreshSlider() {
+      val chapterDuration = viewModel.chapterDuration.value ?: 0L
+      val trackDuration = viewModel.currentTrack.value?.duration ?: 0L
+      val max = (if (chapterDuration == 0L) trackDuration else chapterDuration).toFloat()
+      val chapterProgress = viewModel.chapterProgressForSlider.value ?: -1L
+      val trackProgress = viewModel.trackProgressForSlider.value ?: 0L
+      val current = if (chapterProgress == -1L) trackProgress else chapterProgress
+
+      binding.chapterProgressSeekbar.valueTo = if (max > 0f) max else 1f
+      binding.chapterProgressSeekbar.value =
+        current.toFloat().coerceIn(0f, binding.chapterProgressSeekbar.valueTo)
+    }
+    viewModel.chapterDuration.observe(viewLifecycleOwner) { refreshSlider() }
+    viewModel.currentTrack.observe(viewLifecycleOwner) { refreshSlider() }
+    viewModel.chapterProgressForSlider.observe(viewLifecycleOwner) { refreshSlider() }
+    viewModel.trackProgressForSlider.observe(viewLifecycleOwner) { refreshSlider() }
+
+    viewModel.progressString.observe(viewLifecycleOwner) { binding.progress.text = it }
+    viewModel.progressPercentageString.observe(viewLifecycleOwner) {
+      binding.progressPercentage.text = it
+    }
+    viewModel.chapterProgressString.observe(viewLifecycleOwner) { chapter ->
+      binding.chapterProgress.text =
+        if (chapter.isNullOrEmpty()) viewModel.trackProgress.value.orEmpty() else chapter
+    }
+    viewModel.chapterDurationString.observe(viewLifecycleOwner) { durationString ->
+      binding.chapterDuration.text =
+        if ((viewModel.chapterDuration.value ?: 0L) == 0L) {
+          viewModel.trackDuration.value.orEmpty()
+        } else {
+          durationString
+        }
+    }
+    viewModel.currentChapter.observe(viewLifecycleOwner) { chapter ->
+      binding.chapterTitle.text =
+        if (chapter?.title.isNullOrEmpty()) {
+          viewModel.currentTrack.value?.title.orEmpty()
+        } else {
+          chapter?.title.orEmpty()
+        }
+    }
+    viewModel.audiobook.observe(viewLifecycleOwner) { book ->
+      binding.bookTitle.text = book?.title.orEmpty()
+      binding.detailsArtwork.contentDescription = book?.title.orEmpty()
+      bindImageRounded(binding.detailsArtwork, book?.thumb, plexConfig.isConnected.value == true)
+    }
+    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+      bindImageRounded(
+        binding.detailsArtwork,
+        viewModel.audiobook.value?.thumb,
+        connected == true,
+      )
+    }
+
+    viewModel.isLoadingTracks.observe(viewLifecycleOwner) {
+      binding.loadingTracksSpinner.isVisible = it == true
+    }
+    viewModel.bottomChooserState.observe(viewLifecycleOwner) {
+      setBottomChooserState(binding.bottomSheetChooser, it)
+    }
+    viewModel.sleepTimerChooserState.observe(viewLifecycleOwner) {
+      setBottomChooserState(binding.sleepTimerChooser, it)
+    }
 
     val adapter =
       ChapterListAdapter(

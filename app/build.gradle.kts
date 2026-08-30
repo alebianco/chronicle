@@ -2,7 +2,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
   id("kotlin-parcelize")
-  id("kotlin-kapt")
+  alias(libs.plugins.ksp)
   id("com.google.android.gms.oss-licenses-plugin")
   jacoco
 }
@@ -52,9 +52,6 @@ android {
     freeCompilerArgs += "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
   }
   buildFeatures {
-    // Both are on during the cu-58 conversion: layouts move to ViewBinding one
-    // screen at a time, so unconverted ones still need DataBinding.
-    dataBinding = true
     viewBinding = true
     buildConfig = true
   }
@@ -75,18 +72,12 @@ android {
       isIncludeAndroidResources = true
     }
   }
-
-  // Using kapt instead of KSP in the root project-level build to avoid plugin
-  // resolution issues while upgrading Kotlin. KAPT is applied via the
-  // 'kotlin-kapt' plugin above.
 }
 
-kapt {
-  arguments {
-    arg("room.schemaLocation", "$projectDir/schemas")
-    arg("room.incremental", "true")
-    arg("room.expandProjection", "true")
-  }
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+  arg("room.incremental", "true")
+  arg("room.expandProjection", "true")
 }
 
 dependencies {
@@ -124,11 +115,11 @@ dependencies {
   implementation(libs.coil.network.okhttp)
 
   implementation(libs.room.runtime)
-  kapt(libs.room.compiler)
+  ksp(libs.room.compiler)
   implementation(libs.room.ktx)
 
   implementation(libs.dagger)
-  kapt(libs.dagger.compiler)
+  ksp(libs.dagger.compiler)
 
   implementation(libs.media3.exoplayer)
   implementation(libs.media3.ui)
@@ -140,7 +131,7 @@ dependencies {
      * Local Tests
      */
   testImplementation(libs.dagger)
-  kaptTest(libs.dagger.compiler)
+  kspTest(libs.dagger.compiler)
 
   testImplementation(libs.junit)
   testImplementation(libs.mockk)
@@ -163,7 +154,7 @@ dependencies {
      * Instrumented Tests
      */
   androidTestImplementation(libs.dagger)
-  kaptAndroidTest(libs.dagger.compiler)
+  kspAndroidTest(libs.dagger.compiler)
 
   androidTestImplementation(libs.junit)
   androidTestImplementation(libs.mockk)

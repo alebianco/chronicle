@@ -7,7 +7,6 @@ import android.view.View
 import android.widget.ImageView
 import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
-import androidx.databinding.BindingAdapter
 import coil3.load
 import coil3.request.crossfade
 import coil3.request.error
@@ -24,7 +23,6 @@ import io.github.mattpvaughn.chronicle.application.Injector
  * route changed. This mirrors the `UrlQueryCacheKey` behaviour the previous
  * Fresco implementation configured through its cache-key factory.
  */
-@BindingAdapter(value = ["srcRounded", "serverConnected"], requireAll = true)
 fun bindImageRounded(
   imageView: ImageView,
   src: String?,
@@ -53,7 +51,6 @@ fun bindImageRounded(
 // NOTE: this will not work for Android versions HoneyComb and below, and DataBinding overrides the
 // tag set on all outermost layouts in a data bound layout xml
 @RequiresApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-@BindingAdapter("specialTag")
 fun bindTag(
   view: View,
   o: Any,

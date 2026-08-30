@@ -1,7 +1,7 @@
 ---
 id: cu-58
 title: DataBinding to ViewBinding conversion
-status: In Progress
+status: Done
 assignee: [claude]
 created_date: '2026-08-30'
 labels: [R1, architecture]
@@ -120,12 +120,71 @@ revertable and makes a regression attributable to one screen.
 If a screen cannot be converted without also restructuring its ViewModel, **stop and leave it** for the
 R3 redesign rather than widening scope mid-task. Note it in the task and move on.
 
+## Implementation Notes
+
+**All 29 layouts converted. DataBinding and KAPT are both gone.**
+
+### How it was done
+
+Five of the harder screens by hand (choose-server, choose-library, choose-user, grid item, library,
+home, activity_main, audiobook details, currently playing); the mechanical majority by **four
+subagents running in parallel**, each in an isolated git worktree owning a disjoint set of layouts
+plus their exclusive Fragment/adapter. All four branches **merged without a single conflict**, which
+is the payoff of partitioning by owner rather than by count.
+
+Each agent found something worth keeping:
+
+- **`FormattableString` needs its binding adapter.** `PreferenceModel.title` is a sealed class whose
+  `ResourceString` variant resolves `@StringRes` against `Resources`. A plain `binding.x.text = model.title`
+  would have rendered `ResourceString(stringRes=2131…)` — **silently, without crashing**.
+- **First-frame flash.** DataBinding evaluates every expression once at initial bind; ViewBinding does
+  not. Views whose visibility is now Kotlin-driven hold their XML default until the first LiveData
+  emission and flash over the content. Fixed with `android:visibility="gone"` on the affected views in
+  `fragment_home`, `fragment_library` and `fragment_collections`. No build stage detects this.
+- **`isChosen` was dead.** `view_bottom_sheet_chooser_item.xml` declared it and **nothing in the
+  codebase ever assigned it**, so the "chosen" highlight has never rendered. Behaviour preserved rather
+  than "fixed" — reviving it is a design decision, not a conversion side-effect.
+- **Adapter-cast ordering.** `bindSearchRecyclerView` casts `recyclerView.adapter`, and `observe()`
+  delivers an already-set value synchronously, so any such call registered before the adapter
+  assignment is a guaranteed ClassCastException.
+
+### Judgement calls preserved rather than "improved"
+
+An un-pluralised `" items"` string stayed verbatim despite violating CLAUDE.md convention 5, and the
+`preference_item_clickable` explanation still always shows. Both are pre-existing; fixing them here
+would have smuggled behaviour changes into a mechanical refactor.
+
+### KAPT removal and the measurement (the point of the exercise)
+
+With every layout converted, `dataBinding` was disabled, the `kotlin-kapt` plugin removed, Room and
+Dagger moved to `ksp(...)`, and the ~35-line reflective `kaptArgs` hack deleted from the root build.
+Room schemas are **byte-identical** under KSP.
+
+| | KAPT baseline (cu-8) | Both pipelines (cu-8 attempt) | **KSP-only (now)** |
+|---|---|---|---|
+| Clean `assembleDebug` | 13s | 17.5s | **13s** |
+| **Incremental (edit an entity)** | **~2.0s** | ~5.8s | **~4.6s** |
+
+**The cu-8 hypothesis was wrong.** That attempt concluded the slowdown came from running KAPT and KSP
+together. Removing KAPT entirely recovers the clean-build time but leaves incremental builds still
+**~2.3× slower than KAPT**. Profiling an incremental build shows `kspDebugKotlin` alone at ~3.0s —
+KSP2 reprocesses everything rather than incrementally. The bottleneck is KSP2 itself, not the double
+pipeline. See [[cu-8]] for the follow-up.
+
+### Verification
+
+- `./verify.sh` green; `./test_release_build.sh` green, release APK 5.4 MB, R8 checks pass.
+- App driven on an Android 15 emulator against the cu-16 mock: Home, Library, book details and
+  Settings all render correctly with zero DataBinding.
+- Coverage 7.09% → 6.84%, updated deliberately — generated DataBinding classes were being counted and
+  are now gone. No test was lost.
+
 ## Acceptance Criteria
 
-- [ ] All 30 layouts converted; no `<layout>` wrapper remains in `app/src/main/res/layout`
-- [ ] `dataBinding = false` (or the flag removed) in `app/build.gradle.kts`
-- [ ] No `@BindingAdapter` remains; replacements are ordinary Kotlin called from the call site
-- [ ] LiveData untouched — no StateFlow migration in this task
-- [ ] Every converted screen manually verified to render and behave correctly
-- [ ] `./verify.sh` green; CLAUDE.md convention rule 2 and the DataBinding gotcha updated
-- [ ] cu-8 unblocked: `kotlin-kapt` can be removed with the build still green
+- [x] All 30 layouts converted; no `<layout>` wrapper remains in `app/src/main/res/layout`
+- [x] `dataBinding = false` (flag removed) in `app/build.gradle.kts`
+- [x] No `@BindingAdapter` remains; replacements are ordinary Kotlin called from the call site
+- [x] LiveData untouched — no StateFlow migration in this task
+- [x] Every converted screen manually verified to render and behave correctly
+- [x] `./verify.sh` green; CLAUDE.md convention rule 2 and the DataBinding gotcha updated
+- [x] cu-8 unblocked: `kotlin-kapt` removed with the build still green

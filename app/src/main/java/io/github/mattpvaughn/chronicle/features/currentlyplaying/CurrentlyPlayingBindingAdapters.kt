@@ -5,7 +5,6 @@ import android.view.View
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.constraintlayout.widget.ConstraintSet.*
-import androidx.databinding.BindingAdapter
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import androidx.transition.AutoTransition
 import io.github.mattpvaughn.chronicle.R
@@ -13,7 +12,6 @@ import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.*
 import timber.log.Timber
 
-@BindingAdapter("bottomSheetState")
 fun setBottomSheetState(
   parent: ConstraintLayout,
   state: MainActivityViewModel.BottomSheetState,

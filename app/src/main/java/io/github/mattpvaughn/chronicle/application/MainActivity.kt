@@ -12,7 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.databinding.DataBindingUtil
+import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -30,6 +30,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.ActivityMainBinding
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingFragment
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.setBottomSheetState
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
@@ -39,6 +40,7 @@ import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -103,10 +105,39 @@ class MainActivity : AppCompatActivity() {
     localBroadcastManager = LocalBroadcastManager.getInstance(this)
 
     val binding =
-      DataBindingUtil.setContentView<ActivityMainBinding>(this, R.layout.activity_main)
-    binding.lifecycleOwner = this
-    binding.viewModel = viewModel
-    binding.plexConfig = plexConfig
+      ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
+
+    // Was binding expressions in activity_main.xml.
+    viewModel.currentlyPlayingLayoutState.observe(this) { state ->
+      setBottomSheetState(binding.mainRoot, state)
+    }
+    viewModel.isLoggedIn.observe(this) { loggedIn ->
+      binding.bottomNav.isVisible = loggedIn == true
+      // INVISIBLE, not GONE: the collapsed player keeps its layout slot so the
+      // content above it does not reflow when it appears.
+      binding.currentlyPlayingContainer.visibility =
+        if (loggedIn == true) View.VISIBLE else View.INVISIBLE
+    }
+    viewModel.currentChapterTitle.observe(this) { binding.chapterTitle.text = it }
+    viewModel.audiobook.observe(this) { book ->
+      binding.bookTitle.text = book?.title.orEmpty()
+      binding.currentlyPlayingThumb.contentDescription = book?.title.orEmpty()
+      bindImageRounded(
+        binding.currentlyPlayingThumb,
+        book?.thumb,
+        plexConfig.isConnected.value == true,
+      )
+    }
+    viewModel.isPlaying.observe(this) { playing ->
+      binding.pausePlayButton.setImageResource(
+        if (playing == true) {
+          R.drawable.ic_notification_icon_playing
+        } else {
+          R.drawable.ic_notification_icon_paused
+        },
+      )
+    }
+    binding.pausePlayButton.setOnClickListener { viewModel.pausePlayButtonClicked() }
 
     binding.currentlyPlayingHandle.setOnClickListener {
       viewModel.onCurrentlyPlayingClicked()

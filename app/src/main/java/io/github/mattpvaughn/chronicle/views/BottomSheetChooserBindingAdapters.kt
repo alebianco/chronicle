@@ -2,12 +2,10 @@ package io.github.mattpvaughn.chronicle.views
 
 import android.view.View
 import android.widget.TextView
-import androidx.databinding.BindingAdapter
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString
 
-@BindingAdapter("bottomChooserState")
 fun setBottomChooserState(
   bottomSheetChooser: BottomSheetChooser,
   state: BottomChooserState,
@@ -25,7 +23,6 @@ fun setBottomChooserState(
   bottomSheetChooser.setOptions(state.options)
 }
 
-@BindingAdapter("android:text")
 fun setFormattableText(
   textView: TextView,
   formattableString: FormattableString,

@@ -6,13 +6,11 @@ import android.widget.ImageView
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
-import androidx.databinding.BindingAdapter
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import okhttp3.internal.toHexString
 import timber.log.Timber
 
-@BindingAdapter("chapterList")
 fun bindChapterList(
   recyclerView: RecyclerView,
   chapters: List<Chapter>?,
@@ -21,7 +19,6 @@ fun bindChapterList(
   adapter.submitChapters(chapters ?: emptyList())
 }
 
-@BindingAdapter("android:src")
 fun bindImageDrawableSource(
   imageView: ImageView,
   @DrawableRes drawableRes: Int,
@@ -29,7 +26,6 @@ fun bindImageDrawableSource(
   imageView.setImageResource(drawableRes)
 }
 
-@BindingAdapter("tint")
 fun bindTintResource(
   imageView: ImageView,
   @ColorRes colorRes: Int,

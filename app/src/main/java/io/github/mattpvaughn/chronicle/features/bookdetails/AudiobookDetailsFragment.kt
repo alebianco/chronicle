@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.drawable.AnimatedVectorDrawable
 import android.os.Bundle
 import android.view.*
@@ -9,6 +10,7 @@ import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -20,16 +22,22 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
+import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState
 import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.views.bindImageRounded
+import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.InternalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
+@OptIn(InternalCoroutinesApi::class)
 class AudiobookDetailsFragment : Fragment() {
   companion object {
     fun newInstance() = AudiobookDetailsFragment()
@@ -92,9 +100,85 @@ class AudiobookDetailsFragment : Fragment() {
     viewModel =
       ViewModelProvider(this, viewModelFactory)[AudiobookDetailsViewModel::class.java]
 
-    binding.viewModel = viewModel
-    binding.lifecycleOwner = viewLifecycleOwner
-    binding.plexConfig = plexConfig
+    // Was 29 binding expressions in fragment_audiobook_details.xml.
+    viewModel.audiobook.observe(viewLifecycleOwner) { book ->
+      binding.bookTitle.text = book?.title.orEmpty()
+      binding.author.text = book?.author.orEmpty()
+      binding.infoSummary.text = book?.summary.orEmpty()
+      binding.detailsArtwork.contentDescription = book?.title.orEmpty()
+      bindImageRounded(
+        binding.detailsArtwork,
+        book?.thumb,
+        plexConfig.isConnected.value == true,
+      )
+    }
+    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+      bindImageRounded(
+        binding.detailsArtwork,
+        viewModel.audiobook.value?.thumb,
+        connected == true,
+      )
+    }
+
+    viewModel.progressString.observe(viewLifecycleOwner) { binding.progress.text = it }
+    viewModel.progressPercentageString.observe(viewLifecycleOwner) {
+      binding.progressPercentage.text = it
+    }
+
+    viewModel.cacheStatus.observe(viewLifecycleOwner) { status ->
+      binding.cachingTracksSpinner.isVisible = status == CacheStatus.CACHING
+      // INVISIBLE, not GONE: the icon keeps its slot while the spinner overlays it.
+      binding.download.visibility =
+        if (status == CacheStatus.CACHING) View.INVISIBLE else View.VISIBLE
+    }
+    viewModel.cacheIconDrawable.observe(viewLifecycleOwner) { binding.download.setImageResource(it) }
+    viewModel.cacheIconTint.observe(viewLifecycleOwner) { tint ->
+      binding.download.imageTintList = ColorStateList.valueOf(tint)
+    }
+    binding.download.setOnClickListener { viewModel.onCacheButtonClick() }
+    binding.cachingTracksSpinner.setOnClickListener { viewModel.onCacheButtonClick() }
+
+    viewModel.isBookInViewPlaying.observe(viewLifecycleOwner) { playing ->
+      binding.detailsPausePlay.setImageResource(
+        if (playing == true) {
+          R.drawable.ic_pause_button_large_colored
+        } else {
+          R.drawable.ic_play_button_large_colored
+        },
+      )
+    }
+    binding.detailsPausePlay.setOnClickListener { viewModel.pausePlayButtonClicked() }
+    viewModel.isAudioLoading.observe(viewLifecycleOwner) { loading ->
+      binding.audioLoadingSpinner.isVisible = loading == true
+      binding.detailsPausePlay.isVisible = loading != true
+    }
+
+    viewModel.summaryLinesShown.observe(viewLifecycleOwner) { binding.infoSummary.maxLines = it }
+    viewModel.showSummary.observe(viewLifecycleOwner) { show ->
+      binding.infoSummary.isVisible = show == true
+      binding.infoExpandSummary.isVisible = show == true
+    }
+    viewModel.isExpanded.observe(viewLifecycleOwner) { expanded ->
+      binding.infoExpandSummary.text =
+        getString(if (expanded == true) R.string.less else R.string.more)
+    }
+    binding.infoExpandSummary.setOnClickListener { viewModel.onToggleSummaryView() }
+
+    viewModel.isLoadingTracks.observe(viewLifecycleOwner) {
+      binding.loadingTracksSpinner.isVisible = it == true
+    }
+    viewModel.serverConnection.observe(viewLifecycleOwner) { state ->
+      binding.connectingToServerIndicator.isVisible = state == ConnectionState.CONNECTING
+      binding.connectionFailedMessage.isVisible = state == ConnectionState.CONNECTION_FAILED
+    }
+    binding.connectionFailedMessage.setOnClickListener { viewModel.connectToServer() }
+
+    // Must run after the tracks adapter is assigned: setChapterList casts
+    // recyclerView.adapter, and observe() delivers an already-set value at once.
+    viewModel.chapters.observe(viewLifecycleOwner) { bindChapterList(binding.tracks, it) }
+    viewModel.bottomChooserState.observe(viewLifecycleOwner) {
+      setBottomChooserState(binding.bottomSheetChooser, it)
+    }
 
     val adapter =
       ChapterListAdapter(

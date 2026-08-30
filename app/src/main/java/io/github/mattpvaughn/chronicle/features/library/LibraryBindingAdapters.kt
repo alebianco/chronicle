@@ -4,12 +4,10 @@ import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
-import androidx.databinding.BindingAdapter
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 
-@BindingAdapter("bookList")
 fun bindRecyclerView(
   recyclerView: RecyclerView,
   data: List<Audiobook>?,
@@ -18,7 +16,6 @@ fun bindRecyclerView(
   adapter.submitList(data)
 }
 
-@BindingAdapter("serverConnected")
 fun bindRecyclerView(
   recyclerView: RecyclerView,
   serverConnected: Boolean,
@@ -27,7 +24,6 @@ fun bindRecyclerView(
   adapter.setServerConnected(serverConnected)
 }
 
-@BindingAdapter("overrideWidth")
 fun overrideWidth(
   view: View,
   width: Float,
@@ -35,7 +31,6 @@ fun overrideWidth(
   view.layoutParams.width = if (width > 0) width.toInt() else MATCH_PARENT
 }
 
-@BindingAdapter("isSquare")
 fun setSquareAspectRatio(
   constraintLayout: ConstraintLayout,
   isSquare: Boolean,

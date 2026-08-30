@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.features.login
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
-import androidx.databinding.BindingAdapter
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
@@ -11,7 +10,6 @@ import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import timber.log.Timber
 
-@BindingAdapter("loadingStatus")
 fun bindLoadingStatus(
   recyclerView: RecyclerView,
   loadingStatus: LoadingStatus?,
@@ -25,7 +23,6 @@ fun bindLoadingStatus(
   }
 }
 
-@BindingAdapter("loadingStatus")
 fun bindLoadingStatus(
   errorView: TextView,
   loadingStatus: LoadingStatus?,
@@ -38,7 +35,6 @@ fun bindLoadingStatus(
   }
 }
 
-@BindingAdapter("loadingStatus")
 fun bindLoadingStatus(
   progressBar: ProgressBar,
   loadingStatus: LoadingStatus?,
@@ -51,7 +47,6 @@ fun bindLoadingStatus(
   }
 }
 
-@BindingAdapter("listData")
 fun bindServerData(
   recyclerView: RecyclerView,
   data: List<ServerModel>,
@@ -60,7 +55,6 @@ fun bindServerData(
   adapter.submitList(data)
 }
 
-@BindingAdapter("users")
 fun bindUsers(
   recyclerView: RecyclerView,
   data: List<PlexUser>,
@@ -69,7 +63,6 @@ fun bindUsers(
   adapter.submitList(data)
 }
 
-@BindingAdapter("listData")
 fun bindLibraryData(
   recyclerView: RecyclerView,
   data: List<PlexLibrary>,
