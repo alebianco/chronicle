@@ -23,6 +23,20 @@ class TrackListStateManagerTest {
 
   @Test
   fun updatePosition() {
+    manager.updatePosition(activeTrackIndex = 2, offsetFromTrackStart = 30L)
+
+    assertThat(
+      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      `is`(Pair(2, 30L)),
+    )
+  }
+
+  @Test(expected = IndexOutOfBoundsException::class)
+  fun `updatePosition rejects a track index past the end of the list`() {
+    // Guards the bounds check in updatePosition: silently accepting an index
+    // beyond trackList would leave the manager pointing at a track that does
+    // not exist, and the failure would surface later during playback.
+    manager.updatePosition(activeTrackIndex = exampleTrackList.size, offsetFromTrackStart = 0L)
   }
 
   @Test
