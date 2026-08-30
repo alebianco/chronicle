@@ -14,7 +14,6 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import com.github.michaelbull.result.Ok
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
@@ -432,7 +431,7 @@ class AudiobookMediaSessionCallback
         withContext(Dispatchers.IO) {
           trackRepository.loadTracksForAudiobook(bookId.toInt())
         }
-      if (networkTracks is Ok) {
+      if (networkTracks.isOk) {
         bookRepository.updateTrackData(
           bookId.toInt(),
           networkTracks.value.getProgress(),

@@ -13,7 +13,6 @@ import android.view.Gravity
 import android.widget.Toast
 import androidx.lifecycle.*
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.github.michaelbull.result.Ok
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
@@ -368,7 +367,7 @@ class CurrentlyPlayingViewModel(
           _isLoadingTracks.value = true
         }
         val tracks = trackRepository.loadTracksForAudiobook(bookId)
-        if (tracks is Ok) {
+        if (tracks.isOk) {
           bookRepository.updateTrackData(
             bookId,
             tracks.value.getProgress(),

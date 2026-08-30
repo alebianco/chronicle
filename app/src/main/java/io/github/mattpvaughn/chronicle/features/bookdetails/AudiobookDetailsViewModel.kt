@@ -8,7 +8,6 @@ import android.text.format.DateUtils
 import android.view.Gravity
 import android.widget.Toast
 import androidx.lifecycle.*
-import com.github.michaelbull.result.Ok
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -313,7 +312,7 @@ class AudiobookDetailsViewModel(
         val noExistingChapters = chapters.value.isNullOrEmpty()
         _isLoadingTracks.value = noExistingChapters
         val trackRequest = trackRepository.loadTracksForAudiobook(bookId)
-        if (trackRequest is Ok) {
+        if (trackRequest.isOk) {
           val audiobook = bookRepository.getAudiobookAsync(bookId)
           audiobook?.let {
             trackRepository.syncTracksInBook(audiobook.id)
