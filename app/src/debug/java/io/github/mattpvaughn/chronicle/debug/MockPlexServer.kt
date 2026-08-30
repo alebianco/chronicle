@@ -38,6 +38,11 @@ class MockPlexServer(private val context: Context) {
           if (path.startsWith("/photo/")) {
             return imageResponse()
           }
+          // Audio: serve a generated tone so playback can actually be decoded and
+          // rendered, not merely wired up (cu-64).
+          if (path.startsWith("/library/parts/")) {
+            return audioResponse(request.headers["Range"])
+          }
           val fixture = fixtureFor(path)
           Timber.i("MockPlexServer: $path -> ${fixture ?: "(empty 200)"}")
           if (fixture == null) {
@@ -75,6 +80,53 @@ class MockPlexServer(private val context: Context) {
   }
 
   fun shutdown() = server.shutdown()
+
+  /**
+   * Serves the generated tone, honouring a single-range `Range` header.
+   *
+   * ExoPlayer issues range requests when it seeks, and treats a server that
+   * ignores `Range` as non-seekable — so without this the fixture would exercise
+   * only sequential playback and quietly hide seek bugs.
+   */
+  private fun audioResponse(rangeHeader: String?): MockResponse =
+    try {
+      val bytes = context.assets.open("plex-fixtures/track.wav").use { it.readBytes() }
+      val range = parseRange(rangeHeader, bytes.size)
+      if (range == null) {
+        MockResponse()
+          .setResponseCode(200)
+          .setHeader("Content-Type", "audio/wav")
+          .setHeader("Accept-Ranges", "bytes")
+          .setHeader("Content-Length", bytes.size.toString())
+          .setBody(okio.Buffer().write(bytes))
+      } else {
+        val (start, endInclusive) = range
+        val slice = bytes.copyOfRange(start, endInclusive + 1)
+        MockResponse()
+          .setResponseCode(206)
+          .setHeader("Content-Type", "audio/wav")
+          .setHeader("Accept-Ranges", "bytes")
+          .setHeader("Content-Range", "bytes $start-$endInclusive/${bytes.size}")
+          .setHeader("Content-Length", slice.size.toString())
+          .setBody(okio.Buffer().write(slice))
+      }
+    } catch (e: Exception) {
+      Timber.e(e, "MockPlexServer: missing track.wav")
+      MockResponse().setResponseCode(404)
+    }
+
+  /** Parses `bytes=start-[end]`; returns null for absent or unusable headers. */
+  private fun parseRange(
+    header: String?,
+    size: Int,
+  ): Pair<Int, Int>? {
+    val spec = header?.removePrefix("bytes=")?.trim() ?: return null
+    if (!spec.contains('-') || spec.contains(',')) return null
+    val start = spec.substringBefore('-').toIntOrNull() ?: return null
+    val end = spec.substringAfter('-').toIntOrNull() ?: (size - 1)
+    if (start !in 0 until size) return null
+    return start to end.coerceAtMost(size - 1)
+  }
 
   private fun imageResponse(): MockResponse =
     try {

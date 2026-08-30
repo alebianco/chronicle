@@ -22,7 +22,7 @@
         "viewedLeafCount": 1,
         "leafCount": 3,
         "viewCount": 0,
-        "duration": 10800000,
+        "duration": 15000,
         "index": 1,
         "plexGenres": [{ "tag": "Fantasy" }]
       },
@@ -44,7 +44,7 @@
         "viewedLeafCount": 0,
         "leafCount": 2,
         "viewCount": 0,
-        "duration": 7200000,
+        "duration": 10000,
         "index": 1,
         "plexGenres": [{ "tag": "Science Fiction" }]
       },
@@ -66,7 +66,7 @@
         "viewedLeafCount": 0,
         "leafCount": 1,
         "viewCount": 0,
-        "duration": 3600000,
+        "duration": 5000,
         "index": 1,
         "plexGenres": [{ "tag": "Fantasy" }]
       }

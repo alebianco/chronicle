@@ -43,6 +43,9 @@ class FakePlexServer : ExternalResource() {
           val path = request.path.orEmpty()
           requested += path
           overrides.entries.firstOrNull { path.startsWith(it.key) }?.let { return it.value }
+          if (path.startsWith("/library/parts/")) {
+            return audioResponse(request.headers["Range"])
+          }
           return routeFor(path)
         }
       }
@@ -94,6 +97,47 @@ class FakePlexServer : ExternalResource() {
       else -> MockResponse().setResponseCode(404).setBody("""{"error":"no fixture for $path"}""")
     }
 
+  /**
+   * Serves the generated tone fixture, honouring a single-range `Range` header.
+   *
+   * ExoPlayer range-requests when it seeks and treats a server that ignores
+   * `Range` as non-seekable, so the fixture server has to support it or seek
+   * behaviour cannot be tested at all (cu-64).
+   */
+  fun audioResponse(rangeHeader: String? = null): MockResponse {
+    val bytes = fixtureBytes("track.wav")
+    val range = parseRange(rangeHeader, bytes.size)
+    return if (range == null) {
+      MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "audio/wav")
+        .setHeader("Accept-Ranges", "bytes")
+        .setBody(okio.Buffer().write(bytes))
+    } else {
+      val (start, endInclusive) = range
+      val slice = bytes.copyOfRange(start, endInclusive + 1)
+      MockResponse()
+        .setResponseCode(206)
+        .setHeader("Content-Type", "audio/wav")
+        .setHeader("Accept-Ranges", "bytes")
+        .setHeader("Content-Range", "bytes $start-$endInclusive/${bytes.size}")
+        .setBody(okio.Buffer().write(slice))
+    }
+  }
+
+  /** Parses `bytes=start-[end]`; null for absent or unusable headers. */
+  private fun parseRange(
+    header: String?,
+    size: Int,
+  ): Pair<Int, Int>? {
+    val spec = header?.removePrefix("bytes=")?.trim() ?: return null
+    if (!spec.contains('-') || spec.contains(',')) return null
+    val start = spec.substringBefore('-').toIntOrNull() ?: return null
+    val end = spec.substringAfter('-').toIntOrNull() ?: (size - 1)
+    if (start !in 0 until size) return null
+    return start to end.coerceAtMost(size - 1)
+  }
+
   private fun json(fixture: String): MockResponse =
     MockResponse()
       .setResponseCode(200)
@@ -101,6 +145,13 @@ class FakePlexServer : ExternalResource() {
       .setBody(fixture(fixture))
 
   companion object {
+    /** Reads a binary fixture from the test classpath. */
+    fun fixtureBytes(name: String): ByteArray =
+      FakePlexServer::class.java.classLoader
+        ?.getResourceAsStream("plex-fixtures/$name")
+        ?.use { it.readBytes() }
+        ?: error("Missing fixture: plex-fixtures/$name")
+
     /** Reads a fixture from the test classpath. */
     fun fixture(name: String): String =
       FakePlexServer::class.java.classLoader
