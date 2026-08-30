@@ -7,6 +7,7 @@ import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
@@ -22,6 +23,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentHomeBinding
 import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.AudiobookSearchAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
+import io.github.mattpvaughn.chronicle.features.library.bindRecyclerView
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import javax.inject.Inject
 
@@ -53,9 +55,42 @@ class HomeFragment : Fragment() {
   ): View? {
     val binding = FragmentHomeBinding.inflate(inflater, container, false)
 
-    binding.lifecycleOwner = viewLifecycleOwner
-    binding.viewModel = viewModel
-    binding.plexConfig = plexConfig
+    // Was compound visibility expressions across three shelves in fragment_home.xml.
+    // XML re-ran the whole condition when any source changed; in Kotlin every
+    // contributing source has to drive the shared refresh explicitly.
+    fun refreshShelves() {
+      val added = viewModel.recentlyAdded.value.orEmpty()
+      val listened = viewModel.recentlyListened.value.orEmpty()
+      val downloaded = viewModel.downloaded.value.orEmpty()
+      val offline = viewModel.offlineMode.value == true
+      val allEmpty = added.isEmpty() && listened.isEmpty() && downloaded.isEmpty()
+
+      binding.noBooksMessage.isVisible = allEmpty && !offline
+      binding.offlineEmptyMessage.isVisible = allEmpty && offline
+
+      binding.downloadedTitle.isVisible = downloaded.isNotEmpty()
+      binding.downloadedRecyclerview.isVisible = downloaded.isNotEmpty()
+      binding.recentlyListenedTitle.isVisible = listened.isNotEmpty()
+      binding.onDeckRecyclerview.isVisible = listened.isNotEmpty()
+      binding.recentlyAddedTitle.isVisible = added.isNotEmpty()
+      binding.recentlyAddedRecyclerview.isVisible = added.isNotEmpty()
+
+      bindRecyclerView(binding.downloadedRecyclerview, downloaded)
+      bindRecyclerView(binding.onDeckRecyclerview, listened)
+      bindRecyclerView(binding.recentlyAddedRecyclerview, added)
+    }
+    viewModel.recentlyAdded.observe(viewLifecycleOwner) { refreshShelves() }
+    viewModel.recentlyListened.observe(viewLifecycleOwner) { refreshShelves() }
+    viewModel.downloaded.observe(viewLifecycleOwner) { refreshShelves() }
+    viewModel.offlineMode.observe(viewLifecycleOwner) { refreshShelves() }
+
+    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+      bindRecyclerView(binding.downloadedRecyclerview, connected == true)
+      bindRecyclerView(binding.onDeckRecyclerview, connected == true)
+      bindRecyclerView(binding.recentlyAddedRecyclerview, connected == true)
+    }
+
+    binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
 
     binding.recentlyAddedRecyclerview.adapter = makeAudiobookAdapter()
     binding.recentlyAddedRecyclerview.itemAnimator?.changeDuration = 0

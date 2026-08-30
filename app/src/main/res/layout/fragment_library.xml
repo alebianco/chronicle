@@ -37,6 +37,7 @@ xmlns:tools="http://schemas.android.com/tools"
             android:layout_marginTop="@dimen/margin_normal"
             android:elevation="1dp"
             android:id="@+id/offline_empty_message"
+            android:visibility="gone"
             android:orientation="vertical">
 
             <TextView
@@ -77,6 +78,7 @@ xmlns:tools="http://schemas.android.com/tools"
 
         <TextView
             android:id="@+id/no_books_message"
+            android:visibility="gone"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:drawableTop="@drawable/ic_error_outline_white"
@@ -90,6 +92,7 @@ xmlns:tools="http://schemas.android.com/tools"
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/search_results_list"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@color/colorPrimaryDark"
@@ -100,6 +103,7 @@ xmlns:tools="http://schemas.android.com/tools"
 
             <TextView
                 android:id="@+id/no_search_results_message"
+                android:visibility="gone"
                 style="@style/TextAppearance.Body1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
