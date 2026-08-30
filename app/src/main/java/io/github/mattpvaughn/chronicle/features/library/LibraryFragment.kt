@@ -10,6 +10,7 @@ import androidx.appcompat.widget.SearchView
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -32,8 +33,10 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
+import io.github.mattpvaughn.chronicle.features.search.bindSearchRecyclerView
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.views.checkRadioButtonWithTag
+import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,9 +74,53 @@ class LibraryFragment : Fragment() {
   ): View? {
     Timber.i("Lib frag view create")
     val binding = FragmentLibraryBinding.inflate(inflater, container, false)
-    binding.lifecycleOwner = viewLifecycleOwner
-    binding.viewModel = viewModel
-    binding.plexConfig = plexConfig
+
+    // Was compound visibility expressions in fragment_library.xml. XML combined
+    // several LiveData sources implicitly; in Kotlin each source has to re-run
+    // the whole condition, so the shared logic is factored into one function.
+    fun refreshEmptyStates() {
+      val books = viewModel.books.value.orEmpty()
+      val offline = viewModel.isOffline.value == true
+      binding.offlineEmptyMessage.isVisible = books.isEmpty() && offline
+      binding.noBooksMessage.isVisible = books.isEmpty() && !offline
+      binding.swipeToRefresh.isVisible = books.isNotEmpty()
+    }
+    viewModel.books.observe(viewLifecycleOwner) { refreshEmptyStates() }
+    viewModel.isOffline.observe(viewLifecycleOwner) { refreshEmptyStates() }
+
+    fun refreshSearchStates() {
+      val results = viewModel.searchResults.value.orEmpty()
+      val active = viewModel.isSearchActive.value == true
+      val queryEmpty = viewModel.isQueryEmpty.value == true
+      binding.searchResultsList.isVisible = active
+      binding.noSearchResultsMessage.isVisible = results.isEmpty() && active && !queryEmpty
+      bindSearchRecyclerView(binding.searchResultsList, results)
+    }
+    viewModel.searchResults.observe(viewLifecycleOwner) { refreshSearchStates() }
+    viewModel.isSearchActive.observe(viewLifecycleOwner) { refreshSearchStates() }
+    viewModel.isQueryEmpty.observe(viewLifecycleOwner) { refreshSearchStates() }
+
+    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+      bindSearchRecyclerView(binding.searchResultsList, connected == true)
+    }
+
+    viewModel.bottomChooserState.observe(viewLifecycleOwner) { state ->
+      setBottomChooserState(binding.bottomSheetChooser, state)
+    }
+
+    binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
+    binding.doneFiltering.setOnClickListener { viewModel.setFilterMenuVisible(false) }
+    binding.sortByContainer.setOnClickListener { viewModel.toggleSortDirection() }
+    viewModel.isSortDescending.observe(viewLifecycleOwner) { descending ->
+      binding.sortByContainer.contentDescription =
+        getString(
+          if (descending == true) {
+            R.string.toggle_library_sort_ascending
+          } else {
+            R.string.toggle_library_sort_descending
+          },
+        )
+    }
 
     adapter =
       AudiobookAdapter(

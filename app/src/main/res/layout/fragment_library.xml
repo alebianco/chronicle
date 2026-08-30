@@ -1,381 +1,345 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools">
+<LinearLayout
+xmlns:android="http://schemas.android.com/apk/res/android"
+xmlns:app="http://schemas.android.com/apk/res-auto"
+xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorPrimaryDark"
+    android:orientation="vertical"
+    tools:context=".features.library.LibraryFragment">
 
-    <data>
-
-        <variable
-            name="viewModel"
-            type="io.github.mattpvaughn.chronicle.features.library.LibraryViewModel" />
-
-        <variable
-            name="plexConfig"
-            type="io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig" />
-
-        <import type="android.view.View" />
-
-        <import type="io.github.mattpvaughn.chronicle.data.model.Audiobook" />
-
-        <import type="io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaTypes" />
-
-        <import type="androidx.recyclerview.widget.GridLayoutManager" />
-
-        <import type="androidx.recyclerview.widget.LinearLayoutManager" />
-    </data>
-
-    <LinearLayout
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/toolbar_layout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/colorPrimaryDark"
-        android:orientation="vertical"
-        tools:context=".features.library.LibraryFragment">
+        android:layout_height="wrap_content">
 
-        <com.google.android.material.appbar.AppBarLayout
-            android:id="@+id/toolbar_layout"
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="?attr/actionBarSize"
+            android:theme="@style/ToolbarTheme"
+            app:collapseIcon="@drawable/ic_search_white"
+            app:menu="@menu/library_menu"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
+            app:title="@string/tab_library" />
 
-            <androidx.appcompat.widget.Toolbar
-                android:id="@+id/toolbar"
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/library_coordinator"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="@dimen/margin_normal"
+            android:elevation="1dp"
+            android:id="@+id/offline_empty_message"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/TextAppearance.Title"
                 android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
-                android:theme="@style/ToolbarTheme"
-                app:collapseIcon="@drawable/ic_search_white"
-                app:menu="@menu/library_menu"
-                app:popupTheme="@style/ThemeOverlay.AppCompat.Dark"
-                app:title="@string/tab_library" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/margin_normal"
+                android:text="@string/no_downloaded_books_found"
+                android:textAlignment="center"
+                tools:visibility="gone" />
 
-        </com.google.android.material.appbar.AppBarLayout>
+            <Button
+                android:id="@+id/disable_offline_mode"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:text="@string/disable_offline_mode" />
+        </LinearLayout>
 
-        <androidx.coordinatorlayout.widget.CoordinatorLayout
-            android:id="@+id/library_coordinator"
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_to_refresh"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <LinearLayout
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/library_grid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingLeft="@dimen/margin_small"
+                android:paddingRight="@dimen/margin_small"
+                tools:listitem="@layout/grid_item_audiobook" />
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <TextView
+            android:id="@+id/no_books_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableTop="@drawable/ic_error_outline_white"
+            android:drawablePadding="@dimen/spacing_micro"
+            android:text="@string/no_books_found" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/search_results_list"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_marginTop="@dimen/margin_normal"
-                android:elevation="1dp"
-                android:orientation="vertical"
-                android:visibility="@{viewModel.books.isEmpty() &amp;&amp; viewModel.isOffline() ? View.VISIBLE : View.GONE}">
-
-                <TextView
-                    style="@style/TextAppearance.Title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/margin_normal"
-                    android:text="@string/no_downloaded_books_found"
-                    android:textAlignment="center"
-                    tools:visibility="gone" />
-
-                <Button
-                    style="@style/Widget.MaterialComponents.Button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:onClick="@{() -> viewModel.disableOfflineMode()}"
-                    android:text="@string/disable_offline_mode" />
-            </LinearLayout>
-
-            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-                android:id="@+id/swipe_to_refresh"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="@{viewModel.books.isEmpty ? View.GONE : View.VISIBLE}">
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/library_grid"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingLeft="@dimen/margin_small"
-                    android:paddingRight="@dimen/margin_small"
-                    tools:listitem="@layout/grid_item_audiobook" />
-
-            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+                android:background="@color/colorPrimaryDark"
+                android:elevation="8dp"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                tools:itemCount="9"
+                tools:listitem="@layout/list_item_search_result_audiobook" />
 
             <TextView
-                android:id="@+id/no_books_message"
+                android:id="@+id/no_search_results_message"
+                style="@style/TextAppearance.Body1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:drawableTop="@drawable/ic_error_outline_white"
-                android:drawablePadding="@dimen/spacing_micro"
-                android:text="@string/no_books_found"
-                android:visibility="@{viewModel.books.isEmpty &amp;&amp; !viewModel.isOffline() ? View.VISIBLE : View.GONE}" />
+                android:layout_marginTop="@dimen/margin_normal"
+                android:elevation="8dp"
+                android:text="@string/no_books_found" />
+        </LinearLayout>
+
+        <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
+            android:id="@+id/bottom_sheet_chooser"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:elevation="1dp"
+            tools:layout="@layout/view_bottom_sheet_chooser" />
+
+        <!-- TODO: figure out how to <include /> with databinding -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/filter_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/colorPrimaryDark"
+            android:clickable="true"
+            android:padding="@dimen/screen_horizontal_padding"
+            app:behavior_fitToContents="true"
+            app:behavior_hideable="true"
+            app:behavior_skipCollapsed="true"
+            app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+            tools:ignore="KeyboardInaccessibleWidget">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/filter_title"
+                style="@style/TextAppearance.SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/filter"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/done_filtering"
+                style="@style/TextAppearance.Body2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:text="@string/done_filtering"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
             <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/search_results_list"
-                    searchBookList="@{viewModel.searchResults}"
-                    serverConnectedSearch="@{plexConfig.isConnected()}"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@color/colorPrimaryDark"
-                    android:elevation="8dp"
-                    android:visibility="@{viewModel.isSearchActive() ? View.VISIBLE: View.GONE}"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:itemCount="9"
-                    tools:listitem="@layout/list_item_search_result_audiobook" />
-
-                <TextView
-                    style="@style/TextAppearance.Body1"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/margin_normal"
-                    android:elevation="8dp"
-                    android:text="@string/no_books_found"
-                    android:visibility="@{viewModel.searchResults.isEmpty() &amp;&amp; viewModel.isSearchActive() &amp;&amp; !viewModel.isQueryEmpty() ? View.VISIBLE : View.GONE}" />
-            </LinearLayout>
-
-            <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
-                android:id="@+id/bottom_sheet_chooser"
-                bottomChooserState="@{viewModel.bottomChooserState}"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:elevation="1dp"
-                tools:layout="@layout/view_bottom_sheet_chooser" />
-
-            <!-- TODO: figure out how to <include /> with databinding -->
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:id="@+id/filter_view"
-                android:layout_width="match_parent"
+                android:id="@+id/sort_by_container"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@color/colorPrimaryDark"
+                android:background="?attr/selectableItemBackground"
                 android:clickable="true"
-                android:padding="@dimen/screen_horizontal_padding"
-                app:behavior_fitToContents="true"
-                app:behavior_hideable="true"
-                app:behavior_skipCollapsed="true"
-                app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
-                tools:ignore="KeyboardInaccessibleWidget">
+                android:focusable="true"
+                android:orientation="horizontal"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/filter_title">
 
                 <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/filter_title"
-                    style="@style/TextAppearance.SectionHeader"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/filter"
-                    app:layout_constraintLeft_toLeftOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/done_filtering"
-                    style="@style/TextAppearance.Body2"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:onClick="@{() -> viewModel.setFilterMenuVisible(false)}"
-                    android:text="@string/done_filtering"
-                    app:layout_constraintRight_toRightOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-
-                <LinearLayout
-                    android:id="@+id/sort_by_container"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:contentDescription="@{viewModel.isSortDescending() ? @string/toggle_library_sort_ascending : @string/toggle_library_sort_descending}"
-                    android:focusable="true"
-                    android:onClick="@{() -> viewModel.toggleSortDirection()}"
-                    android:orientation="horizontal"
-                    app:layout_constraintLeft_toLeftOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/filter_title">
-
-                    <androidx.appcompat.widget.AppCompatTextView
-                        android:id="@+id/sort_by"
-                        style="@style/TextAppearance.Body1"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_vertical"
-                        android:paddingTop="@dimen/margin_normal"
-                        android:paddingBottom="@dimen/margin_normal"
-                        android:text="@string/sort_by" />
-
-                    <androidx.appcompat.widget.AppCompatImageView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_vertical"
-                        android:layout_margin="@dimen/spacing_normal"
-                        android:rotationX="@{viewModel.isSortDescending() ? 0 : 180}"
-                        android:src="@drawable/ic_arrow_trending_down_white"
-                        android:tint="@color/icon" />
-
-                </LinearLayout>
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/sort_by_options"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    app:layout_constraintLeft_toLeftOf="parent"
-                    app:layout_constraintRight_toRightOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/sort_by_container">
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_sort_by_title"
-                        android:text="@string/sort_by_title" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_sort_by_author"
-                        android:text="@string/sort_by_author" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_sort_by_duration"
-                        android:text="@string/sort_by_duration" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_sort_by_date_added"
-                        android:text="@string/sort_by_date_added" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_sort_by_date_played"
-                        android:text="@string/sort_by_date_played" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_sort_by_year"
-                        android:text="@string/sort_by_year" />
-
-                    <!--                    <com.google.android.material.chip.Chip-->
-                    <!--                        android:layout_width="wrap_content"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:tag="@string/key_sort_by_rating"-->
-                    <!--                        android:text="@string/sort_by_rating" />-->
-
-                    <!--                    <com.google.android.material.chip.Chip -->
-                    <!--                        android:layout_width="wrap_content"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:tag="@string/key_sort_by_plays"-->
-                    <!--                        android:text="@string/sort_by_plays" />-->
-
-                </com.google.android.material.chip.ChipGroup>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/hide_played"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_gravity="end"
-                    android:layout_marginTop="12dp"
-                    android:layout_weight="1"
-                    android:checked="@{viewModel.arePlayedAudiobooksHidden}"
-                    android:fontFamily="@font/lato"
-                    android:onClick="@{() -> viewModel.toggleHidePlayedAudiobooks()}"
-                    android:text="@string/hide_played_switch"
-                    android:textColor="#D8FFFFFF"
-                    android:textSize="16sp"
-                    app:layout_constraintTop_toBottomOf="@+id/sort_by_options"
-                    tools:layout_editor_absoluteX="16dp" />
-
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/view_style_title"
+                    android:id="@+id/sort_by"
                     style="@style/TextAppearance.Body1"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_vertical"
                     android:paddingTop="@dimen/margin_normal"
                     android:paddingBottom="@dimen/margin_normal"
-                    android:text="@string/view_style"
-                    app:layout_constraintLeft_toLeftOf="parent"
-                    app:layout_constraintRight_toRightOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/hide_played" />
+                    android:text="@string/sort_by" />
 
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/view_styles"
-                    android:layout_width="0dp"
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    app:layout_constraintLeft_toLeftOf="parent"
-                    app:layout_constraintRight_toRightOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/view_style_title">
+                    android:layout_gravity="center_vertical"
+                    android:layout_margin="@dimen/spacing_normal"
+                    android:src="@drawable/ic_arrow_trending_down_white"
+                    android:tint="@color/icon" />
 
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_view_style_cover_grid"
-                        android:text="@string/view_style_book_cover" />
+            </LinearLayout>
 
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_view_style_details"
-                        android:text="@string/view_style_cover_and_text_list" />
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/sort_by_options"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/sort_by_container">
 
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:tag="@string/key_view_style_text_only"
-                        android:text="@string/view_style_text_list" />
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_sort_by_title"
+                    android:text="@string/sort_by_title" />
 
-                </com.google.android.material.chip.ChipGroup>
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_sort_by_author"
+                    android:text="@string/sort_by_author" />
 
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_sort_by_duration"
+                    android:text="@string/sort_by_duration" />
 
-                <!-- TODO: add view by folder, view by author, etc.-->
-                <!--                <androidx.appcompat.widget.AppCompatTextView-->
-                <!--                    android:id="@+id/view_by"-->
-                <!--                    style="@style/TextAppearance.Body1"-->
-                <!--                    android:layout_width="wrap_content"-->
-                <!--                    android:layout_height="wrap_content"-->
-                <!--                    android:paddingTop="@dimen/margin_normal"-->
-                <!--                    android:paddingBottom="@dimen/margin_normal"-->
-                <!--                    android:text="@string/view_by"-->
-                <!--                    app:layout_constraintLeft_toLeftOf="parent"-->
-                <!--                    app:layout_constraintTop_toBottomOf="@id/sort_by_options" />-->
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_sort_by_date_added"
+                    android:text="@string/sort_by_date_added" />
 
-                <!--                <com.google.android.material.chip.ChipGroup-->
-                <!--                    android:id="@+id/view_by_options"-->
-                <!--                    android:layout_width="0dp"-->
-                <!--                    android:layout_height="wrap_content"-->
-                <!--                    app:itemSpacing="@dimen/margin_small"-->
-                <!--                    app:layout_constraintLeft_toLeftOf="parent"-->
-                <!--                    app:layout_constraintRight_toRightOf="parent"-->
-                <!--                    app:layout_constraintTop_toBottomOf="@id/view_by"-->
-                <!--                    app:lineSpacing="@dimen/margin_small">-->
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_sort_by_date_played"
+                    android:text="@string/sort_by_date_played" />
+
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_sort_by_year"
+                    android:text="@string/sort_by_year" />
+
+                <!--                    <com.google.android.material.chip.Chip-->
+                <!--                        android:layout_width="wrap_content"-->
+                <!--                        android:layout_height="wrap_content"-->
+                <!--                        android:tag="@string/key_sort_by_rating"-->
+                <!--                        android:text="@string/sort_by_rating" />-->
 
                 <!--                    <com.google.android.material.chip.Chip -->
                 <!--                        android:layout_width="wrap_content"-->
                 <!--                        android:layout_height="wrap_content"-->
-                <!--                        android:tag="@string/key_view_by_book"-->
-                <!--                        android:text="@string/view_by_book" />-->
+                <!--                        android:tag="@string/key_sort_by_plays"-->
+                <!--                        android:text="@string/sort_by_plays" />-->
 
-                <!--                    <com.google.android.material.chip.Chip -->
-                <!--                        android:layout_width="wrap_content"-->
-                <!--                        android:layout_height="wrap_content"-->
-                <!--                        android:tag="@string/key_view_by_author"-->
-                <!--                        android:text="@string/view_by_author" />-->
+            </com.google.android.material.chip.ChipGroup>
 
-                <!--                    <com.google.android.material.chip.Chip -->
-                <!--                        android:layout_width="wrap_content"-->
-                <!--                        android:layout_height="wrap_content"-->
-                <!--                        android:tag="@string/key_view_by_folder"-->
-                <!--                        android:text="@string/view_by_folder" />-->
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/hide_played"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:layout_marginTop="12dp"
+                android:layout_weight="1"
+                android:fontFamily="@font/lato"
+                android:text="@string/hide_played_switch"
+                android:textColor="#D8FFFFFF"
+                android:textSize="16sp"
+                app:layout_constraintTop_toBottomOf="@+id/sort_by_options"
+                tools:layout_editor_absoluteX="16dp" />
 
-                <!--                    <com.google.android.material.chip.Chip -->
-                <!--                        android:layout_width="wrap_content"-->
-                <!--                        android:layout_height="wrap_content"-->
-                <!--                        android:tag="@string/key_view_by_collection"-->
-                <!--                        android:text="@string/view_by_collection" />-->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/view_style_title"
+                style="@style/TextAppearance.Body1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:paddingTop="@dimen/margin_normal"
+                android:paddingBottom="@dimen/margin_normal"
+                android:text="@string/view_style"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/hide_played" />
 
-                <!--                </com.google.android.material.chip.ChipGroup-->
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/view_styles"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/view_style_title">
 
-            </androidx.constraintlayout.widget.ConstraintLayout>
-        </androidx.coordinatorlayout.widget.CoordinatorLayout>
-    </LinearLayout>
-</layout>
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_view_style_cover_grid"
+                    android:text="@string/view_style_book_cover" />
+
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_view_style_details"
+                    android:text="@string/view_style_cover_and_text_list" />
+
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="@string/key_view_style_text_only"
+                    android:text="@string/view_style_text_list" />
+
+            </com.google.android.material.chip.ChipGroup>
+
+            <!-- TODO: add view by folder, view by author, etc.-->
+            <!--                <androidx.appcompat.widget.AppCompatTextView-->
+            <!--                    android:id="@+id/view_by"-->
+            <!--                    style="@style/TextAppearance.Body1"-->
+            <!--                    android:layout_width="wrap_content"-->
+            <!--                    android:layout_height="wrap_content"-->
+            <!--                    android:paddingTop="@dimen/margin_normal"-->
+            <!--                    android:paddingBottom="@dimen/margin_normal"-->
+            <!--                    android:text="@string/view_by"-->
+            <!--                    app:layout_constraintLeft_toLeftOf="parent"-->
+            <!--                    app:layout_constraintTop_toBottomOf="@id/sort_by_options" />-->
+
+            <!--                <com.google.android.material.chip.ChipGroup-->
+            <!--                    android:id="@+id/view_by_options"-->
+            <!--                    android:layout_width="0dp"-->
+            <!--                    android:layout_height="wrap_content"-->
+            <!--                    app:itemSpacing="@dimen/margin_small"-->
+            <!--                    app:layout_constraintLeft_toLeftOf="parent"-->
+            <!--                    app:layout_constraintRight_toRightOf="parent"-->
+            <!--                    app:layout_constraintTop_toBottomOf="@id/view_by"-->
+            <!--                    app:lineSpacing="@dimen/margin_small">-->
+
+            <!--                    <com.google.android.material.chip.Chip -->
+            <!--                        android:layout_width="wrap_content"-->
+            <!--                        android:layout_height="wrap_content"-->
+            <!--                        android:tag="@string/key_view_by_book"-->
+            <!--                        android:text="@string/view_by_book" />-->
+
+            <!--                    <com.google.android.material.chip.Chip -->
+            <!--                        android:layout_width="wrap_content"-->
+            <!--                        android:layout_height="wrap_content"-->
+            <!--                        android:tag="@string/key_view_by_author"-->
+            <!--                        android:text="@string/view_by_author" />-->
+
+            <!--                    <com.google.android.material.chip.Chip -->
+            <!--                        android:layout_width="wrap_content"-->
+            <!--                        android:layout_height="wrap_content"-->
+            <!--                        android:tag="@string/key_view_by_folder"-->
+            <!--                        android:text="@string/view_by_folder" />-->
+
+            <!--                    <com.google.android.material.chip.Chip -->
+            <!--                        android:layout_width="wrap_content"-->
+            <!--                        android:layout_height="wrap_content"-->
+            <!--                        android:tag="@string/key_view_by_collection"-->
+            <!--                        android:text="@string/view_by_collection" />-->
+
+            <!--                </com.google.android.material.chip.ChipGroup-->
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>
