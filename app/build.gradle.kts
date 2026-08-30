@@ -139,6 +139,10 @@ dependencies {
   // Robolectric drives real SQLite in a JVM test, which lets the Room migration
   // suite run in the unit-test gate. Room's own MigrationTestHelper is
   // instrumented-only, and instrumented tests are quarantined (cu-54).
+  testImplementation(libs.okhttp3.mockwebserver)
+  testImplementation(libs.retrofit)
+  testImplementation(libs.retrofit.converter)
+  testImplementation(libs.moshi)
   testImplementation(libs.robolectric)
   testImplementation(libs.androidx.test.core)
 

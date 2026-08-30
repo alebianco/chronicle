@@ -1,0 +1,26 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "uuid": "fixture-user-admin",
+      "title": "Owner",
+      "username": "owner",
+      "thumb": "https://plex.tv/users/fixture/avatar",
+      "hasPassword": false,
+      "admin": true,
+      "guest": false,
+      "authToken": "fixture-user-token-admin"
+    },
+    {
+      "id": 2,
+      "uuid": "fixture-user-managed",
+      "title": "Household",
+      "username": null,
+      "thumb": "https://plex.tv/users/fixture/avatar2",
+      "hasPassword": true,
+      "admin": false,
+      "guest": false,
+      "authToken": null
+    }
+  ]
+}

@@ -63,7 +63,10 @@ data class Audiobook(
         author = dir.parentTitle,
         thumb = dir.thumb,
         parentId = dir.parentRatingKey,
-        genre = dir.plexGenres.joinToString(separator = ", "),
+        // joinToString on the data class itself yields "PlexGenre(tag=Fantasy)";
+        // this field reaches MediaMetadataCompat, so Android Auto and the media
+        // notification would show that literal string (found via cu-16 fixtures).
+        genre = dir.plexGenres.joinToString(separator = ", ") { it.tag },
         summary = dir.summary,
         year = dir.year.takeIf { it != 0 } ?: dir.parentYear,
         addedAt = dir.addedAt,

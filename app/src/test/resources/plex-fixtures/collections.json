@@ -1,0 +1,20 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "Metadata": [
+      {
+        "ratingKey": "5001",
+        "key": "/library/collections/5001/children",
+        "title": "Middle-earth",
+        "titleSort": "Middle-earth",
+        "type": "collection",
+        "thumb": "/library/collections/5001/composite/1600000000",
+        "summary": "Tolkien readalong",
+        "childCount": 1,
+        "addedAt": 1600000000,
+        "updatedAt": 1600000100,
+        "collectionSort": "0"
+      }
+    ]
+  }
+}

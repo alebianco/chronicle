@@ -1,0 +1,21 @@
+[
+  {
+    "name": "Fixture Server",
+    "provides": "server",
+    "clientIdentifier": "fixture-server-0000-0000",
+    "accessToken": "fixture-access-token",
+    "owned": true,
+    "connections": [
+      { "uri": "http://10.0.0.42:32400", "local": true },
+      { "uri": "https://fixture-server.plex.direct:32400", "local": false }
+    ]
+  },
+  {
+    "name": "Fixture Player",
+    "provides": "player",
+    "clientIdentifier": "fixture-player-0000-0000",
+    "accessToken": "fixture-access-token",
+    "owned": true,
+    "connections": [{ "uri": "http://10.0.0.43:32500", "local": true }]
+  }
+]
