@@ -34,9 +34,9 @@ class LibraryListAdapter(val clickListener: LibraryClickListener) :
         plexLibrary: PlexLibrary,
         clickListener: LibraryClickListener,
       ) {
-        binding.library = plexLibrary
-        binding.clickListener = clickListener
-        binding.executePendingBindings()
+        // Was binding expressions in list_item_library.xml.
+        binding.libraryName.text = plexLibrary.name
+        binding.libraryItemRoot.setOnClickListener { clickListener.onClick(plexLibrary) }
       }
 
       companion object {

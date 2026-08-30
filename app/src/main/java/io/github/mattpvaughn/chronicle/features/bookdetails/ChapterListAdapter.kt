@@ -12,6 +12,7 @@ import io.github.mattpvaughn.chronicle.databinding.ListItemDiscNumberSectionHead
 import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter.ChapterListModel.ChapterItemModel
 import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter.ChapterListModel.SectionHeaderWrapper
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser
+import io.github.mattpvaughn.chronicle.views.setFormattableText
 import timber.log.Timber
 
 class ChapterListAdapter(val clickListener: TrackClickListener) :
@@ -173,8 +174,8 @@ class ChapterListAdapter(val clickListener: TrackClickListener) :
     private val binding: ListItemDiscNumberSectionHeadingBinding,
   ) : RecyclerView.ViewHolder(binding.root) {
     fun bind(heading: SectionHeaderModel) {
-      binding.sectionHeader = heading
-      binding.executePendingBindings()
+      // Was a binding expression in list_item_disc_number_section_heading.xml.
+      setFormattableText(binding.discNumber, heading.text)
     }
 
     companion object {

@@ -32,10 +32,10 @@ class UserListAdapter(val clickListener: UserClickListener) :
         user: PlexUser,
         clickListener: UserClickListener,
       ) {
-        binding.user = user
+        // Was binding expressions in list_item_user.xml.
         binding.userThumb.load(user.thumb?.toUri())
-        binding.clickListener = clickListener
-        binding.executePendingBindings()
+        binding.libraryName.text = user.title
+        binding.userItemRoot.setOnClickListener { clickListener.onClick(user) }
       }
 
       companion object {

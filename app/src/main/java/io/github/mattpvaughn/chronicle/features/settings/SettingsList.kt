@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.CompoundButton
 import android.widget.FrameLayout
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
@@ -16,6 +17,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.PreferenceItemClickableBinding
 import io.github.mattpvaughn.chronicle.databinding.PreferenceItemSwitchBinding
 import io.github.mattpvaughn.chronicle.databinding.PreferenceItemTitleBinding
+import io.github.mattpvaughn.chronicle.views.setFormattableText
 
 /**
  * A view which shows
@@ -81,8 +83,12 @@ class SettingsList : FrameLayout {
     class ClickablePreferenceViewHolder(val binding: PreferenceItemClickableBinding) :
       RecyclerView.ViewHolder(binding.root) {
       fun bind(preferenceModel: PreferenceModel) {
-        binding.model = preferenceModel
-        binding.executePendingBindings()
+        // Was binding expressions in preference_item_clickable.xml.
+        setFormattableText(binding.preferenceTitle, preferenceModel.title)
+        setFormattableText(binding.preferenceExplanation, preferenceModel.explanation)
+        binding.preferenceClickableContent.setOnClickListener {
+          preferenceModel.click.onClick()
+        }
       }
 
       companion object {
@@ -99,7 +105,10 @@ class SettingsList : FrameLayout {
       private val prefsRepo: PrefsRepo,
     ) : RecyclerView.ViewHolder(binding.root) {
       fun bind(preferenceModel: PreferenceModel) {
-        binding.model = preferenceModel
+        // Was binding expressions in preference_item_switch.xml.
+        setFormattableText(binding.preferenceTitle, preferenceModel.title)
+        setFormattableText(binding.preferenceExplanation, preferenceModel.explanation)
+        binding.preferenceExplanation.isVisible = preferenceModel.hasExplanation()
         binding.preferenceSwitch.isChecked =
           if (prefsRepo.containsKey(preferenceModel.key)) {
             prefsRepo.getBoolean(preferenceModel.key)
@@ -114,7 +123,6 @@ class SettingsList : FrameLayout {
           prefsRepo.setBoolean(preferenceModel.key, newIsChecked)
           binding.preferenceSwitch.isChecked = newIsChecked
         }
-        binding.executePendingBindings()
       }
 
       companion object {
@@ -132,8 +140,8 @@ class SettingsList : FrameLayout {
     class TitlePreferenceViewHolder(val binding: PreferenceItemTitleBinding) :
       RecyclerView.ViewHolder(binding.root) {
       fun bind(preferenceModel: PreferenceModel) {
-        binding.model = preferenceModel
-        binding.executePendingBindings()
+        // Was a binding expression in preference_item_title.xml.
+        setFormattableText(binding.preferenceTitle, preferenceModel.title)
       }
 
       companion object {

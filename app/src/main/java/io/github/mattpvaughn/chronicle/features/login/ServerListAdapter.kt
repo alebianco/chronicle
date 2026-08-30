@@ -34,9 +34,9 @@ class ServerListAdapter(val clickListener: ServerClickListener) :
         server: ServerModel,
         clickListener: ServerClickListener,
       ) {
-        binding.server = server
-        binding.clickListener = clickListener
-        binding.executePendingBindings()
+        // Was binding expressions in list_item_server.xml.
+        binding.libraryName.text = server.name
+        binding.serverItemRoot.setOnClickListener { clickListener.onClick(server) }
       }
 
       companion object {
