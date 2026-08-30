@@ -5,7 +5,7 @@ status: Draft
 assignee: []
 created_date: '2026-07-13'
 labels: [R4, architecture]
-dependencies: []
+dependencies: [cu-58]
 priority: low
 milestone: m-4
 ---
@@ -16,9 +16,24 @@ M2: migrate ViewModels/repositories from LiveData to StateFlow. Upstream's own t
 
 Analysis: [`M2-stateflow-migration-plan.md`](../docs/analysis/M2-stateflow-migration-plan.md).
 
-## Open question / why this is a draft
+## Sequencing (owner decision 2026-08-30)
 
-Needs an owner decision before it becomes a tracked task (see below).
+Third in the UI-layer sequence: **cu-58 (DataBinding→ViewBinding) → cu-8 (KAPT→KSP) → this**.
+
+Deliberately kept out of cu-58. The two are coupled only at the XML boundary: 10 files set
+`lifecycleOwner` so layouts can observe LiveData. Once cu-58 moves observation into Kotlin, those call
+sites are `liveData.observe(viewLifecycleOwner) { … }` — which works fine and does **not** require
+StateFlow. Bundling them would have meant ~30 layouts + 73 `MutableLiveData` declarations + 35
+`observe` sites in one change against 3.76% coverage.
+
+Scope when it starts: 28 files reference LiveData, 73 `MutableLiveData` declarations, 35 `observe`
+call sites.
+
+## Open question / why this is still a draft
+
+Still needs an owner decision on *whether* to migrate at all — unlike cu-58, nothing is blocked by
+LiveData and it is not deprecated. Upstream's own note ("may not be worth it if LiveData works well")
+stands. Promote to a task only if the answer is yes.
 
 ## Acceptance Criteria (provisional)
 

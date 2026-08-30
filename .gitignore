@@ -47,3 +47,6 @@ Thumbs.db
 # backlog/ instead (execution plans -> the task's ## Implementation Plan; design
 # specs -> a backlog/decisions/ record or the task description). See CLAUDE.md §Workflow.
 docs/superpowers/
+
+# Kotlin build tooling session data
+.kotlin/

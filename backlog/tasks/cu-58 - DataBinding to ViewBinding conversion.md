@@ -1,0 +1,88 @@
+---
+id: cu-58
+title: DataBinding to ViewBinding conversion
+status: To Do
+assignee: []
+created_date: '2026-08-30'
+labels: [R1, architecture]
+dependencies: []
+priority: high
+milestone: m-1
+---
+
+## Description
+
+Replace DataBinding with ViewBinding across the UI layer. Owner decision 2026-08-30: do the conversion
+**before** the R3 redesigns (cu-26/27/28), and sequence it as **cu-58 → cu-8 → cu-52**.
+
+### Why
+
+- **DataBinding is the sole reason KAPT cannot be removed.** Verified during the cu-8 attempt: Room and
+  Dagger both moved to KSP cleanly, but deleting `kotlin-kapt` breaks the build because DataBinding's
+  `*BindingImpl` / `DataBinderMapperImpl` / `BR` classes are KAPT-only. cu-8 is blocked on this task, and
+  currently costs ~3× slower incremental builds if attempted anyway.
+- **DataBinding is effectively end-of-life.** Google steers new work to ViewBinding or Compose;
+  DataBinding receives maintenance only. ViewBinding is the boring, supported target with the same
+  generated-binding ergonomics and no annotation processor.
+- **218 `@{...}` expressions are logic living in XML** — not type-checked by the Kotlin compiler, not
+  unit-testable, invisible to the cu-3 coverage ratchet. For a project whose north star is
+  agent-implementable code with a truthful verify loop, that is a standing liability.
+- Removes the documented "phantom binding errors, run a clean" gotcha in CLAUDE.md.
+
+### Scope (measured 2026-08-30)
+
+| | Count |
+|---|---|
+| Layouts using `<layout>` DataBinding | **30 of 32** |
+| Kotlin files importing `databinding` | 30 |
+| `@BindingAdapter` functions (across 8 files) | 23 |
+| `<variable>` declarations in XML | 64 |
+| `@{...}` binding expressions in XML | **218** |
+| Two-way `@={...}` bindings | **0** ← the one mercy |
+| Fragments/Activities | 12 |
+
+Zero two-way bindings is the good news: those are the genuinely painful conversions. Everything here is
+one-way and can move to imperative Kotlin.
+
+### Explicitly NOT in scope: LiveData
+
+LiveData stays. The two are coupled only at the XML boundary — 10 files set `lifecycleOwner` so layouts
+can observe LiveData directly, and moving `@{viewModel.foo}` into Kotlin means writing an observation
+call at each site. But that call can be `liveData.observe(viewLifecycleOwner) { … }`; it does **not**
+require StateFlow.
+
+Doing both at once would mean ~30 layouts + ~30 Kotlin files + 73 `MutableLiveData` declarations +
+35 `observe` sites in a single change, against 3.76% coverage and no instrumented tests. That is how
+playback breaks silently. LiveData → StateFlow stays [[cu-52]], decided separately and later.
+
+### Approach
+
+Convert **screen by screen**, one commit per screen — each Fragment is independent, giving natural
+checkpoints and a small blast radius per change:
+
+1. Enable `viewBinding = true` alongside `dataBinding = true` (they coexist).
+2. Per screen: strip the `<layout>`/`<data>` wrapper, move each `@{…}` expression into the Fragment as
+   an explicit assignment or `observe` block, swap `DataBindingUtil.inflate` for `XBinding.inflate`.
+3. `@BindingAdapter` functions become plain extension/helper functions called from Kotlin — 23 of them,
+   several likely collapsible once callers are explicit.
+4. Once all 30 layouts are converted: `dataBinding = false`, delete leftover adapters, unblock cu-8.
+
+Manual QA per screen is the real safety net here — the automated gate cannot see UI regressions
+(no instrumented tests, cu-54). Verify each converted screen actually renders and behaves before moving
+on. Playback, library browse, and onboarding are the highest-risk paths.
+
+### Ordering note
+
+The R3 redesigns (cu-26/27/28) will rewrite many of these layouts anyway, so there is some duplicated
+effort in converting first. Owner accepted that trade deliberately: converting first unblocks cu-8 and
+KAPT removal far earlier, rather than leaving the toolchain slow until R3.
+
+## Acceptance Criteria
+
+- [ ] All 30 layouts converted; no `<layout>` wrapper remains in `app/src/main/res/layout`
+- [ ] `dataBinding = false` (or the flag removed) in `app/build.gradle.kts`
+- [ ] No `@BindingAdapter` remains; replacements are ordinary Kotlin called from the call site
+- [ ] LiveData untouched — no StateFlow migration in this task
+- [ ] Every converted screen manually verified to render and behave correctly
+- [ ] `./verify.sh` green; CLAUDE.md convention rule 2 and the DataBinding gotcha updated
+- [ ] cu-8 unblocked: `kotlin-kapt` can be removed with the build still green
