@@ -56,6 +56,14 @@ android {
     buildConfig = true
   }
 
+  testOptions {
+    unitTests {
+      // Robolectric needs the merged android resources/manifest on the
+      // unit-test classpath.
+      isIncludeAndroidResources = true
+    }
+  }
+
   // Using kapt instead of KSP in the root project-level build to avoid plugin
   // resolution issues while upgrading Kotlin. KAPT is applied via the
   // 'kotlin-kapt' plugin above.
@@ -124,6 +132,12 @@ dependencies {
   testImplementation(libs.coroutines.test)
   testImplementation(libs.androidx.arch.core.testing)
 
+  // Robolectric drives real SQLite in a JVM test, which lets the Room migration
+  // suite run in the unit-test gate. Room's own MigrationTestHelper is
+  // instrumented-only, and instrumented tests are quarantined (cu-54).
+  testImplementation(libs.robolectric)
+  testImplementation(libs.androidx.test.core)
+
     /*
      * Instrumented Tests
      */
@@ -157,6 +171,17 @@ tasks.matching { it.name.contains("DebugAndroidTest") && !it.name.contains("Lint
 
 jacoco {
   toolVersion = "0.8.12"
+}
+
+// Robolectric runs tests through its own sandbox classloader; without these two
+// settings the JaCoCo agent cannot attribute execution to those classes and
+// anything covered only by a Robolectric test silently reports 0%, which would
+// blind the cu-3 coverage ratchet to real gains.
+tasks.withType<Test>().configureEach {
+  extensions.configure<JacocoTaskExtension> {
+    isIncludeNoLocationClasses = true
+    excludes = listOf("jdk.internal.*")
+  }
 }
 
 // Generated code would otherwise dominate the coverage number and make it

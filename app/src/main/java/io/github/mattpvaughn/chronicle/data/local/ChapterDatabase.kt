@@ -23,7 +23,7 @@ fun getChapterDatabase(context: Context): ChapterDatabase {
   return INSTANCE
 }
 
-@Database(entities = [Chapter::class], version = 1, exportSchema = false)
+@Database(entities = [Chapter::class], version = 1, exportSchema = true)
 abstract class ChapterDatabase : RoomDatabase() {
   abstract val chapterDao: ChapterDao
 }

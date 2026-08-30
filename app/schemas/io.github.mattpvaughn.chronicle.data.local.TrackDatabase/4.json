@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 6,
-    "identityHash": "39704d8012a17387a24858ff6fea3efa",
+    "version": 4,
+    "identityHash": "9b1e3bcfa293be224d2c098d0f0011f2",
     "entities": [
       {
         "tableName": "MediaItemTrack",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `serverId` INTEGER NOT NULL, `parentServerId` INTEGER NOT NULL, `title` TEXT NOT NULL, `playQueueItemID` INTEGER NOT NULL, `thumb` TEXT, `index` INTEGER NOT NULL, `discNumber` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `media` TEXT NOT NULL, `album` TEXT NOT NULL, `artist` TEXT NOT NULL, `genre` TEXT NOT NULL, `cached` INTEGER NOT NULL, `artwork` TEXT, `viewCount` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `size` INTEGER NOT NULL, `source` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `parentKey` INTEGER NOT NULL, `title` TEXT NOT NULL, `playQueueItemID` INTEGER NOT NULL, `thumb` TEXT, `index` INTEGER NOT NULL, `discNumber` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `media` TEXT NOT NULL, `album` TEXT NOT NULL, `artist` TEXT NOT NULL, `genre` TEXT NOT NULL, `cached` INTEGER NOT NULL, `artwork` TEXT, `viewCount` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `size` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -15,14 +15,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "serverId",
-            "columnName": "serverId",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "parentServerId",
-            "columnName": "parentServerId",
+            "fieldPath": "parentKey",
+            "columnName": "parentKey",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -41,8 +35,7 @@
           {
             "fieldPath": "thumb",
             "columnName": "thumb",
-            "affinity": "TEXT",
-            "notNull": false
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "index",
@@ -95,8 +88,7 @@
           {
             "fieldPath": "artwork",
             "columnName": "artwork",
-            "affinity": "TEXT",
-            "notNull": false
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "viewCount",
@@ -127,28 +119,19 @@
             "columnName": "size",
             "affinity": "INTEGER",
             "notNull": true
-          },
-          {
-            "fieldPath": "source",
-            "columnName": "source",
-            "affinity": "INTEGER",
-            "notNull": true
           }
         ],
         "primaryKey": {
+          "autoGenerate": false,
           "columnNames": [
             "id"
-          ],
-          "autoGenerate": true
-        },
-        "indices": [],
-        "foreignKeys": []
+          ]
+        }
       }
     ],
-    "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '39704d8012a17387a24858ff6fea3efa')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9b1e3bcfa293be224d2c098d0f0011f2')"
     ]
   }
 }

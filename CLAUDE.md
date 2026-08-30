@@ -31,9 +31,9 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Project snapshot (truthful as of 2026-07-13 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin, minSdk 27, target/compileSdk **34** (SDK 36 bump is task cu-6).
-- MVVM + Repository · Dagger 2 (hand-rolled components) · Room **2.7.0-alpha12 — alpha in production, never bump casually, always write migrations** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 1.3.0 (ExoPlayer + MediaSession + Cast) · LiveData + DataBinding (no Compose) · Fetch2 for downloads.
+- MVVM + Repository · Dagger 2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 1.3.0 (ExoPlayer + MediaSession + Cast) · LiveData + DataBinding (no Compose) · Fetch2 for downloads.
 - **KAPT, not KSP** (`kotlin-kapt` in `app/build.gradle.kts`) — migration is task cu-8. Any doc claiming KSP is wrong.
-- Tests: 2 unit-test files (`app/src/test/...`), ~7 androidTest files (disabled, see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: 3 unit-test files (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -61,7 +61,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Room is alpha** — schema/API can differ from stable docs; check the exact version's behavior.
+- **Four separate Room databases** (`BookDatabase` v8, `TrackDatabase` v4, `ChapterDatabase` v1, `CollectionsDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration.
 - **KAPT** — build errors in generated code usually mean an annotation problem upstream, and builds are slow; don't loop blindly.
 - **No 401 re-auth exists** — an expired Plex token surfaces as a UI error string (`MainActivity`), not a refresh. Fixing = task cu-10.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.

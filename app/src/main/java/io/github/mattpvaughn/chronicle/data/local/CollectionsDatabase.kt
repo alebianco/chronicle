@@ -23,7 +23,7 @@ fun getCollectionsDatabase(context: Context): CollectionsDatabase {
   return INSTANCE
 }
 
-@Database(entities = [Collection::class], version = 1, exportSchema = false)
+@Database(entities = [Collection::class], version = 1, exportSchema = true)
 abstract class CollectionsDatabase : RoomDatabase() {
   abstract val collectionsDao: CollectionsDao
 }

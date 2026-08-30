@@ -25,7 +25,7 @@ fun getTrackDatabase(context: Context): TrackDatabase {
   return INSTANCE
 }
 
-@Database(entities = [MediaItemTrack::class], version = 4, exportSchema = false)
+@Database(entities = [MediaItemTrack::class], version = 4, exportSchema = true)
 abstract class TrackDatabase : RoomDatabase() {
   abstract val trackDao: TrackDao
 }
