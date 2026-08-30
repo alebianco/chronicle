@@ -5,11 +5,26 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_DETAILS_LIST
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_TEXT_LIST
 import io.github.mattpvaughn.chronicle.data.model.Collection
-import io.github.mattpvaughn.chronicle.databinding.*
+import io.github.mattpvaughn.chronicle.databinding.GridItemCollectionBinding
+import io.github.mattpvaughn.chronicle.databinding.ListItemCollectionTextOnlyBinding
+import io.github.mattpvaughn.chronicle.databinding.ListItemCollectionWithDetailsBinding
+import io.github.mattpvaughn.chronicle.features.library.overrideWidth
+import io.github.mattpvaughn.chronicle.features.library.setSquareAspectRatio
+import io.github.mattpvaughn.chronicle.views.bindImageRounded
+
+/**
+ * The item-count subtitle shown under a collection's title.
+ *
+ * Was the `` `` + collection.childCount + ` items` `` binding expression shared by all three
+ * collection item layouts; kept verbatim (including the un-pluralised, untranslated " items")
+ * so the conversion is behaviour-preserving.
+ */
+private fun itemCountLabel(collection: Collection): String = "${collection.childCount} items"
 
 class CollectionsAdapter(
   initialViewStyle: String,
@@ -95,12 +110,21 @@ class CollectionsAdapter(
       collectionClick: CollectionsFragment.CollectionClick,
       serverConnected: Boolean,
     ) {
-      binding.isSquare = isSquare
-      binding.collection = collection
-      binding.isVertical = isVertical
-      binding.collectionClick = collectionClick
-      binding.serverConnected = serverConnected
-      binding.executePendingBindings()
+      // Was binding expressions in grid_item_collection.xml.
+      setSquareAspectRatio(binding.gridItemRoot, isSquare)
+      overrideWidth(
+        binding.gridItemRoot,
+        if (isVertical) {
+          binding.root.resources.getDimension(R.dimen.audiobook_match_parent)
+        } else {
+          binding.root.resources.getDimension(R.dimen.audiobook_item_width)
+        },
+      )
+      binding.gridItemRoot.setOnClickListener { collectionClick.onClick(collection) }
+      binding.title.text = collection.title
+      binding.author.text = itemCountLabel(collection)
+      binding.bookCoverImg.contentDescription = collection.title
+      bindImageRounded(binding.bookCoverImg, collection.thumb, serverConnected)
     }
 
     companion object {
@@ -122,9 +146,10 @@ class CollectionsAdapter(
       collection: Collection,
       collectionClick: CollectionsFragment.CollectionClick,
     ) {
-      binding.collection = collection
-      binding.collectionClick = collectionClick
-      binding.executePendingBindings()
+      // Was binding expressions in list_item_collection_text_only.xml.
+      binding.textOnlyRoot.setOnClickListener { collectionClick.onClick(collection) }
+      binding.title.text = collection.title
+      binding.author.text = itemCountLabel(collection)
     }
 
     companion object {
@@ -148,11 +173,13 @@ class DetailsStyleViewHolder(
     serverConnected: Boolean,
     isSquare: Boolean,
   ) {
-    binding.isSquare = isSquare
-    binding.collection = collection
-    binding.collectionClick = collectionClick
-    binding.serverConnected = serverConnected
-    binding.executePendingBindings()
+    // Was binding expressions in list_item_collection_with_details.xml.
+    setSquareAspectRatio(binding.detailsRoot, isSquare)
+    binding.detailsRoot.setOnClickListener { collectionClick.onClick(collection) }
+    binding.title.text = collection.title
+    binding.author.text = itemCountLabel(collection)
+    binding.bookCoverImg.contentDescription = collection.title
+    bindImageRounded(binding.bookCoverImg, collection.thumb, serverConnected)
   }
 
   companion object {

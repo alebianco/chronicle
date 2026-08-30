@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
@@ -115,6 +116,8 @@ class CollectionDetailsFragment : Fragment() {
 
     viewModel.booksInCollection.observe(viewLifecycleOwner) {
       adapter!!.submitList(it)
+      // Was an `android:visibility` binding expression in fragment_collection_details.xml.
+      binding.noBooksMessage.isVisible = it.isEmpty()
     }
 
     (activity as AppCompatActivity).setSupportActionBar(binding.toolbar)

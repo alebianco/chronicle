@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -29,6 +30,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionsBinding
 import io.github.mattpvaughn.chronicle.features.library.AudiobookSearchAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
+import io.github.mattpvaughn.chronicle.features.search.bindSearchRecyclerView
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,9 +69,6 @@ class CollectionsFragment : Fragment() {
   ): View {
     Timber.i("Lib frag view create")
     val binding = FragmentCollectionsBinding.inflate(inflater, container, false)
-    binding.lifecycleOwner = viewLifecycleOwner
-    binding.viewModel = viewModel
-    binding.plexConfig = plexConfig
 
     adapter =
       CollectionsAdapter(
@@ -88,6 +87,12 @@ class CollectionsFragment : Fragment() {
     binding.collectionsGrid.adapter = adapter
 
     viewModel.collections.observe(viewLifecycleOwner) { collections ->
+      // Was three visibility binding expressions in fragment_collections.xml.
+      val isEmpty = collections.isEmpty()
+      binding.offlineModeContainer.isVisible = isEmpty
+      binding.swipeToRefresh.isVisible = !isEmpty
+      binding.noBooksMessage.isVisible = isEmpty
+
       // Adapter is always non-null between view creation and view destruction
       if (adapter == null) {
         return@observe
@@ -163,6 +168,23 @@ class CollectionsFragment : Fragment() {
         },
       )
 
+    // Was the `searchBookList`/`serverConnectedSearch` binding adapters on search_results_list.
+    // These must stay below the adapter assignment above: bindSearchRecyclerView casts
+    // recyclerView.adapter, and observe() delivers an already-set value synchronously.
+    viewModel.searchResults.observe(viewLifecycleOwner) { results ->
+      bindSearchRecyclerView(binding.searchResultsList, results)
+      updateSearchVisibility(binding)
+    }
+
+    plexConfig.isConnected.observe(viewLifecycleOwner) { isConnected ->
+      bindSearchRecyclerView(binding.searchResultsList, isConnected)
+    }
+
+    viewModel.isSearchActive.observe(viewLifecycleOwner) { updateSearchVisibility(binding) }
+    viewModel.isQueryEmpty.observe(viewLifecycleOwner) { updateSearchVisibility(binding) }
+
+    binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
+
     binding.swipeToRefresh.setOnRefreshListener {
       viewModel.refreshData()
     }
@@ -229,6 +251,20 @@ class CollectionsFragment : Fragment() {
     )
 
     return binding.root
+  }
+
+  /**
+   * Was the two `android:visibility` binding expressions on the search views in
+   * fragment_collections.xml. Both depend on more than one LiveData, so every source
+   * re-evaluates the pair rather than each observer owning one view.
+   */
+  private fun updateSearchVisibility(binding: FragmentCollectionsBinding) {
+    val isSearchActive = viewModel.isSearchActive.value ?: false
+    val isQueryEmpty = viewModel.isQueryEmpty.value ?: false
+    val hasNoResults = viewModel.searchResults.value.isNullOrEmpty()
+
+    binding.searchResultsList.isVisible = isSearchActive
+    binding.noSearchResultsMessage.isVisible = hasNoResults && isSearchActive && !isQueryEmpty
   }
 
   private fun openCollectionDetails(collection: Collection) {
