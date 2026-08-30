@@ -1,10 +1,10 @@
 ---
 id: cu-56
 title: Restore or delete the hollow AudiobookDetailsViewModel tests
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-08-30'
-labels: [R1, agentic]
+labels: [R0, agentic]
 dependencies: []
 priority: high
 ---
