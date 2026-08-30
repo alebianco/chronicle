@@ -4,14 +4,8 @@ import android.app.Application
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
-import android.net.Uri
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import androidx.work.WorkManager
-import com.facebook.cache.common.CacheKey
-import com.facebook.imagepipeline.backends.okhttp3.OkHttpImagePipelineConfigFactory
-import com.facebook.imagepipeline.cache.DefaultCacheKeyFactory
-import com.facebook.imagepipeline.request.ImageRequest
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.tonyodev.fetch2.Fetch
@@ -23,7 +17,6 @@ import io.github.mattpvaughn.chronicle.data.local.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingSingleton
-import io.github.mattpvaughn.chronicle.views.UrlQueryCacheKey
 import kotlinx.coroutines.CoroutineExceptionHandler
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -222,69 +215,4 @@ class AppModule(private val app: Application) {
   @Provides
   @Singleton
   fun provideCurrentlyPlaying(): CurrentlyPlaying = CurrentlyPlayingSingleton()
-
-  @Provides
-  @Singleton
-  fun frescoConfig(
-    @Named(OKHTTP_CLIENT_MEDIA)
-    okHttpClient: OkHttpClient,
-  ) = OkHttpImagePipelineConfigFactory
-    .newBuilder(app, okHttpClient)
-    .setCacheKeyFactory(
-      object : DefaultCacheKeyFactory() {
-        override fun getEncodedCacheKey(
-          request: ImageRequest,
-          sourceUri: Uri,
-          callerContext: Any?,
-        ): CacheKey = UrlQueryCacheKey(sourceUri)
-
-        override fun getEncodedCacheKey(
-          request: ImageRequest,
-          callerContext: Any?,
-        ): CacheKey = UrlQueryCacheKey(request.sourceUri)
-
-        override fun getBitmapCacheKey(
-          request: ImageRequest,
-          callerContext: Any?,
-        ): CacheKey = UrlQueryCacheKey(request.sourceUri)
-
-        override fun getPostprocessedBitmapCacheKey(
-          request: ImageRequest,
-          callerContext: Any?,
-        ): CacheKey = UrlQueryCacheKey(request.sourceUri)
-
-        protected override fun getCacheKeySourceUri(sourceUri: Uri): Uri {
-          return sourceUri.query?.toUri() ?: "".toUri()
-        }
-      },
-    )
-//        .setRequestListeners(
-//            if (BuildConfig.DEBUG) {
-//                Collections.singleton(
-//                    object : BaseRequestListener() {
-//                        override fun onRequestSuccess(
-//                            request: ImageRequest?,
-//                            requestId: String?,
-//                            isPrefetch: Boolean,
-//                        ) {
-//                            Timber.i("Image load success: $request")
-//                            super.onRequestSuccess(request, requestId, isPrefetch)
-//                        }
-//
-//                        override fun onRequestFailure(
-//                            request: ImageRequest?,
-//                            requestId: String?,
-//                            throwable: Throwable?,
-//                            isPrefetch: Boolean,
-//                        ) {
-//                            Timber.i("Image load failure: $request, $throwable")
-//                            super.onRequestFailure(request, requestId, throwable, isPrefetch)
-//                        }
-//                    },
-//                ).toSet()
-//            } else {
-//                emptySet()
-//            },
-//        )
-    .build()
 }

@@ -4,79 +4,49 @@ import android.app.Activity
 import android.net.Uri
 import android.os.Build
 import android.view.View
+import android.widget.ImageView
 import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import androidx.databinding.BindingAdapter
-import com.facebook.cache.common.CacheKey
-import com.facebook.drawee.backends.pipeline.Fresco
-import com.facebook.drawee.generic.GenericDraweeHierarchy
-import com.facebook.drawee.view.DraweeView
-import com.facebook.imagepipeline.request.ImageRequest
+import coil3.load
+import coil3.request.crossfade
+import coil3.request.error
+import coil3.request.placeholder
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
-import timber.log.Timber
 
+/**
+ * Loads a book cover into [imageView] via Plex's photo transcoder.
+ *
+ * The cache key is deliberately the URL *query* rather than the whole URL: the
+ * same artwork is reachable over LAN, WAN or relay at different hostnames, and
+ * keying on the full URL would re-download every cover whenever the connection
+ * route changed. This mirrors the `UrlQueryCacheKey` behaviour the previous
+ * Fresco implementation configured through its cache-key factory.
+ */
 @BindingAdapter(value = ["srcRounded", "serverConnected"], requireAll = true)
 fun bindImageRounded(
-  draweeView: DraweeView<GenericDraweeHierarchy>,
+  imageView: ImageView,
   src: String?,
   serverConnected: Boolean,
 ) {
-  if ((draweeView.context as Activity).isDestroyed) {
+  val activity = imageView.context as? Activity
+  if (activity?.isDestroyed == true) {
     return
   }
 
   val imageSize =
-    draweeView.resources.getDimension(R.dimen.currently_playing_artwork_max_size).toInt()
+    imageView.resources.getDimension(R.dimen.currently_playing_artwork_max_size).toInt()
   val config = Injector.get().plexConfig()
-  val url =
+  val url: Uri =
     config.toServerString("photo/:/transcode?width=$imageSize&height=$imageSize&url=$src")
       .toUri()
 
-  // If no server is connected, don't bother fetching from server, just check cache
-  val request = ImageRequest.fromUri(url)
-  val controller =
-    Fresco.newDraweeControllerBuilder()
-      .setImageRequest(request)
-      .setOldController(draweeView.controller)
-      .build()
-  draweeView.controller = controller
-}
-
-/**
- * A [CacheKey] which uses the query (everything after ?) in the URL as the key,
- * as opposed to the entire URL, so that caching will work regardless of the route
- * connecting the user to the server
- */
-class UrlQueryCacheKey(private val url: Uri?) : CacheKey {
-  override fun containsUri(uri: Uri): Boolean {
-    Timber.i("Checking cache for image")
-    return uri.query?.contains(url?.query ?: "") ?: false
-  }
-
-  // Seems to be primarily used for debugging
-  override fun getUriString() = url?.query ?: ""
-
-  override fun isResourceIdForDebugging() = false
-
-  override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (javaClass != other?.javaClass) return false
-
-    other as UrlQueryCacheKey
-
-    val isEquals = url?.query == other.url?.query
-    Timber.i("Checking for equality: ${this.url?.query}, ${other.url?.query}, $isEquals")
-
-    return isEquals
-  }
-
-  override fun hashCode(): Int {
-    return url?.query?.hashCode() ?: 0
-  }
-
-  override fun toString(): String {
-    return url?.query.toString()
+  imageView.load(url) {
+    memoryCacheKey(url.query ?: url.toString())
+    placeholder(R.drawable.book_cover_missing_placeholder)
+    error(R.drawable.book_cover_missing_placeholder)
+    crossfade(true)
   }
 }
 

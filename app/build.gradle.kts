@@ -79,7 +79,6 @@ kapt {
 
 dependencies {
   implementation(libs.material)
-  implementation(libs.glide)
   implementation(libs.timber)
   implementation(libs.fetch)
   implementation(libs.work)
@@ -109,8 +108,8 @@ dependencies {
   // Removed moshi-codegen KAPT processor - deprecated for Kotlin 2.x
   // Moshi will use reflection-based adapters instead
 
-  implementation(libs.fresco)
-  implementation(libs.fresco.imagepipeline)
+  implementation(libs.coil)
+  implementation(libs.coil.network.okhttp)
 
   implementation(libs.room.runtime)
   kapt(libs.room.compiler)

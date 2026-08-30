@@ -4,8 +4,9 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.facebook.drawee.backends.pipeline.Fresco
-import com.facebook.imagepipeline.request.ImageRequest
+import coil3.SingletonImageLoader
+import coil3.request.ImageRequest
+import coil3.toBitmap
 import com.tonyodev.fetch2.Request
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
@@ -13,7 +14,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionRe
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionResult.Success
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
-import io.github.mattpvaughn.chronicle.util.getImage
 import io.github.mattpvaughn.chronicle.util.toUri
 import kotlinx.coroutines.*
 import timber.log.Timber
@@ -89,7 +89,7 @@ class PlexConfig
         return null
       }
 
-      // Retrieve cached album art from Glide if available
+      // Retrieve cached album art from the image cache if available
       val appContext = Injector.get().applicationContext()
       val imageSize = appContext.resources.getDimension(R.dimen.audiobook_image_width).toInt()
       val uri =
@@ -103,15 +103,26 @@ class PlexConfig
         }
 
       Timber.i("Notification thumb uri is: $uri")
-      val imagePipeline = Fresco.getImagePipeline()
       return withContext(Dispatchers.IO) {
-        val request = ImageRequest.fromUri(uri)
         try {
-          val bm = imagePipeline.fetchDecodedImage(request, null).getImage()
-          Timber.i("Successfully retrieved album art for $thumb")
+          val request =
+            ImageRequest.Builder(appContext)
+              .data(uri)
+              // Same query-based key as the cover binding adapter, so a notification
+              // reuses artwork already cached for the library screen regardless of
+              // which route (LAN/WAN/relay) fetched it.
+              .memoryCacheKey(uri.query ?: uri.toString())
+              .build()
+          val result = SingletonImageLoader.get(appContext).execute(request)
+          val bm = result.image?.toBitmap()
+          if (bm == null) {
+            Timber.e("Failed to retrieve album art for $thumb")
+          } else {
+            Timber.i("Successfully retrieved album art for $thumb")
+          }
           bm
         } catch (t: Throwable) {
-          Timber.e("Failed to retrieve album art for $thumb: $t")
+          Timber.e(t, "Failed to retrieve album art for $thumb")
           null
         }
       }

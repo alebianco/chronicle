@@ -269,7 +269,7 @@
                         android:orientation="vertical"
                         app:layout_constraintGuide_end="@dimen/screen_horizontal_padding" />
 
-                    <io.github.mattpvaughn.chronicle.views.ChronicleDraweeView
+                    <ImageView
                         android:id="@+id/details_artwork"
                         serverConnected="@{plexConfig.isConnected()}"
                         srcRounded="@{viewModel.audiobook.thumb}"
@@ -285,7 +285,7 @@
                         app:layout_constraintRight_toRightOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintWidth_max="@dimen/currently_playing_artwork_max_size"
-                        app:viewAspectRatio="1"
+                        app:layout_constraintDimensionRatio="1:1"
                         tools:src="@drawable/example_cover" />
 
                     <TextView
@@ -301,7 +301,7 @@
                         app:layout_constraintEnd_toEndOf="@+id/details_artwork"
                         app:layout_constraintStart_toStartOf="@+id/details_artwork"
                         app:layout_constraintTop_toTopOf="@+id/details_artwork"
-                        app:viewAspectRatio="1"
+                        app:layout_constraintDimensionRatio="1:1"
                         tools:text="59:59" />
 
                 </androidx.constraintlayout.widget.ConstraintLayout>

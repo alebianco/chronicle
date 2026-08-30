@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.injection.components
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.work.WorkManager
-import com.facebook.imagepipeline.core.ImagePipelineConfig
 import com.squareup.moshi.Moshi
 import com.tonyodev.fetch2.Fetch
 import dagger.Component
@@ -16,8 +15,11 @@ import io.github.mattpvaughn.chronicle.features.login.ChooseServerFragment
 import io.github.mattpvaughn.chronicle.features.login.ChooseUserFragment
 import io.github.mattpvaughn.chronicle.features.login.LoginFragment
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
+import io.github.mattpvaughn.chronicle.injection.modules.AppModule.Companion.OKHTTP_CLIENT_MEDIA
 import kotlinx.coroutines.CoroutineExceptionHandler
+import okhttp3.OkHttpClient
 import java.io.File
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
@@ -71,7 +73,8 @@ interface AppComponent {
 
   fun fetch(): Fetch
 
-  fun frescoConfig(): ImagePipelineConfig
+  @Named(OKHTTP_CLIENT_MEDIA)
+  fun mediaOkHttpClient(): OkHttpClient
 
   //    fun plexMediaSource(): PlexMediaSource
 

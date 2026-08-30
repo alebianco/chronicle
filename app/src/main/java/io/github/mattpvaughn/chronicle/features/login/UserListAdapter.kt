@@ -6,6 +6,7 @@ import androidx.core.net.toUri
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil3.load
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.databinding.ListItemUserBinding
 
@@ -32,7 +33,7 @@ class UserListAdapter(val clickListener: UserClickListener) :
         clickListener: UserClickListener,
       ) {
         binding.user = user
-        binding.userThumb.setImageURI(user.thumb?.toUri())
+        binding.userThumb.load(user.thumb?.toUri())
         binding.clickListener = clickListener
         binding.executePendingBindings()
       }

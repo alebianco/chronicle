@@ -97,25 +97,10 @@
 -keep class android.support.v4.media.MediaMetadataCompat { *; }
 -keep class android.support.v4.media.session.PlaybackStateCompat { *; }
 
-# ============= Fresco =============
--keep class com.facebook.fresco.** { *; }
--keep interface com.facebook.fresco.** { *; }
--keep class com.facebook.imagepipeline.** { *; }
--keep class com.facebook.drawee.** { *; }
--dontwarn com.facebook.**
--keep,allowobfuscation @interface com.facebook.proguard.annotations.DoNotStrip
--keep,allowobfuscation @interface com.facebook.proguard.annotations.KeepGettersAndSetters
--keep @com.facebook.proguard.annotations.DoNotStrip class *
--keepclassmembers class * {
-    @com.facebook.proguard.annotations.DoNotStrip *;
-    @com.facebook.proguard.annotations.KeepGettersAndSetters *;
-}
-
-# ============= Glide =============
--keep public class * implements com.bumptech.glide.module.GlideModule
--keep class * extends com.bumptech.glide.module.AppGlideModule { <init>(...); }
--keep public enum com.bumptech.glide.load.ImageHeaderParser$** { **[] $VALUES; public *; }
--keep class com.bumptech.glide.load.data.ParcelFileDescriptorRewinder$InternalRewinder { *** rewind(); }
+# ============= Coil =============
+# Coil is Kotlin-first and ships its own rules; only the OkHttp fetcher wiring
+# is reflection-adjacent enough to be worth naming here.
+-dontwarn coil3.**
 
 # ============= Kotlin & Coroutines =============
 # A blanket `-keep class kotlin.** { *; }` pinned ~1845 kotlin.reflect.jvm.internal

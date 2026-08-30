@@ -6,7 +6,7 @@ import androidx.lifecycle.*
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.facebook.drawee.backends.pipeline.Fresco
+import coil3.SingletonImageLoader
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.FEATURE_FLAG_IS_AUTO_ENABLED
@@ -899,7 +899,10 @@ class SettingsViewModel(
                 override fun onClick() {
                   viewModelScope.launch {
                     withContext(Dispatchers.IO) {
-                      Fresco.getImagePipeline().clearCaches()
+                      SingletonImageLoader.get(Injector.get().applicationContext()).let { loader ->
+                        loader.memoryCache?.clear()
+                        loader.diskCache?.clear()
+                      }
                     }
                   }
                 }

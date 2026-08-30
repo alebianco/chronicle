@@ -10,9 +10,10 @@ import android.net.Network
 import android.os.Build
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
-import com.bumptech.glide.Glide
-import com.facebook.drawee.backends.pipeline.Fresco
-import com.facebook.imagepipeline.core.ImagePipelineConfig
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.asServer
@@ -30,7 +31,9 @@ import javax.inject.Singleton
 // a singleton
 @Suppress("LeakingThis")
 @Singleton
-open class ChronicleApplication : Application() {
+open class ChronicleApplication :
+  Application(),
+  SingletonImageLoader.Factory {
   // Instance of the AppComponent that will be used by all the Activities in the project
   val appComponent by lazy {
     initializeComponent()
@@ -64,8 +67,20 @@ open class ChronicleApplication : Application() {
   @Inject
   lateinit var plexLoginService: PlexLoginService
 
-  @Inject
-  lateinit var frescoConfig: ImagePipelineConfig
+  /**
+   * Coil's image loader, built on the media OkHttp client so image requests carry
+   * the same Plex auth headers and connection handling as everything else.
+   */
+  override fun newImageLoader(context: PlatformContext): ImageLoader =
+    ImageLoader.Builder(context)
+      .components {
+        add(
+          OkHttpNetworkFetcherFactory(
+            callFactory = { Injector.get().mediaOkHttpClient() },
+          ),
+        )
+      }
+      .build()
 
   override fun onCreate() {
     if (USE_STRICT_MODE && BuildConfig.DEBUG) {
@@ -97,13 +112,6 @@ open class ChronicleApplication : Application() {
     setupNetwork(plexPrefs)
     updateDownloadedFileState()
     super.onCreate()
-    Fresco.initialize(this, frescoConfig)
-    // TODO: remove in a future version
-    applicationScope.launch {
-      withContext(Dispatchers.IO) {
-        Glide.get(Injector.get().applicationContext()).clearDiskCache()
-      }
-    }
   }
 
   /**
@@ -217,15 +225,5 @@ open class ChronicleApplication : Application() {
   @InternalCoroutinesApi
   private fun connectToServer() {
     plexConfig.connectToServer(plexMediaService)
-  }
-
-  override fun onTrimMemory(level: Int) {
-    Fresco.getImagePipeline().clearMemoryCaches()
-    super.onTrimMemory(level)
-  }
-
-  override fun onLowMemory() {
-    Fresco.getImagePipeline().clearMemoryCaches()
-    super.onLowMemory()
   }
 }

@@ -5,8 +5,7 @@ coroutines = "1.8.1"
 material = "1.9.0"
 room = "2.8.1"
 ksp = "2.1.20-1.0.0"
-glide = "4.11.0"
-fresco = "3.5.0"
+coil = "3.0.4"
 timber = "4.7.1"
 dagger = "2.54"
 moshi = "1.15.2"
@@ -40,9 +39,8 @@ material = { group = "com.google.android.material", name = "material", version.r
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
-glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
-fresco = { group = "com.facebook.fresco", name = "fresco", version.ref = "fresco" }
-fresco-imagepipeline = { group = "com.facebook.fresco", name = "imagepipeline-okhttp3", version.ref = "fresco" }
+coil = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 dagger = { group = "com.google.dagger", name = "dagger", version.ref = "dagger" }
 dagger-compiler = { group = "com.google.dagger", name = "dagger-compiler", version.ref = "dagger" }

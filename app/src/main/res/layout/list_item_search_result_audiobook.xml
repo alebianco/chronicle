@@ -44,7 +44,7 @@
             app:layout_constraintEnd_toEndOf="@+id/book_cover_img"
             app:layout_constraintTop_toTopOf="@+id/book_cover_img" />
 
-    <io.github.mattpvaughn.chronicle.views.ChronicleDraweeView
+    <ImageView
             android:id="@+id/book_cover_img"
             srcRounded="@{audiobook.thumb}"
             serverConnected="@{serverConnected}"

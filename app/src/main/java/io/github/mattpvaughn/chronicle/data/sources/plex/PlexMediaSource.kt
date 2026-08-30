@@ -71,7 +71,7 @@ class PlexMediaSource
       TODO("Not yet implemented")
     }
 
-    override fun makeGlideHeaders(): Any? {
+    override fun makeImageRequestHeaders(): Any? {
       TODO("Not yet implemented")
     }
 
