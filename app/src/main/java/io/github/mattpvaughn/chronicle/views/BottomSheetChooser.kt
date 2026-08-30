@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.StringRes
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -35,24 +36,22 @@ class BottomSheetChooser : FrameLayout {
   )
 
   fun setOptions(options: List<FormattableString>) {
-    val binding = findViewById<View>(R.id.bottom_sheet).tag as ViewBottomSheetChooserBinding
-    binding.options = options
-    binding.executePendingBindings()
+    // Was the `options` binding adapter on the RecyclerView.
+    optionsAdapter.submitList(options)
   }
 
   fun setTitle(newTitle: FormattableString) {
-    val binding = findViewById<View>(R.id.bottom_sheet).tag as ViewBottomSheetChooserBinding
-    binding.title = newTitle
-    binding.executePendingBindings()
+    // Was `android:text="@{title}"` via the FormattableString binding adapter.
+    binding.bottomSheetTitle.text = newTitle.format(resources)
   }
 
   var listener = BottomChooserListener.emptyListener
 
   fun setOptionsSelectedListener(listener: BottomChooserListener) {
-    val binding = findViewById<View>(R.id.bottom_sheet).tag as ViewBottomSheetChooserBinding
+    // Was the `listener` binding adapter on the RecyclerView.
     this.listener = listener
-    binding.listener = listener
-    binding.executePendingBindings()
+    optionsAdapter.setListener(listener)
+    optionsAdapter.notifyDataSetChanged()
   }
 
   /**
@@ -87,9 +86,15 @@ class BottomSheetChooser : FrameLayout {
 
   private val optionsAdapter = OptionsListAdapter(BottomChooserListener.emptyListener)
 
+  private val binding: ViewBottomSheetChooserBinding =
+    ViewBottomSheetChooserBinding.inflate(
+      context.getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater,
+      this,
+      false,
+    )
+
   fun hide(wasBackgroundClicked: Boolean) {
     listener.onChooserClosed(wasBackgroundClicked)
-    val binding = findViewById<View>(R.id.bottom_sheet).tag as ViewBottomSheetChooserBinding
     val animDuration = context.resources.getInteger(R.integer.short_animation_ms).toLong()
     // If the height has not been determined yet, don't animate
     if (measuredHeight != 0) {
@@ -113,7 +118,6 @@ class BottomSheetChooser : FrameLayout {
   }
 
   fun show() {
-    val binding = findViewById<View>(R.id.bottom_sheet).tag as ViewBottomSheetChooserBinding
     binding.bottomSheetContainer.visibility = View.VISIBLE
     binding.bottomSheetContainer.translationY = measuredHeight.toFloat()
     binding.tapToClose.visibility = View.VISIBLE
@@ -130,18 +134,14 @@ class BottomSheetChooser : FrameLayout {
   init {
     // Always expand to size of parent so the click-to-close dummy view will be expanded
 //        layoutParams = LayoutParams(MATCH_PARENT, MATCH_PARENT)
-    val inflater = context.getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
-    val binding = ViewBottomSheetChooserBinding.inflate(inflater, this, false)
     addView(binding.root)
-    binding.root.tag = binding
-    binding.options = emptyList()
-    binding.title = FormattableString.LiteralString("Title")
-    binding.listener = BottomChooserListener.emptyListener
+    binding.bottomSheetOptions.adapter = optionsAdapter
     binding.tapToClose.setOnClickListener {
       hide(wasBackgroundClicked = true)
     }
-    binding.bottomSheetOptions.adapter = optionsAdapter
-    binding.executePendingBindings()
+    setTitle(FormattableString.LiteralString("Title"))
+    setOptions(emptyList())
+    setOptionsSelectedListener(BottomChooserListener.emptyListener)
   }
 
   class OptionsListAdapter(private var listener: BottomChooserListener) :
@@ -172,9 +172,16 @@ class BottomSheetChooser : FrameLayout {
         option: FormattableString,
         listener: BottomChooserListener,
       ) {
-        binding.option = option
-        binding.listener = listener
-        binding.executePendingBindings()
+        // Was binding expressions in view_bottom_sheet_chooser_item.xml. The old layout also
+        // had an `isChosen` variable driving textActive/textPrimary, but nothing ever set it,
+        // so the null Boolean always took the false branch — textPrimary. Behaviour preserved;
+        // the unused variable is dropped rather than carried over as dead state.
+        val context = binding.root.context
+        binding.chooserItemText.text = option.format(context.resources)
+        binding.chooserItemText.setTextColor(
+          ContextCompat.getColor(context, R.color.textPrimary),
+        )
+        binding.chooserItemRoot.setOnClickListener { listener.onItemClicked(option) }
       }
 
       companion object {

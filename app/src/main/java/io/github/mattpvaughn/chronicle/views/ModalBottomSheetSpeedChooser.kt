@@ -13,6 +13,7 @@ import com.google.android.material.slider.Slider
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.ModalBottomSheetSpeedChooserBinding
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
@@ -35,7 +36,16 @@ class ModalBottomSheetSpeedChooser : BottomSheetDialogFragment() {
     savedInstanceState: Bundle?,
   ): View {
     val binding = ModalBottomSheetSpeedChooserBinding.inflate(inflater, container, false)
-    binding.speed = prefs.playbackSpeed
+
+    // Was `valueFrom`/`valueTo`/`value` binding expressions in the layout. The bounds must be
+    // set before the value, or Slider rejects a value outside its (default) range.
+    binding.speedSlider.valueFrom = CurrentlyPlayingViewModel.PLAYBACK_SPEED_MIN
+    binding.speedSlider.valueTo = CurrentlyPlayingViewModel.PLAYBACK_SPEED_MAX
+    binding.speedSlider.value =
+      prefs.playbackSpeed.coerceIn(
+        CurrentlyPlayingViewModel.PLAYBACK_SPEED_MIN,
+        CurrentlyPlayingViewModel.PLAYBACK_SPEED_MAX,
+      )
 
     binding.speedSlider.addOnSliderTouchListener(
       object : Slider.OnSliderTouchListener {
@@ -70,7 +80,11 @@ class ModalBottomSheetSpeedChooser : BottomSheetDialogFragment() {
     prefsListener =
       SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == PrefsRepo.KEY_PLAYBACK_SPEED) {
-          binding.speed = prefs.playbackSpeed
+          binding.speedSlider.value =
+            prefs.playbackSpeed.coerceIn(
+              CurrentlyPlayingViewModel.PLAYBACK_SPEED_MIN,
+              CurrentlyPlayingViewModel.PLAYBACK_SPEED_MAX,
+            )
         }
       }.apply {
         prefs.registerPrefsListener(this)

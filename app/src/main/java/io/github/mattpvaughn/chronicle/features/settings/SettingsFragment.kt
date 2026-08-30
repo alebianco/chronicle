@@ -24,6 +24,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentSettingsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.views.getString
+import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import javax.inject.Inject
 
 class SettingsFragment : Fragment() {
@@ -75,8 +76,14 @@ class SettingsFragment : Fragment() {
     val binding = FragmentSettingsBinding.inflate(inflater, container, false)
     val viewModel = ViewModelProvider(this, viewModelFactory).get(SettingsViewModel::class.java)
 
-    binding.viewModel = viewModel
-    binding.lifecycleOwner = viewLifecycleOwner
+    // Was `bottomChooserState` / `preferences` binding adapters in fragment_settings.xml.
+    viewModel.bottomChooserState.observe(viewLifecycleOwner) { state ->
+      setBottomChooserState(binding.bottomSheetChooser, state)
+    }
+
+    viewModel.preferences.observe(viewLifecycleOwner) { preferences ->
+      binding.settingsList.setPreferences(preferences)
+    }
 
     viewModel.messageForUser.observe(
       viewLifecycleOwner,
