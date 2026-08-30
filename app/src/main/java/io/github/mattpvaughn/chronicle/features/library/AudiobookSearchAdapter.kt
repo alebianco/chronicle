@@ -2,11 +2,13 @@ package io.github.mattpvaughn.chronicle.features.library
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.databinding.ListItemSearchResultAudiobookBinding
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
+import io.github.mattpvaughn.chronicle.views.bindImageRounded
 
 class AudiobookSearchAdapter(private val audiobookClick: AudiobookClick) : ListAdapter<Audiobook, AudiobookSearchAdapter.ViewHolder>(
   AudiobookDiffCallback(),
@@ -39,10 +41,14 @@ class AudiobookSearchAdapter(private val audiobookClick: AudiobookClick) : ListA
         searchResultClick: AudiobookClick,
         isConnected: Boolean,
       ) {
-        binding.audiobook = audiobook
-        binding.searchResultClick = searchResultClick
-        binding.serverConnected = isConnected
-        binding.executePendingBindings()
+        // Was binding expressions in list_item_search_result_audiobook.xml.
+        binding.searchResultRoot.setOnClickListener { searchResultClick.onClick(audiobook) }
+        binding.title.text = audiobook.title
+        binding.author.text = audiobook.author
+        binding.bookCoverImg.contentDescription = audiobook.title
+        bindImageRounded(binding.bookCoverImg, audiobook.thumb, isConnected)
+        binding.notPlayedDogEar.isVisible =
+          audiobook.viewCount == 0L && audiobook.progress == 0L
       }
 
       companion object {

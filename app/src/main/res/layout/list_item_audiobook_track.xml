@@ -1,95 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools">
+<androidx.constraintlayout.widget.ConstraintLayout
+xmlns:android="http://schemas.android.com/apk/res/android"
+xmlns:app="http://schemas.android.com/apk/res-auto"
+xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/track_item_root"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/track_list_item_height">
 
-    <data>
-
-        <variable
-            name="isActive"
-            type="Boolean" />
-
-        <variable
-            name="chapter"
-            type="io.github.mattpvaughn.chronicle.data.model.Chapter" />
-
-        <variable
-            name="audiobookProgress"
-            type="Long" />
-
-        <variable
-            name="clickListener"
-            type="io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener" />
-
-        <import type="android.view.View" />
-    </data>
-
-    <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/track_list_item_height"
-        android:onClick="@{() -> clickListener.onClick(chapter)}">
-
-        <FrameLayout
-            android:id="@+id/track_number_wrapper"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/chapter_indent"
-            android:layout_marginEnd="@dimen/chapter_indent"
-            app:layout_constraintBottom_toBottomOf="@id/track_name"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintTop_toTopOf="@id/track_name">
-
-            <TextView
-                android:id="@+id/track_number"
-                style="@style/TextAppearance.Body2"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:lines="1"
-                android:text="@{chapter.paddedIndex(2)}"
-                android:textAllCaps="true"
-                android:textColor="@{isActive ? @color/textActiveSecondary : @color/textSecondary}"
-                tools:text="01" />
-
-            <!--            <ImageView-->
-            <!--                android:layout_width="@dimen/track_list_item_indicator_size"-->
-            <!--                android:layout_height="@dimen/track_list_item_indicator_size"-->
-            <!--                android:tint="@{track.cached ? @color/iconActive : @color/icon}"-->
-            <!--                android:src="@drawable/ic_playing"-->
-            <!--                android:scaleType="centerInside"-->
-            <!--                android:visibility="@{track.id == activeTrackId ? View.VISIBLE : View.GONE}" />-->
-        </FrameLayout>
+    <FrameLayout
+        android:id="@+id/track_number_wrapper"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/chapter_indent"
+        android:layout_marginEnd="@dimen/chapter_indent"
+        app:layout_constraintBottom_toBottomOf="@id/track_name"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="@id/track_name">
 
         <TextView
-            android:id="@+id/track_name"
-            style="@style/TextAppearance.Body1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/keyline_x_offset"
-            android:layout_marginTop="@dimen/margin_normal"
-            android:layout_marginEnd="@dimen/screen_horizontal_padding"
-            android:layout_marginBottom="@dimen/margin_normal"
-            android:ellipsize="end"
-            android:lines="1"
-            android:text="@{chapter.title}"
-            android:textColor="@{isActive ? @color/textActive : @color/textPrimary}"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/track_duration"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:text="Track name but it's very long with a lot of text so it overflows" />
-
-        <TextView
-            android:id="@+id/track_duration"
+            android:id="@+id/track_number"
             style="@style/TextAppearance.Body2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/chapter_indent"
-            android:layout_marginEnd="@dimen/screen_horizontal_padding"
-            android:text="@{chapter.durationStr}"
-            android:textColor="@{isActive ? @color/textActive : @color/textPrimary}"
-            app:layout_constraintBottom_toBottomOf="@id/track_name"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/track_name"
-            tools:text="05:14" />
+            android:lines="1"
+            android:textAllCaps="true"
+            tools:text="01" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</layout>
+        <!--            <ImageView-->
+        <!--                android:layout_width="@dimen/track_list_item_indicator_size"-->
+        <!--                android:layout_height="@dimen/track_list_item_indicator_size"-->
+        <!--                android:tint="@{track.cached ? @color/iconActive : @color/icon}"-->
+        <!--                android:src="@drawable/ic_playing"-->
+        <!--                android:scaleType="centerInside"-->
+        <!--                android:visibility="@{track.id == activeTrackId ? View.VISIBLE : View.GONE}" />-->
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/track_name"
+        style="@style/TextAppearance.Body1"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/keyline_x_offset"
+        android:layout_marginTop="@dimen/margin_normal"
+        android:layout_marginEnd="@dimen/screen_horizontal_padding"
+        android:layout_marginBottom="@dimen/margin_normal"
+        android:ellipsize="end"
+        android:lines="1"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/track_duration"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="Track name but it's very long with a lot of text so it overflows" />
+
+    <TextView
+        android:id="@+id/track_duration"
+        style="@style/TextAppearance.Body2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/chapter_indent"
+        android:layout_marginEnd="@dimen/screen_horizontal_padding"
+        app:layout_constraintBottom_toBottomOf="@id/track_name"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/track_name"
+        tools:text="05:14" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

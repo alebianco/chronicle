@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.features.bookdetails
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -152,10 +153,19 @@ class ChapterListAdapter(val clickListener: TrackClickListener) :
       chapter: Chapter,
       isActive: Boolean,
     ) {
-      binding.chapter = chapter
-      binding.isActive = isActive
-      binding.clickListener = clickListener
-      binding.executePendingBindings()
+      // Was binding expressions in list_item_audiobook_track.xml.
+      val context = binding.root.context
+      binding.trackItemRoot.setOnClickListener { clickListener.onClick(chapter) }
+      binding.trackNumber.text = chapter.paddedIndex(2)
+      binding.trackName.text = chapter.title
+      binding.trackDuration.text = chapter.durationStr
+
+      val secondaryColor =
+        if (isActive) R.color.textActiveSecondary else R.color.textSecondary
+      val primaryColor = if (isActive) R.color.textActive else R.color.textPrimary
+      binding.trackNumber.setTextColor(ContextCompat.getColor(context, secondaryColor))
+      binding.trackName.setTextColor(ContextCompat.getColor(context, primaryColor))
+      binding.trackDuration.setTextColor(ContextCompat.getColor(context, primaryColor))
     }
 
     companion object {

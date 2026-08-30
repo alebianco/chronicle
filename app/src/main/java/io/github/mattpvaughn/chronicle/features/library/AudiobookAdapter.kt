@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.library
 
+import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.view.isVisible
@@ -79,7 +80,7 @@ class AudiobookAdapter(
         holder.bind(getItem(position), audiobookClick)
       }
       is DetailsStyleViewHolder -> {
-        holder.bind(getItem(position), audiobookClick, serverConnected, isSquare)
+        holder.bind(getItem(position), audiobookClick, serverConnected)
       }
       else -> throw IllegalStateException("Unknown view type")
     }
@@ -140,9 +141,11 @@ class AudiobookAdapter(
       audiobook: Audiobook,
       audiobookClick: LibraryFragment.AudiobookClick,
     ) {
-      binding.audiobook = audiobook
-      binding.audiobookClick = audiobookClick
-      binding.executePendingBindings()
+      // Was binding expressions in list_item_audiobook_text_only.xml.
+      binding.textOnlyItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
+      binding.title.text = audiobook.title
+      binding.author.text = audiobook.author
+      binding.bookProgress.text = formatProgress(audiobook)
     }
 
     companion object {
@@ -156,6 +159,15 @@ class AudiobookAdapter(
   }
 }
 
+/**
+ * "<elapsed>/<total>" for the book progress label — was a `DateUtils.formatElapsedTime`
+ * expression in list_item_audiobook_text_only.xml and list_item_audiobook_with_details.xml.
+ */
+private fun formatProgress(audiobook: Audiobook): String {
+  return DateUtils.formatElapsedTime(audiobook.progress / 1000) + "/" +
+    DateUtils.formatElapsedTime(audiobook.duration / 1000)
+}
+
 class DetailsStyleViewHolder(
   val binding: ListItemAudiobookWithDetailsBinding,
   val isSquare: Boolean,
@@ -164,13 +176,19 @@ class DetailsStyleViewHolder(
     audiobook: Audiobook,
     audiobookClick: LibraryFragment.AudiobookClick,
     serverConnected: Boolean,
-    isSquare: Boolean,
   ) {
-    binding.isSquare = isSquare
-    binding.audiobook = audiobook
-    binding.audiobookClick = audiobookClick
-    binding.serverConnected = serverConnected
-    binding.executePendingBindings()
+    // Was binding expressions in list_item_audiobook_with_details.xml.
+    setSquareAspectRatio(binding.detailsItemRoot, isSquare)
+    binding.detailsItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
+    binding.title.text = audiobook.title
+    binding.author.text = audiobook.author
+    binding.bookProgressString.text = formatProgress(audiobook)
+    binding.bookCoverImg.contentDescription = audiobook.title
+    bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected)
+    binding.notPlayedDogEar.isVisible = audiobook.viewCount == 0L && audiobook.progress == 0L
+    binding.bookProgress.max = audiobook.duration.toInt()
+    binding.bookProgress.progress = audiobook.progress.toInt()
+    binding.bookProgress.isVisible = audiobook.progress > 0L
   }
 
   companion object {
