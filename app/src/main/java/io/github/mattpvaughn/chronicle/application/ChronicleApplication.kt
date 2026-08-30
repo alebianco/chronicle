@@ -19,6 +19,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
+import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.injection.components.AppComponent
 import io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
@@ -109,6 +110,10 @@ open class ChronicleApplication :
     }
 
     appComponent.inject(this)
+    // No-op in release. In debug this may seed a fixture-backed Plex session, so
+    // it must run before setupNetwork, which would otherwise try to refresh
+    // connections against the real plex.tv and clear them.
+    DebugHooks.onApplicationCreate(this)
     setupNetwork(plexPrefs)
     updateDownloadedFileState()
     super.onCreate()

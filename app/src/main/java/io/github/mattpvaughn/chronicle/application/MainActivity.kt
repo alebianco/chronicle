@@ -28,6 +28,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginSta
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.ActivityMainBinding
+import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingFragment
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
@@ -92,6 +93,10 @@ class MainActivity : AppCompatActivity() {
         .activityModule(ActivityModule(this))
         .build()
     activityComponent!!.inject(this)
+
+    // No-op in release: the release source set provides an empty DebugHooks, so
+    // the mock-Plex machinery is not compiled into a release build at all.
+    DebugHooks.onMainActivityIntent(intent)
 
     super.onCreate(savedInstanceState)
 

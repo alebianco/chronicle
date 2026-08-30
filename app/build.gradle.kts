@@ -56,6 +56,15 @@ android {
     buildConfig = true
   }
 
+  // The debug variant serves the cu-16 Plex fixtures as assets so the app can be
+  // driven on a device with no account. Pointed at the same directory the unit
+  // tests use, so there is exactly one copy of each fixture to keep in sync.
+  sourceSets {
+    getByName("debug") {
+      assets.srcDir("src/test/resources")
+    }
+  }
+
   testOptions {
     unitTests {
       // Robolectric needs the merged android resources/manifest on the
@@ -139,6 +148,7 @@ dependencies {
   // Robolectric drives real SQLite in a JVM test, which lets the Room migration
   // suite run in the unit-test gate. Room's own MigrationTestHelper is
   // instrumented-only, and instrumented tests are quarantined (cu-54).
+  debugImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.retrofit)
   testImplementation(libs.retrofit.converter)

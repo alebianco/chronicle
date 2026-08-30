@@ -1,7 +1,7 @@
 ---
 id: cu-16
 title: Plex API fixture pack + FakePlexServer
-status: In Progress
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, agentic]
@@ -56,7 +56,72 @@ The seams already exist:
 - Do not weaken `PlexInterceptor`'s real behaviour; the mock works by pointing it somewhere else, not
   by bypassing it.
 
+## Implementation Notes
+
+Delivered in two layers: the test-side fixture pack (committed first, `ef77016`) and a debug-only mock
+mode that runs the same fixtures on a device.
+
+### Test side
+
+- **11 JSON fixtures** in `app/src/test/resources/plex-fixtures/`, authored against the Moshi models
+  rather than transcribed from `example-query-responses/` (whose bodies are elided). Cover libraries,
+  albums, an empty library, tracks, chapters, collections, resources, home users and OAuth pins.
+- **`FakePlexServer`** — a JUnit rule wrapping MockWebServer that **dispatches by path**, so asking for
+  an album and then its tracks returns matching data. A single canned body would let a sync test pass
+  while proving nothing. Also exposes `stubFailure`/`stubUnauthorized` and records requested paths.
+- **15 tests** across two suites: contract tests asserting the fixtures deserialize into real domain
+  objects, and integration tests driving the same fixtures through the real Retrofit/Moshi stack.
+
+The contract tests matter more than they look. Moshi in reflection mode fills absent fields with
+defaults instead of failing, so a renamed key yields an empty list rather than an error — drift stays
+invisible. Asserting on *values* makes it loud.
+
+### Debug mock mode
+
+`app/src/debug/` gains `MockPlexServer`, `MockPlexMode` and `DebugHooks`; `app/src/release/` gains a
+**no-op `DebugHooks` twin**. That seam — rather than a `BuildConfig.DEBUG` branch in shared code —
+means none of the fixture machinery is *compiled into* release. Verified: `mapping.txt` contains no
+`MockPlexServer`/`MockPlexMode`/`MockWebServer`, and the release APK carries 0 fixtures against the
+debug APK's 11.
+
+Enable without rebuilding:
+
+```
+adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity --ez mock_plex true
+```
+
+### Two ordering problems worth recording
+
+1. **The flag has to be persisted, not read from the launch intent.** Mock mode must be established
+   before `ChronicleApplication.setupNetwork()`, which otherwise refreshes connections against the real
+   plex.tv, gets a 401 for the fake token, and clears the seeded server. An intent extra arrives at
+   `MainActivity.onCreate`, far too late — so the extra now only records the preference and restarts the
+   process, and `DebugHooks.onApplicationCreate` applies it before any network setup.
+2. **`PlexLoginRepo` evaluates login state in its own `init`**, so seeded prefs need an explicit
+   `determineLoginState()` to take effect.
+
+Also: MockWebServer binds a socket *and* `server.url()` does a reverse DNS lookup, both banned on
+Android's main thread. The server starts on a background thread and the base url is built by hand.
+
+### A production bug the fixtures found immediately
+
+`Audiobook.from` mapped genre with `dir.plexGenres.joinToString(", ")` — which calls `toString()` on the
+data class, storing **`"PlexGenre(tag=Fantasy)"`** instead of `"Fantasy"`. That field flows into
+`MediaMetadataCompat`, so Android Auto and the media notification were displaying the literal debug
+string. Fixed to `joinToString(", ") { it.tag }`.
+
+This is exactly the class of bug that needs a real end-to-end fixture to surface: every layer compiled,
+nothing threw, and no existing test looked at the value.
+
+### Verification
+
+- `./verify.sh` green; **44 tests**, 0 failures. Coverage 4.20% → **7.29%**.
+- `./test_release_build.sh` green — 5.5 MB, R8 checks pass, no mock code in the release mapping.
+- **Driven live on a Pixel Tablet AVD (Android 15)**: the app reaches the library, renders all three
+  fixture books with covers, and opens book details with progress computed from the fixture
+  `viewOffset` — with no Plex account and no credentials anywhere.
+
 ## Acceptance Criteria
 
-- [ ] Sync/progress/download tests need no live server or credentials
-- [ ] Full test suite runs offline in CI
+- [x] Sync/progress/download tests need no live server or credentials
+- [x] Full test suite runs offline in CI

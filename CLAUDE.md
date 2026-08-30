@@ -33,6 +33,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - Single module `:app`, Kotlin, minSdk 27, target/compileSdk **34** (SDK 36 bump is task cu-6).
 - MVVM + Repository · Dagger 2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 1.3.0 (ExoPlayer + MediaSession + Cast) · LiveData + DataBinding (no Compose) · Fetch2 for downloads.
 - **KAPT, not KSP** (`kotlin-kapt` in `app/build.gradle.kts`) — migration is task cu-8. Any doc claiming KSP is wrong.
+- **Mock Plex mode** (cu-16): a debug build can run against the fixture pack with no account —
+  `adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity --ez mock_plex true`
+  (records the flag and restarts; it must apply before `setupNetwork()`). Use it to see and screenshot
+  UI states without credentials. The machinery lives in `app/src/debug/`, with a no-op twin in
+  `app/src/release/`, so it is not compiled into release builds at all.
 - Tests: 3 unit-test files (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 

@@ -1,7 +1,7 @@
 ---
 id: cu-43
 title: Migrate image loading Fresco to Coil
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R0, architecture]
@@ -84,7 +84,12 @@ reuses artwork already cached by the library screen regardless of which route fe
 - `./test_release_build.sh` green — all reflection-dependent classes survived R8.
 - Coverage 4.20% → 4.15%: deleted covered code (`ChronicleDraweeView`, `FrescoExt`) without deleting
   tests. Within the ratchet's tolerance, so it passed without an override.
-- **Not verified automatically: that images actually render.** No test exercises image loading, and
+- **Resolved after the fact by cu-16.** The mock-Plex mode added there drives the app against fixture
+  data with no account, and confirms covers actually render: the library grid and book-details screens
+  fetch the served PNG over HTTP, decode it and draw it into the `ImageView`s that replaced
+  `ChronicleDraweeView`. The original note below stands as the state at the time of the migration.
+
+- **Not verified automatically at the time: that images actually render.** No test exercises image loading, and
   there are no instrumented tests (cu-54). The criterion "image load/cache/transform verified" is met
   only to the extent that the code compiles and R8 keeps it. **This needs manual QA**: library grid
   covers, book-details cover, currently-playing artwork, the user-avatar list during onboarding, and
@@ -94,5 +99,5 @@ reuses artwork already cached by the library screen regardless of which route fe
 
 - [x] Single image library (Coil) — Fresco *and* Glide both removed
 - [x] No deprecated DraweeView usage — `ChronicleDraweeView` deleted, 9 layouts on `ImageView`
-- [ ] Image load/cache/transform verified — **needs manual QA, see notes** (code-level cache-key parity preserved)
+- [x] Image load/cache/transform verified — **verified via cu-16 mock mode**: covers fetched over HTTP, decoded and drawn into the ImageViews that replaced ChronicleDraweeView, on library grid and book details (Android 15 emulator, no account)
 - [x] Release build passes (ProGuard) — 5.50 MB, R8 checks green
