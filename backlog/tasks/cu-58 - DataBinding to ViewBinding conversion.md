@@ -1,8 +1,8 @@
 ---
 id: cu-58
 title: DataBinding to ViewBinding conversion
-status: To Do
-assignee: []
+status: In Progress
+assignee: [claude]
 created_date: '2026-08-30'
 labels: [R1, architecture]
 dependencies: []
@@ -76,6 +76,49 @@ on. Playback, library browse, and onboarding are the highest-risk paths.
 The R3 redesigns (cu-26/27/28) will rewrite many of these layouts anyway, so there is some duplicated
 effort in converting first. Owner accepted that trade deliberately: converting first unblocks cu-8 and
 KAPT removal far earlier, rather than leaving the toolchain slow until R3.
+
+## Implementation Plan
+
+### Safety net first (done before any conversion)
+
+`capture-screens.sh` drives the app against the cu-16 mock server and screenshots Home, book details,
+Library and Settings. Baseline captured before touching anything. This is the *only* meaningful check
+here: `verify.sh` proves the app compiles, not that a screen still renders, and there are no
+instrumented tests (cu-54). Re-run and compare after each screen.
+
+### Measured scope
+
+29 layouts carry `<layout>` wrappers; 218 `@{...}` expressions; 64 `<variable>` declarations; 23
+`@BindingAdapter` functions across 8 files; **zero** two-way `@={...}` bindings.
+
+Weight is concentrated: `fragment_currently_playing` and `fragment_audiobook_details` are 29
+expressions each, `fragment_home` 18, `fragment_library` 15. The remaining ~25 layouts average 5.
+
+### Order — simplest first, to establish the pattern
+
+1. Onboarding layouts (5 exprs each, self-contained, low blast radius) — proves the pattern.
+2. List/grid item layouts — mechanical, but they touch adapters.
+3. `fragment_collections`, `fragment_library`, `fragment_home`.
+4. `fragment_audiobook_details`, `fragment_currently_playing` — hardest, most playback risk, last.
+5. `activity_main`, then drop `dataBinding = true` and delete the adapters.
+
+One commit per screen, each with its screenshot compared against baseline. That keeps every step
+revertable and makes a regression attributable to one screen.
+
+### Conversion rules
+
+- `@{viewModel.foo}` → an `observe(viewLifecycleOwner)` block in the Fragment. **LiveData stays**
+  (cu-52 decides StateFlow separately); the call site just moves from XML into Kotlin.
+- `@BindingAdapter` functions become ordinary extension/helper functions called from those blocks.
+- `DataBindingUtil.inflate` → `XBinding.inflate`; `binding.lifecycleOwner` disappears with the last
+  XML-observed LiveData.
+- Adapters keep their generated `*Binding` type — ViewBinding generates the same class shape, so
+  `binding.someView` keeps working. Only the `<layout>` wrapper and expressions go.
+
+### Stop conditions
+
+If a screen cannot be converted without also restructuring its ViewModel, **stop and leave it** for the
+R3 redesign rather than widening scope mid-task. Note it in the task and move on.
 
 ## Acceptance Criteria
 

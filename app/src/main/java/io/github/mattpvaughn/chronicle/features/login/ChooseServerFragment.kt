@@ -8,10 +8,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
+import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseServerBinding
 import javax.inject.Inject
@@ -45,7 +47,6 @@ class ChooseServerFragment : Fragment() {
     super.onCreate(savedInstanceState)
 
     val binding = OnboardingPlexChooseServerBinding.inflate(inflater, container, false)
-    binding.lifecycleOwner = viewLifecycleOwner
 
     viewModel =
       ViewModelProvider(
@@ -61,6 +62,7 @@ class ChooseServerFragment : Fragment() {
       )
 
     binding.serverList.adapter = serverAdapter
+    binding.refresh.setOnClickListener { viewModel.refresh() }
 
     viewModel.servers.observe(
       viewLifecycleOwner,
@@ -70,6 +72,13 @@ class ChooseServerFragment : Fragment() {
         }
       },
     )
+
+    // Was three `app:loadingStatus` bindings in XML, one per view type.
+    viewModel.loadingStatus.observe(viewLifecycleOwner) { status ->
+      binding.serverList.isVisible = status == LoadingStatus.DONE
+      binding.noServersFound.isVisible = status == LoadingStatus.ERROR
+      binding.loadingIcon.isVisible = status == LoadingStatus.LOADING
+    }
 
     viewModel.userMessage.observe(
       viewLifecycleOwner,
@@ -81,7 +90,6 @@ class ChooseServerFragment : Fragment() {
       },
     )
 
-    binding.chooseServerViewModel = viewModel
     return binding.root
   }
 }

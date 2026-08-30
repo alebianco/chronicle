@@ -52,7 +52,10 @@ android {
     freeCompilerArgs += "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
   }
   buildFeatures {
+    // Both are on during the cu-58 conversion: layouts move to ViewBinding one
+    // screen at a time, so unconverted ones still need DataBinding.
     dataBinding = true
+    viewBinding = true
     buildConfig = true
   }
 
