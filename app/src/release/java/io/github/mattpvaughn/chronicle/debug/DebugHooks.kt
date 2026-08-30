@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.debug
 
 import android.content.Intent
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
+import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 
 /**
  * Release build: every debug hook is a no-op.
@@ -15,4 +16,9 @@ object DebugHooks {
   fun onApplicationCreate(application: ChronicleApplication) = Unit
 
   fun onMainActivityIntent(intent: Intent?) = Unit
+
+  fun onPlayBookIntent(
+    intent: Intent?,
+    mediaServiceConnection: MediaServiceConnection,
+  ) = Unit
 }

@@ -99,6 +99,16 @@ class MainActivity : AppCompatActivity() {
     // No-op in release: the release source set provides an empty DebugHooks, so
     // the mock-Plex machinery is not compiled into a release build at all.
     DebugHooks.onMainActivityIntent(intent)
+    // Debug-only: `--el play_book <id>` starts playback once the media service is
+    // connected. connect{} is required — transportControls is null until then,
+    // which is why driving playback from a bare intent alone does not work.
+    if (mediaServiceConnection.isConnected.value == true) {
+      DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
+    } else {
+      mediaServiceConnection.connect {
+        DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
+      }
+    }
 
     super.onCreate(savedInstanceState)
 
@@ -257,6 +267,15 @@ class MainActivity : AppCompatActivity() {
 
   override fun onNewIntent(intent: Intent?) {
     handleNotificationIntent(intent)
+    // The activity is singleInstance, so a re-launch arrives here rather than in
+    // onCreate — the debug play_book hook has to be handled in both places.
+    if (mediaServiceConnection.isConnected.value == true) {
+      DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
+    } else {
+      mediaServiceConnection.connect {
+        DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
+      }
+    }
     super.onNewIntent(intent)
   }
 

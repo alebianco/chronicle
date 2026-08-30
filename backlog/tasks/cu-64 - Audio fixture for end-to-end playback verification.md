@@ -76,18 +76,54 @@ historically occurred. Verified to bite: removing the `Accept-Ranges` header fai
 **Verified:** the fixture server delivers a real, seekable audio stream over HTTP, and the app reaches
 ExoPlayer construction with `MediaBrowserService` running under `targetSdk 36`.
 
-**Not verified: audio actually decoding and rendering in the app.** Driving the play button by `adb
-shell input tap` proved unreliable — coordinates that work on one screen state miss on another, and the
-media-key path needs an active session. The transport half is now solid and covered by tests; the
-in-app trigger is not. Left In Review rather than Done for that reason.
+### The debug playback intent (added)
 
-The cleanest fix is a debug-only intent that starts playback of a known book directly, removing tap
-coordinates from the loop entirely. Worth adding when cu-9 needs it.
+`--el play_book <id>` on the MainActivity intent calls `playFromMediaId` — the exact call the play
+button makes, so it exercises the real path rather than a shortcut around it. Debug source set only;
+R8 strips `DebugHooks` entirely from release (`R8$$REMOVED$$CLASS$$` in the mapping).
+
+Two things it needed that are worth recording:
+
+- **`onNewIntent`, not just `onCreate`.** MainActivity is `launchMode="singleInstance"`, so a second
+  `am start` is delivered to `onNewIntent` and `onCreate` never re-runs.
+- **A guard around `connect()`.** `MediaServiceConnection.connect()` throws
+  `IllegalStateException: connect() called while neither disconnecting nor disconnected` if the session
+  is already connected, so the hook connects only when it is not.
+
+With it, a scripted run reaches playback:
+
+```
+I DebugHooks: play_book: starting playback of book 1001
+I AudiobookMediaSessionCallback$playBook: Tracks: [3 tracks, duration=5000, progress=1500 ...]
+I MediaMetadataCompatExtKt: Media uri is: http://127.0.0.1:57693/library/parts/3001/.../file.wav
+I OnMediaChangedCallback: Playback state changed to STATE_BUFFERING
+I OnMediaChangedCallback: Playback state changed to STATE_PLAYING
+```
+
+The track list, durations, saved progress and resolved media URI are all correct, and the session
+reaches `STATE_PLAYING`.
+
+### The remaining gap
+
+**No request for the audio ever reaches the mock server** — `MockPlexServer` logs zero
+`/library/parts/` hits despite the player reporting `STATE_PLAYING`. So the session state machine is
+satisfied while nothing is being fetched or decoded.
+
+Untested hypotheses, roughly in order of likelihood: ExoPlayer's `DataSource` is not the OkHttp client
+the mock is bound to and is failing silently against a stale/unreachable host; or the player is
+resolving to a cached-file path (`CachedFileManager` is active in the logs) and finding nothing; or the
+error is being swallowed before it reaches logcat at the level I filtered.
+
+This is a real diagnosis job rather than a small fix, and it belongs with cu-9 (progress reporting),
+which has to understand this path anyway. **What is delivered here is the transport layer and a
+reliable trigger; what is not is proof that bytes flow.** Recorded plainly rather than claimed.
 
 ## Acceptance Criteria
 
 - [x] Mock serves an audio stream for track part requests, with range support — in both the debug app
       and the test server, covered by 6 tests
-- [ ] A scripted run reaches ExoPlayer `STATE_READY` and confirms `isPlaying` — **not done**: driving
-      play via `adb input tap` is unreliable; needs a debug intent to trigger playback directly
+- [x] A scripted run reaches playback without tap coordinates — `--el play_book <id>` drives
+      `playFromMediaId` directly; the session reports `STATE_BUFFERING` then `STATE_PLAYING`
+- [ ] Audio confirmed fetched from the fixture server — **not done**: the player reports playing but no
+      request reaches the mock. See "The remaining gap" below.
 - [x] Fixture audio is generated or licence-clean; no third-party media committed — generated sine tone
