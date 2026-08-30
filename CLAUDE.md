@@ -31,7 +31,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Project snapshot (truthful as of 2026-07-13 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin **2.2.10**, minSdk 27, target/compileSdk **36** (cu-6). Gradle 9.5.1 + AGP 8.13.2 — note AGP 8.x cannot use Gradle >= 9.6.0, and AGP 9.x absorbs the Kotlin plugin (its own migration).
-- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 1.3.0 (ExoPlayer + MediaSession + Cast) · LiveData + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
+- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · LiveData + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
 - **KSP, not KAPT** (cu-8/cu-58). `kotlin-kapt` is gone; Room and Dagger use `ksp(...)`. Any doc claiming KAPT is wrong.
   Note incremental builds are *slower* than they were under KAPT (+13% on an ordinary edit, +97% when an annotated type
   changes) — this is fixed per-invocation overhead in KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating
