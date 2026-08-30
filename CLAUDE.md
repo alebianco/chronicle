@@ -31,8 +31,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Project snapshot (truthful as of 2026-07-13 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin, minSdk 27, target/compileSdk **34** (SDK 36 bump is task cu-6).
-- MVVM + Repository · Dagger 2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 1.3.0 (ExoPlayer + MediaSession + Cast) · LiveData + DataBinding (no Compose) · Fetch2 for downloads.
-- **KAPT, not KSP** (`kotlin-kapt` in `app/build.gradle.kts`) — migration is task cu-8. Any doc claiming KSP is wrong.
+- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 1.3.0 (ExoPlayer + MediaSession + Cast) · LiveData + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
+- **KSP, not KAPT** (cu-8/cu-58). `kotlin-kapt` is gone; Room and Dagger use `ksp(...)`. Any doc claiming KAPT is wrong.
+  Note incremental builds are *slower* than they were under KAPT (+13% on an ordinary edit, +97% when an annotated type
+  changes) — this is fixed per-invocation overhead in KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating
+  outputs, `ALL_FILES` poisoning, KSP1 fallback, larger daemon heap, newer Dagger. See cu-8 notes before re-investigating.
 - **Mock Plex mode** (cu-16): a debug build can run against the fixture pack with no account —
   `adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity --ez mock_plex true`
   (records the flag and restarts; it must apply before `setupNetwork()`). Use it to see and screenshot
@@ -67,12 +70,16 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Gotchas (things that waste agent runs)
 
 - **Four separate Room databases** (`BookDatabase` v8, `TrackDatabase` v4, `ChapterDatabase` v1, `CollectionsDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration.
-- **KAPT** — build errors in generated code usually mean an annotation problem upstream, and builds are slow; don't loop blindly.
+- **KSP** — build errors in generated code usually mean an annotation problem upstream; don't loop blindly. KSP errors are
+  clearer than KAPT's were, but a DataBinding-style opaque failure is gone with DataBinding itself.
 - **No 401 re-auth exists** — an expired Plex token surfaces as a UI error string (`MainActivity`), not a refresh. Fixing = task cu-10.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.
-- DataBinding: layout changes can produce stale generated classes — a `clean` fixes phantom binding errors.
+- **ViewBinding, not DataBinding** (cu-58). Layouts have no `<layout>` wrapper and no `@{...}` expressions; view state is
+  set from Kotlin. Two traps when converting or reviewing UI code: a view whose visibility is Kotlin-driven needs
+  `android:visibility="gone"` in XML or it flashes its default for a frame; and a binding-adapter-backed type such as
+  `FormattableString` must go through its helper, since a plain `.text =` renders the data class `toString()` silently.
 
 ## Definition of done
 
