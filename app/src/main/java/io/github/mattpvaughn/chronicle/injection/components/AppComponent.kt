@@ -8,7 +8,6 @@ import com.squareup.moshi.Moshi
 import com.tonyodev.fetch2.Fetch
 import dagger.Component
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
-import io.github.mattpvaughn.chronicle.application.ChronicleBillingManager
 import io.github.mattpvaughn.chronicle.data.local.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
@@ -75,7 +74,6 @@ interface AppComponent {
   fun frescoConfig(): ImagePipelineConfig
 
   //    fun plexMediaSource(): PlexMediaSource
-  fun billingManager(): ChronicleBillingManager
 
   // Inject
   fun inject(chronicleApplication: ChronicleApplication)

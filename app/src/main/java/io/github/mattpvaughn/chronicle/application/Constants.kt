@@ -9,5 +9,3 @@ const val SECONDS_PER_MINUTE = 60L
 const val USE_STRICT_MODE = false
 
 val LOG_NETWORK_REQUESTS = BuildConfig.DEBUG
-const val PREMIUM_IAP_SKU = "premium"
-val IAP_SKU_LIST = listOf(PREMIUM_IAP_SKU)

@@ -134,10 +134,6 @@ class SettingsViewModel(
     )
   }
 
-  private var _upgradeToPremium = MutableLiveData<Event<Unit>>()
-  val upgradeToPremium: LiveData<Event<Unit>>
-    get() = _upgradeToPremium
-
   private val prefsListener =
     OnSharedPreferenceChangeListener { _, _ ->
       // Rebuild the prefs list whenever any prefs change
@@ -152,42 +148,9 @@ class SettingsViewModel(
     prefsRepo.unregisterPrefsListener(prefsListener)
   }
 
-  fun startUpgradeToPremiumFlow() {
-    _upgradeToPremium.postEvent(Unit)
-  }
-
   private fun makePreferences(): List<PreferenceModel> {
     val list =
       mutableListOf(
-        PreferenceModel(
-          PreferenceType.TITLE,
-          FormattableString.from(R.string.settings_premium_upgrade_label),
-        ),
-        if (prefsRepo.isPremium) {
-          PreferenceModel(
-            type = PreferenceType.CLICKABLE,
-            title = FormattableString.from(R.string.settings_premium_unlocked_title),
-            explanation =
-              FormattableString.from(
-                R.string.settings_premium_unlocked_explanation,
-              ),
-          )
-        } else {
-          PreferenceModel(
-            type = PreferenceType.CLICKABLE,
-            title = FormattableString.from(R.string.settings_premium_upgrade_label),
-            explanation =
-              FormattableString.from(
-                R.string.settings_premium_upgrade_explanation,
-              ),
-            click =
-              object : PreferenceClick {
-                override fun onClick() {
-                  startUpgradeToPremiumFlow()
-                }
-              },
-          )
-        },
         PreferenceModel(
           PreferenceType.TITLE,
           FormattableString.from(R.string.settings_category_appearance),

@@ -56,9 +56,6 @@ open class ChronicleApplication : Application() {
   lateinit var prefsRepo: PrefsRepo
 
   @Inject
-  lateinit var billingManager: ChronicleBillingManager
-
-  @Inject
   lateinit var unhandledExceptionHandler: CoroutineExceptionHandler
 
   @Inject

@@ -81,7 +81,6 @@ dependencies {
   implementation(libs.material)
   implementation(libs.glide)
   implementation(libs.timber)
-  implementation(libs.iapwrapper)
   implementation(libs.fetch)
   implementation(libs.work)
   implementation(libs.result)
@@ -90,6 +89,12 @@ dependencies {
   implementation(libs.browserx)
   implementation(libs.oss)
   implementation(libs.appcompat)
+  // Declared explicitly: asLiveData/viewModelScope/ViewModel were previously
+  // only reaching the classpath transitively through the Google-IAP billing
+  // library, so removing that (cu-60) took them with it.
+  implementation(libs.lifecycle.livedata.ktx)
+  implementation(libs.lifecycle.runtime.ktx)
+  implementation(libs.lifecycle.viewmodel.ktx)
   implementation(libs.annotation)
   implementation(libs.coroutines)
   compileOnly(libs.facebook.infer.annotation)

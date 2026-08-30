@@ -722,10 +722,6 @@ class CurrentlyPlayingViewModel(
   }
 
   fun showPlaybackSpeedChooser() {
-    if (!prefsRepo.isPremium) {
-      _showUserMessage.postEvent("Error: variable playback speed is a premium feature")
-      return
-    }
     _showModalBottomSheetSpeedChooser.postEvent(Unit)
   }
 

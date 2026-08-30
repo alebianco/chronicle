@@ -85,7 +85,6 @@
     <string name="cannot_play_media_no_server">Cannot play media- not connected to any server!</string>
     <string name="prompt_mark_as_unwatched">Mark as unwatched?</string>
     <string name="failed_to_sync_progress">Failed to sync progress</string>
-    <string name="premium_required_offline_playback">Premium is required for offline playback!</string>
     <string name="unable_to_cache_audiobook">Unable to download audiobook- not connected to server</string>
     <string name="force_sync">Force Sync</string>
     <string name="prompt_force_sync">Force sync with network? Local progress will be lost</string>
@@ -213,10 +212,6 @@
     <string name="settings_book_cover_type_explanation">Book cover appearance type in library and home</string>
     <string name="settings_book_cover_type_square">Square</string>
     <string name="settings_book_cover_type_rect">Rectangular</string>
-    <string name="settings_premium_upgrade_label">Upgrade to pro</string>
-    <string name="settings_premium_upgrade_explanation">Get access to your books offline, get adjustable playback speed, and more!</string>
-    <string name="settings_premium_unlocked_title">Pro is unlocked!</string>
-    <string name="settings_premium_unlocked_explanation">You have full access to all of Chronicle\'s features</string>
     <string name="settings_category_appearance">Appearance</string>
     <string name="settings_category_playback">Playback</string>
     <string name="settings_skip_silent_audio">Skip silent audio</string>

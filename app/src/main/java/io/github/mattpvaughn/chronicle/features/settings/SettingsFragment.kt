@@ -12,7 +12,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
-import io.github.mattpvaughn.chronicle.application.ChronicleBillingManager
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
@@ -24,7 +23,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.FragmentSettingsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
-import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.getString
 import javax.inject.Inject
 
@@ -40,9 +38,6 @@ class SettingsFragment : Fragment() {
 
   @Inject
   lateinit var plexLoginRepo: IPlexLoginRepo
-
-  @Inject
-  lateinit var chronicleBillingManager: ChronicleBillingManager
 
   @Inject
   lateinit var cachedFileManager: ICachedFileManager
@@ -97,10 +92,6 @@ class SettingsFragment : Fragment() {
         }
       },
     )
-
-    viewModel.upgradeToPremium.observeEvent(viewLifecycleOwner) {
-      chronicleBillingManager.launchBillingFlow(requireActivity())
-    }
 
     viewModel.webLink.observe(
       viewLifecycleOwner,

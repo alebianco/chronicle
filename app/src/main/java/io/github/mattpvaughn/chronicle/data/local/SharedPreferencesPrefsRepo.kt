@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.SharedPreferences
-import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_ALLOW_AUTO
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_AUTO_REWIND_ENABLED
@@ -10,7 +9,6 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_BOOK_S
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_DEBUG_DISABLE_PROGRESS
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_HIDE_PLAYED_AUDIOBOOKS
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_IS_LIBRARY_SORT_DESCENDING
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_IS_PREMIUM
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_JUMP_BACKWARD_SECONDS
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_JUMP_FORWARD_SECONDS
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_LAST_REFRESH
@@ -19,12 +17,10 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_LIBRAR
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_OFFLINE_MODE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_PAUSE_ON_FOCUS_LOST
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_PLAYBACK_SPEED
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_PREMIUM_TOKEN
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_REFRESH_RATE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_SHAKE_TO_SNOOZE_ENABLED
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_SKIP_SILENCE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_SYNC_DIR_PATH
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.NO_PREMIUM_TOKEN
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLES
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -65,9 +61,6 @@ interface PrefsRepo {
   /** Pause when audio focus lost */
   var pauseOnFocusLost: Boolean
 
-  /** Whether the app should display premium features */
-  val isPremium: Boolean
-
   /** The last time the library was refreshed, as Unix timestamp (in millis) */
   var lastRefreshTimeStamp: Long
 
@@ -79,9 +72,6 @@ interface PrefsRepo {
 
   /** The time interval for jumping backward in the player view.*/
   var jumpBackwardSeconds: Long
-
-  /** The user's IAP token returned in a [Purchase] upon paying for an upgrade to premium */
-  var premiumPurchaseToken: String
 
   /** The key by which the books in the library are sorted. One of [Audiobook.SORT_KEYS] */
   var bookSortKey: String
@@ -144,9 +134,6 @@ interface PrefsRepo {
     const val KEY_ALLOW_AUTO = "key_allow_auto"
     const val KEY_SHAKE_TO_SNOOZE_ENABLED = "key_shake_to_snooze_enabled"
     const val KEY_PAUSE_ON_FOCUS_LOST = "key_pause_on_focus_lost"
-    const val KEY_IS_PREMIUM = "key_is_premium"
-    const val NO_PREMIUM_TOKEN = "no premium token"
-    const val KEY_PREMIUM_TOKEN = "key_premium_token"
     const val KEY_BOOK_SORT_BY = "key_sort_by"
     const val KEY_IS_LIBRARY_SORT_DESCENDING = "key_is_sort_descending"
     const val KEY_HIDE_PLAYED_AUDIOBOOKS = "key_hide_played_audiobooks"
@@ -257,24 +244,6 @@ class SharedPreferencesPrefsRepo
     override var allowAuto: Boolean
       get() = sharedPreferences.getBoolean(KEY_ALLOW_AUTO, defaultAllowAuto)
       set(value) = sharedPreferences.edit().putBoolean(KEY_ALLOW_AUTO, value).apply()
-
-    private val defaultIsPremium = true
-    override val isPremium: Boolean
-      get() =
-        sharedPreferences.getBoolean(KEY_IS_PREMIUM, defaultIsPremium) ||
-          BuildConfig.DEBUG
-//                        || BuildConfig.FREE_AS_IN_BEER
-
-    private val defaultPremiumToken = NO_PREMIUM_TOKEN
-    override var premiumPurchaseToken: String
-      get() = getString(KEY_PREMIUM_TOKEN, defaultPremiumToken)
-      set(value) {
-        sharedPreferences.edit().putString(KEY_PREMIUM_TOKEN, value).apply()
-        sharedPreferences.edit().putBoolean(
-          KEY_IS_PREMIUM,
-          value != NO_PREMIUM_TOKEN,
-        ).apply()
-      }
 
     private val defaultBookSortKey = Audiobook.SORT_KEY_TITLE
     override var bookSortKey: String

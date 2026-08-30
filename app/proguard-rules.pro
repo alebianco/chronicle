@@ -171,9 +171,6 @@
 -dontwarn org.jetbrains.annotations.**
 -keep class timber.log.Timber { *; }
 
-# ============= Billing =============
--keep class com.android.billingclient.api.** { *; }
-
 # ============= Release Logging Removal =============
 -assumenosideeffects class android.util.Log { public static *** d(...); public static *** v(...); public static *** i(...); }
 -assumenosideeffects class timber.log.Timber { public static *** d(...); public static *** v(...); public static *** i(...); }
