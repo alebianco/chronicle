@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.test.core.app.ApplicationProvider
+import io.github.mattpvaughn.chronicle.data.model.Chapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -176,6 +177,26 @@ class RoomSchemaTest {
       .build()
   }
 
+  /** A chapter with every key column set, so tests only name what they are varying. */
+  private fun chapter(
+    id: String,
+    bookId: String,
+    trackId: String,
+    index: Long = 1L,
+    discNumber: Int = 1,
+    title: String = "Chapter $index",
+    endTimeOffset: Long = 60_000L,
+  ) = Chapter(
+    title = title,
+    id = id,
+    index = index,
+    discNumber = discNumber,
+    startTimeOffset = 0L,
+    endTimeOffset = endTimeOffset,
+    trackId = trackId,
+    bookId = bookId,
+  )
+
   /**
    * The track id must survive as TEXT *and* keep pointing at its book.
    *
@@ -215,36 +236,6 @@ class RoomSchemaTest {
     db.close()
   }
 
-  /** Chapters carry two foreign ids, and both are retyped. */
-  @Test
-  fun `the chapter database survives being opened after migrating from v1`() {
-    val db =
-      migrated(
-        klass = ChapterDatabase::class.java,
-        oldVersion = 1,
-        createSql =
-          "CREATE TABLE IF NOT EXISTS `Chapter` (`title` TEXT NOT NULL, `id` INTEGER NOT NULL, " +
-            "`index` INTEGER NOT NULL, `discNumber` INTEGER NOT NULL, " +
-            "`startTimeOffset` INTEGER NOT NULL, `endTimeOffset` INTEGER NOT NULL, " +
-            "`downloaded` INTEGER NOT NULL, `trackId` INTEGER NOT NULL, " +
-            "`bookId` INTEGER NOT NULL, PRIMARY KEY(`id`))",
-        seedSql =
-          "INSERT INTO Chapter (title, id, `index`, discNumber, startTimeOffset, endTimeOffset, " +
-            "downloaded, trackId, bookId) " +
-            "VALUES ('Chapter One', 11, 1, 1, 0, 60000, 0, 2001, 1001)",
-        migrations = CHAPTER_MIGRATIONS,
-      )
-
-    db.query("SELECT id, trackId, bookId, title FROM Chapter", emptyArray()).use { cursor ->
-      assertTrue("the pre-existing chapter must survive the upgrade", cursor.moveToFirst())
-      assertEquals("11", cursor.getString(0))
-      assertEquals("a chapter that loses its trackId cannot be located in the book", "2001", cursor.getString(1))
-      assertEquals("1001", cursor.getString(2))
-      assertEquals("Chapter One", cursor.getString(3))
-    }
-    db.close()
-  }
-
   /**
    * `childIds` is deliberately untouched by the migration: its converter already stored a JSON
    * array of strings, so only the Kotlin type changed. This asserts the stored form still reads
@@ -277,6 +268,93 @@ class RoomSchemaTest {
         cursor.getString(2),
       )
     }
+    db.close()
+  }
+
+  /**
+   * The collision the old single-column key allowed.
+   *
+   * `Chapter.id` came from two namespaces — `PlexChapter.id`, and the *track* id on the per-track
+   * fallback — and Plex hands out chapter and track ratingKeys from one server-wide sequence, so
+   * two books' chapters could share an id. With `id` as the primary key and `insertAll` using
+   * `OnConflictStrategy.REPLACE`, inserting the second silently evicted the first: one book lost a
+   * chapter with no error anywhere. The composite key `(bookId, trackId, discNumber, index)` is
+   * what makes both rows survive.
+   */
+  @Test
+  fun `two books whose chapters share a server id both survive insertAll`() {
+    val db =
+      Room.inMemoryDatabaseBuilder(
+        ApplicationProvider.getApplicationContext(),
+        ChapterDatabase::class.java,
+      ).allowMainThreadQueries().build()
+
+    val shared = "4001"
+    val fromBookA = chapter(id = shared, bookId = "1001", trackId = "2001")
+    val fromBookB = chapter(id = shared, bookId = "1002", trackId = "3001", endTimeOffset = 90_000L)
+
+    db.chapterDao.insertAll(listOf(fromBookA, fromBookB))
+
+    assertEquals(
+      "a shared server id must not make one book evict the other's chapter",
+      2,
+      db.chapterDao.getChapters().size,
+    )
+    db.close()
+  }
+
+  /**
+   * Same rule, one book: two chapters of the same book must not collide either. This is the case
+   * the *fallback* path produces, where every chapter's `id` is its track id.
+   */
+  @Test
+  fun `chapters of one book on different tracks both survive insertAll`() {
+    val db =
+      Room.inMemoryDatabaseBuilder(
+        ApplicationProvider.getApplicationContext(),
+        ChapterDatabase::class.java,
+      ).allowMainThreadQueries().build()
+
+    val one = chapter(id = "2001", bookId = "1001", trackId = "2001", title = "Track 1")
+    val two = chapter(id = "2002", bookId = "1001", trackId = "2002", index = 2L, title = "Track 2")
+
+    db.chapterDao.insertAll(listOf(one, two))
+
+    assertEquals(2, db.chapterDao.getChapters().size)
+    db.close()
+  }
+
+  /**
+   * Migrating a v2 chapter database must produce a table the entity validates against.
+   *
+   * The v2→v3 migration drops the table rather than copying it, which is safe *only* here: nothing
+   * ever wrote to it (no Dagger module provided `ChapterDatabase` before cu-49), and pre-cu-49 rows
+   * all carry `bookId = NO_AUDIOBOOK_FOUND_ID`, so copying them would collide on the new key.
+   * What this test proves is that Room opens the result and accepts the schema — the failure mode
+   * that shipped a crashing migration once already.
+   */
+  @Test
+  fun `the chapter database survives being opened after migrating from v2`() {
+    val db =
+      migrated(
+        klass = ChapterDatabase::class.java,
+        oldVersion = 2,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `Chapter` (`title` TEXT NOT NULL, `id` TEXT NOT NULL, " +
+            "`index` INTEGER NOT NULL, `discNumber` INTEGER NOT NULL, " +
+            "`startTimeOffset` INTEGER NOT NULL, `endTimeOffset` INTEGER NOT NULL, " +
+            "`downloaded` INTEGER NOT NULL, `trackId` TEXT NOT NULL, " +
+            "`bookId` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        seedSql =
+          "INSERT INTO Chapter (title, id, `index`, discNumber, startTimeOffset, endTimeOffset, " +
+            "downloaded, trackId, bookId) " +
+            "VALUES ('Stale Chapter', '11', 1, 1, 0, 60000, 0, '2001', '-22321')",
+        migrations = CHAPTER_MIGRATIONS,
+      )
+
+    // The table must exist, validate, and accept a row under the new composite key.
+    db.chapterDao.insertAll(listOf(chapter(id = "4001", bookId = "1001", trackId = "2001", title = "Fresh")))
+    assertEquals(listOf("Fresh"), db.chapterDao.getChapters().map { it.title })
     db.close()
   }
 }

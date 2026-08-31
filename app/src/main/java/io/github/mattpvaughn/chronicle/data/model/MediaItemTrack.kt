@@ -285,6 +285,9 @@ fun MediaItemTrack.asChapter(startOffset: Long): Chapter {
     endTimeOffset = startOffset + duration,
     downloaded = cached,
     trackId = id,
+    // parentKey is this track's book. Required because chapters share one table keyed partly
+    // on bookId (cu-49); an unset one collides with every other chapter in the library.
+    bookId = parentKey,
   )
 }
 

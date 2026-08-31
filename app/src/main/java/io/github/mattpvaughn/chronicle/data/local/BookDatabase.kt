@@ -87,7 +87,7 @@ val BOOK_MIGRATION_7_8 =
 val BOOK_MIGRATION_8_9 =
   object : Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) {
-      db.rebuildTableWithTextIds(
+      db.rebuildTable(
         table = "Audiobook",
         createNewTableSql =
           "CREATE TABLE IF NOT EXISTS `Audiobook_new` (`id` TEXT NOT NULL, `source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `chapters` TEXT NOT NULL, PRIMARY KEY(`id`))",

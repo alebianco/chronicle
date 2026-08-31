@@ -94,7 +94,7 @@ class PlexFixtureContractTest {
     val directory = container("track-with-chapters.json").plexMediaContainer.metadata.single()
     val chapters =
       directory.plexChapters.map {
-        it.toChapter(trackId = "2001", trackDiscNumber = 1, downloaded = false)
+        it.toChapter(trackId = "2001", trackDiscNumber = 1, downloaded = false, bookId = "1001")
       }
 
     assertEquals(3, chapters.size)

@@ -110,7 +110,7 @@ class MigrationSupportTest {
   }
 
   private fun SupportSQLiteDatabase.rebuildThing() =
-    rebuildTableWithTextIds(
+    rebuildTable(
       table = "Thing",
       createNewTableSql =
         "CREATE TABLE Thing_new (id TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(id))",

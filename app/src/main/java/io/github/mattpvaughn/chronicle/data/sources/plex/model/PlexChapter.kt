@@ -14,10 +14,19 @@ data class PlexChapter(
   val endTimeOffset: Long = 0L,
 )
 
+/**
+ * Maps a Plex chapter onto the neutral [Chapter] entity.
+ *
+ * [bookId] is required rather than defaulted: chapters live in a shared table keyed partly on it
+ * (cu-49), so an unset book id would collide with every other chapter in the library. It was
+ * genuinely absent while chapters were serialized inside `Audiobook.chapters`, where the
+ * containing book was implicit.
+ */
 fun PlexChapter.toChapter(
   trackId: String,
   trackDiscNumber: Int,
   downloaded: Boolean,
+  bookId: String,
 ): Chapter {
   return Chapter(
     title = tag.takeIf { it.isNotEmpty() } ?: "Chapter $index",
@@ -28,5 +37,6 @@ fun PlexChapter.toChapter(
     endTimeOffset = endTimeOffset,
     downloaded = downloaded,
     trackId = trackId,
+    bookId = bookId,
   )
 }

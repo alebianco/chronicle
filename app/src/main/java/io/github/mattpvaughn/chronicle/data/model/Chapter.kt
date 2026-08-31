@@ -2,15 +2,28 @@ package io.github.mattpvaughn.chronicle.data.model
 
 import android.text.format.DateUtils
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import timber.log.Timber
 
-@Entity
+/**
+ * Keyed on `(bookId, trackId, discNumber, index)` rather than on [id].
+ *
+ * [id] is the value the server gave, and it is **not safe as a primary key** (cu-49). It arrives
+ * from two different namespaces: `PlexChapter.id` on the Plex path, and the *track* id on the
+ * per-track fallback (`MediaItemTrack.asChapter`). Plex hands out chapter and track ratingKeys
+ * from one server-wide sequence, so the two can collide, and `insertAll` uses
+ * `OnConflictStrategy.REPLACE` — a collision would silently drop one book's chapter in favour of
+ * another's. That was harmless while chapters were serialized inside `Audiobook.chapters`, where
+ * the containing book was implicit and each list was stored separately.
+ *
+ * The composite key is unique without trusting either namespace: one book, one track, one disc,
+ * one chapter index. [id] stays as a plain column — it is still what the server said, and
+ * `updateCachedStatus` addresses rows by it.
+ */
+@Entity(primaryKeys = ["bookId", "trackId", "discNumber", "index"])
 data class Chapter(
   val title: String = "",
-  @PrimaryKey
   val id: String = "0",
   val index: Long = 0L,
   val discNumber: Int = 1,

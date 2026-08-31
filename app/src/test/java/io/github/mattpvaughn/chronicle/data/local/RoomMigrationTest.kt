@@ -202,4 +202,43 @@ class RoomMigrationTest {
     assertTrue("year added by 7->8", columnsOf(db, "Audiobook").contains("year"))
     db.close()
   }
+
+  /**
+   * The chapter retype from v1 to v2 must not lose a row or a foreign id.
+   *
+   * Driven through raw SQLite rather than Room, because Room always opens a database at its
+   * entity's current version — there is no way to ask it to stop at v2. That matters here: v2→v3
+   * deliberately drops the table (see `CHAPTER_MIGRATION_2_3`), so running the whole chain through
+   * Room would leave no rows and assert nothing about the retype. This exercises
+   * `CHAPTER_MIGRATION_1_2` in isolation, where losing a row *is* a bug.
+   */
+  @Test
+  fun `chapter database migration 1 to 2 retypes ids and preserves rows`() {
+    val chapterV1Create =
+      "CREATE TABLE IF NOT EXISTS `Chapter` (`title` TEXT NOT NULL, `id` INTEGER NOT NULL, " +
+        "`index` INTEGER NOT NULL, `discNumber` INTEGER NOT NULL, " +
+        "`startTimeOffset` INTEGER NOT NULL, `endTimeOffset` INTEGER NOT NULL, " +
+        "`downloaded` INTEGER NOT NULL, `trackId` INTEGER NOT NULL, " +
+        "`bookId` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+
+    val db = openHelperFor("chapter", chapterV1Create)
+    db.execSQL(
+      "INSERT INTO Chapter (title, id, `index`, discNumber, startTimeOffset, endTimeOffset, " +
+        "downloaded, trackId, bookId) " +
+        "VALUES ('Chapter One', 11, 1, 1, 0, 60000, 0, 2001, 1001)",
+    )
+
+    CHAPTER_MIGRATION_1_2.migrate(db)
+
+    db.query("SELECT id, trackId, bookId, title, endTimeOffset FROM Chapter").use { cursor ->
+      assertTrue("the chapter must survive the retype", cursor.moveToFirst())
+      assertEquals("11", cursor.getString(0))
+      assertEquals("a chapter that loses its trackId cannot be located in the book", "2001", cursor.getString(1))
+      assertEquals("1001", cursor.getString(2))
+      assertEquals("Chapter One", cursor.getString(3))
+      assertEquals(60_000L, cursor.getLong(4))
+      assertEquals("exactly one row expected", 1, cursor.count)
+    }
+    db.close()
+  }
 }

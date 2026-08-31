@@ -3,13 +3,14 @@ package io.github.mattpvaughn.chronicle.data.local
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * Rebuilds [table] so the columns named in [textColumns] hold TEXT instead of INTEGER.
+ * Rebuilds [table] via create-copy-drop-rename, optionally retyping [textColumns] to TEXT.
  *
- * SQLite cannot change a column's type or a table's primary key, so retyping an id means
- * create-copy-drop-rename. Every migration this codebase had before cu-71 was a simple
- * `ADD COLUMN`, so there was no precedent to copy — hence one tested helper rather than the same
- * five statements written out four times, where a mistyped column list drops a column's data with
- * no error at all.
+ * SQLite cannot change a column's type *or* a table's primary key, so both kinds of change need a
+ * full rebuild. Pass an empty [textColumns] for a pure primary-key change (cu-49's composite key);
+ * name the id columns for a retype (cu-71). Every migration this codebase had before cu-71 was a
+ * simple `ADD COLUMN`, so there was no precedent to copy — hence one tested helper rather than the
+ * same five statements written out repeatedly, where a mistyped column list drops a column's data
+ * with no error at all.
  *
  * `CAST(x AS TEXT)` is belt-and-braces rather than load-bearing: SQLite applies TEXT affinity on
  * insert, so a copied INTEGER already lands as text (verified — `typeof()` reports `text` with or
@@ -20,8 +21,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * @param columns every column in the table. Order must match [createNewTableSql]'s declaration
  *   order, and omitting a column silently discards its data — so callers build this list from the
  *   exported schema in `app/schemas/`, which is the authority.
+ * @param textColumns columns to wrap in `CAST(... AS TEXT)`; empty for a rebuild that keeps every
+ *   column's type, such as a primary-key change.
  */
-fun SupportSQLiteDatabase.rebuildTableWithTextIds(
+fun SupportSQLiteDatabase.rebuildTable(
   table: String,
   createNewTableSql: String,
   columns: List<String>,

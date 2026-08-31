@@ -67,9 +67,11 @@ class ChapterRepository
             // If no chapters for this track, make a chapter from the current track
             networkChapters?.map { plexChapter ->
               plexChapter.toChapter(
-                track.id,
-                track.discNumber,
-                isAudiobookCached,
+                trackId = track.id,
+                trackDiscNumber = track.discNumber,
+                downloaded = isAudiobookCached,
+                // The track's parentKey is its book; no book is passed to this function.
+                bookId = track.parentKey,
               )
             }.takeIf { !it.isNullOrEmpty() } ?: listOf(track.asChapter(0L))
           }.sorted()

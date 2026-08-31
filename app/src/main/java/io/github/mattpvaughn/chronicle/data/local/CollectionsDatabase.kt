@@ -72,7 +72,7 @@ interface CollectionsDao {
 val COLLECTIONS_MIGRATION_1_2 =
   object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
-      db.rebuildTableWithTextIds(
+      db.rebuildTable(
         table = "Collection",
         createNewTableSql =
           "CREATE TABLE IF NOT EXISTS `Collection_new` (`id` TEXT NOT NULL, `source` INTEGER NOT NULL, `title` TEXT NOT NULL, `childCount` INTEGER NOT NULL, `sortType` TEXT NOT NULL, `isCached` INTEGER NOT NULL, `thumb` TEXT NOT NULL, `childIds` TEXT NOT NULL, PRIMARY KEY(`id`))",

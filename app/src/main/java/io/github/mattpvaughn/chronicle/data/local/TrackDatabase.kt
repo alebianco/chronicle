@@ -35,7 +35,7 @@ fun getTrackDatabase(context: Context): TrackDatabase {
 val MIGRATION_4_5 =
   object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
-      db.rebuildTableWithTextIds(
+      db.rebuildTable(
         table = "MediaItemTrack",
         createNewTableSql =
           "CREATE TABLE IF NOT EXISTS `MediaItemTrack_new` (`id` TEXT NOT NULL, `parentKey` TEXT NOT NULL, `title` TEXT NOT NULL, `playQueueItemID` INTEGER NOT NULL, `thumb` TEXT, `index` INTEGER NOT NULL, `discNumber` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `media` TEXT NOT NULL, `album` TEXT NOT NULL, `artist` TEXT NOT NULL, `genre` TEXT NOT NULL, `cached` INTEGER NOT NULL, `artwork` TEXT, `viewCount` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `size` INTEGER NOT NULL, PRIMARY KEY(`id`))",
