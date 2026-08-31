@@ -152,6 +152,7 @@ class BookRepository
   @Inject
   constructor(
     private val bookDao: BookDao,
+    private val chapterDao: ChapterDao,
     private val prefsRepo: PrefsRepo,
     private val plexPrefsRepo: PlexPrefsRepo,
     private val plexMediaService: PlexMediaService,
@@ -442,7 +443,10 @@ class BookRepository
       withContext(dispatchers.io) {
         val chapters: List<Chapter> =
           try {
-            tracks.flatMap { track ->
+            // assembleChapters carries the running offset. This used to fall back to
+            // `track.asChapter(0L)` per track — a literal zero — so a multi-file book with no
+            // server chapters had every chapter starting at 0 (cu-49).
+            assembleChapters(tracks) { track ->
               val networkChapters =
                 plexMediaService.retrieveChapterInfo(track.id)
                   .plexMediaContainer.metadata.firstOrNull()?.plexChapters
@@ -451,16 +455,15 @@ class BookRepository
                 // tree isn't attached in the release build
                 Timber.i("Network chapters: $networkChapters")
               }
-              // If no chapters for this track, make a chapter from the current track
-              networkChapters?.map { plexChapter ->
+              networkChapters.orEmpty().map { plexChapter ->
                 plexChapter.toChapter(
                   trackId = track.id,
                   trackDiscNumber = track.discNumber,
                   downloaded = audiobook.isCached,
                   bookId = audiobook.id,
                 )
-              }.takeIf { !it.isNullOrEmpty() } ?: listOf(track.asChapter(0L))
-            }.sorted()
+              }
+            }
           } catch (t: Throwable) {
             Timber.e("Failed to load chapters: $t")
             return@withContext false
@@ -476,6 +479,14 @@ class BookRepository
           }
 
         Timber.i("Loaded chapters: ${chapters.map { "[${it.index}/${it.discNumber}]" }}")
+
+        // Chapters are written to their own table (cu-49) *and* still onto the book, so the read
+        // sites can move over one at a time. `Audiobook.chapters` is retired once they all have.
+        // Replacing rather than merging: the server's answer is authoritative, and a book whose
+        // chapter count shrank must not keep the stale extras. Scoped to this book by the
+        // composite key, so it cannot disturb another book's rows.
+        chapterDao.removeAllForBook(audiobook.id)
+        chapterDao.insertAll(chapters)
 
         val merged =
           Audiobook.merge(

@@ -115,6 +115,14 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
+  fun provideChapterDao(): ChapterDao = getChapterDatabase(app.applicationContext).chapterDao
+
+  @Provides
+  @Singleton
+  fun provideChapterRepo(chapterRepository: ChapterRepository): IChapterRepository = chapterRepository
+
+  @Provides
+  @Singleton
   fun provideCollectionsDao(): CollectionsDao =
     getCollectionsDatabase(
       app.applicationContext,

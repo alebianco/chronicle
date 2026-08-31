@@ -56,6 +56,8 @@ interface AppComponent {
 
   fun bookRepo(): IBookRepository
 
+  fun chapterRepo(): IChapterRepository
+
   fun bookRepos(): BookRepository
 
   fun workManager(): WorkManager

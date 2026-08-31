@@ -1,7 +1,7 @@
 ---
 id: cu-49
 title: Refactor chapters into their own DB table
-status: In Progress
+status: In Review
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, architecture]
@@ -14,7 +14,8 @@ milestone: m-1
 
 M4: chapters are embedded in tracks/books, complicating queries. Design a chapter schema + ChapterDao + migration; playback + UI read chapters from the DB. Sequence with cu-13 (chapter correctness) and the neutral Chapter model (cu-13 builds it; this persists it).
 
-Analysis: [`M4-chapter-management-refactor-plan.md`](../docs/analysis/M4-chapter-management-refactor-plan.md).
+Analysis: superseded by the plan below; the old file is archived at
+[`archive/M4-chapter-management-refactor-plan.md`](../docs/analysis/archive/M4-chapter-management-refactor-plan.md).
 
 ## Implementation Plan
 
@@ -94,15 +95,95 @@ archive it when this task closes rather than repairing it.
 
 ## Acceptance Criteria
 
-- [ ] `Chapter` has a composite primary key that cannot collide across books, with a migration to
+- [x] `Chapter` has a composite primary key that cannot collide across books, with a migration to
       `ChapterDatabase` v3 and an exported schema
-- [ ] `bookId` is populated on both chapter paths (Plex and the per-track fallback)
-- [ ] Two books whose chapters share a server `id` both survive `insertAll` — the regression the
-      old single-column key allowed, covered by a test
-- [ ] `ChapterDao` can fetch the chapters for one book
-- [ ] `ChapterDatabase` + `ChapterRepository` provided in Dagger and actually injected
-- [ ] Chapters are written to the table by the live fetch path
-- [ ] Playback + UI read chapters from the DB, with the `asChapterList()` fallback preserved
-- [ ] Every new migration has a file-backed test in `RoomSchemaTest`, each verified to bite by
+- [x] `bookId` is populated on both chapter paths (Plex and the per-track fallback)
+- [x] Two books whose chapters share a server `id` both survive `insertAll` — covered by a test
+      verified to bite
+- [x] `ChapterDao` can fetch the chapters for one book
+- [x] `ChapterDatabase` + `ChapterRepository` provided in Dagger and actually injected
+- [x] Chapters are written to the table by the live fetch path
+- [ ] Playback + UI read chapters from the DB, with the `asChapterList()` fallback preserved —
+      **not done, see "Step 6" below**
+- [x] Every new migration has a file-backed test in `RoomSchemaTest`, each verified to bite by
       deliberate sabotage
-- [ ] Verify loop green; coverage not regressed
+- [x] Verify loop green; coverage not regressed (12.62% → 13.05%)
+
+## Implementation Notes
+
+Steps 1–5 of the plan landed. Step 6 (moving the reads) and step 7 (retiring
+`Audiobook.chapters`) did not — the reason matters and is below.
+
+### The blocker that shaped the whole task: `Chapter.id` was unsafe as a primary key
+
+`id` arrived from two namespaces — `PlexChapter.id` on the Plex path, the *track* id on the
+per-track fallback — and Plex assigns chapter and track ratingKeys from one server-wide sequence.
+With `id` as the primary key and `insertAll` using `OnConflictStrategy.REPLACE`, two books whose
+chapters shared an id would silently evict each other. Harmless while chapters were serialized per
+book; a data-loss bug the moment they share a table.
+
+In the fixtures the ranges happen not to overlap (tracks 2001–2003, chapters 4001–4003) — the same
+accidental correctness the missing-`parentKey` bug was made of, so it is not evidence.
+
+Now keyed `(bookId, trackId, discNumber, index)`. `bookId` had to be populated first: neither
+construction path set it, so every chapter carried `NO_AUDIOBOOK_FOUND_ID` and would have collided
+on the new key.
+
+`ChapterDatabase` → v3. The migration **drops** the table rather than copying it, safe only here:
+nothing ever wrote to it, pre-existing rows would all collide anyway, and chapters are derived data
+refetched per book. That argument does not extend to books or tracks.
+
+### A second bug found on the way
+
+Both `BookRepository.syncAudiobook` and `ChapterRepository.loadChapterData` fell back to
+`listOf(track.asChapter(0L))` — a literal zero offset for **every** track. Chapter offsets are
+absolute within the book, so a multi-file book where Plex returns no chapters had every chapter
+starting at 0, and `getChapterAt` resolves the wrong chapter or none. Same class of bug as the one
+[[cu-13]] fixed in `asChapterList`, in the path that runs when the server answers for *some*
+tracks.
+
+Fixed by extracting `assembleChapters` (`data/model/ChapterAssembly.kt`), which owns the running
+offset, and pointing both repositories at it — so the duplication that let the two copies drift is
+gone too. 7 tests, including the mixed case: a track the server answered for must still advance
+the offset used by a later track it did not.
+
+### Replacement, not merge
+
+`syncAudiobook` calls `removeAllForBook(bookId)` before `insertAll`. A chapter list can *shrink* —
+a re-tagged file, or a book dropping from server chapters to the fallback — and `REPLACE` only
+overwrites rows whose key matches, so stale extras would otherwise survive. Scoped by `bookId` so
+it cannot disturb another book; both properties are tested, and the scoping was verified by
+inverting the `WHERE` clause.
+
+### Step 6: why the reads did not move
+
+Chapters are written **and** still stored on the book, deliberately, so reads could move one at a
+time. On investigation that turned out to need more than a swap:
+
+1. **`syncAudiobook` is the only writer and runs on demand**, per book, when its tracks load. So
+   the table is empty for any book not re-synced on this version. A read site switched to the DAO
+   would show *no chapters* for an existing library until each book happened to sync — a visible
+   regression on upgrade. The correct read is DAO-first with a fall back to `Audiobook.chapters`,
+   which means the fallback chain grows to three levels (table → book column → `asChapterList`).
+2. **All four read sites are `DoubleLiveData` combinators over the book** (`CurrentlyPlayingViewModel`,
+   `AudiobookDetailsViewModel`, `MainActivityViewModel`, plus `CurrentlyPlayingSingleton`). Making
+   them DAO-backed means restructuring each ViewModel's reactive wiring, not changing an expression.
+
+Stopping here leaves a working app with a populated chapter table and a redundant column, which is
+exactly the safe midpoint the plan named ("if anything is uncertain, stopping after step 6 leaves a
+working app with a redundant column"). Steps 6–7 are carved into a follow-up rather than rushed
+against the same tables that hold listening progress.
+
+### Analysis file
+
+`M4-chapter-management-refactor-plan.md` was **unusable**: every section's lines in reverse order
+(Problem Statement last, Phase 6 before Phase 1), code blocks shredded, and its premise stale —
+it proposed creating a `ChapterDao` that already existed. Superseded by the plan in this task;
+moved to `analysis/archive/` since it no longer reflects the code.
+
+### Follow-ups
+
+- Steps 6–7: move the reads to the DAO, then retire `Audiobook.chapters`. → new draft.
+- **No live verification.** Every check is a unit test against Robolectric SQLite. Whether a real
+  library's chapters land correctly, and whether the v2→v3 drop is truly harmless on a real device,
+  belong in [[cu-73]].

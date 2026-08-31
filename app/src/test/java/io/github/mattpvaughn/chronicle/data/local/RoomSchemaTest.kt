@@ -357,4 +357,72 @@ class RoomSchemaTest {
     assertEquals(listOf("Fresh"), db.chapterDao.getChapters().map { it.title })
     db.close()
   }
+
+  /**
+   * A refetch must *replace* a book's chapters, not merge into them.
+   *
+   * A chapter list can shrink — a re-tagged file, or a book that drops from server chapters to the
+   * per-track fallback. `insertAll` with `OnConflictStrategy.REPLACE` only overwrites rows whose
+   * key matches, so without an explicit delete the stale extras survive and the book shows
+   * chapters that no longer exist. This is what `removeAllForBook` is for.
+   */
+  @Test
+  fun `refetching fewer chapters for a book leaves no stale rows`() =
+    kotlinx.coroutines.test.runTest {
+      val db =
+        Room.inMemoryDatabaseBuilder(
+          ApplicationProvider.getApplicationContext(),
+          ChapterDatabase::class.java,
+        ).allowMainThreadQueries().build()
+
+      db.chapterDao.insertAll(
+        listOf(
+          chapter(id = "41", bookId = "1001", trackId = "2001", index = 1L),
+          chapter(id = "42", bookId = "1001", trackId = "2001", index = 2L),
+          chapter(id = "43", bookId = "1001", trackId = "2001", index = 3L),
+        ),
+      )
+      // Another book's chapters must be untouched by the scoped delete.
+      db.chapterDao.insertAll(listOf(chapter(id = "51", bookId = "1002", trackId = "3001")))
+
+      db.chapterDao.removeAllForBook("1001")
+      db.chapterDao.insertAll(listOf(chapter(id = "41", bookId = "1001", trackId = "2001", index = 1L)))
+
+      assertEquals(
+        "the shrunk book must keep only its remaining chapter",
+        1,
+        db.chapterDao.getChaptersForBook("1001").size,
+      )
+      assertEquals(
+        "another book's chapters must survive a scoped delete",
+        1,
+        db.chapterDao.getChaptersForBook("1002").size,
+      )
+      db.close()
+    }
+
+  /** The per-book read must not leak other books' chapters. */
+  @Test
+  fun `getChaptersForBook returns only that book's chapters, in order`() =
+    kotlinx.coroutines.test.runTest {
+      val db =
+        Room.inMemoryDatabaseBuilder(
+          ApplicationProvider.getApplicationContext(),
+          ChapterDatabase::class.java,
+        ).allowMainThreadQueries().build()
+
+      db.chapterDao.insertAll(
+        listOf(
+          chapter(id = "42", bookId = "1001", trackId = "2002", index = 2L, title = "Second"),
+          chapter(id = "41", bookId = "1001", trackId = "2001", index = 1L, title = "First"),
+          chapter(id = "51", bookId = "1002", trackId = "3001", index = 1L, title = "Other book"),
+        ),
+      )
+
+      assertEquals(
+        listOf("First", "Second"),
+        db.chapterDao.getChaptersForBook("1001").map { it.title },
+      )
+      db.close()
+    }
 }

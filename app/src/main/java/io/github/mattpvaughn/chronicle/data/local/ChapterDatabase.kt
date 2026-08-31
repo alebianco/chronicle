@@ -73,6 +73,17 @@ interface ChapterDao {
 
   @Query("DELETE FROM Chapter WHERE id IN (:chaptersToRemove)")
   fun removeAll(chaptersToRemove: List<String>): Int
+
+  /**
+   * Drops every chapter of one book, so a refetch replaces rather than merges.
+   *
+   * Needed because a book's chapter list can *shrink* — a re-tagged file, or a switch from server
+   * chapters to the per-track fallback. `insertAll` with `REPLACE` only overwrites rows whose key
+   * matches, so without this the stale extras would survive and the book would show chapters that
+   * no longer exist.
+   */
+  @Query("DELETE FROM Chapter WHERE bookId = :bookId")
+  suspend fun removeAllForBook(bookId: String): Int
 }
 
 /**

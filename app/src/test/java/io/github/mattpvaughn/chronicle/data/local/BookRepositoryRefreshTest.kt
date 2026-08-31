@@ -78,9 +78,12 @@ class BookRepositoryRefreshTest {
       coVerify(exactly = 0) { bookDao.insertAll(any()) }
     }
 
+  private val chapterDao = mockk<ChapterDao>(relaxed = true)
+
   private fun TestScope.repository() =
     BookRepository(
       bookDao = bookDao,
+      chapterDao = chapterDao,
       prefsRepo = prefsRepo,
       plexPrefsRepo = plexPrefsRepo,
       plexMediaService = plexMediaService,

@@ -3,7 +3,7 @@ package io.github.mattpvaughn.chronicle.data.local
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
-import io.github.mattpvaughn.chronicle.data.model.asChapter
+import io.github.mattpvaughn.chronicle.data.model.assembleChapters
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.toChapter
@@ -55,7 +55,9 @@ class ChapterRepository
       Timber.i("Loading chapter data for tracks: $tracks")
       val chapters: List<Chapter> =
         try {
-          tracks.flatMap { track ->
+          // Shares assembleChapters with BookRepository, which is where the running offset
+          // lives — both used to fall back to `track.asChapter(0L)` per track (cu-49).
+          assembleChapters(tracks) { track ->
             val networkChapters =
               plexMediaService.retrieveChapterInfo(track.id)
                 .plexMediaContainer.metadata.firstOrNull()?.plexChapters
@@ -64,8 +66,7 @@ class ChapterRepository
               // tree isn't attached in the release build
               Timber.i("Network chapters: $networkChapters")
             }
-            // If no chapters for this track, make a chapter from the current track
-            networkChapters?.map { plexChapter ->
+            networkChapters.orEmpty().map { plexChapter ->
               plexChapter.toChapter(
                 trackId = track.id,
                 trackDiscNumber = track.discNumber,
@@ -73,8 +74,8 @@ class ChapterRepository
                 // The track's parentKey is its book; no book is passed to this function.
                 bookId = track.parentKey,
               )
-            }.takeIf { !it.isNullOrEmpty() } ?: listOf(track.asChapter(0L))
-          }.sorted()
+            }
+          }
         } catch (t: Throwable) {
           Timber.e("Failed to load chapters: $t")
           emptyList()
