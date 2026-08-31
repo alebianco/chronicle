@@ -88,9 +88,16 @@ class ServiceModule(private val service: MediaPlayerService) {
   @ServiceScope
   fun mediaSession(launchActivityPendingIntent: PendingIntent): MediaSessionCompat =
     MediaSessionCompat(service, APP_NAME).apply {
-      // Enable queue management; media buttons handled automatically on recent APIs
+      // All three deliberately, not just queue commands. The media-button and transport-control
+      // flags are auto-enabled from API 28, but minSdk here is 27 — so on the oldest supported
+      // release the session advertised neither, and a session that does not claim transport
+      // controls is a candidate cause of Android Auto showing no media card (cu-89). Setting them
+      // is a no-op on newer releases, so this rules the theory out cheaply rather than leaving it
+      // as a maybe. It is *not* a confirmed fix: the remaining diagnosis needs a device.
       setFlags(
-        FLAG_HANDLES_QUEUE_COMMANDS,
+        FLAG_HANDLES_MEDIA_BUTTONS or
+          FLAG_HANDLES_TRANSPORT_CONTROLS or
+          FLAG_HANDLES_QUEUE_COMMANDS,
       )
       service.sessionToken = sessionToken
       setSessionActivity(launchActivityPendingIntent)

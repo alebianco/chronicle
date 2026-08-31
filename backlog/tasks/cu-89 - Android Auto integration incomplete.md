@@ -1,10 +1,11 @@
 ---
 id: cu-89
 title: Android Auto integration incomplete (no icon, no media card)
-status: To Do
+status: In Progress
 labels: [R2, comfort, bug]
 dependencies: [cu-73]
 priority: medium
+assignee: [claude]
 ---
 
 ## Description
@@ -76,6 +77,41 @@ give a server-free way to reproduce.
 - [ ] Transport controls in the card work: play/pause, skip, seek
 - [ ] Browsing the four categories works, and playing from Auto starts the right book at the right
       position
-- [ ] Whatever is fixed is covered by a test where one is meaningful (session flags, playback-state
-      construction, notification/session token identity); device-only parts recorded in [[cu-73]]
-- [ ] Verify loop green
+- [x] One candidate cause ruled out cheaply: the session now claims media buttons and transport
+      controls, not only queue commands
+- [ ] Whatever is fixed is covered by a test where one is meaningful; device-only parts in [[cu-73]]
+
+## Progress Notes
+
+### One theory ruled out, not a claimed fix
+
+`MediaSessionCompat.setFlags` was called with `FLAG_HANDLES_QUEUE_COMMANDS` alone. The media-button
+and transport-control flags are auto-enabled from **API 28**, but `minSdk` here is **27** — so on the
+oldest supported release the session advertised neither, and a session that does not claim transport
+controls is a plausible reason for Auto showing no media card.
+
+All three are now set. Harmless on newer releases, so this closes off the theory rather than leaving
+it as a maybe. **It is not a confirmed fix** — the reported device's API level is unknown, and if it
+is 28+ this changes nothing.
+
+### Still the open question
+
+The owner's clarification reframed this: **Pocket Casts held the media card while Chronicle was
+playing audio.** So Chronicle's session is not becoming the *active* session, which is not a
+browse-tree or artwork problem.
+
+Everything the platform requires is present and was individually checked — `mediaPlayback` service
+type, `isActive = true` (in `ServiceModule`, not `MediaPlayerService`, where the only occurrence is
+the `false` on teardown), `service.sessionToken`, audio focus with `handleAudioFocus = true`,
+`MediaStyle` with `setMediaSession`, a real `setSmallIcon`, `PlaybackStateCompat` with actions and
+state, `automotive_app_desc.xml`, `MediaButtonReceiver`, and Auto in `auto_allowed_callers.xml`.
+
+Remaining leads, in order:
+
+1. **Two competing sessions, or one recreated per service start** without releasing the old.
+   `dumpsys media_session` settles this immediately.
+2. **Audio focus requested but not granted or immediately lost.** If focus never lands, the system's
+   notion of "who is playing" never moves. Log focus transitions.
+3. **Notification/session token mismatch**, which can stop the card binding.
+
+Next step is hardware, not code.
