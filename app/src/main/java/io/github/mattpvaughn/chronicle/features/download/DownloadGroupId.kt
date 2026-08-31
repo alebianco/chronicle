@@ -31,3 +31,20 @@ fun downloadGroupId(bookId: String): Int {
   val hashed = bookId.hashCode()
   return if (hashed == Int.MIN_VALUE) 0 else kotlin.math.abs(hashed)
 }
+
+/**
+ * A stable, unique PendingIntent request code for [bookId] under [prefix].
+ *
+ * Two notification actions used to compute this as `prefix + bookId`, which a `String` id cannot
+ * do. Android matches a PendingIntent by request code plus intent, so the code must be identical
+ * across process restarts — otherwise a notification posted before a relaunch stops matching its
+ * own action — and distinct per book, or two books share an action.
+ *
+ * Reuses [downloadGroupId] rather than adding a second String→Int mapping, so there is one place
+ * where collision behaviour is defined. A numeric id therefore still yields `prefix + id`,
+ * preserving the codes of notifications posted before the retype.
+ */
+fun requestCodeFor(
+  prefix: Int,
+  bookId: String,
+): Int = prefix + downloadGroupId(bookId)

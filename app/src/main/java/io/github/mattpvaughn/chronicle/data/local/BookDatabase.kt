@@ -27,6 +27,7 @@ fun getBookDatabase(context: Context): BookDatabase {
           BOOK_MIGRATION_5_6,
           BOOK_MIGRATION_6_7,
           BOOK_MIGRATION_7_8,
+          BOOK_MIGRATION_8_9,
         ).build()
     }
   }
@@ -84,7 +85,42 @@ val BOOK_MIGRATION_7_8 =
     }
   }
 
-@Database(entities = [Audiobook::class], version = 8, exportSchema = true)
+/**
+ * Retypes `id` and `parentId` to TEXT so a non-numeric backend can be represented (cu-71,
+ * decision-11).
+ *
+ * A full table rebuild because SQLite cannot alter a column type or a primary key. The column list
+ * comes from `app/schemas/...BookDatabase/8.json`, which is the authority — a column omitted here
+ * is dropped with no error at all.
+ */
+val BOOK_MIGRATION_8_9 =
+  object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.rebuildTableWithTextIds(
+        table = "Audiobook",
+        createNewTableSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook_new` (" +
+            "`id` TEXT NOT NULL, `source` INTEGER NOT NULL, `title` TEXT NOT NULL, " +
+            "`titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, " +
+            "`parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, " +
+            "`year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+            "`lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, " +
+            "`isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, " +
+            "`favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, " +
+            "`leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, " +
+            "`chapters` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        columns =
+          listOf(
+            "id", "source", "title", "titleSort", "author", "thumb", "parentId", "genre",
+            "summary", "year", "addedAt", "updatedAt", "lastViewedAt", "duration", "isCached",
+            "progress", "favorited", "viewedLeafCount", "leafCount", "viewCount", "chapters",
+          ),
+        textColumns = setOf("id", "parentId"),
+      )
+    }
+  }
+
+@Database(entities = [Audiobook::class], version = 9, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract val bookDao: BookDao
 }

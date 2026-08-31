@@ -202,4 +202,88 @@ class RoomMigrationTest {
     assertTrue("year added by 7->8", columnsOf(db, "Audiobook").contains("year"))
     db.close()
   }
+  // ---------------------------------------------------------------------
+  // BookDatabase: v8 -> v9. Retypes id and parentId from INTEGER to TEXT.
+  // ---------------------------------------------------------------------
+
+  private val bookV8Create =
+    """
+    CREATE TABLE IF NOT EXISTS `Audiobook` (
+      `id` INTEGER NOT NULL, `source` INTEGER NOT NULL, `title` TEXT NOT NULL,
+      `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL,
+      `parentId` INTEGER NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL,
+      `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL,
+      `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL,
+      `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL,
+      `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL,
+      `viewCount` INTEGER NOT NULL, `chapters` TEXT NOT NULL, PRIMARY KEY(`id`)
+    )
+    """.trimIndent()
+
+  @Test
+  fun `book database migrates 8 to 9 and preserves listening progress`() {
+    val db = openHelperFor("book", bookV8Create)
+
+    db.execSQL(
+      """
+      INSERT INTO Audiobook
+        (id, source, title, titleSort, author, thumb, parentId, genre, summary, year,
+         addedAt, updatedAt, lastViewedAt, duration, isCached, progress, favorited,
+         viewedLeafCount, leafCount, viewCount, chapters)
+      VALUES (1001, 1, 'Dune', 'Dune', 'Frank Herbert', '', 0, '', '', 1965,
+              0, 0, 1700000000000, 3600000, 1, 1234567, 0, 0, 3, 0, '')
+      """.trimIndent(),
+    )
+
+    BOOK_MIGRATION_8_9.migrate(db)
+
+    db.query(
+      "SELECT id, parentId, title, progress, lastViewedAt, isCached FROM Audiobook",
+    ).use { cursor ->
+      assertTrue("the row must survive the table rebuild", cursor.moveToFirst())
+      assertEquals(1, cursor.count)
+      assertEquals("1001", cursor.getString(0))
+      assertEquals("parentId is retyped alongside id", "0", cursor.getString(1))
+      assertEquals("Dune", cursor.getString(2))
+      assertEquals(
+        "losing progress here loses the user's place in the book",
+        1_234_567L,
+        cursor.getLong(3),
+      )
+      assertEquals(1_700_000_000_000L, cursor.getLong(4))
+      assertEquals("a downloaded book must not become undownloaded", 1, cursor.getInt(5))
+    }
+  }
+
+  @Test
+  fun `book migration 8 to 9 leaves the id column with TEXT affinity`() {
+    val db = openHelperFor("book", bookV8Create)
+
+    BOOK_MIGRATION_8_9.migrate(db)
+
+    db.query("PRAGMA table_info(`Audiobook`)").use { cursor ->
+      val nameIndex = cursor.getColumnIndex("name")
+      val typeIndex = cursor.getColumnIndex("type")
+      val types = mutableMapOf<String, String>()
+      while (cursor.moveToNext()) {
+        types[cursor.getString(nameIndex)] = cursor.getString(typeIndex)
+      }
+      assertEquals("Room validates this on open; a mismatch crashes there", "TEXT", types["id"])
+      assertEquals("TEXT", types["parentId"])
+      assertEquals("progress must stay numeric", "INTEGER", types["progress"])
+    }
+  }
+
+  @Test
+  fun `book migration 8 to 9 keeps every column`() {
+    val db = openHelperFor("book", bookV8Create)
+
+    BOOK_MIGRATION_8_9.migrate(db)
+
+    val columns = columnsOf(db, "Audiobook")
+    assertEquals("a column dropped by the rebuild is lost silently", 21, columns.size)
+    listOf("chapters", "titleSort", "viewCount", "favorited").forEach {
+      assertTrue("$it must survive", columns.contains(it))
+    }
+  }
 }
