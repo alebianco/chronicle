@@ -57,6 +57,7 @@ media3-datasource = { group = "androidx.media3", name = "media3-datasource", ver
 media3-cast = { group = "androidx.media3", name = "media3-cast", version.ref = "media3" }
 fetch = { group = "com.github.tonyofrancis.Fetch", name = "fetch2", version.ref = "fetch" }
 work = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
+work-testing = { group = "androidx.work", name = "work-testing", version.ref = "work" }
 result = { group = "com.michael-bull.kotlin-result", name = "kotlin-result", version.ref = "result" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 retrofit-converter = { group = "com.squareup.retrofit2", name = "converter-moshi", version.ref = "retrofit" }

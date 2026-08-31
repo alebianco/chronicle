@@ -161,6 +161,7 @@ dependencies {
   testImplementation(libs.moshi)
   testImplementation(libs.robolectric)
   testImplementation(libs.androidx.test.core)
+  testImplementation(libs.work.testing)
 
     /*
      * Instrumented Tests

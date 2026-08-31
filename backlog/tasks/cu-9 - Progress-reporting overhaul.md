@@ -1,8 +1,8 @@
 ---
 id: cu-9
 title: Progress-reporting overhaul
-status: To Do
-assignee: []
+status: In Progress
+assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
 dependencies: [cu-7, cu-16]
