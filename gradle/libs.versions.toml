@@ -26,6 +26,8 @@ localbroadcastmanager = "1.1.0"
 lifecycle = "2.10.0"
 annotation = "1.10.0"
 ktlint = "12.1.2"
+pitest = "0.2.27"
+pitestTool = "1.22.1"
 junit = "4.13.2"
 mockk = "1.14.11"
 robolectric = "4.16.1"
@@ -99,3 +101,6 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+# droidsonroids fork, not mainline solidsoft: solidsoft is built on JavaPlugin and needs
+# sourceSets.main/test, which com.android.application does not provide (cu-57).
+pitest = { id = "pl.droidsonroids.pitest", version.ref = "pitest" }

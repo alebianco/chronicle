@@ -4,6 +4,7 @@ plugins {
   id("kotlin-parcelize")
   alias(libs.plugins.ksp)
   id("com.google.android.gms.oss-licenses-plugin")
+  alias(libs.plugins.pitest)
   jacoco
 }
 
@@ -256,5 +257,77 @@ tasks.register<JacocoReport>("jacocoTestReport") {
     fileTree(layout.buildDirectory) {
       include("**/*.exec", "**/*.ec")
     },
+  )
+}
+
+// Mutation testing (cu-57). Deliberately **manual**: not in verify.sh, not in CI, and no score
+// threshold. It answers a different question from the coverage ratchet — "would the tests notice if
+// this code changed?" rather than "was this line executed?" — and it is far too slow for an inner
+// loop.
+//
+//   ./gradlew pitestDebug     report: app/build/reports/pitest/index.html
+//
+// The allowlist is the whole design. Two reasons it is not a wildcard:
+//
+//  1. **Robolectric tests must not be in scope.** PIT + Robolectric is broken and unfixed
+//     (koral--/gradle-pitest-plugin#80, open since 2022). It fails *silently*, reporting false
+//     SURVIVED/NO_COVERAGE — so pointing PIT at RoomSchemaTest would report our sabotage-verified
+//     migration tests as worthless. Every class listed here is covered by plain-JVM tests only.
+//  2. **Generated code must not be mutated.** Room `_Impl`, Dagger factories and ViewBinding classes
+//     would produce thousands of meaningless mutants. An allowlist avoids needing exclusions.
+//
+// Note the `Kt` suffixes: most of the logic worth mutating lives in top-level functions, which
+// Kotlin compiles into `<FileName>Kt`. Listing only the class names would silently mutate nothing.
+pitest {
+  pitestVersion.set(libs.versions.pitestTool)
+  // No junit5PluginVersion: this project is on JUnit 4.13.2. Setting it made the coverage
+  // minion die with NoClassDefFoundError on PreconditionViolationException, reported only as
+  // "Minion exited abnormally (UNKNOWN_ERROR)" until verbose was enabled.
+  mutators.set(listOf("DEFAULTS"))
+  // Suppresses Intrinsics.checkNotNull* mutants, which are compiler-generated null checks rather
+  // than behaviour anyone wrote.
+  avoidCallsTo.set(listOf("kotlin.jvm.internal"))
+  threads.set(4)
+  timestampedReports.set(false)
+  targetClasses.set(
+    listOf(
+      // Listening position and completion (decision-16, cu-86, cu-90)
+      "io.github.mattpvaughn.chronicle.data.model.MediaItemTrackKt",
+      "io.github.mattpvaughn.chronicle.data.model.MediaItemTrack",
+      "io.github.mattpvaughn.chronicle.data.model.MediaItemTrack${'$'}Companion",
+      "io.github.mattpvaughn.chronicle.data.model.AudiobookKt",
+      "io.github.mattpvaughn.chronicle.data.model.Audiobook${'$'}Companion",
+      // Chapters (cu-13, cu-49, cu-87)
+      "io.github.mattpvaughn.chronicle.data.model.ChapterKt",
+      "io.github.mattpvaughn.chronicle.data.model.ChapterAssemblyKt",
+      "io.github.mattpvaughn.chronicle.data.model.ChapterListConverter",
+      // Downloads (cu-71, cu-76, cu-85)
+      "io.github.mattpvaughn.chronicle.features.download.CacheScanOutcomeKt",
+      "io.github.mattpvaughn.chronicle.features.download.DownloadGroupIdKt",
+      "io.github.mattpvaughn.chronicle.features.download.ResumePlan",
+      // Auth (cu-10, cu-84)
+      "io.github.mattpvaughn.chronicle.data.sources.plex.PlexTokenAuthenticator",
+      "io.github.mattpvaughn.chronicle.data.sources.plex.AccountAuthState",
+      // Progress reporting (cu-9)
+      "io.github.mattpvaughn.chronicle.data.sources.plex.ProgressReporter",
+    ),
+  )
+  // Only real test classes. `io.github.mattpvaughn.chronicle.*` matched 969 classes — every
+  // class on the test *classpath*, not the test sources — and the coverage minion died
+  // (UNKNOWN_ERROR) trying to run them all.
+  targetTests.set(listOf("io.github.mattpvaughn.chronicle.*Test"))
+  excludedTestClasses.set(
+    listOf(
+      // Robolectric — see (1) above. Named explicitly so a new Robolectric test that forgets this
+      // list produces a confusing result rather than a silent lie.
+      "io.github.mattpvaughn.chronicle.data.local.RoomSchemaTest",
+      "io.github.mattpvaughn.chronicle.data.local.RoomMigrationTest",
+      "io.github.mattpvaughn.chronicle.data.local.MigrationSupportTest",
+      "io.github.mattpvaughn.chronicle.data.model.TrackSourceUriTest",
+      "io.github.mattpvaughn.chronicle.features.player.ProgressUpdaterTest",
+      "io.github.mattpvaughn.chronicle.features.library.ProgressIndicatorTest",
+      "io.github.mattpvaughn.chronicle.views.ColorContrastTest",
+      "io.github.mattpvaughn.chronicle.data.sources.plex.ReauthenticationTest*",
+    ),
   )
 }
