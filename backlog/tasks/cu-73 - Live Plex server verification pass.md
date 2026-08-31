@@ -117,6 +117,20 @@ Grouped by what breaks if the real server disagrees.
 - [ ] **Which route a download takes** once `OkHttpDownloader` is wired ([[cu-76]] item 3):
       downloads should get the same tier as playback, not a relay while playback uses LAN.
 
+### Sync drift (cu-14)
+
+- [ ] **A second device's position is adopted.** Listen on device A, stop, then open the book
+      on device B and refresh. B should jump to A's position. This is the round trip the
+      timestamp fix enables and that no mock can prove — the fixture server accepts timeline
+      writes without modelling server-side state.
+- [ ] **`lastViewedAt` really is seconds on a live server.** The fix normalises seconds to
+      millis and passes through anything already large enough to be millis. Capture a real
+      `/library/metadata/{id}/children` response and confirm the magnitude — if a server
+      reports something else, the threshold heuristic could be wrong either way.
+- [ ] **Local progress is not clobbered by a stale server value.** The converse of the above:
+      listen on this device with no other client active, refresh, and confirm the position
+      does not jump backwards.
+
 ### Unofficial endpoints
 
 - [ ] **`/:/timeline`, scrobble, websockets.** Community-documented, not guaranteed
