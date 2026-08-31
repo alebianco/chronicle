@@ -94,7 +94,15 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 3. **Self-review pass done** (principle 2): diff re-read for correctness, silent failures, dead code, simpler alternatives; error paths log with context and never swallow.
 4. Docs synced in the same PR: relevant `backlog/docs/reference/` file if architecture/behavior changed; the task file's status/criteria updated; this file if any statement here became false.
 5. Attribution trailer if code was ported (principle 4).
-6. Commit messages: imperative summary + why; no Co-Authored-By lines.
+6. Commit messages: **[Scoped Commits](https://scopedcommits.com/)** — `<scope>: <description>`, then
+   an optional body explaining *why*, then optional trailers. No Co-Authored-By lines.
+   - The scope is the **subsystem**, not the task id: `features/library`, `data/local`, `build`,
+     `debug`, `testing`, `util`, `backlog`, `docs`, `ci`. Use a package-ish path when one fits, a
+     broader scope when a change spans several, and `treewide` when it touches everything.
+   - Task ids go in a **`Task: cu-NN` trailer**, not the subject — the subject says what changed, the
+     trailer links it back to `backlog/tasks/`.
+   - History is **flat**: rebase onto the base branch, never merge. One task = one branch, replayed
+     linearly.
 
 ## Never touch without explicit owner sign-off
 
