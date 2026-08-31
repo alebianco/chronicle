@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.widget.Toast
 import androidx.lifecycle.*
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
@@ -53,6 +54,7 @@ class CurrentlyPlayingViewModel(
   private val prefsRepo: PrefsRepo,
   private val plexConfig: PlexConfig,
   private val currentlyPlaying: CurrentlyPlaying,
+  private val workManager: WorkManager,
   sharedPrefs: SharedPreferences,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
@@ -66,6 +68,7 @@ class CurrentlyPlayingViewModel(
       private val prefsRepo: PrefsRepo,
       private val plexConfig: PlexConfig,
       private val currentlyPlaying: CurrentlyPlaying,
+      private val workManager: WorkManager,
       private val sharedPrefs: SharedPreferences,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -78,6 +81,7 @@ class CurrentlyPlayingViewModel(
             prefsRepo,
             plexConfig,
             currentlyPlaying,
+            workManager,
             sharedPrefs,
           ) as T
         } else {
@@ -89,6 +93,18 @@ class CurrentlyPlayingViewModel(
   private var _showUserMessage = MutableLiveData<Event<String>>()
   val showUserMessage: LiveData<Event<String>>
     get() = _showUserMessage
+
+  /**
+   * True when a progress report has permanently failed, so the position on the server is
+   * behind the device's.
+   *
+   * Failure-only by design — see [hasFailedSync] for why a synced/pending indicator
+   * cannot be built honestly from WorkManager's states here.
+   */
+  val hasFailedProgressSync: LiveData<Boolean> =
+    workManager
+      .getWorkInfosByTagLiveData(ProgressUpdater.PROGRESS_SYNC_WORK_TAG)
+      .map { hasFailedSync(it) }
 
   private var audiobookId = MutableLiveData(EMPTY_AUDIOBOOK.id)
 

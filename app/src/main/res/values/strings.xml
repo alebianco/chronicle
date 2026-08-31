@@ -91,6 +91,10 @@
     <string name="progress_sync_successful">Sync successful!</string>
     <string name="progress_sync_failed">Sync failed</string>
     <string name="cannot_sync_no_server">Not connected to server</string>
+    <!-- Persistent badge on the player when a position report to the server has run out
+         of retries, so the server is behind the device. Distinct from
+         progress_sync_failed, which is a transient toast for a manual force-sync. -->
+    <string name="progress_not_synced_badge">Position not synced</string>
 
     <!-- Home screen -->
     <string name="home">Home</string>

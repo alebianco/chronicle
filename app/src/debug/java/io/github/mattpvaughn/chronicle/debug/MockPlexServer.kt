@@ -23,6 +23,16 @@ import kotlin.concurrent.thread
 class MockPlexServer(private val context: Context) {
   private val server = MockWebServer()
 
+  /**
+   * When true, `/:/timeline` answers 401 instead of 200.
+   *
+   * Exists so the "position not synced" badge can actually be seen: it only appears on a
+   * *terminal* report failure, and a mock that always returns 200 can never produce one.
+   * 401 rather than 500 because a 5xx is retried, so the work would sit in ENQUEUED and
+   * never reach FAILED.
+   */
+  var failProgressReports: Boolean = false
+
   /** Base url to point PlexConfig at, valid once [start] returns. */
   lateinit var baseUrl: String
     private set
@@ -47,6 +57,10 @@ class MockPlexServer(private val context: Context) {
           // rendered, not merely wired up (cu-64).
           if (path.startsWith("/library/parts/")) {
             return audioResponse(request.headers["Range"])
+          }
+          if (failProgressReports && path.startsWith("/:/timeline")) {
+            Timber.i("MockPlexServer: -> 401 (failProgressReports)")
+            return MockResponse().setResponseCode(401)
           }
           val fixture = fixtureFor(path)
           Timber.i("MockPlexServer: -> ${fixture ?: "(empty 200)"}")

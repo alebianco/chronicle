@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.BOOK_FINISHED_END_OFFSET_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.NETWORK_CALL_FREQUENCY
+import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.PROGRESS_SYNC_WORK_TAG
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -77,6 +78,12 @@ interface ProgressUpdater {
      * calls to the local database
      */
     const val NETWORK_CALL_FREQUENCY = 10
+
+    /**
+     * Tags every progress-sync work request, so sync health can be observed without
+     * knowing which track ids are in flight (the unique work name is the track id).
+     */
+    const val PROGRESS_SYNC_WORK_TAG = "progress-sync"
   }
 }
 
@@ -249,6 +256,9 @@ class SimpleProgressUpdater
         OneTimeWorkRequestBuilder<PlexSyncScrobbleWorker>()
           .setInputData(inputData)
           .setConstraints(syncWorkerConstraints)
+          // A shared tag, because the unique work name is per-track: without it, showing
+          // sync health means knowing which track ids to watch.
+          .addTag(PROGRESS_SYNC_WORK_TAG)
           .setBackoffCriteria(
             BackoffPolicy.LINEAR,
             WorkRequest.DEFAULT_BACKOFF_DELAY_MILLIS,

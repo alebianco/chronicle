@@ -29,6 +29,15 @@ import timber.log.Timber
 object MockPlexMode {
   private var server: MockPlexServer? = null
 
+  /**
+   * Makes `/:/timeline` answer 401, so the terminal-failure path — and the "position not
+   * synced" badge that depends on it — can be exercised without a real server outage.
+   */
+  fun setFailProgressReports(fail: Boolean) {
+    server?.failProgressReports = fail
+    Timber.i("MockPlexMode: failProgressReports=$fail")
+  }
+
   val isRunning: Boolean
     get() = server != null
 

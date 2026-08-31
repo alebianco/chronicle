@@ -96,6 +96,9 @@ class CurrentlyPlayingFragment : Fragment() {
     binding.changeSpeedButton.setOnClickListener { viewModel.showPlaybackSpeedChooser() }
     binding.sleepTimerButton.setOnClickListener { viewModel.showSleepTimerOptions() }
 
+    viewModel.hasFailedProgressSync.observe(viewLifecycleOwner) { failed ->
+      binding.syncFailedBadge.isVisible = failed == true
+    }
     viewModel.jumpBackwardsIcon.observe(viewLifecycleOwner) {
       binding.rewindButton.setImageResource(it)
     }

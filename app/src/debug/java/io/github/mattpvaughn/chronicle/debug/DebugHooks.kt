@@ -28,6 +28,7 @@ object DebugHooks {
   private const val KEY_MOCK_PLEX = "mock_plex"
   private const val EXTRA_MOCK_PLEX = "mock_plex"
   private const val EXTRA_PLAY_BOOK = "play_book"
+  private const val EXTRA_FAIL_SYNC = "fail_sync"
 
   /** Applied at Application start, before any network setup. */
   fun onApplicationCreate(application: ChronicleApplication) {
@@ -99,6 +100,22 @@ object DebugHooks {
         putLong(KEY_SEEK_TO_TRACK_WITH_ID, ACTIVE_TRACK)
       },
     )
+  }
+
+  /**
+   * Makes progress reports fail terminally, so the "position not synced" badge can be
+   * seen:
+   *
+   * ```
+   * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \
+   *   --ez fail_sync true
+   * ```
+   */
+  fun onFailSyncIntent(intent: Intent?) {
+    if (intent == null || !intent.hasExtra(EXTRA_FAIL_SYNC)) {
+      return
+    }
+    MockPlexMode.setFailProgressReports(intent.getBooleanExtra(EXTRA_FAIL_SYNC, false))
   }
 
   private fun isEnabled(context: Context): Boolean =

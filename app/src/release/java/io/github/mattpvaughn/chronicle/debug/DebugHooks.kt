@@ -21,4 +21,6 @@ object DebugHooks {
     intent: Intent?,
     mediaServiceConnection: MediaServiceConnection,
   ) = Unit
+
+  fun onFailSyncIntent(intent: Intent?) = Unit
 }
