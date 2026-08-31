@@ -1,8 +1,8 @@
 ---
 id: cu-44
 title: Test-coverage push on critical paths
-status: To Do
-assignee: []
+status: In Progress
+assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, agentic]
 dependencies: [cu-16, cu-15]

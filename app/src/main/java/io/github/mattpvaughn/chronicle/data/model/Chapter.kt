@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
+import timber.log.Timber
 
 @Entity
 data class Chapter(
@@ -60,37 +61,104 @@ fun List<Chapter>.getChapterAt(
   return EMPTY_CHAPTER
 }
 
+/**
+ * Persists a chapter list into a single Room column.
+ *
+ * The format joins fields with [FIELD_SEPARATOR] and records with [RECORD_SEPARATOR]. Those
+ * characters are **escaped** in titles, because a title containing one used to shift or split the
+ * record and make the decoder throw — `IndexOutOfBoundsException` for a stray record separator,
+ * `NumberFormatException` for a field separator. Room raises that while reading the row, so the
+ * book crashed on open, permanently, until the row was deleted. Plex titles are arbitrary
+ * server-side strings and a rights line like "© 2019 Macmillan Audio" is ordinary chapter
+ * metadata, so it was reachable (cu-78).
+ *
+ * Escaping is backward compatible: rows written before it decode unchanged, because only titles
+ * that would have broken contain anything to unescape.
+ */
 class ChapterListConverter {
   @TypeConverter
   fun toChapterList(s: String): List<Chapter> {
     if (s.isEmpty()) {
       return emptyList()
     }
-    return s.split("®").map {
-      val split = it.split("©")
-      val discNumber = if (split.size >= 6) split[5].toInt() else 1
-      val downloaded = if (split.size >= 7) split[6].toBoolean() else false
-      val trackId = if (split.size >= 8) split[7].toLong() else TRACK_NOT_FOUND.toLong()
-      val bookId = if (split.size >= 9) split[8].toLong() else NO_AUDIOBOOK_FOUND_ID.toLong()
-      Chapter(
-        title = split[0],
-        id = split[1].toLong(),
-        index = split[2].toLong(),
-        startTimeOffset = split[3].toLong(),
-        endTimeOffset = split[4].toLong(),
-        discNumber = discNumber,
-        downloaded = downloaded,
-        trackId = trackId,
-        bookId = bookId,
-      )
+    // A malformed record is skipped rather than propagated: one bad chapter must not make a
+    // whole book unopenable, which is what throwing out of a type converter does.
+    return s.split(RECORD_SEPARATOR).mapNotNull { record ->
+      try {
+        decodeChapter(record)
+      } catch (e: Exception) {
+        Timber.e(e, "Skipping malformed chapter record")
+        null
+      }
     }
   }
 
-  // A little yikes but funny
+  private fun decodeChapter(record: String): Chapter {
+    val split = record.split(FIELD_SEPARATOR)
+    val discNumber = if (split.size >= 6) split[5].toInt() else 1
+    val downloaded = if (split.size >= 7) split[6].toBoolean() else false
+    val trackId = if (split.size >= 8) split[7].toLong() else TRACK_NOT_FOUND.toLong()
+    val bookId = if (split.size >= 9) split[8].toLong() else NO_AUDIOBOOK_FOUND_ID.toLong()
+    return Chapter(
+      title = split[0].unescapeSeparators(),
+      id = split[1].toLong(),
+      index = split[2].toLong(),
+      startTimeOffset = split[3].toLong(),
+      endTimeOffset = split[4].toLong(),
+      discNumber = discNumber,
+      downloaded = downloaded,
+      trackId = trackId,
+      bookId = bookId,
+    )
+  }
+
   @TypeConverter
-  fun toString(chapters: List<Chapter>): String {
-    return chapters.joinToString("®") {
-      "${it.title}©${it.id}©${it.index}©${it.startTimeOffset}©${it.endTimeOffset}©${it.discNumber}©${it.downloaded}©${it.trackId}©${it.bookId}"
+  fun toString(chapters: List<Chapter>): String =
+    chapters.joinToString(RECORD_SEPARATOR) {
+      listOf(
+        it.title.escapeSeparators(),
+        it.id,
+        it.index,
+        it.startTimeOffset,
+        it.endTimeOffset,
+        it.discNumber,
+        it.downloaded,
+        it.trackId,
+        it.bookId,
+      ).joinToString(FIELD_SEPARATOR)
+    }
+
+  private companion object {
+    const val FIELD_SEPARATOR = "\u00A9"
+    const val RECORD_SEPARATOR = "\u00AE"
+    const val ESCAPE = "\u241B"
+
+    /** Escape the escape first, or unescaping would be ambiguous. */
+    fun String.escapeSeparators(): String =
+      replace(ESCAPE, "$ESCAPE$ESCAPE")
+        .replace(FIELD_SEPARATOR, "${ESCAPE}F")
+        .replace(RECORD_SEPARATOR, "${ESCAPE}R")
+
+    fun String.unescapeSeparators(): String {
+      val out = StringBuilder(length)
+      var i = 0
+      while (i < length) {
+        val c = this[i]
+        if (c.toString() == ESCAPE && i + 1 < length) {
+          val escaped =
+            when (this[i + 1]) {
+              'F' -> FIELD_SEPARATOR
+              'R' -> RECORD_SEPARATOR
+              else -> this[i + 1].toString()
+            }
+          out.append(escaped)
+          i += 2
+        } else {
+          out.append(c)
+          i++
+        }
+      }
+      return out.toString()
     }
   }
 }
