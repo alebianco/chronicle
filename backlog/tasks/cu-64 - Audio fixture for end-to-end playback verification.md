@@ -127,7 +127,8 @@ fail proves nothing, and that applies to diagnostic logging just as much as to t
 
 ExoPlayer fetched with `range=null` — it read the streams sequentially and never seeked, so the 206 /
 `Content-Range` path is implemented and unit-tested (`AudioFixtureTest`) but not yet exercised
-end-to-end by the app. Proving that needs a scripted seek, which belongs with cu-9.
+end-to-end by the app. Proving that needs a scripted seek, which belongs with cu-9, and a
+real-server scrub is on the [[cu-73]] checklist.
 
 ## Acceptance Criteria
 

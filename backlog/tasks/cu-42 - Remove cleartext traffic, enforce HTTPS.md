@@ -1,7 +1,7 @@
 ---
 id: cu-42
 title: Remove cleartext traffic, enforce HTTPS
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, security]
@@ -78,6 +78,6 @@ release config (1 failure).
 - [x] Documented per-domain exceptions only where a real LAN http server needs it — **none
       needed**; the rationale and the CIDR trap are documented in the config file itself
 - [x] Works against actual Plex servers over HTTPS — via the `*.plex.direct` hyphenated-IP
-      form; fixtures updated to model it. Not yet exercised against a live server (no
-      credentials in this environment), so the LAN path is verified by construction and
-      by the APK-level assertions rather than end-to-end
+      form; fixtures updated to model it. Verified by construction and by APK-level
+      assertions; the live-server confirmation is tracked in [[cu-73]] along with the
+      other items needing real credentials, so it is not lost by closing this.

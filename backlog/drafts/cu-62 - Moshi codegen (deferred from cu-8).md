@@ -25,7 +25,8 @@ verify it safely.
 
 **That objection is now weaker**: cu-16 landed a fixture pack and contract tests that assert every
 model deserializes into real domain objects. Flipping to codegen and re-running those tests would catch
-most of the risk — the residual being fields the fixtures do not exercise.
+most of the risk — the residual being fields the fixtures do not exercise. Those residual
+fields are on the [[cu-73]] live-server checklist.
 
 ### Scope
 
