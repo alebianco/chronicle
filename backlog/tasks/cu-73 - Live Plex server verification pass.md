@@ -46,6 +46,21 @@ Grouped by what breaks if the real server disagrees.
       hyphenated-IP HTTPS. Capture a real `/api/resources` response and confirm the shape
       matches; correct the fixture if not.
 
+### Connection tiering (cu-11)
+
+- [ ] **A LAN-only server connects, and over LAN.** Confirm from the log which tier was
+      chosen (`Chose LAN connection: ...`) rather than assuming — the whole point is that
+      relay no longer wins races it should not be in.
+- [ ] **Network switch mid-playback recovers in under 5 seconds.** Wi-Fi to cellular and
+      back while a book plays. The arithmetic supports it (1.5s tier budget + 5s connect
+      timeout) but elapsed time cannot be measured in a unit test.
+- [ ] **The real `/resources` response shape.** Capture it and confirm `relay` is present
+      and spelled as the model expects, and note whether `IPv6` connections appear at all —
+      that decides whether [[cu-75]] is worth opening.
+- [ ] **End-to-end connection selection via `FakePlexServer`.** The chooser's tests inject
+      the probe, so the real `checkServer` wiring in `PlexConfig` is covered only by the
+      Dagger graph resolving. Same harness cu-10 needs.
+
 ### Data and parsing
 
 - [ ] **cu-62 (draft) — Moshi codegen.** Reflection is lenient about absent/null fields

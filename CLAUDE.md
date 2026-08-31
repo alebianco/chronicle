@@ -91,6 +91,13 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - **Never log an auth token.** `TokenLoggingTest` fails the build on any `Timber` call that
   interpolates one — it caught three live leaks, including one logging *two* tokens per media
   item. Logging *presence* (`token.isNotEmpty()`) is fine and is what the guard permits.
+- **Connections are tiered, not raced** (cu-11). `ConnectionChooser` tries LAN, then direct
+  WAN, then relay, each tier getting a 1.5s budget before the next also starts (earlier
+  attempts keep running, so a slow LAN address can still win). The **last** tier is awaited
+  for a real answer, which is what keeps a LAN-only server working. `Connection.relay` comes
+  from `/api/v2/resources` and is checked *before* `local`, because Plex can report a relay
+  route with `local = 1`. Don't reorder `ConnectionTier` — its declaration order *is* the
+  preference order.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.
