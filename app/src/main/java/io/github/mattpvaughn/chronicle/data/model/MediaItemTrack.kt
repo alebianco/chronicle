@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.model
 
+import android.net.Uri
 import android.support.v4.media.MediaMetadataCompat
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -124,6 +125,23 @@ data class MediaItemTrack(
     }
 
     const val PARENT_KEY_PREFIX = "/library/metadata/"
+
+    /**
+     * The `file://` URI for a downloaded track, as a string.
+     *
+     * Must carry the scheme. This used to be `File(...).absolutePath`, a bare path, and
+     * `MediaMetadataCompat.mediaUri` parses whatever it is given with `toUri()` — which yields
+     * `scheme = null`. ExoPlayer's `DefaultDataSource` then does not resolve it as a local file,
+     * and the user gets an unsupported-format error on **downloaded books only** (cu-83). The
+     * server branch was never affected, because `toServerString` produces an `https://` URL.
+     *
+     * `Uri.fromFile` rather than `"file://" + path`: it percent-encodes spaces and non-ASCII
+     * characters, which appear in real sync directories on removable storage.
+     */
+    fun cachedTrackUri(
+      cachedMediaDir: File,
+      cachedFileName: String,
+    ): String = Uri.fromFile(File(cachedMediaDir, cachedFileName)).toString()
   }
 
   /** The name of the track when it is written to the file system */
@@ -133,7 +151,7 @@ data class MediaItemTrack(
 
   fun getTrackSource(): String {
     return if (cached) {
-      File(Injector.get().prefsRepo().cachedMediaDir, getCachedFileName()).absolutePath
+      cachedTrackUri(Injector.get().prefsRepo().cachedMediaDir, getCachedFileName())
     } else {
       Injector.get().plexConfig().toServerString(media)
     }

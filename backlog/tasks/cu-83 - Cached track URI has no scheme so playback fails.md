@@ -1,10 +1,11 @@
 ---
 id: cu-83
 title: Cached track URI has no scheme, so downloaded books fail to play
-status: To Do
+status: In Review
 labels: [R1, trust, bug]
 dependencies: []
 priority: critical
+assignee: [claude]
 ---
 
 ## Description
@@ -44,10 +45,36 @@ branches converge.
 
 ## Acceptance Criteria
 
-- [ ] A cached track's source URI has scheme `file`, covered by a test that fails on a bare path
-- [ ] The uncached branch still yields the `https` server URL
-- [ ] Round-trip test: the string `getTrackSource()` returns parses back to a URI whose scheme is
+- [x] A cached track's source URI has scheme `file`, covered by a test that fails on a bare path
+- [x] The uncached branch still yields the `https` server URL
+- [x] Round-trip test: the string `getTrackSource()` returns parses back to a URI whose scheme is
       non-null in both branches
 - [ ] Live check added to [[cu-73]]: download a book, force-quit, relaunch, play offline — no
       format error
-- [ ] Verify loop green
+- [x] Verify loop green
+
+## Implementation Notes
+
+`MediaItemTrack.cachedTrackUri(dir, fileName)` now builds the string with `Uri.fromFile(...)`, and
+`getTrackSource()` calls it. Five tests, written failing first.
+
+**`Uri.fromFile`, not `"file://" + path`.** The concatenated form percent-encodes nothing, so a
+literal space or non-ASCII character reaches the `DataSource` — and real sync directories on
+removable storage have both.
+
+**A test-design correction worth recording.** The encoding test originally asserted on
+`Uri.path`, and it **passed against the naive concatenation** — because `Uri.path` *decodes*, so it
+returns the same value either way. Probed and confirmed:
+
+```
+Uri.fromFile(f)          -> file:///storage/emulated/0/Audio%20Books/%C3%86ther/3001.mp3
+"file://" + absolutePath -> file:///storage/emulated/0/Audio Books/Æther/3001.mp3
+both .path               -> /storage/emulated/0/Audio Books/Æther/3001.mp3
+```
+
+The test now asserts on the raw string and that no raw space survives. Both sabotages — bare path,
+and naive concatenation — are caught.
+
+The tests exercise `cachedTrackUri` directly rather than `getTrackSource()`, which reaches the Dagger
+graph through `Injector.get()` for `cachedMediaDir` and `plexConfig` and cannot be constructed in a
+unit test. That coupling is [[cu-79]].
