@@ -241,4 +241,61 @@ class TrackRepositoryMergeTest {
       assertTrue("a failed fetch must surface as an error", result.getError() != null)
       coVerify(exactly = 0) { trackDao.insertAll(any()) }
     }
+
+  /**
+   * Mark-as-read writes three fields per track, and each one is a decision (cu-86, cu-90):
+   * `progress = 0` because a finished book is not part-way through, `viewCount = 1` because
+   * completion is an explicit fact rather than something inferred from position (decision-16), and
+   * `lastViewedAt = now` so the local state wins the next merge against the server.
+   */
+  @Test
+  fun `marking a book read zeroes progress and records the view`() =
+    runTest {
+      coEvery { trackDao.getTracksForAudiobookAsync("1001", any()) } returns
+        listOf(
+          localTrack(id = "2001", progress = 900L),
+          localTrack(id = "2002", progress = 4_000L),
+        )
+
+      repository().markTracksInBookAsWatched("1001")
+
+      val written = captureInserted()
+      assertEquals("every track resets to the start", listOf(0L, 0L), written.map { it.progress })
+      assertEquals("completion is explicit, not inferred", listOf(1L, 1L), written.map { it.viewCount })
+      assertTrue("the local write must win the next merge", written.all { it.lastViewedAt > 0L })
+    }
+
+  /**
+   * Unread is not simply the inverse: `lastViewedAt` is cleared too. Leaving it set would read as
+   * "listened to just now with no progress", which wins every subsequent merge against the server
+   * and keeps re-clearing a position set on another device.
+   */
+  @Test
+  fun `marking a book unread clears the timestamp as well as the position`() =
+    runTest {
+      coEvery { trackDao.getTracksForAudiobookAsync("1001", any()) } returns
+        listOf(localTrack(id = "2001", progress = 4_000L, lastViewedAt = 9_000L))
+
+      repository().markTracksInBookAsUnwatched("1001")
+
+      val written = captureInserted().single()
+      assertEquals(0L, written.progress)
+      assertEquals(0L, written.viewCount)
+      assertEquals(
+        "a stale timestamp here re-clears a position set on another device",
+        0L,
+        written.lastViewedAt,
+      )
+    }
+
+  /** A book with no tracks must not write anything, rather than failing. */
+  @Test
+  fun `marking a book with no tracks writes an empty list`() =
+    runTest {
+      coEvery { trackDao.getTracksForAudiobookAsync("1001", any()) } returns emptyList()
+
+      repository().markTracksInBookAsWatched("1001")
+
+      assertTrue(captureInserted().isEmpty())
+    }
 }

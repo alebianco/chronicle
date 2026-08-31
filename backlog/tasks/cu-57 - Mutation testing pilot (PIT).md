@@ -200,3 +200,67 @@ real. **Any `inline` function will read as 0% here.** Do not "fix" it by adding 
 `ProgressReporter` sits at 27% because ~14 of its mutants are suspend-machinery nulls and
 `runCatching` plumbing that no assertion should target.
 
+## Third pass — targeting by value, not by score (2026-09-01)
+
+Overall coverage **15.43% → 20.51%**, 339 → 409 tests, mutation 47% → 34% *on a deliberately wider
+target set* (the denominator nearly doubled, from 217 to 414 mutants, by adding the repositories
+and a ViewModel).
+
+The owner's read was right: the second pass raised coverage by 0.02 points because `data/model` was
+already the best-covered package in the app at 76%. The value was in code with **zero** tests.
+
+### Two bugs found by writing the first test for a method
+
+- **`BookRepository.syncAudiobook` reported every failure as success.** Its three failure paths use
+  `return@withContext false`, which returns from the *lambda*; the result was discarded and the
+  function fell through to `return true`. The book-details "sync now" button therefore showed *"sync
+  successful"* on every network failure. Fixed.
+- **`updateProgressIfChangingBook` tests the opposite of its name** — drafted as cu-91, not fixed
+  here because it changes playback behaviour.
+- **`onCacheButtonClick` throws on a null cache status** — drafted as cu-92.
+
+### What PIT cannot see here
+
+**Suspend machinery inflates the survivor count on repositories.** All six remaining mutants on
+`markTracksInBookAsWatched`/`AsUnwatched` are `removed conditional` on the coroutine state check and
+`replaced return value with null` on the `Continuation` — compiler artifacts, not behaviour. The
+tests on those methods provably catch real defects (verified by sabotage: dropping the
+`lastViewedAt = 0L` clear fails immediately), yet the score barely moves. **Do not read
+`BookRepository` 9% or `TrackRepository` 17% as "untested"** — read the survivor *descriptions*.
+
+**`inline` functions always read 0%** — see the second pass; `ChapterAssembly` is the standing
+example.
+
+### The real blocker for ViewModels was never their design
+
+Not `MediaServiceConnection` or `PlexConfig` being final — MockK handles final classes. It was
+`Dispatchers.Main`, which `asLiveData()` touches during *construction*, so a ViewModel could not be
+instantiated at all on the JVM. `MainDispatcherRule` (new, in `app/src/test/.../util/`) pays that
+once for all twelve. Two further framework statics need stubbing per-test where they are hit:
+`DateUtils.formatElapsedTime` and `SystemClock.elapsedRealtime` (reached via
+`PlaybackStateCompat.Builder.setState`).
+
+A construction test is worth writing on its own: every LiveData in a ViewModel body is evaluated
+eagerly, so cu-87's declaration-order crash fails it with the exact production error. Note the
+alias itself is lazy — reproducing that bug needs an *eagerly-initialised* property reading it
+before its target is declared, which is not what I first tried.
+
+### Coverage by the classes that moved
+
+| Class | Before | After |
+|---|---|---|
+| `MainActivityViewModel` | 0% | 57% |
+| `TrackRepository` | 15% | 47% |
+| `AudiobookDetailsViewModel` | 0% | 40% |
+| `BookRepository` | 10% | 39% |
+| `CurrentlyPlayingViewModel` | 0% | 31% |
+| `CacheReconciliation` (extracted) | — | 100% (6/6 mutants) |
+
+### Deliberately not covered
+
+`MediaPlayerService` (1,756 instructions), `AudiobookMediaSessionCallback` and `NotificationBuilder`
+are genuinely device-bound. `PackageValidator` (702) and `MediaMetadataCompatExt` (793) are Google
+Apache-2.0 sample code over `PackageManager`/`XmlResourceParser`/`MediaMetadataCompat` — testing
+them would mostly re-test the framework. The populated branches of the mini-player's chapter readout
+need real media metadata; better done with cu-89.
+

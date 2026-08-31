@@ -312,6 +312,11 @@ pitest {
       "io.github.mattpvaughn.chronicle.data.sources.plex.AccountAuthState",
       // Progress reporting (cu-9)
       "io.github.mattpvaughn.chronicle.data.sources.plex.ProgressReporter",
+      // Repositories and the cache reconciliation, covered from cu-57's second pass on
+      "io.github.mattpvaughn.chronicle.features.download.CacheReconciliationKt",
+      "io.github.mattpvaughn.chronicle.data.local.TrackRepository",
+      "io.github.mattpvaughn.chronicle.data.local.BookRepository",
+      "io.github.mattpvaughn.chronicle.application.MainActivityViewModel",
     ),
   )
   // Only real test classes. `io.github.mattpvaughn.chronicle.*` matched 969 classes — every

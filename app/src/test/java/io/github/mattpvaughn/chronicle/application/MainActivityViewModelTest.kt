@@ -10,10 +10,13 @@ import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomS
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
+import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -73,6 +76,26 @@ class MainActivityViewModelTest {
     }
 
   private val mediaServiceConnection = mockk<MediaServiceConnection>(relaxed = true)
+
+  private val book = Audiobook(id = "1001", source = 1L, title = "Dune")
+
+  private val bookRepository =
+    mockk<IBookRepository>(relaxed = true) {
+      coEvery { getAudiobookAsync(any()) } returns book
+    }
+
+  private fun track(
+    id: String,
+    progress: Long = 0L,
+    title: String = "Track",
+  ) = MediaItemTrack(
+    id = id,
+    parentKey = "1001",
+    title = title,
+    duration = 10_000L,
+    progress = progress,
+    index = 1,
+  )
 
   /** The sheet starts hidden: nothing is playing yet. */
   @Test
@@ -200,11 +223,30 @@ class MainActivityViewModelTest {
     verify(exactly = 0) { mediaServiceConnection.connect(any()) }
   }
 
+  /**
+   * Nothing playing: the readout says so rather than showing a stale or blank title.
+   *
+   * Only the idle branch is covered. The populated branches of `chapters` and `currentChapterTitle`
+   * hang off `audiobookId`, which is set by the `MediaControllerCompat` metadata observer and then
+   * loaded through an async `mapAsync` hop — so exercising them means driving real playback
+   * metadata, not stubbing a repository. Worth doing with the media-session work (cu-89) rather
+   * than faking the controller here.
+   */
+  @Test
+  fun `the chapter title reads as idle when there are no tracks`() {
+    every { trackRepository.getTracksForAudiobook(any()) } returns MutableLiveData(emptyList())
+
+    val viewModel = viewModel()
+    viewModel.currentChapterTitle.observeForever { }
+
+    assertEquals("No track playing", viewModel.currentChapterTitle.value)
+  }
+
   private fun viewModel() =
     MainActivityViewModel(
       loginRepo = loginRepo,
       trackRepository = trackRepository,
-      bookRepository = mockk<IBookRepository>(relaxed = true),
+      bookRepository = bookRepository,
       mediaServiceConnection = mediaServiceConnection,
       collectionsRepository = collectionsRepository,
     )
