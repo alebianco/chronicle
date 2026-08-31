@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What Android's Auto Backup and device-transfer may take.
+
+  Why this file exists: with `allowBackup="true"` and no rules, Auto Backup includes *all*
+  shared preferences by default — and this app keeps its Plex auth token, server access token
+  and user record in the **same** `SharedPreferences` file as its settings (both prefs repos
+  inject the one instance provided for `APP_NAME`). So the default behaviour uploaded working
+  credentials to the user's Drive. Backups are end-to-end encrypted with the device screen lock
+  on Android 9+, so this was not an open leak, but D8 is explicit that auth tokens stay on the
+  device and re-login is expected on restore.
+
+  `Chronicle.xml` is therefore excluded whole rather than by key, because Auto Backup cannot
+  exclude individual preference keys — only files. Splitting tokens into their own prefs file
+  would allow finer rules and is worth doing (see cu-17 notes), but excluding the file is
+  correct and complete today.
+
+  The Room databases are excluded too. They hold only what Plex can re-derive — books, tracks,
+  chapters, collections — plus listening progress, which also lives server-side and is synced
+  (cu-9/cu-14). Restoring a stale copy of them onto a fresh install would fight that sync
+  rather than help it, and the export in cu-17 is the supported way to move local-only state.
+
+  Note `device-transfer` is deliberately as strict as `cloud-backup`: a direct device-to-device
+  copy still moves a token onto hardware whose owner has not authenticated to Plex.
+-->
+<data-extraction-rules>
+  <cloud-backup>
+    <exclude
+      domain="sharedpref"
+      path="Chronicle.xml" />
+    <exclude domain="database" />
+  </cloud-backup>
+
+  <device-transfer>
+    <exclude
+      domain="sharedpref"
+      path="Chronicle.xml" />
+    <exclude domain="database" />
+  </device-transfer>
+</data-extraction-rules>
