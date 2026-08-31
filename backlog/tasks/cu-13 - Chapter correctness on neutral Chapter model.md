@@ -5,7 +5,7 @@ status: To Do
 assignee: []
 created_date: '2026-07-13'
 labels: [R1, trust]
-dependencies: [cu-15]
+dependencies: [cu-15, cu-71]
 priority: high
 milestone: m-1
 ---
