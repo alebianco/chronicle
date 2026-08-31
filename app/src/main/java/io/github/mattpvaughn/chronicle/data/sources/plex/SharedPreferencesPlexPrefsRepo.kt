@@ -43,6 +43,19 @@ interface PlexPrefsRepo {
 
   /** Clear all preferences which are handled by PrefsRepo */
   fun clear()
+
+  /**
+   * Clears only the credentials, keeping the chosen user, server and library.
+   *
+   * The difference between re-authenticating and logging out. A Plex token can be invalidated
+   * server-side (a password change with "sign out connected devices", a server re-claim) while the
+   * user's choice of server and library remains perfectly good — so the recovery is a fresh OAuth
+   * PIN, not re-picking a library they already picked (cu-84).
+   *
+   * The per-user token on [user] goes too: it is derived from the account token, so keeping it
+   * would leave a dead credential that outlives the re-auth.
+   */
+  fun clearCredentials()
 }
 
 /** An implementation of [PlexPrefsRepo] wrapping [SharedPreferences]. */
@@ -188,6 +201,12 @@ class SharedPreferencesPlexPrefsRepo
       library = null
       user = null
       accountAuthToken = ""
+    }
+
+    override fun clearCredentials() {
+      accountAuthToken = ""
+      // Keep the identity, drop the derived token: the same person, needing a new credential.
+      user = user?.copy(authToken = "")
     }
 
     @SuppressLint("ApplySharedPref")

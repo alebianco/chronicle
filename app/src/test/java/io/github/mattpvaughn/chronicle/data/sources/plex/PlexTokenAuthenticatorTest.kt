@@ -8,7 +8,9 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -93,7 +95,72 @@ class PlexTokenAuthenticatorTest {
     )
   }
 
-  private fun authenticator(refresh: suspend () -> ServerModel?) = PlexTokenAuthenticator(prefs, refresh)
+  /**
+   * plex.tv answered and still refused: the account token itself is dead. Recorded so the UI can
+   * say so and offer re-authentication, instead of the app presenting stale data in silence (cu-84).
+   */
+  @Test
+  fun `an unchanged token records the account as signed out`() {
+    val authenticator = authenticator { cachedServer(STALE_TOKEN) }
+
+    authenticator.authenticate(null, response401())
+
+    assertTrue(
+      "a surviving 401 is the only reliable signal that the account is signed out",
+      accountAuthState.isSignedOut.value,
+    )
+  }
+
+  /**
+   * The distinction that keeps this honest. A refresh can fail because the network is gone, and
+   * being offline is **not** being signed out — claiming otherwise would tell every user on a train
+   * that their account is dead.
+   */
+  @Test
+  fun `a failed refresh does not record the account as signed out`() {
+    val authenticator = authenticator { null }
+
+    authenticator.authenticate(null, response401())
+
+    assertFalse(
+      "offline must not be reported as signed out",
+      accountAuthState.isSignedOut.value,
+    )
+  }
+
+  @Test
+  fun `a throwing refresh does not record the account as signed out`() {
+    val authenticator = authenticator { throw java.io.IOException("offline") }
+
+    authenticator.authenticate(null, response401())
+
+    assertFalse(accountAuthState.isSignedOut.value)
+  }
+
+  /** A successful refresh means the account is fine, so an earlier signal must be cleared. */
+  @Test
+  fun `a successful refresh clears a previous signed-out state`() {
+    accountAuthState.onAccountRejected()
+    val authenticator = authenticator { cachedServer("a-fresh-token") }
+
+    authenticator.authenticate(null, response401())
+
+    assertFalse(accountAuthState.isSignedOut.value)
+  }
+
+  /** Giving up after a prior retry says nothing new; it must not manufacture a signal. */
+  @Test
+  fun `a second 401 on the same call does not record a signed-out state`() {
+    val authenticator = authenticator { cachedServer("a-fresh-token") }
+
+    authenticator.authenticate(null, response401(hasPriorResponse = true))
+
+    assertFalse(accountAuthState.isSignedOut.value)
+  }
+
+  private val accountAuthState = AccountAuthState()
+
+  private fun authenticator(refresh: suspend () -> ServerModel?) = PlexTokenAuthenticator(prefs, accountAuthState, refresh)
 
   private fun response401(hasPriorResponse: Boolean = false): Response {
     val request =

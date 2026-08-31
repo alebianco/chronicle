@@ -765,6 +765,23 @@ class SettingsViewModel(
         ),
         PreferenceModel(
           PreferenceType.CLICKABLE,
+          title = FormattableString.from(R.string.settings_reauthenticate),
+          explanation = FormattableString.from(R.string.settings_reauthenticate_summary),
+          click =
+            object : PreferenceClick {
+              override fun onClick() {
+                // Not a logout: keeps the chosen user, server, library *and* downloads, so the
+                // recovery for an expired token is one OAuth PIN rather than the whole setup
+                // again (cu-84). Plex has no refresh token, so a human at a browser is
+                // unavoidable — re-picking a library they already picked was not.
+                // beginReauthentication posts NOT_LOGGED_IN, which is what drives navigation to
+                // the login screen — the same mechanism clearConfig uses via determineLoginState.
+                plexLoginRepo.beginReauthentication()
+              }
+            },
+        ),
+        PreferenceModel(
+          PreferenceType.CLICKABLE,
           title = FormattableString.from(R.string.settings_log_out),
           click =
             object : PreferenceClick {

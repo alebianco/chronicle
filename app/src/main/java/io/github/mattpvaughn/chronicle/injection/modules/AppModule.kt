@@ -206,6 +206,7 @@ class AppModule(private val app: Application) {
     // client's construction to the login Retrofit's. There is no cycle today, but a lazy
     // edge keeps it that way if the login branch ever grows a media dependency.
     plexLoginService: Provider<PlexLoginService>,
+    accountAuthState: AccountAuthState,
   ): OkHttpClient =
     OkHttpClient.Builder()
       .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -218,7 +219,10 @@ class AppModule(private val app: Application) {
       // only: a 401 from the *login* client means the account token is dead, and
       // re-fetching resources with that same dead token cannot help.
       .authenticator(
-        PlexTokenAuthenticator(plexPrefsRepo) {
+        PlexTokenAuthenticator(
+          plexPrefsRepo = plexPrefsRepo,
+          accountAuthState = accountAuthState,
+        ) {
           val cached = plexPrefsRepo.server ?: return@PlexTokenAuthenticator null
           plexLoginService.get().resources()
             .filter { it.provides.contains("server") }

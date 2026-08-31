@@ -34,6 +34,9 @@ import timber.log.Timber
  */
 class PlexTokenAuthenticator(
   private val plexPrefsRepo: PlexPrefsRepo,
+  // No default: an accidentally private instance would record a signed-out state nothing
+  // observes, which is indistinguishable from the bug this fixes.
+  private val accountAuthState: AccountAuthState,
   private val refreshServer: suspend () -> ServerModel?,
 ) : Authenticator {
   override fun authenticate(
@@ -59,6 +62,9 @@ class PlexTokenAuthenticator(
       }
 
     if (refreshed == null) {
+      // Deliberately *not* a signed-out signal. The refresh can fail because the network is
+      // gone, and being offline is not being signed out — claiming otherwise would nag every
+      // user on a train (cu-84).
       Timber.w("Could not refresh the server token after a 401")
       return null
     }
@@ -67,10 +73,15 @@ class PlexTokenAuthenticator(
       // Plex handed back the same token (or none), so the rejection is not about the
       // server token. The account is signed out and only the user can fix that.
       Timber.w("Server token unchanged after a 401; the account token is likely invalid")
+      // The definitive case: plex.tv answered, and still refuses. Recorded so the UI can say so
+      // and offer re-authentication rather than presenting stale data silently.
+      accountAuthState.onAccountRejected()
       return null
     }
 
     plexPrefsRepo.server = refreshed
+    // A fresh token means the account is still good, so clear any earlier signed-out state.
+    accountAuthState.onAuthenticated()
     Timber.i("Refreshed the server token after a 401; retrying once")
     return response.request.newBuilder()
       .header("X-Plex-Token", refreshed.accessToken)

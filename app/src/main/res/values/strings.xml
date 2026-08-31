@@ -232,6 +232,9 @@
     <string name="settings_change_server">Change server</string>
     <string name="settings_change_user">Switch user</string>
     <string name="settings_log_out">Log out</string>
+    <string name="settings_reauthenticate">Sign in again</string>
+    <string name="settings_reauthenticate_summary">Refresh your Plex login without losing your server, library or downloads</string>
+    <string name="account_signed_out">Your Plex login has expired. Downloaded books still play; sign in again to sync.</string>
     <string name="settings_category_etc">Etc</string>
     <string name="settings_licenses_title">Licenses</string>
     <string name="settings_licenses_explanation">Open source libraries used by Chronicle</string>

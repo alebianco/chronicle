@@ -45,6 +45,17 @@ interface IPlexLoginRepo {
    */
   fun determineLoginState()
 
+  /**
+   * Drops the credentials so the user can sign in again, keeping their chosen user, server and
+   * library.
+   *
+   * The recovery for a token invalidated server-side. Plex has no refresh token — a new account
+   * token needs a human approving an OAuth PIN in a browser — but that is the *only* thing needed,
+   * so making the user re-pick a library they already picked was gratuitous. Before this the sole
+   * path was a full logout (cu-84).
+   */
+  fun beginReauthentication()
+
   val loginEvent: LiveData<Event<LoginState>>
 
   enum class LoginState {
@@ -76,6 +87,7 @@ class PlexLoginRepo
     private val plexPrefsRepo: PlexPrefsRepo,
     private val plexLoginService: PlexLoginService,
     private val plexConfig: PlexConfig,
+    private val accountAuthState: AccountAuthState,
   ) : IPlexLoginRepo {
     private var _loginState = MutableLiveData<Event<LoginState>>()
     override val loginEvent: LiveData<Event<LoginState>>
@@ -92,6 +104,12 @@ class PlexLoginRepo
         _loginState.postEvent(FAILED_TO_LOG_IN)
         null
       }
+    }
+
+    override fun beginReauthentication() {
+      plexPrefsRepo.clearCredentials()
+      accountAuthState.onAuthenticated()
+      _loginState.postEvent(NOT_LOGGED_IN)
     }
 
     override fun chooseUser(responseUser: PlexUser) {
@@ -181,6 +199,14 @@ class PlexLoginRepo
       _loginState.postEvent(
         when {
           token.isEmpty() -> NOT_LOGGED_IN
+          // A stored token is not a valid one. Plex tokens are invalidated by an event, never on a
+          // timer, so presence proves nothing — and reporting LOGGED_IN_FULLY here is what made the
+          // app show stale data with no way back (cu-84). Only a request that actually came back
+          // 401 sets this, so being offline does not land here.
+          accountAuthState.isSignedOut.value -> {
+            Timber.w("Stored token was rejected by the server; account needs re-authentication")
+            NOT_LOGGED_IN
+          }
           server != null && library != null -> LOGGED_IN_FULLY // Migrating from v0.41, impossible otherwise
           user == null -> LOGGED_IN_NO_USER_CHOSEN
           server == null -> LOGGED_IN_NO_SERVER_CHOSEN
