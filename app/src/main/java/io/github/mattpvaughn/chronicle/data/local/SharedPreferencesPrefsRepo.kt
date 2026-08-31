@@ -26,7 +26,6 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingViewModel.Companion.PLAYBACK_SPEED_DEFAULT
-import io.github.mattpvaughn.chronicle.injection.components.AppComponent
 import java.io.File
 import javax.inject.Inject
 
@@ -161,21 +160,35 @@ class SharedPreferencesPrefsRepo
   @Inject
   constructor(private val sharedPreferences: SharedPreferences) :
   PrefsRepo {
+    /**
+     * The directory downloads live in.
+     *
+     * Returns the **stored** path whenever one is set, even if that volume is not currently
+     * mounted. It used to fall back to `externalDeviceDirs().first()` when the stored path was not
+     * in the current list, which is the subtler half of cu-85: with an SD card removed, this
+     * returned a *different, readable* directory, the cache scan found none of the expected files
+     * there, and it un-cached the whole library. Returning the real (absent) path lets
+     * `scanCachedMediaDir` report `Unavailable` and change nothing — which is the correct outcome
+     * for "the card is out", and is recoverable when it is put back.
+     *
+     * The default for a first run is still the first available directory, but it is *persisted*
+     * immediately, so the choice never depends on `getExternalFilesDirs` ordering again.
+     */
     override var cachedMediaDir: File
       get() {
         val syncLoc = sharedPreferences.getString(KEY_SYNC_DIR_PATH, "")
-        return if (syncLoc.isNullOrEmpty()) {
-          /** Set default location to first location in [AppComponent.externalDeviceDirs] */
-          val deviceStorage = Injector.get().externalDeviceDirs().first()
-          sharedPreferences.edit()
-            .putString(KEY_SYNC_DIR_PATH, deviceStorage.absolutePath)
-            .apply()
-          deviceStorage
-        } else {
-          Injector.get().externalDeviceDirs()
-            .firstOrNull { it.absolutePath == syncLoc }
-            ?: Injector.get().externalDeviceDirs().first()
+        if (!syncLoc.isNullOrEmpty()) {
+          return File(syncLoc)
         }
+        // First run: pick a default and persist it, so ordering is consulted exactly once.
+        // filesDir as the last resort: always present, unlike any external volume.
+        val deviceStorage =
+          Injector.get().externalDeviceDirs().firstOrNull()
+            ?: Injector.get().applicationContext().filesDir
+        sharedPreferences.edit()
+          .putString(KEY_SYNC_DIR_PATH, deviceStorage.absolutePath)
+          .apply()
+        return deviceStorage
       }
       set(value) =
         sharedPreferences.edit().putString(

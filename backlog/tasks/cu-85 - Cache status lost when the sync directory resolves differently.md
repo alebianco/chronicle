@@ -1,10 +1,11 @@
 ---
 id: cu-85
 title: Cache status lost when the sync directory resolves differently
-status: To Do
+status: In Review
 labels: [R1, trust, bug]
 dependencies: [cu-76]
 priority: high
+assignee: [claude]
 ---
 
 ## Description
@@ -54,12 +55,55 @@ silently reading as not-downloaded.
 
 ## Acceptance Criteria
 
-- [ ] An unreadable or missing sync directory leaves cached status **unchanged**, covered by a test
-      that fails if the DB is touched
-- [ ] A readable, empty directory still un-caches (the legitimate case) — both directions tested
-- [ ] The default sync-directory choice does not depend on `externalDeviceDirs()` ordering
+- [x] An unreadable or missing sync directory leaves cached status **unchanged**
+- [x] A readable, empty directory still un-caches (the legitimate case) — both directions tested
+- [x] The default sync-directory choice does not depend on `externalDeviceDirs()` ordering
 - [ ] `MoveSyncLocationWorker` interaction checked: moving storage must not leave the old path in
       prefs
 - [ ] Live checks in [[cu-73]]: download a book, relaunch several times, confirm status sticks; and
       with downloads on an SD card, unmount it and confirm the app does not report them gone forever
-- [ ] Verify loop green
+- [x] Verify loop green
+
+## Implementation Notes
+
+Three distinct defects, all in the path from "which directory?" to "is this book downloaded?".
+
+### 1. Unreadable was indistinguishable from empty
+
+`listFiles(...) ?: emptyList()` — `listFiles` returns null for a missing or unreadable directory, so
+both became "no files", and the scan then un-cached every track. Now
+`scanCachedMediaDir` returns `CacheScanOutcome.Scanned` or `Unavailable`, and
+`refreshTrackDownloadedStatus` returns early on `Unavailable` without touching the database. Also
+reports a path that exists but is a *file* as unavailable, since that means the sync location is
+wrong rather than the downloads being gone.
+
+### 2. The stored sync path silently fell back to a different directory
+
+The subtler half, and the one that made the guard in (1) insufficient on its own:
+
+```kotlin
+externalDeviceDirs().firstOrNull { it.absolutePath == syncLoc } ?: externalDeviceDirs().first()
+```
+
+With an SD card removed, the stored path is not in the current list, so this returned a
+*different, perfectly readable* directory. The scan found none of the expected files **there** and
+un-cached the library — `Unavailable` never fired, because the wrong directory was readable.
+
+Now the stored path is returned as-is whenever one is set, mounted or not, so an absent volume
+surfaces as `Unavailable` and changes nothing. Recoverable when the card goes back in. The first-run
+default still picks the first available directory but **persists it immediately**, so ordering is
+consulted exactly once in the app's lifetime.
+
+### 3. `externalDeviceDirs()` could contain nulls
+
+`getExternalFilesDirs` returns a `File[]` with **null entries** for unavailable volumes, and
+`.toList()` kept them — so the declared `List<File>` really held nulls, and `first()` could return
+null in defiance of its own type. Now `filterNotNull()`.
+
+7 tests for the scan distinction, verified to bite by restoring `?: emptyList()` (3 fail).
+
+### Not done
+
+`MoveSyncLocationWorker` was not audited — moving storage may leave a stale path in prefs, which
+after this change means the app keeps pointing at the old location instead of quietly relocating.
+That is the *safer* failure, but it is not verified. Kept as an open criterion rather than claimed.

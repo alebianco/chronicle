@@ -20,11 +20,13 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.model.isCompleteDownload
+import io.github.mattpvaughn.chronicle.features.download.CacheScanOutcome
 import io.github.mattpvaughn.chronicle.features.download.DownloadNotificationWorker
 import io.github.mattpvaughn.chronicle.features.download.FetchGroupStartFinishListener
 import io.github.mattpvaughn.chronicle.features.download.ResumePlan
 import io.github.mattpvaughn.chronicle.features.download.bookIdOrNull
 import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
+import io.github.mattpvaughn.chronicle.features.download.scanCachedMediaDir
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -391,12 +393,24 @@ class CachedFileManager
      */
     override suspend fun refreshTrackDownloadedStatus() {
       val idToFileMap = HashMap<String, File>()
+
+      // "Cannot read the directory" is not "the directory is empty". This used to be
+      // `listFiles(...) ?: emptyList()`, so an unmounted SD card or a moved sync directory made
+      // every track look absent and un-cached a whole library while the files were still there
+      // (cu-85). A scan that cannot see the directory must change nothing at all.
       val filesOnDisk =
-        prefsRepo.cachedMediaDir.listFiles(
-          FileFilter {
-            MediaItemTrack.cachedFilePattern.matches(it.name)
-          },
-        )?.toList() ?: emptyList()
+        when (
+          val outcome =
+            scanCachedMediaDir(prefsRepo.cachedMediaDir) { file ->
+              MediaItemTrack.cachedFilePattern.matches(file.name)
+            }
+        ) {
+          is CacheScanOutcome.Unavailable -> {
+            Timber.w("Skipping cached-file refresh: ${outcome.reason}")
+            return
+          }
+          is CacheScanOutcome.Scanned -> outcome.files
+        }
 
       // A file's presence is not proof it finished downloading. This scan used to mark any
       // matching file as cached, so a Wi-Fi drop mid-download left a partial file that the

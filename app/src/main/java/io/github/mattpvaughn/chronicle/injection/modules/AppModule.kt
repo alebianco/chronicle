@@ -132,13 +132,25 @@ class AppModule(private val app: Application) {
   @Singleton
   fun provideInternalDeviceDirs(): File = app.applicationContext.filesDir
 
+  /**
+   * The app's external storage directories, nulls removed.
+   *
+   * `getExternalFilesDirs` returns a `File[]` that **may contain null entries** for volumes that
+   * are currently unavailable — an ejected SD card, or one not yet mounted. `.toList()` kept those,
+   * so the declared `List<File>` really held nulls at runtime and `first()` could hand back null in
+   * defiance of its type, or a `NullPointerException` at the first use (cu-85).
+   *
+   * The order is also not a stable identity: entries come and go with the volumes, so the *index*
+   * of a directory must never be treated as a durable reference to it. See
+   * `SharedPreferencesPrefsRepo.cachedMediaDir`, which stores the chosen path instead.
+   */
   @Provides
   @Singleton
   fun provideExternalDeviceDirs(): List<File> =
     ContextCompat.getExternalFilesDirs(
       app.applicationContext,
       null,
-    ).toList()
+    ).filterNotNull()
 
   @Provides
   @Singleton
