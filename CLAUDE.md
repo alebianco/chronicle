@@ -88,6 +88,12 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   that class's tests assert it gives up, because looping would hammer plex.tv. Plex tokens never
   expire on a timer; they are invalidated by an event (password change with "sign out connected
   devices", server re-claim).
+- **Auth tokens and settings share one `SharedPreferences` file** (`Chronicle.xml`), because both
+  prefs repos inject the single instance provided for `APP_NAME`. Two consequences: Auto Backup
+  can only exclude the file *whole* (`data_extraction_rules.xml` + `backup_rules.xml`, one per API
+  level — keep them in agreement, `BackupRulesTest` enforces it), and any settings export MUST use
+  the `BACKUP_SETTING_KEYS` allowlist. **Never enumerate `sharedPreferences.all` into a file or
+  payload** — it contains the Plex account token, the server token and the serialized user.
 - **Never log an auth token.** `TokenLoggingTest` fails the build on any `Timber` call that
   interpolates one — it caught three live leaks, including one logging *two* tokens per media
   item. Logging *presence* (`token.isNotEmpty()`) is fine and is what the guard permits.
