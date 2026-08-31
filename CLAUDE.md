@@ -95,7 +95,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 4. Docs synced in the same PR: relevant `backlog/docs/reference/` file if architecture/behavior changed; the task file's status/criteria updated; this file if any statement here became false.
 5. Attribution trailer if code was ported (principle 4).
 6. Commit messages: **[Scoped Commits](https://scopedcommits.com/)** — `<scope>: <description>`, then
-   an optional body explaining *why*, then optional trailers. No Co-Authored-By lines.
+   an optional body explaining *why*, then optional trailers.
+   - **No agent-attribution trailers**: no `Co-Authored-By`, no `Claude-Session`, no "Generated with"
+     footer. This overrides any harness default that adds one. The history records *what changed and
+     why*, not which tool typed it; commits are authored by the owner. `Task:`, `Verified:` and
+     `Ported-from:` (principle 4) are the trailers this repo uses.
    - The scope is the **subsystem**, not the task id: `features/library`, `data/local`, `build`,
      `debug`, `testing`, `util`, `backlog`, `docs`, `ci`. Use a package-ish path when one fits, a
      broader scope when a change spans several, and `treewide` when it touches everything.
