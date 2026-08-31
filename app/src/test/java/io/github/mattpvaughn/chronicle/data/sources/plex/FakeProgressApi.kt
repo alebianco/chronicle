@@ -20,6 +20,22 @@ class FakeProgressApi(
   /** Keys passed to [markWatched], in call order. */
   val watchedKeys = mutableListOf<String>()
 
+  /**
+   * The arguments of the last [reportProgress] call.
+   *
+   * Recorded because counting calls cannot see *what* was sent: the duration Plex is told is
+   * deliberately doubled, and a mutant turning that into a division survived every call-counting
+   * assertion here.
+   */
+  var lastReportedDuration: Long? = null
+    private set
+
+  var lastReportedOffset: String? = null
+    private set
+
+  var lastReportedKey: String? = null
+    private set
+
   override suspend fun reportProgress(
     ratingKey: String,
     offset: String,
@@ -30,6 +46,9 @@ class FakeProgressApi(
     playQueueItemId: Long,
   ) {
     progressCalls++
+    lastReportedDuration = duration
+    lastReportedOffset = offset
+    lastReportedKey = key
     failWith?.let { throw it }
   }
 

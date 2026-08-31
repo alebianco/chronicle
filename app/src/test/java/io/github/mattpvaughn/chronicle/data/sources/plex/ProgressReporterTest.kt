@@ -136,4 +136,64 @@ class ProgressReporterTest {
         bookProgress = 2_000L,
       )
   }
+
+  /**
+   * The duration sent to Plex is deliberately **doubled**.
+   *
+   * Plex marks an item finished at 90% of whatever duration it is told, so reporting the real
+   * duration makes it auto-finish a book the listener has not finished — one of the owner's
+   * reported symptoms (books completing early). The doubling is load-bearing, and nothing asserted
+   * it: a mutant replacing the multiplication with a division survived, because every test here
+   * only counted calls.
+   */
+  @Test
+  fun `the duration reported to Plex is doubled`() =
+    runTest {
+      val api = FakeProgressApi()
+
+      reporterWith(api).report(REQUEST)
+
+      assertEquals(
+        "Plex finishes at 90% of the duration it is told; doubling keeps it from finishing early",
+        10_000L,
+        api.lastReportedDuration,
+      )
+    }
+
+  /** The position itself must be reported as-is, not scaled along with the duration. */
+  @Test
+  fun `the reported offset is the real track position`() =
+    runTest {
+      val api = FakeProgressApi()
+
+      reporterWith(api).report(REQUEST.copy(trackProgress = 1_234L))
+
+      assertEquals("1234", api.lastReportedOffset)
+    }
+
+  /**
+   * The retry boundary: 500 and above is transient, 499 and below is a rejection.
+   *
+   * The existing cases use 503 and 401, both far from the edge, so a boundary mutant on
+   * `code >= 500` survived.
+   */
+  @Test
+  fun `a 500 is retried`() =
+    runTest {
+      val reporter = reporterWith(FakeProgressApi(failWith = httpException(500)))
+
+      assertEquals(ProgressReporter.Outcome.RETRY, reporter.report(REQUEST))
+    }
+
+  @Test
+  fun `a 499 is permanent`() =
+    runTest {
+      val reporter = reporterWith(FakeProgressApi(failWith = httpException(499)))
+
+      assertEquals(
+        "below 500 is a rejection a retry cannot fix",
+        ProgressReporter.Outcome.PERMANENT_FAILURE,
+        reporter.report(REQUEST),
+      )
+    }
 }

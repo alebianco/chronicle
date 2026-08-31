@@ -154,3 +154,49 @@ Mutation testing would **not** have caught the two worst bugs of this session: t
 and the migration-vs-entity mismatch. Both were in code no test executed at all, and PIT only mutates
 what tests already reach. It is a check on assertion quality, not a substitute for pointing tests at
 the right code.
+
+## Second pass — acting on the report (2026-08-31)
+
+Baseline **94/217 (43%)** → **102/217 (47%)**, 339 → 353 tests, coverage 15.41% → 15.43%. Every new
+test was verified by **deliberately sabotaging the source and watching it fail** — a test written
+against a mutation report that is never seen to fail proves nothing.
+
+Machine-readable output added (`outputFormats = ["HTML", "XML"]`) because scraping the HTML for
+survivors is fragile; `mutations.xml` can be parsed directly.
+
+### Real defects the report found
+
+| Where | Mutant | Why it matters |
+|---|---|---|
+| `ProgressReporter:68` | `duration * 2` → `/ 2` | The doubling stops Plex auto-finishing at 90%. Flipping it **marks books complete early** — a symptom the owner reported. Nothing asserted it: the fake counted calls but discarded arguments. |
+| `ProgressReporter:82` | `code >= 500` boundary | Retry-vs-give-up. Tests used 503 and 401, both far from the edge. |
+| `Audiobook:220` | `>=` boundary, `-` → `+` | The 2-minute completion window. Nearest test sat 60s inside it. |
+| `Audiobook:109` | comparison inverted | `merge`'s freshness rule. Every existing test asserted `.progress`, which is *identical in both branches* by design — so the branch selector was unobserved. |
+| `CacheScanOutcome:43/46/50` | all three guards | Tests asserted `is Unavailable` but never *which* guard fired, so any one could be deleted and the next produced an indistinguishable result. |
+
+`CacheScanOutcome:50` is the cu-85 bug itself (`listFiles()` null → un-cached library) and now has a
+test that reproduces it, guarded by `assumeTrue` so it skips rather than lies where chmod has no
+effect. Verified it genuinely runs (`skipped="0"`), not silently skips.
+
+### Two equivalent mutants — do not chase these
+
+- **`Audiobook:109` boundary (`>` → `>=`).** Both branches return `network.copy(...)` and the stale
+  branch overrides only `lastViewedAt`; at equal timestamps the branches produce an identical book.
+  Unkillable by construction. Documented in `BookProgressDerivationTest`. Inverting the comparison
+  *is* killed, so the rule is pinned.
+- **`AccountAuthState` L40/48.** The `if` guards wrap only a Timber call; the state assignment is
+  outside them. Confirmed by replacing both with `false` — all tests still pass.
+
+### A false 0% worth knowing about
+
+`ChapterAssembly.kt` reports **0/3, NO_COVERAGE** despite `AssembleChaptersTest` passing. It is an
+`inline fun`: the body is copied into each caller, so the original carries no executable bytecode for
+PIT to attribute coverage to. Sabotaging the accumulator fails 2 tests immediately — the tests are
+real. **Any `inline` function will read as 0% here.** Do not "fix" it by adding tests.
+
+### Still open, and honestly assessed
+
+`MediaItemTrack` 48% and `DownloadGroupId` 40% carry the most remaining substance;
+`ProgressReporter` sits at 27% because ~14 of its mutants are suspend-machinery nulls and
+`runCatching` plumbing that no assertion should target.
+

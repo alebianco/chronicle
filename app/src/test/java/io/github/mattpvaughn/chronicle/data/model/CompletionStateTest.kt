@@ -67,6 +67,42 @@ class CompletionStateTest {
     assertTrue(book(progress = 3_600_000L).isCompleted())
   }
 
+  /**
+   * The exact edge of the window, which is where `>=` and `>` differ.
+   *
+   * With duration 3_600_000 and a 2-minute window the threshold is exactly 3_480_000. Every other
+   * test here sits a comfortable distance either side of it, so a boundary mutant survived: the
+   * comparison could flip to `>` and nothing failed. These two pin it from both directions.
+   */
+  @Test
+  fun `a book exactly at the window threshold is completed`() {
+    val threshold = 3_600_000L - BOOK_FINISHED_END_WINDOW
+
+    assertTrue(
+      "progress exactly at duration minus the window is finished",
+      book(progress = threshold).isCompleted(),
+    )
+  }
+
+  @Test
+  fun `a book one millisecond short of the window is not completed`() {
+    val threshold = 3_600_000L - BOOK_FINISHED_END_WINDOW
+
+    assertFalse(
+      "one ms before the threshold is still unfinished",
+      book(progress = threshold - 1L).isCompleted(),
+    )
+  }
+
+  /**
+   * Pins the window's *value*, not just its use. A mutant replacing the constant with 0 left every
+   * other assertion here passing, because they all sit far from the edge.
+   */
+  @Test
+  fun `the finished window is two minutes`() {
+    assertEquals(120_000L, BOOK_FINISHED_END_WINDOW)
+  }
+
   /** An explicit mark-as-read is authoritative regardless of where the position sits. */
   @Test
   fun `a book marked as played is completed even at zero progress`() {

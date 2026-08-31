@@ -289,6 +289,8 @@ pitest {
   avoidCallsTo.set(listOf("kotlin.jvm.internal"))
   threads.set(4)
   timestampedReports.set(false)
+  // XML alongside HTML so surviving mutants can be listed mechanically rather than scraped.
+  outputFormats.set(listOf("HTML", "XML"))
   targetClasses.set(
     listOf(
       // Listening position and completion (decision-16, cu-86, cu-90)

@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.features.download
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -100,5 +101,61 @@ class CacheScanOutcomeTest {
     val outcome = scanCachedMediaDir(dir, cachedMedia) as CacheScanOutcome.Scanned
 
     assertTrue(outcome.files.isEmpty())
+  }
+
+  /**
+   * Each guard must be distinguishable, not merely "unavailable".
+   *
+   * All three conditions returned `Unavailable`, and the existing tests only asserted the *type* —
+   * so any one of the three could be removed and the next guard would produce an indistinguishable
+   * result. All three mutants survived. Asserting on the reason pins which branch actually fired.
+   */
+  @Test
+  fun `each unavailable reason identifies its own cause`() {
+    val missing = File(folder.root, "definitely-absent")
+    val notADir = folder.newFile("a-file.txt")
+
+    val missingReason = (scanCachedMediaDir(missing, anyFile) as CacheScanOutcome.Unavailable).reason
+    val notADirReason = (scanCachedMediaDir(notADir, anyFile) as CacheScanOutcome.Unavailable).reason
+
+    assertTrue("a missing directory says so: $missingReason", missingReason.contains("does not exist"))
+    assertTrue("a plain file says so: $notADirReason", notADirReason.contains("not a directory"))
+  }
+
+  /** An existing, readable directory must not be reported as missing. */
+  @Test
+  fun `a real directory does not report the missing-directory reason`() {
+    val outcome = scanCachedMediaDir(folder.root, anyFile)
+
+    assertTrue("a real directory scans", outcome is CacheScanOutcome.Scanned)
+  }
+
+  /**
+   * The null branch from `listFiles()` — the cu-85 bug itself.
+   *
+   * `listFiles` returns null for a directory that exists but cannot be read, and coalescing that to
+   * an empty list un-cached whole libraries. Chmod is skipped when it does not take effect (running
+   * as root, or a filesystem that ignores permission bits), because a test that cannot fail is
+   * worse than no test.
+   */
+  @Test
+  fun `an unreadable directory is unavailable, not empty`() {
+    val locked = folder.newFolder("unreadable")
+    File(locked, "cached.mp3").writeText("x")
+
+    assumeTrue("could not make the directory unreadable", locked.setReadable(false, false))
+    assumeTrue("permission bits ignored on this filesystem", locked.listFiles() == null)
+
+    val outcome = scanCachedMediaDir(locked, anyFile)
+
+    locked.setReadable(true, false)
+
+    assertTrue(
+      "an unreadable directory must not read as an empty one; that un-caches the library",
+      outcome is CacheScanOutcome.Unavailable,
+    )
+    assertTrue(
+      (outcome as CacheScanOutcome.Unavailable).reason.contains("not readable"),
+    )
   }
 }

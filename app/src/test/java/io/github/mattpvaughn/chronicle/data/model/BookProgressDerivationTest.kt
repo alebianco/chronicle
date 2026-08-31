@@ -125,4 +125,70 @@ class BookProgressDerivationTest {
 
     assertEquals(1_000L + 750L, tracks.getProgress())
   }
+
+  /**
+   * The branch selector itself, which no other test here observes.
+   *
+   * Every other assertion in this class reads `.progress`, and `merge` deliberately carries the
+   * local progress through in *both* branches (decision-16) — so the freshness comparison could be
+   * inverted, or removed entirely, without failing any of them. Two mutants survived on that line
+   * for exactly this reason.
+   *
+   * `lastViewedAt` is the one field the branches treat differently: the stale branch pins it to the
+   * local value, the fresh branch lets the network's through. It drives "recently played" ordering,
+   * so picking the wrong branch silently reorders the library.
+   */
+  @Test
+  fun `a newer network timestamp is adopted`() {
+    val merged =
+      Audiobook.merge(
+        network = book(progress = 0L, lastViewedAt = 900L),
+        local = book(progress = 4_000L, lastViewedAt = 500L),
+      )
+
+    assertEquals("the network is newer, so its timestamp wins", 900L, merged.lastViewedAt)
+  }
+
+  @Test
+  fun `an older network timestamp is not adopted`() {
+    val merged =
+      Audiobook.merge(
+        network = book(progress = 0L, lastViewedAt = 500L),
+        local = book(progress = 4_000L, lastViewedAt = 900L),
+      )
+
+    assertEquals("the local copy is newer and must keep its timestamp", 900L, merged.lastViewedAt)
+  }
+
+  /**
+   * The boundary: equal timestamps are not "newer", so the local copy stands.
+   *
+   * Note this case cannot distinguish `>` from `>=`. Both branches return `network.copy(...)` and
+   * the only field the stale branch overrides is `lastViewedAt` — so when the two timestamps are
+   * equal the branches produce an identical book, and a boundary mutant here is *equivalent*.
+   * `a newer network timestamp is adopted` is what actually pins the comparison.
+   */
+  @Test
+  fun `an equal timestamp keeps the local copy`() {
+    val merged =
+      Audiobook.merge(
+        network = book(progress = 0L, lastViewedAt = 700L),
+        local = book(progress = 4_000L, lastViewedAt = 700L),
+      )
+
+    assertEquals(700L, merged.lastViewedAt)
+  }
+
+  /** Forcing overrides the comparison, including when the network is older. */
+  @Test
+  fun `forcing the network adopts its timestamp even when older`() {
+    val merged =
+      Audiobook.merge(
+        network = book(progress = 0L, lastViewedAt = 100L),
+        local = book(progress = 4_000L, lastViewedAt = 900L),
+        forceNetwork = true,
+      )
+
+    assertEquals("forceNetwork takes the network branch regardless", 100L, merged.lastViewedAt)
+  }
 }
