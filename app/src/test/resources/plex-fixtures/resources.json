@@ -8,11 +8,21 @@
     "connections": [
       {
         "uri": "https://10-0-0-42.fixtureserverhash.plex.direct:32400",
-        "local": true
+        "local": true,
+        "relay": false,
+        "protocol": "https"
       },
       {
         "uri": "https://fixture-server.plex.direct:32400",
-        "local": false
+        "local": false,
+        "relay": false,
+        "protocol": "https"
+      },
+      {
+        "uri": "https://fixture-relay.plex.direct:443",
+        "local": false,
+        "relay": true,
+        "protocol": "https"
       }
     ]
   },
