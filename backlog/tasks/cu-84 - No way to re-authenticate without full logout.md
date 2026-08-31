@@ -106,6 +106,27 @@ Surfaced as a **"Sign in again"** entry in settings, above "Log out". Plex has n
 human approving an OAuth PIN is unavoidable — but re-picking a library they already picked was not,
 and downloads survive, which a full logout destroys.
 
+### Test coverage, after an audit prompted by the owner
+
+The first pass tested only the authenticator (12 tests) — the *detection* half. An audit showed the
+three pieces that decide what the user actually experiences had **no tests at all**:
+`AccountAuthState`, `determineLoginState`'s new branch, and `clearCredentials`/`beginReauthentication`.
+Now 34 tests across four files, each verified to bite.
+
+**The audit found a real problem that a fake had hidden.** `ReauthenticationTest` exercises the prefs
+layer through an in-memory `FakePlexPrefsRepo`, whose `clearCredentials` duplicates the production one
+because the difference between it and `clear` *is* the behaviour under test. A duplicate can drift, so
+a nested `AgainstTheRealImplementation` class runs the same assertions through
+`SharedPreferencesPlexPrefsRepo` under Robolectric — and it failed: `server` came back null.
+
+The cause was the **test fixture**, not the production code: the real getter returns null for a server
+with no connections, and the fixture built one with `connections = emptyList()`, so an empty server was
+indistinguishable from an absent one. Fixed with a realistic `Connection`. Worth recording because the
+fake-versus-real test is what surfaced it — without it the suite would have been green while proving
+nothing about the real storage layer. The same class of blind spot as trusting Moshi's default config:
+the test also had to add `KotlinJsonAdapterFactory` to match `AppModule.moshi()`, since codegen is
+disabled here.
+
 ### Not done
 
 - **No live verification.** Invalidating a token server-side and watching the app notice needs a real

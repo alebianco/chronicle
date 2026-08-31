@@ -141,6 +141,18 @@ reset that to 0, as **not played**, indistinguishable from a book never opened.
 CLAUDE.md puts branding with the owner, so this keeps the fix to behaviour rather than inventing UI.
 Worth revisiting if the owner wants a clearer indicator.
 
+### Test coverage, after an audit prompted by the owner
+
+`markTracksInBookAsUnwatched` — added by this task — had **no test**, and neither did `setUnwatched`.
+`WatchedRoundTripTest` now covers the pair as a round trip: 6 tests, verified to bite.
+
+The most valuable of them is cross-task: every track marked watched carries `lastViewedAt = now`, so
+if that counted as "started", `getActiveTrack` would return the *last* track and the book would
+report itself part way through — 3000ms of 6000 for the fixture. That is the regression [[cu-90]]
+introduced and this task fixed, and it is only visible when the two are exercised **together**.
+Sabotaging `hasProgress()` back to `progress > 0 || lastViewedAt > 0` fails that test, so the
+interaction is now permanently guarded rather than relying on someone remembering it.
+
 ### Not done
 
 - **No live verification.** Whether the server agrees after a mark-as-read round trip — Plex's
