@@ -31,7 +31,10 @@ import kotlin.random.Random
 @Singleton
 class PlexConfig
   @Inject
-  constructor(private val plexPrefsRepo: PlexPrefsRepo) {
+  constructor(
+    private val plexPrefsRepo: PlexPrefsRepo,
+    private val connectionChooser: ConnectionChooser,
+  ) {
     private val connectionSet = mutableSetOf<Connection>()
 
     var url: String = PLACEHOLDER_URL
@@ -223,69 +226,19 @@ class PlexConfig
     }
 
     /**
-     * Attempts to connect to all [Connection]s in [connectionSet] via [PlexMediaService.checkServer].
-     *
-     * On the first successful connection, return a [ConnectionResult.Success] with
-     *   [ConnectionResult.Success.url] from the [Connection.uri]
-     *
-     * If all connections fail: return a [Failure] as soon as all connections have completed
-     *
-     * If no connections are made within 15 seconds, return a [ConnectionResult.Failure].
+     * Picks a connection via [ConnectionChooser], which prefers LAN, then direct WAN, then
+     * relay. The previous implementation launched every attempt at once and polled them, so
+     * a relay could win a race against a LAN address it should never have been in (cu-11).
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun chooseViableConnections(plexMediaService: PlexMediaService): ConnectionResult {
-      val timeoutFailureReason = "Connection timed out"
-      return withTimeoutOrNull(15000) {
-        val unknownFailureReason = "Failed for unknown reason"
-        Timber.i("Choosing viable connection from: $connectionSet")
-        val connections = connectionSet.sortedByDescending { it.local }
-        val deferredConnections =
-          connections.map { conn ->
-            async {
-              Timber.i("Testing connection: ${conn.uri}")
-              try {
-                val result = plexMediaService.checkServer(conn.uri)
-                if (result.isSuccessful) {
-                  return@async Success(conn.uri)
-                } else {
-                  return@async Failure(result.message() ?: unknownFailureReason)
-                }
-              } catch (e: Throwable) {
-                return@async Failure(e.localizedMessage ?: unknownFailureReason)
-              }
-            }
-          }
-
-        while (deferredConnections.any { it.isActive }) {
-          Timber.i("Connections: $deferredConnections")
-          deferredConnections.forEach { deferred ->
-            if (deferred.isCompleted) {
-              val completed = deferred.getCompleted()
-              if (completed is Success) {
-                Timber.i("Returning connection $completed")
-                deferredConnections.forEach { it.cancel("Sibling completed, killing connection attempt: $it") }
-                return@withTimeoutOrNull completed
-              }
-            }
-          }
-          delay(500)
+      val chosen =
+        connectionChooser.choose(connectionSet.toList()) { connection ->
+          plexMediaService.checkServer(connection.uri).isSuccessful
         }
-
-        // Check if the final completed job was a success
-        Timber.i("Connections: $deferredConnections")
-        deferredConnections.forEach { deferred ->
-          if (deferred.isCompleted && deferred.getCompleted() is Success) {
-            Timber.i("Returning final completed connection ${deferred.getCompleted()}")
-            return@withTimeoutOrNull deferred.getCompleted()
-          } else {
-            if (deferred.isCompleted) {
-              Timber.i("Connection failed: ${(deferred.getCompleted() as Failure).reason}")
-            }
-          }
-        }
-
-        Timber.i("Returning connection ${Failure(unknownFailureReason)}")
-        Failure(unknownFailureReason)
-      } ?: Failure(timeoutFailureReason)
+      return if (chosen != null) {
+        Success(chosen.uri)
+      } else {
+        Failure("No connection answered")
+      }
     }
   }

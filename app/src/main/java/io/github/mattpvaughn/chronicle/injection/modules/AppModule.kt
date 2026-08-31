@@ -40,6 +40,20 @@ class AppModule(private val app: Application) {
   companion object {
     const val OKHTTP_CLIENT_MEDIA = "Media"
     const val OKHTTP_CLIENT_LOGIN = "Login"
+
+    /**
+     * Handshake budget. A reachability probe that takes 15s has already failed as far as
+     * the listener is concerned, and the old value let a dead LAN address consume the whole
+     * connection attempt before relay was tried (cu-11).
+     */
+    const val CONNECT_TIMEOUT_SECONDS = 5L
+
+    /**
+     * Transfer budget, deliberately still long. A slow *stream* of audio is useful; a slow
+     * *handshake* just means the route is wrong. Do not shorten this to match the connect
+     * timeout.
+     */
+    const val READ_TIMEOUT_SECONDS = 15L
   }
 
   @Provides
@@ -159,9 +173,9 @@ class AppModule(private val app: Application) {
     plexLoginService: Provider<PlexLoginService>,
   ): OkHttpClient =
     OkHttpClient.Builder()
-      .connectTimeout(15, TimeUnit.SECONDS)
-      .writeTimeout(15, TimeUnit.SECONDS)
-      .readTimeout(15, TimeUnit.SECONDS)
+      .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+      .writeTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+      .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
       .protocols(listOf(Protocol.HTTP_1_1, Protocol.QUIC))
       .addInterceptor(plexConfig.plexMediaInterceptor)
       .addInterceptor(loggingInterceptor)
@@ -187,9 +201,9 @@ class AppModule(private val app: Application) {
     loggingInterceptor: HttpLoggingInterceptor,
   ): OkHttpClient =
     OkHttpClient.Builder()
-      .connectTimeout(15, TimeUnit.SECONDS)
-      .writeTimeout(15, TimeUnit.SECONDS)
-      .readTimeout(15, TimeUnit.SECONDS)
+      .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+      .writeTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+      .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
       .addInterceptor(plexConfig.plexLoginInterceptor)
       .addInterceptor(loggingInterceptor)
       .build()
