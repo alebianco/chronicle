@@ -169,10 +169,12 @@ class PlexLoginRepo
       val user: PlexUser? = plexPrefsRepo.user
       val server: ServerModel? = plexPrefsRepo.server
       val library: PlexLibrary? = plexPrefsRepo.library
+      // Presence, never the values: this line used to log three working credentials
+      // into logcat, which persists and ends up in bug reports (cu-10).
       Timber.i(
-        """Login state: token = $token,
-                    |user token = ${user?.authToken},
-                    |server token = ${server?.accessToken},
+        """Login state: hasAccountToken = ${token.isNotEmpty()},
+                    |hasUserToken = ${!user?.authToken.isNullOrEmpty()},
+                    |hasServerToken = ${!server?.accessToken.isNullOrEmpty()},
                     |library = ${library?.name}
         """.trimMargin(),
       )

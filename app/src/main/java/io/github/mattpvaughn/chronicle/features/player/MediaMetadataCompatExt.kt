@@ -306,9 +306,7 @@ fun List<MediaMetadataCompat>.toMediaSources(
   dataSourceFactory: DataSource.Factory,
 ): List<ProgressiveMediaSource> {
   return map {
-    Timber.i(
-      "Media uri is: ${it.mediaUri}, server auth token is ${plexPrefsRepo.server?.accessToken}, user is ${plexPrefsRepo.accountAuthToken}",
-    )
+    Timber.i("Media uri is: ${it.mediaUri}")
     it.toMediaSource(dataSourceFactory)
   }
 }

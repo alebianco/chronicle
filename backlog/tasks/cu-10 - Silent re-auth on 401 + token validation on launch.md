@@ -1,8 +1,8 @@
 ---
 id: cu-10
 title: Silent re-auth on 401 + token validation on launch
-status: To Do
-assignee: []
+status: In Progress
+assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
 dependencies: [cu-16]

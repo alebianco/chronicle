@@ -71,9 +71,7 @@ class ChooseLibraryViewModel
     private val networkObserver =
       Observer<Boolean> { isConnected ->
         if (isConnected) {
-          Timber.i(
-            "Connected to server at ${plexConfig.url}, fetching libraries with token ${plexPrefsRepo.server?.accessToken}",
-          )
+          Timber.i("Connected to server at ${plexConfig.url}, fetching libraries")
           loadLibraries()
         }
       }
