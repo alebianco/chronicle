@@ -73,6 +73,13 @@ stage "assembleDebug — debug APK"
 stage "lintDebug — Android lint"
 "$GRADLE" lintDebug
 
+# The debug and release source sets each provide their own DebugHooks object, and only the
+# release variant catches a twin that has drifted — DebugHooksContract makes the compiler check
+# the shape, but it can only check the variant being built. Everything above builds debug only,
+# so without this a release-only break lands green and fails the first release build (cu-70).
+stage "compileReleaseKotlin — release variant compiles"
+"$GRADLE" compileReleaseKotlin
+
 echo ""
 echo "=============================================================="
 echo "  VERIFY PASSED ($STAGE_NUM stages)"

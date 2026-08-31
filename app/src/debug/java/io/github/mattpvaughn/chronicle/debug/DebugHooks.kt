@@ -23,7 +23,7 @@ import timber.log.Timber
  * and clears the seeded server. An intent extra arrives too late for that, so it
  * only records the preference and the next process start applies it.
  */
-object DebugHooks {
+object DebugHooks : DebugHooksContract {
   private const val PREFS = "chronicle_debug"
   private const val KEY_MOCK_PLEX = "mock_plex"
   private const val EXTRA_MOCK_PLEX = "mock_plex"
@@ -31,7 +31,7 @@ object DebugHooks {
   private const val EXTRA_FAIL_SYNC = "fail_sync"
 
   /** Applied at Application start, before any network setup. */
-  fun onApplicationCreate(application: ChronicleApplication) {
+  override fun onApplicationCreate(application: ChronicleApplication) {
     if (!isEnabled(application)) {
       return
     }
@@ -48,7 +48,7 @@ object DebugHooks {
    * ```
    */
 
-  fun onMainActivityIntent(intent: Intent?) {
+  override fun onMainActivityIntent(intent: Intent?) {
     if (intent == null || !intent.hasExtra(EXTRA_MOCK_PLEX)) {
       return
     }
@@ -79,7 +79,7 @@ object DebugHooks {
    * call the play button makes, so it exercises the real path rather than a
    * shortcut around it (cu-64).
    */
-  fun onPlayBookIntent(
+  override fun onPlayBookIntent(
     intent: Intent?,
     mediaServiceConnection: MediaServiceConnection,
   ) {
@@ -111,7 +111,7 @@ object DebugHooks {
    *   --ez fail_sync true
    * ```
    */
-  fun onFailSyncIntent(intent: Intent?) {
+  override fun onFailSyncIntent(intent: Intent?) {
     if (intent == null || !intent.hasExtra(EXTRA_FAIL_SYNC)) {
       return
     }

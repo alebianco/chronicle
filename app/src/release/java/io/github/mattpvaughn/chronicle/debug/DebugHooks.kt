@@ -12,15 +12,15 @@ import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
  * code — means the mock-Plex machinery is not merely disabled in release, it is
  * not compiled into it at all.
  */
-object DebugHooks {
-  fun onApplicationCreate(application: ChronicleApplication) = Unit
+object DebugHooks : DebugHooksContract {
+  override fun onApplicationCreate(application: ChronicleApplication) = Unit
 
-  fun onMainActivityIntent(intent: Intent?) = Unit
+  override fun onMainActivityIntent(intent: Intent?) = Unit
 
-  fun onPlayBookIntent(
+  override fun onPlayBookIntent(
     intent: Intent?,
     mediaServiceConnection: MediaServiceConnection,
   ) = Unit
 
-  fun onFailSyncIntent(intent: Intent?) = Unit
+  override fun onFailSyncIntent(intent: Intent?) = Unit
 }

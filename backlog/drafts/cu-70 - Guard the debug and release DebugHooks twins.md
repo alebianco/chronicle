@@ -1,8 +1,8 @@
 ---
 id: cu-70
 title: Guard the debug/release DebugHooks twins against drift
-status: Draft
-assignee: []
+status: Done
+assignee: [claude]
 created_date: '2026-08-31'
 labels: [R1, agentic]
 dependencies: []
@@ -33,7 +33,30 @@ only because the same change built both variants locally.
 (1) is broader and probably the better default; the release build is currently only exercised by
 `test_release_build.sh`, which is not part of the standard gate.
 
+## Implementation Notes
+
+**Both options were needed, and finding that out was the useful part.**
+
+Option 2 first: `DebugHooksContract` in `main/`, implemented by both twins, so the compiler
+enforces the shape. Then I tested it by adding a hook to the contract and the debug twin and
+omitting the release stub — the exact mistake this guards.
+
+**The debug variant compiled clean.** Zero errors. Only `compileReleaseKotlin` failed. The
+interface makes the compiler check the shape, but it can only check *the variant being built* —
+so on its own it would not have helped, because everything in `verify.sh` built debug only.
+
+So option 1 as well: `compileReleaseKotlin` is now stage 6 of the verify loop. Chosen over
+`assembleRelease` because it catches the same class of breakage — a release source set that does
+not compile — without R8, resource shrinking or APK packaging. 17s cold, ~1s warm, against
+`assembleRelease`'s ~90s. `test_release_build.sh` still covers the R8-specific risks and stays
+separate.
+
+Verified by sabotage: with the drift in place, `./verify.sh` fails at stage 6.
+
 ## Acceptance Criteria
 
-- [ ] A signature divergence between the twins fails a build that CI actually runs
-- [ ] Decision recorded on whether `assembleRelease` joins the verify loop
+- [x] A signature divergence between the twins fails a build that CI actually runs — CI calls
+      `verify.sh`, which now compiles the release variant
+- [x] Decision recorded: `compileReleaseKotlin` joins the loop, not `assembleRelease` — the
+      cheaper task catches the same failure, and the release *packaging* risks stay with
+      `test_release_build.sh`

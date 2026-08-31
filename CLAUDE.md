@@ -17,13 +17,17 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Verify loop (run before claiming anything is done)
 
 ```bash
-./verify.sh            # the full gate: ktlint, unit tests, coverage ratchet, debug APK, lint
+./verify.sh            # the full gate: ktlint, unit tests, coverage ratchet, debug APK, lint, release compile
 ./verify.sh --quick    # inner loop while iterating: ktlint + unit tests + coverage only
 ./verify.sh --format   # runs ktlintFormat first, then the full gate
 ```
 
 - `verify.sh` **is** the definition of "the build is fine" (D12 rule 6) — not CI, not a forge's required checks. CI is a thin wrapper that calls this same script, so the gate is identical on a laptop and on any forge.
-- Green = ktlint clean + unit tests pass + coverage did not regress + debug APK builds + lint passes. Nothing less.
+- Green = ktlint clean + unit tests pass + coverage did not regress + debug APK builds + lint passes
+  + **the release variant compiles**. Nothing less. That last stage exists because the debug and
+  release source sets each provide their own `DebugHooks` object: `DebugHooksContract` makes the
+  compiler check the shape, but only for the variant being built, so a drifted release twin used to
+  pass every debug-only check and break the first release build (cu-70).
 - **Coverage ratchet**: `coverage-ratchet.sh` compares JaCoCo instruction coverage against the committed `coverage-baseline.txt` and fails on a drop; a rise ratchets the baseline up (commit the change). Baseline is deliberately a plain file in git so every movement is reviewable in a diff. To lower it on purpose: `./coverage-ratchet.sh --update`, and justify it in the commit message.
 - Release builds: `./test_release_build.sh` (R8/ProGuard smoke test; see CONTRIBUTING.md "Release Builds & ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (Moshi models, Room entities), or dependencies. It asserts against the **dex** that Room/Retrofit/Dagger/Moshi classes survived R8 — these fail at runtime, not build time. Keep rules are deliberately narrow (cu-45): prefer adding one precise rule over widening a blanket `-keep`, which silently exempts code from R8.
 - **Instrumented tests are quarantined, not just disabled**: the sources in `app/src/androidTest` no longer compile — they target an `OnboardingActivity` and strings removed when onboarding became Fragments (`9e89270`). `DebugAndroidTest` tasks are force-disabled in `app/build.gradle.kts`; the fake CI emulator job was deleted in cu-3. **There is no instrumented coverage — never claim any.** Rebuilding the suite is task cu-54.
