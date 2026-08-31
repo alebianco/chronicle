@@ -413,7 +413,11 @@ suspend fun fetchNewData(): List<NewItem> = withContext(Dispatchers.IO) {
 ```kotlin
 @Entity
 data class NewEntity(
-    @PrimaryKey val id: Int,
+    // String, not Int: ids are backend-neutral since cu-71 so a non-numeric backend
+    // (Audiobookshelf UUIDs, local file paths) can be represented. Any DAO parameter
+    // bound against this column must also be String — a numeric bind silently matches
+    // no row, because SQLite compares across storage classes without erroring.
+    @PrimaryKey val id: String,
     val name: String,
     val value: Int
 )

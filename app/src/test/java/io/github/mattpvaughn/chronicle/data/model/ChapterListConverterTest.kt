@@ -24,14 +24,14 @@ class ChapterListConverterTest {
   private val chapter =
     Chapter(
       title = "Chapter One",
-      id = 11L,
+      id = "11",
       index = 1L,
       startTimeOffset = 0L,
       endTimeOffset = 60_000L,
       discNumber = 1,
       downloaded = false,
-      trackId = 3001L,
-      bookId = 1001L,
+      trackId = "3001",
+      bookId = "1001",
     )
 
   @Test
@@ -46,8 +46,8 @@ class ChapterListConverterTest {
     val chapters =
       listOf(
         chapter,
-        chapter.copy(title = "Chapter Two", id = 12L, index = 2L, startTimeOffset = 60_000L),
-        chapter.copy(title = "Chapter Three", id = 13L, index = 3L, startTimeOffset = 120_000L),
+        chapter.copy(title = "Chapter Two", id = "12", index = 2L, startTimeOffset = 60_000L),
+        chapter.copy(title = "Chapter Three", id = "13", index = 3L, startTimeOffset = 120_000L),
       )
 
     assertEquals(chapters, converter.toChapterList(converter.toString(chapters)))
@@ -144,6 +144,6 @@ class ChapterListConverterTest {
     assertEquals("Old Chapter", restored[0].title)
     assertEquals(1, restored[0].discNumber)
     assertEquals(false, restored[0].downloaded)
-    assertTrue("trackId should fall back, not throw", restored[0].trackId != 0L)
+    assertTrue("trackId should fall back, not throw", restored[0].trackId.isNotEmpty())
   }
 }

@@ -122,8 +122,8 @@ class MainActivityViewModel(
       val activeTrack = _tracks.getActiveTrack()
       val currentTrackProgress: Long = activeTrack.progress
       return@DoubleLiveData _chapters.filter {
-        it.trackId.toInt() == activeTrack.id
-      }.getChapterAt(_tracks.getActiveTrack().id.toLong(), currentTrackProgress).title
+        it.trackId == activeTrack.id
+      }.getChapterAt(_tracks.getActiveTrack().id, currentTrackProgress).title
     }
 
   val isPlaying =
@@ -136,7 +136,7 @@ class MainActivityViewModel(
       metadata.id?.let { trackId ->
         if (trackId.isNotEmpty()) {
           viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
-            setAudiobook(trackId.toInt())
+            setAudiobook(trackId)
           }
         }
       } ?: _currentlyPlayingLayoutState.postValue(HIDDEN)
@@ -160,7 +160,7 @@ class MainActivityViewModel(
     mediaServiceConnection.playbackState.observeForever(playbackObserver)
   }
 
-  private fun setAudiobook(trackId: Int) {
+  private fun setAudiobook(trackId: String) {
     val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
     viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
       val bookId = trackRepository.getBookIdForTrack(trackId)

@@ -24,11 +24,11 @@ class CollectionsRepository
     private val dispatchers: DispatcherProvider,
   ) {
     // TODO: handle collections sorting!
-    suspend fun getChildIds(collectionId: Int): List<Long> {
+    suspend fun getChildIds(collectionId: String): List<String> {
       return collectionsDao.getCollectionAsync(collectionId).childIds
     }
 
-    fun getCollection(id: Int): LiveData<Collection?> = collectionsDao.getCollection(id)
+    fun getCollection(id: String): LiveData<Collection?> = collectionsDao.getCollection(id)
 
     fun getAllCollections(): LiveData<List<Collection>> = collectionsDao.getAllRows()
 
@@ -72,7 +72,7 @@ class CollectionsRepository
                   .plexMediaContainer
                   .asAudiobooks()
 
-              val childIds = collectionItems.map { book -> book.id.toLong() }
+              val childIds = collectionItems.map { book -> book.id }
               it.copy(childIds = childIds)
             }
           collectionsDao.insertAll(collectionsWithChildIds)

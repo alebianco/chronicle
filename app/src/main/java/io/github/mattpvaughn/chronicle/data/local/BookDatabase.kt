@@ -77,6 +77,32 @@ val BOOK_MIGRATION_7_8 =
   }
 
 /**
+ * Retypes `id` and `parentId` to TEXT so a non-numeric backend can be represented
+ * (cu-71, decision-11).
+ *
+ * A table rebuild because SQLite cannot alter a column type or a primary key. The column list comes
+ * from the exported v8 schema, which is the authority — a column omitted here is dropped with
+ * no error at all.
+ */
+val BOOK_MIGRATION_8_9 =
+  object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.rebuildTableWithTextIds(
+        table = "Audiobook",
+        createNewTableSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook_new` (`id` TEXT NOT NULL, `source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `chapters` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        columns =
+          listOf(
+            "id", "source", "title", "titleSort", "author", "thumb", "parentId", "genre",
+            "summary", "year", "addedAt", "updatedAt", "lastViewedAt", "duration", "isCached",
+            "progress", "favorited", "viewedLeafCount", "leafCount", "viewCount", "chapters",
+          ),
+        textColumns = setOf("id", "parentId"),
+      )
+    }
+  }
+
+/**
  * Every migration, in order, as one list.
  *
  * Named rather than inlined into the builder so a test can open a real database file at an older
@@ -92,9 +118,10 @@ val BOOK_MIGRATIONS =
     BOOK_MIGRATION_5_6,
     BOOK_MIGRATION_6_7,
     BOOK_MIGRATION_7_8,
+    BOOK_MIGRATION_8_9,
   )
 
-@Database(entities = [Audiobook::class], version = 8, exportSchema = true)
+@Database(entities = [Audiobook::class], version = 9, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract val bookDao: BookDao
 }
@@ -121,13 +148,13 @@ interface BookDao {
 
   @Query("UPDATE Audiobook SET isCached = :cached WHERE id = :bookId")
   fun updateCachedStatus(
-    bookId: Int,
+    bookId: String,
     cached: Boolean,
   )
 
   @Query("SELECT * FROM Audiobook WHERE id = :id AND isCached >= :isOfflineModeActive LIMIT 1")
   fun getAudiobook(
-    id: Int,
+    id: String,
     isOfflineModeActive: Boolean,
   ): LiveData<Audiobook?>
 
@@ -180,7 +207,7 @@ interface BookDao {
     "UPDATE Audiobook SET lastViewedAt = :currentTime, progress = :progress WHERE lastViewedAt < :currentTime AND id = :bookId",
   )
   fun updateProgress(
-    bookId: Int,
+    bookId: String,
     currentTime: Long,
     progress: Long,
   )
@@ -189,7 +216,7 @@ interface BookDao {
     "UPDATE Audiobook SET duration = :duration, leafCount = :trackCount, progress = :progress WHERE id = :bookId",
   )
   suspend fun updateTrackData(
-    bookId: Int,
+    bookId: String,
     progress: Long,
     duration: Long,
     trackCount: Int,
@@ -218,7 +245,7 @@ interface BookDao {
   suspend fun getMostRecent(): Audiobook?
 
   @Query("SELECT * FROM Audiobook WHERE id = :bookId LIMIT 1")
-  suspend fun getAudiobookAsync(bookId: Int): Audiobook?
+  suspend fun getAudiobookAsync(bookId: String): Audiobook?
 
   @Query("SELECT * FROM Audiobook WHERE isCached >= :isCached")
   fun getCachedAudiobooks(isCached: Boolean = true): LiveData<List<Audiobook>>
@@ -242,11 +269,11 @@ interface BookDao {
   suspend fun getRandomBookAsync(): Audiobook?
 
   @Query("UPDATE Audiobook SET progress = 0 WHERE id = :bookId")
-  suspend fun resetBookProgress(bookId: Int)
+  suspend fun resetBookProgress(bookId: String)
 
   @Query("UPDATE Audiobook SET viewCount = viewCount + 1 WHERE id = :bookId")
-  suspend fun setWatched(bookId: Int)
+  suspend fun setWatched(bookId: String)
 
   @Query("UPDATE Audiobook SET viewCount = 0 WHERE id = :bookId")
-  suspend fun setUnwatched(bookId: Int)
+  suspend fun setUnwatched(bookId: String)
 }

@@ -68,7 +68,7 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
       }
 
     if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
-      val chapter = chapters.getChapterAt(track.id.toLong(), track.progress)
+      val chapter = chapters.getChapterAt(track.id, track.progress)
       if (this.chapter.value != chapter) {
         this.chapter.value = chapter
         listener?.onChapterChange(chapter)

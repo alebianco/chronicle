@@ -53,7 +53,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   unit-tested only. `./capture-screens.sh <dir>` drives the app and screenshots the main
   screens; it asserts the app was actually foregrounded, because an earlier version silently captured
   the launcher.
-- Tests: 14 unit-test files, **73 tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: 39 unit-test files, **204 tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -81,7 +81,9 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Four separate Room databases** (`BookDatabase` v8, `TrackDatabase` v4, `ChapterDatabase` v1, `CollectionsDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration.
+- **Four separate Room databases** (`BookDatabase` v9, `TrackDatabase` v5, `ChapterDatabase` v2, `CollectionsDatabase` v2), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration.
+- **All four entity ids are `String`** (cu-71), so a non-numeric backend can be represented (decision-11). Two traps follow. **A DAO parameter bound against an id column must be `String`**: SQLite compares across storage classes, so a numeric bind matches *no row, silently, with no error* — two dead DAO methods had exactly this. And **a numeric-looking id must never be parsed**: `id.toLong()` throws on the very ids the retype exists to allow (it did, in two RecyclerView `getItemId` overrides; they hash now).
+- **A migration is only tested if a *file* is opened through Room.** `verify.sh` was green while a committed migration would have crashed on launch: Room validates entity against schema **on open**, and an in-memory database is created fresh at the current version and never migrated. `RoomSchemaTest` does both — in-memory opens for entity consistency, plus a file created at the old schema and opened at the current one, which is the only check that catches a migration disagreeing with its entity. A migration that dropped every track's `parentKey` — orphaning every book from its tracks — passed all 201 other tests. Every migration there is verified by deliberate sabotage; a check that cannot fail proves nothing.
 - **KSP** — build errors in generated code usually mean an annotation problem upstream; don't loop blindly. KSP errors are
   clearer than KAPT's were, but a DataBinding-style opaque failure is gone with DataBinding itself.
 - **401 re-auth covers the server token only** (cu-10). `PlexTokenAuthenticator` on the media

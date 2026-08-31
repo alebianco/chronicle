@@ -142,7 +142,7 @@ class Navigator
     }
 
     fun showDetails(
-      audiobookId: Int,
+      audiobookId: String,
       audiobookTitle: String,
       isAudiobookCached: Boolean,
     ) {
@@ -151,7 +151,7 @@ class Navigator
           if (arguments == null) {
             arguments = Bundle()
           }
-          requireArguments().putInt(ARG_AUDIOBOOK_ID, audiobookId)
+          requireArguments().putString(ARG_AUDIOBOOK_ID, audiobookId)
           requireArguments().putString(ARG_AUDIOBOOK_TITLE, audiobookTitle)
           requireArguments().putBoolean(ARG_IS_AUDIOBOOK_CACHED, isAudiobookCached)
         }
@@ -161,7 +161,7 @@ class Navigator
         .commit()
     }
 
-    fun showCollectionDetails(collectionId: Int) {
+    fun showCollectionDetails(collectionId: String) {
       val collectionDetails = CollectionDetailsFragment.newInstance(collectionId)
       fragmentManager.beginTransaction()
         .replace(R.id.fragNavHost, collectionDetails)

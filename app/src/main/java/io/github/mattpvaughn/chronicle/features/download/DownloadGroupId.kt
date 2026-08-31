@@ -48,3 +48,36 @@ fun requestCodeFor(
   prefix: Int,
   bookId: String,
 ): Int = prefix + downloadGroupId(bookId)
+
+/**
+ * Key under which a download request carries its book id in Fetch2's `Extras`.
+ *
+ * [downloadGroupId] is one-way — a hash cannot be reversed — but Fetch2's listeners hand back an
+ * `Int` groupId and the app needs the real book id to update the database. So the id travels with
+ * the request and comes back verbatim (cu-71).
+ */
+const val EXTRA_BOOK_ID = "chronicle.bookId"
+
+/**
+ * The book id a download was enqueued for, or null if the request predates [EXTRA_BOOK_ID].
+ *
+ * Returns null rather than guessing for downloads enqueued by an older version: those have no
+ * extras, and inventing an id would update the wrong book's cached status.
+ */
+fun com.tonyodev.fetch2.Download.bookIdOrNull(): String? = extras.getString(EXTRA_BOOK_ID, "").ifEmpty { null }
+
+/**
+ * Groups downloads by the book they belong to, dropping any that predate [EXTRA_BOOK_ID].
+ *
+ * Replaces `groupBy { it.group }`. Fetch2's group is [downloadGroupId]'s output — a hash, so it
+ * cannot be turned back into a book id, and two ids could in principle share one. Reading the id
+ * the request carried avoids both problems.
+ *
+ * Downloads enqueued by a version before cu-71 have no extras. They are dropped rather than
+ * attributed to a guessed id: the consequence of a wrong guess is marking the wrong book
+ * downloaded, and a dropped one is picked up by the next cache scan
+ * (`CachedFileManager.refreshCachedFileStatus`) instead.
+ */
+fun List<com.tonyodev.fetch2.Download>.groupByBookId(): Map<String, List<com.tonyodev.fetch2.Download>> =
+  mapNotNull { download -> download.bookIdOrNull()?.let { it to download } }
+    .groupBy({ it.first }, { it.second })

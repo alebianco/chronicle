@@ -35,7 +35,7 @@ interface IBookRepository {
 
   /** Updates the book with information regarding the tracks contained within the book */
   suspend fun updateTrackData(
-    bookId: Int,
+    bookId: String,
     bookProgress: Long,
     bookDuration: Long,
     trackCount: Int,
@@ -45,9 +45,9 @@ interface IBookRepository {
    * Returns a [LiveData<Audiobook>] corresponding to an [Audiobook] with the [Audiobook.id]
    * equal to [id]
    */
-  fun getAudiobook(id: Int): LiveData<Audiobook?>
+  fun getAudiobook(id: String): LiveData<Audiobook?>
 
-  suspend fun getAudiobookAsync(bookId: Int): Audiobook?
+  suspend fun getAudiobookAsync(bookId: String): Audiobook?
 
   /**
    * Returns the [getBookCount] most recently added books in the local database, ordered by most
@@ -74,7 +74,7 @@ interface IBookRepository {
    * [progress], respectively for a book with id [bookId]
    */
   suspend fun updateProgress(
-    bookId: Int,
+    bookId: String,
     currentTime: Long,
     progress: Long,
   )
@@ -132,17 +132,17 @@ interface IBookRepository {
    * by [Audiobook.id] == [bookId]
    */
   suspend fun updateCachedStatus(
-    bookId: Int,
+    bookId: String,
     isCached: Boolean,
   )
 
   /** Sets the book's [Audiobook.progress] to 0 in the DB and the server */
-  suspend fun setWatched(bookId: Int)
+  suspend fun setWatched(bookId: String)
 
-  suspend fun setUnwatched(bookId: Int)
+  suspend fun setUnwatched(bookId: String)
 
   /** Loads an [Audiobook] in from the network */
-  suspend fun fetchBookAsync(bookId: Int): Audiobook?
+  suspend fun fetchBookAsync(bookId: String): Audiobook?
 
   suspend fun refreshDataPaginated()
 }
@@ -214,7 +214,7 @@ class BookRepository
 
       Timber.i("Removed from network: ${removedFromNetwork.map { it.title }}")
       withContext(dispatchers.io) {
-        val removed = bookDao.removeAll(removedFromNetwork.map { it.id.toString() })
+        val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
         Timber.i("Removed $removed items from DB")
 
         Timber.i("Loaded books: $mergedBooks")
@@ -276,7 +276,7 @@ class BookRepository
 
       Timber.i("Removed from network: ${removedFromNetwork.map { it.title }}")
       withContext(dispatchers.io) {
-        val removed = bookDao.removeAll(removedFromNetwork.map { it.id.toString() })
+        val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
         Timber.i("Removed $removed items from DB")
 
         Timber.i("Loaded books: $mergedBooks")
@@ -291,7 +291,7 @@ class BookRepository
     }
 
     override suspend fun updateTrackData(
-      bookId: Int,
+      bookId: String,
       bookProgress: Long,
       bookDuration: Long,
       trackCount: Int,
@@ -301,7 +301,7 @@ class BookRepository
       }
     }
 
-    override fun getAudiobook(id: Int): LiveData<Audiobook?> {
+    override fun getAudiobook(id: String): LiveData<Audiobook?> {
       return bookDao.getAudiobook(id, prefsRepo.offlineMode)
     }
 
@@ -326,7 +326,7 @@ class BookRepository
     }
 
     override suspend fun updateProgress(
-      bookId: Int,
+      bookId: String,
       currentTime: Long,
       progress: Long,
     ) {
@@ -353,7 +353,7 @@ class BookRepository
     }
 
     override suspend fun updateCachedStatus(
-      bookId: Int,
+      bookId: String,
       isCached: Boolean,
     ) {
       withContext(dispatchers.io) {
@@ -368,10 +368,10 @@ class BookRepository
       }
     }
 
-    override suspend fun setWatched(bookId: Int) {
+    override suspend fun setWatched(bookId: String) {
       withContext(dispatchers.io) {
         try {
-          plexMediaService.watched(bookId.toString())
+          plexMediaService.watched(bookId)
           bookDao.setWatched(bookId)
           bookDao.resetBookProgress(bookId)
         } catch (t: Throwable) {
@@ -380,10 +380,10 @@ class BookRepository
       }
     }
 
-    override suspend fun setUnwatched(bookId: Int) {
+    override suspend fun setUnwatched(bookId: String) {
       withContext(dispatchers.io) {
         try {
-          plexMediaService.unwatched(bookId.toString())
+          plexMediaService.unwatched(bookId)
           bookDao.setUnwatched(bookId)
         } catch (t: Throwable) {
           Timber.e("Failed to update watched status: $t")
@@ -395,7 +395,7 @@ class BookRepository
       return bookDao.getMostRecent() ?: EMPTY_AUDIOBOOK
     }
 
-    override suspend fun getAudiobookAsync(bookId: Int): Audiobook? {
+    override suspend fun getAudiobookAsync(bookId: String): Audiobook? {
       return withContext(dispatchers.io) {
         bookDao.getAudiobookAsync(bookId)
       }
@@ -454,7 +454,7 @@ class BookRepository
               // If no chapters for this track, make a chapter from the current track
               networkChapters?.map { plexChapter ->
                 plexChapter.toChapter(
-                  track.id.toLong(),
+                  track.id,
                   track.discNumber,
                   audiobook.isCached,
                 )
@@ -491,7 +491,7 @@ class BookRepository
       return true
     }
 
-    override suspend fun fetchBookAsync(bookId: Int): Audiobook? =
+    override suspend fun fetchBookAsync(bookId: String): Audiobook? =
       withContext(dispatchers.io) {
         plexMediaService.retrieveAlbum(bookId)
           .plexMediaContainer

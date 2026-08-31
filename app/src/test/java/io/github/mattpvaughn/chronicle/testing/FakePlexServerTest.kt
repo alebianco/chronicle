@@ -50,7 +50,7 @@ class FakePlexServerTest {
   @Test
   fun `retrieveTracksForAlbum returns tracks for that album`() =
     runBlocking {
-      val tracks = service.retrieveTracksForAlbum(1001).plexMediaContainer.asTrackList()
+      val tracks = service.retrieveTracksForAlbum("1001").plexMediaContainer.asTrackList()
 
       assertEquals(3, tracks.size)
       assertEquals("An Unexpected Party", tracks.first().title)
@@ -63,12 +63,12 @@ class FakePlexServerTest {
       // If the dispatcher got that ordering wrong, both would return the same
       // body and every sync test built on this would be meaningless.
       val books = service.retrieveAllAlbums("1").plexMediaContainer.asAudiobooks()
-      val tracks = service.retrieveTracksForAlbum(1001).plexMediaContainer.asTrackList()
+      val tracks = service.retrieveTracksForAlbum("1001").plexMediaContainer.asTrackList()
 
       assertTrue(books.isNotEmpty())
       assertTrue(tracks.isNotEmpty())
-      assertEquals("The Hobbit", books.first { it.id == 1001 }.title)
-      assertEquals(1001, tracks.first().parentKey)
+      assertEquals("The Hobbit", books.first { it.id == "1001" }.title)
+      assertEquals("1001", tracks.first().parentKey)
     }
 
   @Test

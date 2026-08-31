@@ -202,7 +202,7 @@ class CurrentlyPlayingFragment : Fragment() {
       ChapterListAdapter(
         object : TrackClickListener {
           override fun onClick(chapter: Chapter) {
-            viewModel.jumpToChapter(chapter.startTimeOffset, chapter.trackId.toInt())
+            viewModel.jumpToChapter(chapter.startTimeOffset, chapter.trackId)
           }
         },
       )

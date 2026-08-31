@@ -15,13 +15,13 @@ data class PlexChapter(
 )
 
 fun PlexChapter.toChapter(
-  trackId: Long,
+  trackId: String,
   trackDiscNumber: Int,
   downloaded: Boolean,
 ): Chapter {
   return Chapter(
     title = tag.takeIf { it.isNotEmpty() } ?: "Chapter $index",
-    id = id,
+    id = id.toString(),
     index = index,
     discNumber = discNumber.takeIf { it != 0 } ?: trackDiscNumber,
     startTimeOffset = startTimeOffset,

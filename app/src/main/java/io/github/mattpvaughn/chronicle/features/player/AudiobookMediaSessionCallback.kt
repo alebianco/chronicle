@@ -26,7 +26,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.getMediaItemUri
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTIVE_TRACK
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
@@ -96,9 +95,9 @@ class AudiobookMediaSessionCallback
               mostRecentlyPlayed
             }
           if (playWhenReady) {
-            onPlayFromMediaId(bookToPlay.id.toString(), null)
+            onPlayFromMediaId(bookToPlay.id, null)
           } else {
-            onPrepareFromMediaId(bookToPlay.id.toString(), null)
+            onPrepareFromMediaId(bookToPlay.id, null)
           }
         }
         return
@@ -106,7 +105,7 @@ class AudiobookMediaSessionCallback
       serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
         val matchingBooks = bookRepository.searchAsync(query)
         if (matchingBooks.isNotEmpty()) {
-          val result = matchingBooks.first().id.toString()
+          val result = matchingBooks.first().id
           if (playWhenReady) {
             onPlayFromMediaId(result, null)
           } else {
@@ -270,9 +269,10 @@ class AudiobookMediaSessionCallback
       extras: Bundle,
       playWhenReady: Boolean,
     ) {
-      // The [MediaItemTrack.id] of the track to be played, either a unique non-negative ID from
-      // the DB, or default to ACTIVE_TRACK, the most recently listened track in [bookId]
-      val startingTrackId = extras.getLong(KEY_SEEK_TO_TRACK_WITH_ID, ACTIVE_TRACK)
+      // The [MediaItemTrack.id] of the track to be played, or null to resume the most recently
+      // listened track in [bookId]. Absence of the key replaces the old ACTIVE_TRACK sentinel:
+      // ids are Strings now (cu-71), and "no id supplied" is what the sentinel always meant.
+      val startingTrackId = extras.getString(KEY_SEEK_TO_TRACK_WITH_ID)
 
       // [startTimeOffsetMillis] is an offset in milliseconds from start of the track where
       // [MediaItemTrack.id] == [startingTrackId] from the local repo
@@ -282,11 +282,11 @@ class AudiobookMediaSessionCallback
       val startTimeOffsetMillis =
         extras.getLong(KEY_START_TIME_TRACK_OFFSET, USE_SAVED_TRACK_PROGRESS)
 
-      check(bookId != EMPTY_AUDIOBOOK.id.toString()) { "Attempted to play empty audiobook" }
+      check(bookId != EMPTY_AUDIOBOOK.id) { "Attempted to play empty audiobook" }
 
       if (BuildConfig.DEBUG) {
         val debugTrackIdString =
-          if (startingTrackId == ACTIVE_TRACK) "ACTIVE_TRACK" else startingTrackId
+          startingTrackId ?: "ACTIVE_TRACK"
         val readableOffset =
           startTimeOffsetMillis.takeIf { it != USE_SAVED_TRACK_PROGRESS }
             ?: "USE_SAVED_TRACK_PROGRESS"
@@ -297,7 +297,7 @@ class AudiobookMediaSessionCallback
       serviceScope.launch {
         val tracks =
           withContext(Dispatchers.IO) {
-            trackRepository.getTracksForAudiobookAsync(bookId.toInt())
+            trackRepository.getTracksForAudiobookAsync(bookId)
           }
         if (tracks.isEmpty()) {
           handlePlayBookWithNoTracks(bookId, tracks, extras, playWhenReady)
@@ -310,26 +310,22 @@ class AudiobookMediaSessionCallback
         val metadataList = buildPlaylist(tracks, plexConfig)
 
         val queueItems =
-          metadataList.zip(tracks).map { (metadata, track) ->
-            MediaSessionCompat.QueueItem(
-              metadata.fullDescription,
-              track.id.toLong(),
-            )
+          metadataList.zip(tracks).mapIndexed { index, (metadata, _) ->
+            // The queue id is a session-local handle, not a media id — MediaSessionCompat
+            // requires a Long and track ids are Strings now. The position in the queue is
+            // unique and stable for as long as the queue is set, which is all it must be.
+            MediaSessionCompat.QueueItem(metadata.fullDescription, index.toLong())
           }
         mediaSession.setQueue(queueItems)
 
-        check(
-          startingTrackId != ACTIVE_TRACK || startingTrackId.toInt() !in
-            tracks.map {
-              it.id
-            },
-        ) { "Track not found! " }
-
+        // The removed `check` here asserted the opposite of its message: for an explicit id it
+        // required the track *not* to be in the list, and for ACTIVE_TRACK it short-circuited to
+        // true. The checkNotNull below is what actually catches a missing track.
         val startingTrack =
-          if (startingTrackId == ACTIVE_TRACK) {
+          if (startingTrackId == null) {
             tracks.getActiveTrack()
           } else {
-            tracks.find { it.id == startingTrackId.toInt() }
+            tracks.find { it.id == startingTrackId }
           }
 
         checkNotNull(startingTrack) { "No starting track provided for $startingTrackId" }
@@ -347,7 +343,7 @@ class AudiobookMediaSessionCallback
 
         val book =
           withContext(Dispatchers.IO) {
-            return@withContext bookRepository.getAudiobookAsync(bookId.toInt())
+            return@withContext bookRepository.getAudiobookAsync(bookId)
           }
         if (book == null || book.id == NO_AUDIOBOOK_FOUND_ID) {
           // Return if no book found- no reason to setup playback if there's no book
@@ -429,16 +425,16 @@ class AudiobookMediaSessionCallback
       // Tracks haven't been loaded by UI for this track, so load it here
       val networkTracks =
         withContext(Dispatchers.IO) {
-          trackRepository.loadTracksForAudiobook(bookId.toInt())
+          trackRepository.loadTracksForAudiobook(bookId)
         }
       if (networkTracks.isOk) {
         bookRepository.updateTrackData(
-          bookId.toInt(),
+          bookId,
           networkTracks.value.getProgress(),
           networkTracks.value.getDuration(),
           networkTracks.value.size,
         )
-        val audiobook = bookRepository.getAudiobookAsync(bookId.toInt())
+        val audiobook = bookRepository.getAudiobookAsync(bookId)
         if (audiobook != null) {
           bookRepository.syncAudiobook(audiobook, tracks)
         }
@@ -481,9 +477,9 @@ class AudiobookMediaSessionCallback
                 return@launch
               }
               if (playWhenReady) {
-                onPlayFromMediaId(mostRecentBook.id.toString(), null)
+                onPlayFromMediaId(mostRecentBook.id, null)
               } else {
-                onPrepareFromMediaId(mostRecentBook.id.toString(), null)
+                onPrepareFromMediaId(mostRecentBook.id, null)
               }
             }
           }

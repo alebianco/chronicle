@@ -26,7 +26,6 @@ import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.player.*
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTIVE_TRACK
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
@@ -168,9 +167,9 @@ class CurrentlyPlayingViewModel(
   val showModalBottomSheetSpeedChooser: LiveData<Event<Unit>>
     get() = _showModalBottomSheetSpeedChooser
 
-  val activeTrackId: LiveData<Int> =
+  val activeTrackId: LiveData<String> =
     mediaServiceConnection.nowPlaying.map { metadata ->
-      metadata.takeIf { !it.id.isNullOrEmpty() }?.id?.toInt() ?: TRACK_NOT_FOUND
+      metadata.takeIf { !it.id.isNullOrEmpty() }?.id ?: TRACK_NOT_FOUND
     }
 
   val currentTrack: LiveData<MediaItemTrack> =
@@ -349,11 +348,11 @@ class CurrentlyPlayingViewModel(
   private val playbackObserver =
     Observer<MediaMetadataCompat> { metadata ->
       if (metadata.id?.isEmpty() == false) {
-        setAudiobook(metadata.id!!.toInt())
+        setAudiobook(metadata.id!!)
       }
     }
 
-  private fun setAudiobook(trackId: Int) {
+  private fun setAudiobook(trackId: String) {
     val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
     viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
       // only update [audiobookId] when we see a new audiobook
@@ -372,7 +371,7 @@ class CurrentlyPlayingViewModel(
     prefsRepo.registerPrefsListener(prefsChangeListener)
   }
 
-  private fun refreshTracks(bookId: Int) {
+  private fun refreshTracks(bookId: String) {
     if (bookId == NO_AUDIOBOOK_FOUND_ID) {
       return
     }
@@ -412,9 +411,10 @@ class CurrentlyPlayingViewModel(
         return
       }
       pausePlay(
-        bookId = audiobook.value!!.id.toString(),
-        trackId = ACTIVE_TRACK,
-        startTimeOffset = ACTIVE_TRACK,
+        bookId = audiobook.value!!.id,
+        // Neither a track id nor an offset is supplied: resume where the book left off.
+        // This used to pass ACTIVE_TRACK — a *track id* sentinel — as startTimeOffset,
+        // which is not a time at all.
         forcePlay = false,
       )
     }
@@ -424,14 +424,15 @@ class CurrentlyPlayingViewModel(
     bookId: String,
     startTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
     forcePlay: Boolean = false,
-    trackId: Long = ACTIVE_TRACK,
+    trackId: String? = null,
   ) {
     val transportControls = mediaServiceConnection.transportControls
 
     val extras =
       Bundle().apply {
         putLong(KEY_START_TIME_TRACK_OFFSET, startTimeOffset)
-        putLong(KEY_SEEK_TO_TRACK_WITH_ID, trackId)
+        // Only written when a specific track was asked for; absence means "resume active".
+        trackId?.let { putString(KEY_SEEK_TO_TRACK_WITH_ID, it) }
       }
     if (transportControls != null) {
       mediaServiceConnection.playbackState.value?.let { playbackState ->
@@ -576,7 +577,7 @@ class CurrentlyPlayingViewModel(
   /** Jumps to a given track with [MediaItemTrack.id] == [trackId] */
   fun jumpToChapter(
     startTimeOffset: Long = 0,
-    trackId: Int = TRACK_NOT_FOUND,
+    trackId: String = TRACK_NOT_FOUND,
     hasUserConfirmation: Boolean = false,
   ) {
     if (!hasUserConfirmation) {
@@ -609,9 +610,9 @@ class CurrentlyPlayingViewModel(
     val jumpToChapterAction = {
       audiobook.value?.let { book ->
         pausePlay(
-          book.id.toString(),
+          book.id,
           startTimeOffset = startTimeOffset,
-          trackId = trackId.toLong(),
+          trackId = trackId,
           forcePlay = true,
         )
       }
@@ -818,7 +819,7 @@ class CurrentlyPlayingViewModel(
       currentTrack.value?.let { curr ->
         val extras =
           Bundle().apply {
-            putLong(KEY_SEEK_TO_TRACK_WITH_ID, curr.id.toLong())
+            putString(KEY_SEEK_TO_TRACK_WITH_ID, curr.id)
           }
         mediaServiceConnection.transportControls?.playFromMediaId(id, extras)
       }

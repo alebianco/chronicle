@@ -48,8 +48,11 @@ class AudiobookAdapter(
 
   private var serverConnected: Boolean = false
 
+  // RecyclerView requires a Long, so a String id is hashed rather than parsed: `toLong()`
+  // throws NumberFormatException on exactly the non-numeric ids cu-71 exists to allow.
+  // A stable-id collision only costs an animation, not correctness.
   override fun getItemId(position: Int): Long {
-    return getItem(position).id.toLong()
+    return getItem(position).id.hashCode().toLong()
   }
 
   override fun getItemViewType(position: Int): Int {

@@ -8,12 +8,15 @@ import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.toBitmap
 import com.tonyodev.fetch2.Request
+import com.tonyodev.fetch2core.Extras
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionResult.Failure
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionResult.Success
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
+import io.github.mattpvaughn.chronicle.features.download.EXTRA_BOOK_ID
+import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
 import io.github.mattpvaughn.chronicle.util.toUri
 import kotlinx.coroutines.*
 import timber.log.Timber
@@ -133,7 +136,7 @@ class PlexConfig
 
     fun makeDownloadRequest(
       trackSource: String,
-      uniqueBookId: Int,
+      bookId: String,
       bookTitle: String,
       downloadLoc: String,
     ): Request {
@@ -142,7 +145,11 @@ class PlexConfig
       val remoteUri = "${toServerString(trackSource)}?download=1"
       return Request(remoteUri, downloadLoc).apply {
         tag = bookTitle
-        groupId = uniqueBookId
+        // Fetch2's grouping API is Int-only, so the book id is hashed for the group id — and
+        // carried verbatim in extras, because the listeners get a groupId back and need the real
+        // id to update the database. A hash cannot be reversed (cu-71).
+        groupId = downloadGroupId(bookId)
+        extras = Extras(mapOf(EXTRA_BOOK_ID to bookId))
         addHeader("X-Plex-Token", token)
       }
     }

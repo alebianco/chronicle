@@ -29,10 +29,10 @@ import javax.inject.Inject
 @ExperimentalCoroutinesApi
 class CollectionDetailsFragment : Fragment() {
   companion object {
-    fun newInstance(collectionId: Int): CollectionDetailsFragment {
+    fun newInstance(collectionId: String): CollectionDetailsFragment {
       val newFrag = CollectionDetailsFragment()
       val args = Bundle()
-      args.putInt(ARG_COLLECTION_ID, collectionId)
+      args.putString(ARG_COLLECTION_ID, collectionId)
       newFrag.arguments = args
       return newFrag
     }
@@ -75,7 +75,7 @@ class CollectionDetailsFragment : Fragment() {
 
     val binding = FragmentCollectionDetailsBinding.inflate(inflater, container, false)
 
-    val inputId = requireArguments().getInt(ARG_COLLECTION_ID)
+    val inputId = requireArguments().getString(ARG_COLLECTION_ID)
 
     viewModelFactory.collectionId = inputId
     viewModel =

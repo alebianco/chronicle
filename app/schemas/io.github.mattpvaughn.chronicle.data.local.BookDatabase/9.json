@@ -2,16 +2,16 @@
   "formatVersion": 1,
   "database": {
     "version": 9,
-    "identityHash": "e56ce20744845be53da3e1b9af625a0a",
+    "identityHash": "f6eaa21e2cc4822b5ae97cd981b32180",
     "entities": [
       {
         "tableName": "Audiobook",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` INTEGER NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `chapters` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `chapters` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -47,7 +47,7 @@
           {
             "fieldPath": "parentId",
             "columnName": "parentId",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -145,7 +145,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e56ce20744845be53da3e1b9af625a0a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f6eaa21e2cc4822b5ae97cd981b32180')"
     ]
   }
 }

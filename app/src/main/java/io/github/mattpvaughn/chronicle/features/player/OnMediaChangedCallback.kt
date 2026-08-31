@@ -46,7 +46,7 @@ class OnMediaChangedCallback
       mediaController.playbackState?.let { state ->
         serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
           withContext(Dispatchers.IO) {
-            val trackId = metadata?.id?.toInt() ?: TRACK_NOT_FOUND
+            val trackId = metadata?.id ?: TRACK_NOT_FOUND
             if (trackId == TRACK_NOT_FOUND) {
               return@withContext
             }

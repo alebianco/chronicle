@@ -22,7 +22,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.*
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTIVE_TRACK
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
@@ -123,7 +122,7 @@ class AudiobookDetailsViewModel(
     DoubleLiveData(
       cachedFileManager.activeBookDownloads,
       audiobook,
-    ) { activeDownloadIDs: Set<Int>?, _audiobook: Audiobook? ->
+    ) { activeDownloadIDs: Set<String>?, _audiobook: Audiobook? ->
       Timber.i("Active downloads: $activeDownloadIDs")
       return@DoubleLiveData when {
         _audiobook?.isCached == true -> CACHED
@@ -299,7 +298,7 @@ class AudiobookDetailsViewModel(
    * Refresh details for the current audiobook. Mostly important because we want to refresh the
    * progress in the audiobook is there has been new playback
    */
-  private fun loadBookDetails(bookId: Int) {
+  private fun loadBookDetails(bookId: String) {
     Timber.i("Refreshing tracks!")
     viewModelScope.launch {
       try {
@@ -387,8 +386,7 @@ class AudiobookDetailsViewModel(
 
     val pausePlayAction = {
       pausePlay(
-        bookId = inputAudiobook.id.toString(),
-        trackId = ACTIVE_TRACK,
+        bookId = inputAudiobook.id,
         startTimeOffset = USE_SAVED_TRACK_PROGRESS,
         forcePlayFromMediaId = false,
       )
@@ -407,8 +405,8 @@ class AudiobookDetailsViewModel(
    * Assume that [mediaServiceConnection] has connected
    *
    * Play behavior: start/resume playback from [startTimeOffset] milliseconds from the start of
-   * the book. [startTimeOffset] == [ACTIVE_TRACK] indicates that playback should be resumed from
-   * the most recent playback location
+   * the book. A null [trackId] indicates that playback should be resumed from the most recent
+   * playback location
    *
    * [forcePlayFromMediaId] == true indicates to ignore playback state and play the book from the
    * given [trackId] and [startTimeOffset] provided, otherwise pause/play/resume depending on
@@ -417,7 +415,7 @@ class AudiobookDetailsViewModel(
   private fun pausePlay(
     bookId: String,
     startTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
-    trackId: Long = ACTIVE_TRACK,
+    trackId: String? = null,
     forcePlayFromMediaId: Boolean = false,
   ) {
     if (mediaServiceConnection.isConnected.value != true) {
@@ -431,7 +429,8 @@ class AudiobookDetailsViewModel(
     val extras =
       Bundle().apply {
         putLong(KEY_START_TIME_TRACK_OFFSET, startTimeOffset)
-        putLong(KEY_SEEK_TO_TRACK_WITH_ID, trackId)
+        // Only written when a specific track was asked for; absence means "resume active".
+        trackId?.let { putString(KEY_SEEK_TO_TRACK_WITH_ID, it) }
       }
     Timber.i(
       "is this book playing? ${isBookInViewPlaying.value}, this this book active? ${isBookInViewActive.value}",
@@ -456,7 +455,7 @@ class AudiobookDetailsViewModel(
       } else {
         Timber.i("Currently playing is $currentlyPlayingTrackId")
         tracks.value?.let { trackList ->
-          trackList.any { it.id == currentlyPlayingTrackId.toInt() }
+          trackList.any { it.id == currentlyPlayingTrackId }
         } ?: false
       }
 
@@ -464,7 +463,7 @@ class AudiobookDetailsViewModel(
       if (!currentlyPlayingTrackId.isNullOrEmpty()) {
         mediaServiceConnection.playbackState.value?.let { state ->
           progressUpdater.updateProgress(
-            currentlyPlayingTrackId.toInt(),
+            currentlyPlayingTrackId,
             PLEX_STATE_STOPPED,
             state.currentPlayBackPosition,
             true,
@@ -477,7 +476,7 @@ class AudiobookDetailsViewModel(
   /** Jumps to a chapter starting [offset] milliseconds into the audiobook */
   fun jumpToChapter(
     offset: Long = 0,
-    trackId: Long = TRACK_NOT_FOUND.toLong(),
+    trackId: String = TRACK_NOT_FOUND,
     hasUserConfirmation: Boolean = false,
   ) {
     if (!hasUserConfirmation) {
@@ -504,7 +503,7 @@ class AudiobookDetailsViewModel(
 
     val jumpToChapterAction = {
       audiobook.value?.let { book ->
-        pausePlay(book.id.toString(), offset, trackId, forcePlayFromMediaId = true)
+        pausePlay(book.id, offset, trackId, forcePlayFromMediaId = true)
       }
     }
     if (mediaServiceConnection.isConnected.value != true) {

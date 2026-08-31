@@ -23,8 +23,8 @@ import java.io.IOException
  */
 class ProgressReporter(
   private val api: ProgressApi,
-  private val lookupTrack: suspend (Int) -> MediaItemTrack?,
-  private val lookupBookDuration: suspend (Int) -> Long,
+  private val lookupTrack: suspend (String) -> MediaItemTrack?,
+  private val lookupBookDuration: suspend (String) -> Long,
 ) {
   /** What the caller should tell WorkManager. */
   enum class Outcome {
@@ -38,7 +38,7 @@ class ProgressReporter(
   }
 
   data class Request(
-    val trackId: Int,
+    val trackId: String,
     val playbackState: String,
     val trackProgress: Long,
     val bookProgress: Long,
@@ -59,7 +59,7 @@ class ProgressReporter(
 
     return try {
       api.reportProgress(
-        ratingKey = track.id.toString(),
+        ratingKey = track.id,
         offset = request.trackProgress.toString(),
         key = "${MediaItemTrack.PARENT_KEY_PREFIX}${track.id}",
         // Plex marks an item finished at 90% of whatever duration it is told, so
@@ -100,14 +100,14 @@ class ProgressReporter(
    */
   private suspend fun markFinishedIfNeeded(
     track: MediaItemTrack,
-    bookId: Int,
+    bookId: String,
     request: Request,
   ) {
     val hasUserEndedPlayback =
       request.playbackState == PLEX_STATE_STOPPED || request.playbackState == PLEX_STATE_PAUSED
 
     if (request.trackProgress > track.duration - TRACK_FINISHED_WINDOW_MILLIS) {
-      runCatching { api.markWatched(track.id.toString()) }
+      runCatching { api.markWatched(track.id) }
         .onFailure { Timber.e(it, "Failed to mark track ${track.id} watched") }
     }
 
@@ -115,7 +115,7 @@ class ProgressReporter(
 
     val bookDuration = lookupBookDuration(bookId)
     if (bookDuration - request.bookProgress < BOOK_FINISHED_END_OFFSET_MILLIS) {
-      runCatching { api.markWatched(bookId.toString()) }
+      runCatching { api.markWatched(bookId) }
         .onFailure { Timber.e(it, "Failed to mark book $bookId watched") }
     }
   }

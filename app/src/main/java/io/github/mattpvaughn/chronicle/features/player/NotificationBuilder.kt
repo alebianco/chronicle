@@ -154,7 +154,7 @@ class NotificationBuilder
         )
     }
 
-    var bookTitleBitmapPair: Pair<Int, Bitmap?>? = null
+    var bookTitleBitmapPair: Pair<String, Bitmap?>? = null
 
     private var currentNotificationMetadata =
       NotificationData(
@@ -165,9 +165,9 @@ class NotificationBuilder
       )
 
     private data class NotificationData(
-      private val bookId: Int,
-      private val trackId: Int,
-      private val chapterId: Long,
+      private val bookId: String,
+      private val trackId: String,
+      private val chapterId: String,
       private val playbackState: Int,
     )
 

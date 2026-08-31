@@ -20,8 +20,8 @@ import kotlin.math.roundToInt
 @Entity
 data class MediaItemTrack(
   @PrimaryKey
-  val id: Int = TRACK_NOT_FOUND,
-  val parentKey: Int = -1,
+  val id: String = TRACK_NOT_FOUND,
+  val parentKey: String = "-1",
   val title: String = "",
   val playQueueItemID: Long = -1,
   val thumb: String? = null,
@@ -45,7 +45,7 @@ data class MediaItemTrack(
   companion object {
     fun from(metadata: MediaMetadataCompat): MediaItemTrack {
       return MediaItemTrack(
-        id = metadata.id?.toInt() ?: -1,
+        id = metadata.id ?: "-1",
         title = metadata.title ?: "",
         playQueueItemID = metadata.trackNumber,
         thumb = metadata.artUri.toString(),
@@ -72,9 +72,7 @@ data class MediaItemTrack(
      */
     val cachedFilePattern = Regex("""\d+\.[^.]+""")
 
-    fun getTrackIdFromFileName(fileName: String): Int {
-      return fileName.substringBefore('.').toInt()
-    }
+    fun getTrackIdFromFileName(fileName: String): String = fileName.substringBefore('.')
 
     /**
      * Merges updated local fields with a network copy of the book. Prefers network metadata,
@@ -101,8 +99,8 @@ data class MediaItemTrack(
     /** Create a [MediaItemTrack] from a Plex model and an index */
     fun fromPlexModel(networkTrack: PlexDirectory): MediaItemTrack {
       return MediaItemTrack(
-        id = networkTrack.ratingKey.toInt(),
-        parentKey = networkTrack.parentRatingKey,
+        id = networkTrack.ratingKey,
+        parentKey = networkTrack.parentRatingKey.toString(),
         title = networkTrack.title,
         artist = networkTrack.grandparentTitle,
         thumb = networkTrack.thumb,
@@ -227,7 +225,7 @@ fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
 /** Converts the metadata of a [MediaItemTrack] to a [MediaMetadataCompat]. */
 fun MediaItemTrack.toMediaMetadata(plexConfig: PlexConfig): MediaMetadataCompat {
   val metadataBuilder = MediaMetadataCompat.Builder()
-  metadataBuilder.id = this.id.toString()
+  metadataBuilder.id = this.id
   metadataBuilder.title = this.title
   metadataBuilder.displayTitle = this.album
   metadataBuilder.displaySubtitle = this.artist
@@ -255,20 +253,14 @@ fun List<MediaItemTrack>.asChapterList(): List<Chapter> {
 fun MediaItemTrack.asChapter(startOffset: Long): Chapter {
   return Chapter(
     title = title,
-    id = id.toLong(),
+    id = id,
     index = index.toLong(),
     discNumber = discNumber,
     startTimeOffset = startOffset,
     endTimeOffset = duration,
     downloaded = cached,
-    trackId = id.toLong(),
+    trackId = id,
   )
-}
-
-// Produces an ID unique to a track and source
-// TODO: after merging multiple sources branch: make this a hash of source and track id
-fun MediaItemTrack.uniqueId(): Int {
-  return id
 }
 
 val EMPTY_TRACK = MediaItemTrack(id = TRACK_NOT_FOUND)

@@ -15,7 +15,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 @Entity
 data class Collection(
   @PrimaryKey
-  val id: Int,
+  val id: String,
   /** Unique long representing a [MediaSource] in [SourceManager] */
   val source: Long,
   val title: String,
@@ -23,12 +23,12 @@ data class Collection(
   val sortType: SortType = SortType.RELEASE_DATE,
   val isCached: Boolean = false,
   val thumb: String = "",
-  val childIds: List<Long> = emptyList(),
+  val childIds: List<String> = emptyList(),
 ) {
   companion object {
     fun from(dir: PlexDirectory) =
       Collection(
-        id = dir.ratingKey.toInt(),
+        id = dir.ratingKey,
         source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX,
         title = dir.title,
         childCount = dir.childCount,
@@ -64,18 +64,19 @@ class CollectionIdConverter {
   private val stringType = Types.newParameterizedType(List::class.java, String::class.java)
   private val stringsAdapter = Injector.get().moshi().adapter<List<String>>(stringType)
 
+  // The stored form is unchanged by cu-71: this always serialized a JSON array of strings
+  // and only converted to Long in Kotlin. Dropping that conversion removes a lossy step —
+  // `toLong()` would throw on a non-numeric child id.
   @TypeConverter
-  fun fromList(value: List<Long>): String {
-    return stringsAdapter.toJson(value.map { it.toString() })
+  fun fromList(value: List<String>): String {
+    return stringsAdapter.toJson(value)
   }
 
   @TypeConverter
-  fun toList(value: String): List<Long> {
+  fun toList(value: String): List<String> {
     if (value.isEmpty()) {
       return emptyList()
     }
-    return stringsAdapter.fromJson(value)
-      ?.map { it.toLong() }
-      ?: emptyList()
+    return stringsAdapter.fromJson(value) ?: emptyList()
   }
 }

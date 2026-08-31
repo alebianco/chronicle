@@ -9,7 +9,7 @@ import org.junit.Test
  * Which files in the download directory are treated as cached tracks.
  *
  * The pattern was `\d*\..+`, and `\d*` matches **zero** digits — so a dotfile or any
- * `.something` matched, and `getTrackIdFromFileName` then called `"".toInt()` and threw. The
+ * `.something` matched, and `getTrackIdFromFileName` then returned an empty id. The
  * scan runs over a user-writable directory (`MoveSyncLocationWorker` moves files between SD
  * card and internal storage), so a stray file is not hypothetical.
  */
@@ -22,7 +22,7 @@ class CachedFilePatternTest {
 
   @Test
   fun `the track id is recovered from the name`() {
-    assertEquals(3001, MediaItemTrack.getTrackIdFromFileName("3001.mp3"))
+    assertEquals("3001", MediaItemTrack.getTrackIdFromFileName("3001.mp3"))
   }
 
   @Test

@@ -48,7 +48,7 @@ class PlexSyncScrobbleWorker(
 
     val request =
       ProgressReporter.Request(
-        trackId = inputData.requireInt(TRACK_ID_ARG),
+        trackId = inputData.requireId(TRACK_ID_ARG),
         playbackState = inputData.requireString(TRACK_STATE_ARG),
         trackProgress = inputData.requireLong(TRACK_POSITION_ARG),
         bookProgress = inputData.requireLong(BOOK_PROGRESS),
@@ -69,7 +69,7 @@ class PlexSyncScrobbleWorker(
     const val BOOK_PROGRESS = "Book progress"
 
     fun makeWorkerData(
-      trackId: Int,
+      trackId: String,
       playbackState: String,
       trackProgress: Long,
       bookProgress: Long,
@@ -84,11 +84,6 @@ class PlexSyncScrobbleWorker(
     }
   }
 
-  private fun Data.requireInt(key: String): Int {
-    require(hasKeyWithValueOfType<Int>(key))
-    return getInt(key, -1)
-  }
-
   private fun Data.requireLong(key: String): Long {
     require(hasKeyWithValueOfType<Long>(key))
     return getLong(key, -1L)
@@ -98,4 +93,20 @@ class PlexSyncScrobbleWorker(
     require(hasKeyWithValueOfType<String>(key))
     return getString(key) ?: ""
   }
+
+  /**
+   * Reads an id that [makeWorkerData] now writes as a `String`.
+   *
+   * A work request enqueued by a version before cu-71 stored it as an `Int`, and WorkManager
+   * persists pending requests across an app upgrade. [requireString] would throw on those, and an
+   * exception out of `doWork` is an uncaught crash — so the `Int` form is still accepted. Losing
+   * one report would be harmless (the next playback tick re-sends the position, and the work is
+   * unique per track), but crashing on upgrade is not.
+   */
+  private fun Data.requireId(key: String): String =
+    when {
+      hasKeyWithValueOfType<String>(key) -> getString(key) ?: ""
+      hasKeyWithValueOfType<Int>(key) -> getInt(key, -1).toString()
+      else -> throw IllegalArgumentException("no id under $key")
+    }
 }

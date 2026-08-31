@@ -45,7 +45,7 @@ class PlexFixtureContractTest {
 
     assertEquals(3, books.size)
     val hobbit = books.first { it.title == "The Hobbit" }
-    assertEquals(1001, hobbit.id)
+    assertEquals("1001", hobbit.id)
     assertEquals("J R R Tolkien", hobbit.author)
     assertEquals("Hobbit, The", hobbit.titleSort)
     assertEquals(1937, hobbit.year)
@@ -73,8 +73,8 @@ class PlexFixtureContractTest {
 
     assertEquals(3, tracks.size)
     val first = tracks.first()
-    assertEquals(2001, first.id)
-    assertEquals(1001, first.parentKey)
+    assertEquals("2001", first.id)
+    assertEquals("1001", first.parentKey)
     assertEquals("An Unexpected Party", first.title)
     assertEquals("listening progress survives deserialization", 1500L, first.progress)
     assertEquals(5000L, first.duration)
@@ -94,7 +94,7 @@ class PlexFixtureContractTest {
     val directory = container("track-with-chapters.json").plexMediaContainer.metadata.single()
     val chapters =
       directory.plexChapters.map {
-        it.toChapter(trackId = 2001L, trackDiscNumber = 1, downloaded = false)
+        it.toChapter(trackId = "2001", trackDiscNumber = 1, downloaded = false)
       }
 
     assertEquals(3, chapters.size)

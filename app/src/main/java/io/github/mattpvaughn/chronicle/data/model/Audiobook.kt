@@ -21,14 +21,14 @@ import kotlin.time.Duration.Companion.seconds
 @Entity
 data class Audiobook(
   @PrimaryKey
-  val id: Int,
+  val id: String,
   /** Unique long representing a [MediaSource] in [SourceManager] */
   val source: Long,
   val title: String = "",
   val titleSort: String = "",
   val author: String = "",
   val thumb: String = "",
-  val parentId: Int = -1,
+  val parentId: String = "-1",
   val genre: String = "",
   val summary: String = "",
   val year: Int = 0,
@@ -56,13 +56,13 @@ data class Audiobook(
   companion object {
     fun from(dir: PlexDirectory) =
       Audiobook(
-        id = dir.ratingKey.toInt(),
+        id = dir.ratingKey,
         source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX,
         title = dir.title,
         titleSort = dir.titleSort.takeIf { it.isNotEmpty() } ?: dir.title,
         author = dir.parentTitle,
         thumb = dir.thumb,
-        parentId = dir.parentRatingKey,
+        parentId = dir.parentRatingKey.toString(),
         // joinToString on the data class itself yields "PlexGenre(tag=Fantasy)";
         // this field reaches MediaMetadataCompat, so Android Auto and the media
         // notification would show that literal string (found via cu-16 fixtures).
@@ -150,7 +150,7 @@ data class Audiobook(
 
 fun Audiobook.toAlbumMediaMetadata(): MediaMetadataCompat {
   val metadataBuilder = MediaMetadataCompat.Builder()
-  metadataBuilder.id = this.id.toString()
+  metadataBuilder.id = this.id
   metadataBuilder.title = this.title
   metadataBuilder.displayTitle = this.title
   metadataBuilder.albumArtUri = this.thumb
@@ -168,7 +168,7 @@ fun Audiobook.toAlbumMediaMetadata(): MediaMetadataCompat {
 fun Audiobook.toMediaItem(plexConfig: PlexConfig): MediaBrowserCompat.MediaItem {
   val mediaDescription = MediaDescriptionCompat.Builder()
   mediaDescription.setTitle(title)
-  mediaDescription.setMediaId(id.toString())
+  mediaDescription.setMediaId(id)
   mediaDescription.setSubtitle(author)
   mediaDescription.setIconUri(plexConfig.makeThumbUri(this.thumb))
   val extras = Bundle()
@@ -190,10 +190,13 @@ fun Audiobook.isCompleted(): Boolean {
   return progress < 10.seconds.inWholeMilliseconds || progress > (duration - 2.minutes.inWholeMilliseconds)
 }
 
-fun Audiobook.uniqueId(): Int {
-  return (source * id).toInt()
-}
-
-const val NO_AUDIOBOOK_FOUND_ID = -22321
+/**
+ * The id of "no book".
+ *
+ * The *textual* form of the old numeric sentinel, deliberately: a `Chapter.bookId` written before
+ * the cu-71 retype migrates to the string "-22321", so changing this to "" would orphan every
+ * chapter that had no book.
+ */
+const val NO_AUDIOBOOK_FOUND_ID = "-22321"
 const val NO_AUDIOBOOK_FOUND_TITLE = "No audiobook found"
 val EMPTY_AUDIOBOOK = Audiobook(NO_AUDIOBOOK_FOUND_ID, NO_SOURCE_FOUND, NO_AUDIOBOOK_FOUND_TITLE)

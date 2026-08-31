@@ -56,19 +56,19 @@ interface PlexMediaService {
 
   @GET("/library/metadata/{trackId}")
   suspend fun retrieveChapterInfo(
-    @Path("trackId") trackId: Int,
+    @Path("trackId") trackId: String,
     @Query("includeChapters") includeChapters: Int = 1,
   ): PlexMediaContainerWrapper
 
   @GET("/library/metadata/{albumId}")
   suspend fun retrieveAlbum(
-    @Path("albumId") albumId: Int,
+    @Path("albumId") albumId: String,
     @Query("includeChapters") includeChapters: Int = 1,
   ): PlexMediaContainerWrapper
 
   @GET("/library/metadata/{albumId}/children")
   suspend fun retrieveTracksForAlbum(
-    @Path("albumId") albumId: Int,
+    @Path("albumId") albumId: String,
   ): PlexMediaContainerWrapper
 
   @GET("/library/sections")
@@ -151,6 +151,6 @@ interface PlexMediaService {
 
   @GET("/library/collections/{collectionId}/children")
   suspend fun fetchBooksInCollection(
-    @Path("collectionId") collectionId: Int,
+    @Path("collectionId") collectionId: String,
   ): PlexMediaContainerWrapper
 }

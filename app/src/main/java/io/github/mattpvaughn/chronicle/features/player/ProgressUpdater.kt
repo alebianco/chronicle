@@ -43,7 +43,7 @@ interface ProgressUpdater {
    * to pass playback state to server
    */
   fun updateProgress(
-    trackId: Int,
+    trackId: String,
     playbackState: String,
     progress: Long,
     forceNetworkUpdate: Boolean,
@@ -62,7 +62,7 @@ interface ProgressUpdater {
    * is bound to its caller instead, so the write survives the service dying.
    */
   suspend fun updateProgressBlocking(
-    trackId: Int,
+    trackId: String,
     playbackState: String,
     progress: Long,
   )
@@ -120,7 +120,7 @@ class SimpleProgressUpdater
         if (controller.playbackState?.isPlaying != false) {
           serviceScope.launch(context = serviceScope.coroutineContext + dispatchers.io) {
             updateProgress(
-              controller.metadata?.id?.toInt() ?: TRACK_NOT_FOUND,
+              controller.metadata?.id ?: TRACK_NOT_FOUND,
               MediaPlayerService.PLEX_STATE_PLAYING,
               controller.playbackState?.currentPlayBackPosition ?: 0L,
               false,
@@ -140,7 +140,7 @@ class SimpleProgressUpdater
           PlaybackStateCompat.STATE_STOPPED -> MediaPlayerService.PLEX_STATE_PAUSED
           else -> ""
         }
-      val currentTrack = controller.metadata.id?.toInt() ?: return
+      val currentTrack = controller.metadata.id ?: return
       val currentTrackProgress = controller.playbackState.currentPlayBackPosition
       updateProgress(
         currentTrack,
@@ -151,7 +151,7 @@ class SimpleProgressUpdater
     }
 
     override fun updateProgress(
-      trackId: Int,
+      trackId: String,
       playbackState: String,
       progress: Long,
       forceNetworkUpdate: Boolean,
@@ -165,7 +165,7 @@ class SimpleProgressUpdater
     }
 
     override suspend fun updateProgressBlocking(
-      trackId: Int,
+      trackId: String,
       playbackState: String,
       progress: Long,
     ) {
@@ -185,14 +185,14 @@ class SimpleProgressUpdater
      * network report is handed to WorkManager, which survives process death by design.
      */
     private suspend fun writeProgress(
-      trackId: Int,
+      trackId: String,
       playbackState: String,
       progress: Long,
       forceNetworkUpdate: Boolean,
     ) {
       Timber.i("Updating progress")
       val currentTime = System.currentTimeMillis()
-      val bookId: Int = trackRepository.getBookIdForTrack(trackId)
+      val bookId: String = trackRepository.getBookIdForTrack(trackId)
       val track: MediaItemTrack = trackRepository.getTrackAsync(trackId) ?: EMPTY_TRACK
 
       // No reason to update if the track or book doesn't exist in the DB
@@ -238,7 +238,7 @@ class SimpleProgressUpdater
     }
 
     private fun updateNetworkProgress(
-      trackId: Int,
+      trackId: String,
       playbackState: String,
       trackProgress: Long,
       bookProgress: Long,
@@ -267,15 +267,15 @@ class SimpleProgressUpdater
           .build()
 
       workManager
-        .beginUniqueWork(trackId.toString(), ExistingWorkPolicy.REPLACE, worker)
+        .beginUniqueWork(trackId, ExistingWorkPolicy.REPLACE, worker)
         .enqueue()
     }
 
     private suspend fun updateLocalProgress(
-      bookId: Int,
+      bookId: String,
       currentTime: Long,
       trackProgress: Long,
-      trackId: Int,
+      trackId: String,
       bookProgress: Long,
       tracks: List<MediaItemTrack>,
       bookDuration: Long,

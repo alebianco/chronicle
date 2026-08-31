@@ -145,8 +145,8 @@ class ProgressUpdaterTest {
   )
 
   private companion object {
-    const val TRACK_ID = 3001
-    const val BOOK_ID = 1001
+    const val TRACK_ID = "3001"
+    const val BOOK_ID = "1001"
     const val PLEX_SOURCE = 1L
   }
 }

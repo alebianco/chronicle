@@ -60,7 +60,7 @@ class ChapterRepository
             // If no chapters for this track, make a chapter from the current track
             networkChapters?.map { plexChapter ->
               plexChapter.toChapter(
-                track.id.toLong(),
+                track.id,
                 track.discNumber,
                 isAudiobookCached,
               )

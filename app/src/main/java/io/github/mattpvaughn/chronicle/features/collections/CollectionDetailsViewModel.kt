@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class CollectionDetailsViewModel(
-  private val collectionId: Int,
+  private val collectionId: String,
   private val bookRepo: BookRepository,
   private val collectionRepo: CollectionsRepository,
   prefsRepo: PrefsRepo,
@@ -18,7 +18,7 @@ class CollectionDetailsViewModel(
   private suspend fun getBooksInCollection(): List<Audiobook> {
     val childIds = collectionRepo.getChildIds(collectionId)
     return childIds.mapNotNull {
-      bookRepo.getAudiobookAsync(it.toInt())
+      bookRepo.getAudiobookAsync(it)
     }
   }
 
@@ -50,7 +50,7 @@ class CollectionDetailsViewModel(
       private val sharedPreferences: SharedPreferences,
       private val collectionRepo: CollectionsRepository,
     ) : ViewModelProvider.Factory {
-      var collectionId: Int? = null
+      var collectionId: String? = null
 
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CollectionDetailsViewModel::class.java)) {

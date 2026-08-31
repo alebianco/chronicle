@@ -9,9 +9,9 @@ import org.junit.Test
 class TrackListStateManagerTest {
   val exampleTrackList =
     listOf(
-      MediaItemTrack(1, progress = 0, duration = 50, lastViewedAt = 1),
-      MediaItemTrack(2, progress = 25, duration = 50, lastViewedAt = 3),
-      MediaItemTrack(3, progress = 0, duration = 50, lastViewedAt = 0),
+      MediaItemTrack("1", progress = 0, duration = 50, lastViewedAt = 1),
+      MediaItemTrack("2", progress = 25, duration = 50, lastViewedAt = 3),
+      MediaItemTrack("3", progress = 0, duration = 50, lastViewedAt = 0),
     )
 
   val manager = TrackListStateManager()

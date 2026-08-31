@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTIVE_TRACK
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
@@ -83,8 +81,14 @@ object DebugHooks : DebugHooksContract {
     intent: Intent?,
     mediaServiceConnection: MediaServiceConnection,
   ) {
-    val bookId = intent?.takeIf { it.hasExtra(EXTRA_PLAY_BOOK) }?.getLongExtra(EXTRA_PLAY_BOOK, -1L)
-    if (bookId == null || bookId <= 0L) {
+    // Accepts both `--el play_book 123` (the documented form, kept working) and
+    // `--es play_book <id>`, since ids are Strings now and need not be numeric (cu-71).
+    val bookId =
+      intent?.takeIf { it.hasExtra(EXTRA_PLAY_BOOK) }?.let { source ->
+        source.getStringExtra(EXTRA_PLAY_BOOK)
+          ?: source.getLongExtra(EXTRA_PLAY_BOOK, -1L).takeIf { it > 0L }?.toString()
+      }
+    if (bookId.isNullOrEmpty()) {
       return
     }
     val controls = mediaServiceConnection.transportControls
@@ -94,10 +98,10 @@ object DebugHooks : DebugHooksContract {
     }
     Timber.i("play_book: starting playback of book $bookId")
     controls.playFromMediaId(
-      bookId.toString(),
+      bookId,
+      // No KEY_SEEK_TO_TRACK_WITH_ID: absence resumes the most recently listened track.
       Bundle().apply {
         putLong(KEY_START_TIME_TRACK_OFFSET, USE_SAVED_TRACK_PROGRESS)
-        putLong(KEY_SEEK_TO_TRACK_WITH_ID, ACTIVE_TRACK)
       },
     )
   }

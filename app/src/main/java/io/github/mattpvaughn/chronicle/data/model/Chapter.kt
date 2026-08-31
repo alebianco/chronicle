@@ -11,7 +11,7 @@ import timber.log.Timber
 data class Chapter(
   val title: String = "",
   @PrimaryKey
-  val id: Long = 0L,
+  val id: String = "0",
   val index: Long = 0L,
   val discNumber: Int = 1,
   // The number of milliseconds from the start of the containing track and the start of the chapter
@@ -19,8 +19,8 @@ data class Chapter(
   // The number of milliseconds between the start of the containing track and the end of the chapter
   val endTimeOffset: Long = 0L,
   val downloaded: Boolean = false,
-  val trackId: Long = TRACK_NOT_FOUND.toLong(),
-  val bookId: Long = NO_AUDIOBOOK_FOUND_ID.toLong(),
+  val trackId: String = TRACK_NOT_FOUND,
+  val bookId: String = NO_AUDIOBOOK_FOUND_ID,
 ) : Comparable<Chapter> {
   val durationStr: String
     get() =
@@ -50,7 +50,7 @@ val EMPTY_CHAPTER = Chapter("")
  * this chapter), or [EMPTY_TRACK] if there is no chapter
  */
 fun List<Chapter>.getChapterAt(
-  trackId: Long,
+  trackId: String,
   timeStamp: Long,
 ): Chapter {
   for (chapter in this) {
@@ -97,11 +97,11 @@ class ChapterListConverter {
     val split = record.split(FIELD_SEPARATOR)
     val discNumber = if (split.size >= 6) split[5].toInt() else 1
     val downloaded = if (split.size >= 7) split[6].toBoolean() else false
-    val trackId = if (split.size >= 8) split[7].toLong() else TRACK_NOT_FOUND.toLong()
-    val bookId = if (split.size >= 9) split[8].toLong() else NO_AUDIOBOOK_FOUND_ID.toLong()
+    val trackId = if (split.size >= 8) split[7] else TRACK_NOT_FOUND
+    val bookId = if (split.size >= 9) split[8] else NO_AUDIOBOOK_FOUND_ID
     return Chapter(
       title = split[0].unescapeSeparators(),
-      id = split[1].toLong(),
+      id = split[1],
       index = split[2].toLong(),
       startTimeOffset = split[3].toLong(),
       endTimeOffset = split[4].toLong(),

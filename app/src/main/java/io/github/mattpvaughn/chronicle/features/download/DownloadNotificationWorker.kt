@@ -75,7 +75,7 @@ class DownloadNotificationWorker(
       while (hasActiveDownloads || System.currentTimeMillis() - startedTimeStamp < maxWaitToStartDurationMs) {
         fetch.getDownloads { allDownloads ->
           val activeBooks =
-            allDownloads.groupBy { it.group }
+            allDownloads.groupByBookId()
               .filter { (_, trackDownloads) ->
                 trackDownloads.any { it.status in activeDownloadStatuses }
               }
@@ -93,15 +93,17 @@ class DownloadNotificationWorker(
         CoroutineScope(workerContext).launch {
           withContext(Dispatchers.IO) {
             // Mark successful downloads as cached
-            val successfulGroupIds =
-              downloads.groupBy { it.group }
-                .filter { group ->
-                  group.value.all { it.status == Status.COMPLETED }
-                }
+            // Grouped by the book id the request carries in its extras, not by Fetch2's
+            // Int group: downloadGroupId is a hash and cannot be reversed, so the group
+            // alone no longer identifies a book (cu-71). A download enqueued before this
+            // change has no extras and is skipped rather than attributed to a guess.
+            val successfulBookIds =
+              downloads.groupByBookId()
+                .filter { (_, group) -> group.all { it.status == Status.COMPLETED } }
                 .map { it.key }
-            successfulGroupIds.forEach { groupId ->
-              Timber.i("Book download success for ($groupId)")
-              bookRepository.updateCachedStatus(groupId, true)
+            successfulBookIds.forEach { bookId ->
+              Timber.i("Book download success for ($bookId)")
+              bookRepository.updateCachedStatus(bookId, true)
             }
 
             // Show notifications for finished/failed downloads, then remove them from Fetch
@@ -118,7 +120,7 @@ class DownloadNotificationWorker(
    * downloads if they wish to
    */
   private fun showDownloadsCompleteNotification(downloads: List<Download>) {
-    val bookDownloads = downloads.groupBy { it.group }
+    val bookDownloads = downloads.groupByBookId()
     Timber.i("Downloads: $bookDownloads")
     val bookStatuses =
       bookDownloads.map { bookDownload ->
@@ -168,13 +170,14 @@ class DownloadNotificationWorker(
 
     // Remove all downloads from download manager after completion
     for ((bookId, _) in bookDownloads) {
-      fetch.removeGroup(bookId)
+      // Back to Fetch2's Int group, which is the direction downloadGroupId works in.
+      fetch.removeGroup(downloadGroupId(bookId))
     }
   }
 
   internal data class DownloadResult(
     val bookName: String,
-    val bookId: Int,
+    val bookId: String,
     val status: Status,
     val errors: List<String>,
   )
@@ -322,7 +325,7 @@ class DownloadNotificationWorker(
     return builder.build()
   }
 
-  private fun updateNotifications(bookDownloadGroups: Map<Int, List<Download>>) {
+  private fun updateNotifications(bookDownloadGroups: Map<String, List<Download>>) {
     if (bookDownloadGroups.isEmpty()) {
       return
     }
@@ -348,7 +351,7 @@ class DownloadNotificationWorker(
   }
 
   private fun showDownloadNotifications(
-    downloadNotifications: List<Pair<Int, Notification>>,
+    downloadNotifications: List<Pair<String, Notification>>,
     summaryNotification: Notification,
   ) {
     val size = downloadNotifications.size
@@ -362,7 +365,9 @@ class DownloadNotificationWorker(
       size >= 2 -> {
         showNotificationForeground(summaryNotification, DOWNLOAD_NOTIF_SUMMARY_ID)
         downloadNotifications.forEach { (bookId, notification) ->
-          notificationManager.notify(bookId, notification)
+          // A notification id must be an Int; downloadGroupId gives a stable one per book,
+          // so a book's progress notification keeps replacing itself rather than stacking.
+          notificationManager.notify(downloadGroupId(bookId), notification)
         }
       }
     }
@@ -382,7 +387,7 @@ class DownloadNotificationWorker(
     )
   }
 
-  private fun makeActiveDownloadsSummary(bookGroups: Map<Int, List<Download>>): Notification {
+  private fun makeActiveDownloadsSummary(bookGroups: Map<String, List<Download>>): Notification {
     // Show up to 5 downloads on legacy devices
     val downloadsToShow =
       bookGroups.toList().sortedBy { (_, b) ->
@@ -426,7 +431,7 @@ class DownloadNotificationWorker(
 
   /** Creates a [Notification] for a book download */
   private fun createDownloadNotificationForBook(
-    bookId: Int,
+    bookId: String,
     bookTitle: String,
     avgCompletion: Int,
     showInGroup: Boolean,
@@ -441,7 +446,7 @@ class DownloadNotificationWorker(
     val cancelPendingIntent =
       PendingIntent.getBroadcast(
         applicationContext,
-        ACTION_CANCEL_BOOK_DOWNLOAD_ID + bookId,
+        requestCodeFor(ACTION_CANCEL_BOOK_DOWNLOAD_ID, bookId),
         Intent(ACTION_CANCEL_BOOK_DOWNLOAD).apply {
           putExtra(KEY_BOOK_ID, bookId)
         },
@@ -462,7 +467,7 @@ class DownloadNotificationWorker(
       .build()
   }
 
-  private fun makeOpenBookPendingIntent(bookId: Int): PendingIntent? {
+  private fun makeOpenBookPendingIntent(bookId: String): PendingIntent? {
     val intent = Intent()
     val activity =
       applicationContext.packageManager.getPackageInfo(
@@ -474,7 +479,7 @@ class DownloadNotificationWorker(
     intent.component = ComponentName(applicationContext.packageName, activity?.name ?: "")
     return PendingIntent.getActivity(
       applicationContext,
-      REQUEST_CODE_PREFIX_OPEN_ACTIVITY_TO_AUDIOBOOK_WITH_ID + bookId,
+      requestCodeFor(REQUEST_CODE_PREFIX_OPEN_ACTIVITY_TO_AUDIOBOOK_WITH_ID, bookId),
       intent,
       PendingIntent.FLAG_IMMUTABLE,
     )

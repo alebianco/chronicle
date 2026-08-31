@@ -22,6 +22,8 @@ import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.model.isCompleteDownload
 import io.github.mattpvaughn.chronicle.features.download.DownloadNotificationWorker
 import io.github.mattpvaughn.chronicle.features.download.FetchGroupStartFinishListener
+import io.github.mattpvaughn.chronicle.features.download.bookIdOrNull
+import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -34,20 +36,20 @@ import javax.inject.Inject
 interface ICachedFileManager {
   enum class CacheStatus { CACHED, CACHING, NOT_CACHED }
 
-  val activeBookDownloads: LiveData<Set<Int>>
+  val activeBookDownloads: LiveData<Set<String>>
 
   fun cancelCaching()
 
-  fun cancelGroup(id: Int)
+  fun cancelGroup(id: String)
 
   fun downloadTracks(
-    bookId: Int,
+    bookId: String,
     bookTitle: String,
   )
 
   suspend fun uncacheAllInLibrary(): Int
 
-  suspend fun deleteCachedBook(bookId: Int)
+  suspend fun deleteCachedBook(bookId: String)
 
   suspend fun hasUserCachedTracks(): Boolean
 
@@ -100,14 +102,10 @@ class CachedFileManager
               Injector.get().fetch()
                 .cancelAll()
             DownloadNotificationWorker.ACTION_CANCEL_BOOK_DOWNLOAD -> {
-              val bookId =
-                intent.getIntExtra(
-                  DownloadNotificationWorker.KEY_BOOK_ID,
-                  -1,
-                )
-              if (bookId != -1) {
+              val bookId = intent.getStringExtra(DownloadNotificationWorker.KEY_BOOK_ID)
+              if (!bookId.isNullOrEmpty()) {
                 Timber.i("Cancelling book: $bookId")
-                Injector.get().fetch().cancelGroup(bookId)
+                Injector.get().fetch().cancelGroup(downloadGroupId(bookId))
               }
             }
           }
@@ -127,8 +125,8 @@ class CachedFileManager
       }
     }
 
-    override fun cancelGroup(id: Int) {
-      fetch.cancelGroup(id)
+    override fun cancelGroup(id: String) {
+      fetch.cancelGroup(downloadGroupId(id))
     }
 
     override fun cancelCaching() {
@@ -142,7 +140,7 @@ class CachedFileManager
     }
 
     override fun downloadTracks(
-      bookId: Int,
+      bookId: String,
       bookTitle: String,
     ) {
       // Add downloads to Fetch
@@ -172,7 +170,7 @@ class CachedFileManager
      * @return the number of files to be downloaded
      */
     private suspend fun makeRequests(
-      bookId: Int,
+      bookId: String,
       bookTitle: String,
     ): List<Request> {
       // Gets all tracks for album id
@@ -220,7 +218,7 @@ class CachedFileManager
     /** Create a [Request] for a track download with the proper metadata */
     private fun makeTrackDownloadRequest(
       track: MediaItemTrack,
-      bookId: Int,
+      bookId: String,
       bookTitle: String,
       dest: String,
     ) = plexConfig.makeDownloadRequest(track.media, bookId, bookTitle, dest)
@@ -259,9 +257,9 @@ class CachedFileManager
      * Return [Result.success] on successful deletion of all files or [Result.failure] if the
      * deletion of any files fail
      */
-    override suspend fun deleteCachedBook(bookId: Int) {
+    override suspend fun deleteCachedBook(bookId: String) {
       Timber.i("Deleting downloaded book: $bookId")
-      fetch.deleteGroup(bookId)
+      fetch.deleteGroup(downloadGroupId(bookId))
       externalScope.launch {
         withContext(dispatchers.io) {
           val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
@@ -278,28 +276,34 @@ class CachedFileManager
 
     /** Set of [Audiobook.id] representing all books being actively downloaded */
     private var activeDownloads =
-      object : SimpleSet<Int> {
-        private val internalSet = mutableSetOf<Int>()
+      object : SimpleSet<String> {
+        private val internalSet = mutableSetOf<String>()
         override val size: Int
           get() = internalSet.size
 
-        override fun add(elem: Int): Boolean {
-          _activeBookDownloads.postValue(internalSet)
-          return internalSet.add(elem)
+        // Posts a copy *after* mutating. Both of these used to post the mutable set itself
+        // before the change landed, so an observer saw the previous contents — and because
+        // LiveData compares by reference, posting the same instance twice can be coalesced
+        // away entirely, leaving the download indicator stale.
+        override fun add(elem: String): Boolean {
+          val changed = internalSet.add(elem)
+          _activeBookDownloads.postValue(internalSet.toSet())
+          return changed
         }
 
-        override fun remove(elem: Int): Boolean {
-          _activeBookDownloads.postValue(internalSet)
-          return internalSet.remove(elem)
+        override fun remove(elem: String): Boolean {
+          val changed = internalSet.remove(elem)
+          _activeBookDownloads.postValue(internalSet.toSet())
+          return changed
         }
 
         override fun toString() = internalSet.toString()
 
-        override operator fun contains(elem: Int) = internalSet.contains(elem)
+        override operator fun contains(elem: String) = internalSet.contains(elem)
       }
 
-    private val _activeBookDownloads = MutableLiveData<Set<Int>>()
-    override val activeBookDownloads: LiveData<Set<Int>>
+    private val _activeBookDownloads = MutableLiveData<Set<String>>()
+    override val activeBookDownloads: LiveData<Set<String>>
       get() = _activeBookDownloads
 
     init {
@@ -319,10 +323,17 @@ class CachedFileManager
             groupId: Int,
             fetchGroup: FetchGroup,
           ) {
-            if (groupId !in activeDownloads) {
-              Timber.i("Starting downloading book with id: $groupId")
+            // The listener only receives Fetch2's Int group, which downloadGroupId hashed from
+            // the book id and cannot invert — so read the id back off any download in the group.
+            val bookId = fetchGroup.downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
+            if (bookId == null) {
+              Timber.i("Download group $groupId started with no book id in its extras")
+              return
             }
-            activeDownloads.add(groupId)
+            if (bookId !in activeDownloads) {
+              Timber.i("Starting downloading book with id: $bookId")
+            }
+            activeDownloads.add(bookId)
           }
 
           override fun onStarted(
@@ -345,16 +356,24 @@ class CachedFileManager
             )
             val downloads = fetchGroup.downloads
             Timber.i(downloads.joinToString { it.status.toString() })
-            activeDownloads.remove(groupId)
+            downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
+              ?.let { activeDownloads.remove(it) }
             val downloadSuccess =
               downloads.all { it.error == Error.NONE } && downloads.isNotEmpty()
-            if (downloadSuccess) {
+            // Fetch2 reports an Int groupId, which is a hash of the book id and cannot be
+            // reversed — so the id is read back from the extras it was enqueued with (cu-71).
+            // A download from an older version has none; skipping is right, because guessing
+            // would mark the wrong book as downloaded.
+            val bookId = downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
+            if (downloadSuccess && bookId != null) {
               externalScope.launch {
                 withContext(dispatchers.io) {
-                  Timber.i("Book download success for ($groupId)")
-                  bookRepository.updateCachedStatus(groupId, true)
+                  Timber.i("Book download success for $bookId (group $groupId)")
+                  bookRepository.updateCachedStatus(bookId, true)
                 }
               }
+            } else if (downloadSuccess) {
+              Timber.w("Download group $groupId finished with no book id in its extras")
             }
           }
         },
@@ -368,7 +387,7 @@ class CachedFileManager
      * for downloaded files which no longer exist on the file system
      */
     override suspend fun refreshTrackDownloadedStatus() {
-      val idToFileMap = HashMap<Int, File>()
+      val idToFileMap = HashMap<String, File>()
       val filesOnDisk =
         prefsRepo.cachedMediaDir.listFiles(
           FileFilter {
@@ -396,7 +415,7 @@ class CachedFileManager
 
       val reportedCachedKeys = trackRepository.getCachedTracks().map { it.id }
 
-      val alteredTracks = mutableListOf<Int>()
+      val alteredTracks = mutableListOf<String>()
 
       // Exists in DB but not in cache- remove from DB!
       reportedCachedKeys.filter {
@@ -425,7 +444,7 @@ class CachedFileManager
       // Update cached status for the books containing any added/removed tracks
       alteredTracks.map {
         trackRepository.getBookIdForTrack(it)
-      }.distinct().forEach { bookId: Int ->
+      }.distinct().forEach { bookId: String ->
         Timber.i("Book: $bookId")
         if (bookId == NO_AUDIOBOOK_FOUND_ID) {
           return@forEach

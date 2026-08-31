@@ -27,8 +27,8 @@ import java.io.IOException
 class ProgressReporterTest {
   private val track =
     MediaItemTrack(
-      id = 3001,
-      parentKey = 1001,
+      id = "3001",
+      parentKey = "1001",
       title = "Track 1",
       duration = 5_000L,
       index = 1,
@@ -130,7 +130,7 @@ class ProgressReporterTest {
   private companion object {
     val REQUEST =
       ProgressReporter.Request(
-        trackId = 3001,
+        trackId = "3001",
         playbackState = PLEX_STATE_PAUSED,
         trackProgress = 2_000L,
         bookProgress = 2_000L,

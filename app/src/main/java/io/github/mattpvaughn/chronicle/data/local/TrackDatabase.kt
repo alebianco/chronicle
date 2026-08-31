@@ -19,13 +19,38 @@ fun getTrackDatabase(context: Context): TrackDatabase {
           context.applicationContext,
           TrackDatabase::class.java,
           TRACK_DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+        ).addMigrations(*TRACK_MIGRATIONS).build()
     }
   }
   return INSTANCE
 }
 
-@Database(entities = [MediaItemTrack::class], version = 4, exportSchema = true)
+/**
+ * Retypes `id` and `parentKey` to TEXT. `parentKey` is a book id, so it converts in step with Audiobook (cu-71).
+ *
+ * A table rebuild because SQLite cannot alter a column type or a primary key. The column list comes
+ * from the exported v4 schema, which is the authority — a column omitted here is dropped with
+ * no error at all.
+ */
+val MIGRATION_4_5 =
+  object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.rebuildTableWithTextIds(
+        table = "MediaItemTrack",
+        createNewTableSql =
+          "CREATE TABLE IF NOT EXISTS `MediaItemTrack_new` (`id` TEXT NOT NULL, `parentKey` TEXT NOT NULL, `title` TEXT NOT NULL, `playQueueItemID` INTEGER NOT NULL, `thumb` TEXT, `index` INTEGER NOT NULL, `discNumber` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `media` TEXT NOT NULL, `album` TEXT NOT NULL, `artist` TEXT NOT NULL, `genre` TEXT NOT NULL, `cached` INTEGER NOT NULL, `artwork` TEXT, `viewCount` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `size` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        columns =
+          listOf(
+            "id", "parentKey", "title", "playQueueItemID", "thumb", "index", "discNumber",
+            "duration", "media", "album", "artist", "genre", "cached", "artwork",
+            "viewCount", "progress", "lastViewedAt", "updatedAt", "size",
+          ),
+        textColumns = setOf("id", "parentKey"),
+      )
+    }
+  }
+
+@Database(entities = [MediaItemTrack::class], version = 5, exportSchema = true)
 abstract class TrackDatabase : RoomDatabase() {
   abstract val trackDao: TrackDao
 }
@@ -72,13 +97,13 @@ interface TrackDao {
   fun update(track: MediaItemTrack)
 
   @Query("SELECT * FROM MediaItemTrack WHERE id = :id LIMIT 1")
-  suspend fun getTrackAsync(id: Int): MediaItemTrack?
+  suspend fun getTrackAsync(id: String): MediaItemTrack?
 
   @Query(
     "SELECT * FROM MediaItemTrack WHERE parentKey = :bookId AND cached >= :isOfflineMode ORDER BY `discNumber` ASC, `index` ASC",
   )
   fun getTracksForAudiobook(
-    bookId: Int,
+    bookId: String,
     isOfflineMode: Boolean,
   ): LiveData<List<MediaItemTrack>>
 
@@ -86,19 +111,19 @@ interface TrackDao {
     "SELECT * FROM MediaItemTrack WHERE parentKey = :id AND cached >= :offlineModeActive ORDER BY `discNumber` ASC, `index` ASC",
   )
   suspend fun getTracksForAudiobookAsync(
-    id: Int,
+    id: String,
     offlineModeActive: Boolean,
   ): List<MediaItemTrack>
 
   @Query("SELECT COUNT(*) FROM MediaItemTrack WHERE parentKey = :bookId")
-  suspend fun getTrackCountForAudiobookAsync(bookId: Int): Int
+  suspend fun getTrackCountForAudiobookAsync(bookId: String): Int
 
   @Query(
     "UPDATE MediaItemTrack SET progress = :trackProgress, lastViewedAt = :lastViewedAt WHERE id = :trackId",
   )
   fun updateProgress(
     trackProgress: Long,
-    trackId: Int,
+    trackId: String,
     lastViewedAt: Long,
   )
 
@@ -107,7 +132,7 @@ interface TrackDao {
 
   @Query("UPDATE MediaItemTrack SET cached = :isCached WHERE id = :trackId")
   fun updateCachedStatus(
-    trackId: Int,
+    trackId: String,
     isCached: Boolean,
   ): Int
 
@@ -116,7 +141,7 @@ interface TrackDao {
 
   @Query("SELECT COUNT(*) FROM MediaItemTrack WHERE cached = :isCached AND parentKey = :bookId")
   suspend fun getCachedTrackCountForBookAsync(
-    bookId: Int,
+    bookId: String,
     isCached: Boolean = true,
   ): Int
 
@@ -126,3 +151,6 @@ interface TrackDao {
   @Query("SELECT * FROM MediaItemTrack WHERE title LIKE :title")
   suspend fun findTrackByTitle(title: String): MediaItemTrack?
 }
+
+/** Every migration, in order. Named so `RoomSchemaTest` runs exactly what production runs. */
+val TRACK_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
