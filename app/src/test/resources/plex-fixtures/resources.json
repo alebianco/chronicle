@@ -6,8 +6,14 @@
     "accessToken": "fixture-access-token",
     "owned": true,
     "connections": [
-      { "uri": "http://10.0.0.42:32400", "local": true },
-      { "uri": "https://fixture-server.plex.direct:32400", "local": false }
+      {
+        "uri": "https://10-0-0-42.fixtureserverhash.plex.direct:32400",
+        "local": true
+      },
+      {
+        "uri": "https://fixture-server.plex.direct:32400",
+        "local": false
+      }
     ]
   },
   {
@@ -16,6 +22,11 @@
     "clientIdentifier": "fixture-player-0000-0000",
     "accessToken": "fixture-access-token",
     "owned": true,
-    "connections": [{ "uri": "http://10.0.0.43:32500", "local": true }]
+    "connections": [
+      {
+        "uri": "https://10-0-0-43.fixtureplayerhash.plex.direct:32500",
+        "local": true
+      }
+    ]
   }
 ]

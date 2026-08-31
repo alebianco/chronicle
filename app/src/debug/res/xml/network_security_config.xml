@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug override of the release config, which refuses cleartext outright.
+
+  Loopback only, and only so the cu-16 mock Plex server (MockWebServer on
+  http://127.0.0.1:<port>) can be driven without credentials. Nothing else is
+  relaxed: a debug build still refuses cleartext to any real host, so the mock
+  cannot mask a genuine plaintext regression.
+
+  Declared explicitly rather than relying on the platform's implicit localhost
+  config, which exists only behind the networkSecurityConfigLocalhost flag and
+  inherits cleartext from base-config when absent — i.e. it would be denied here.
+
+  This file is in src/debug/, so it is never part of a release build.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="false">127.0.0.1</domain>
+    <domain includeSubdomains="false">localhost</domain>
+    <!-- The emulator reaches the host machine at 10.0.2.2. -->
+    <domain includeSubdomains="false">10.0.2.2</domain>
+  </domain-config>
+</network-security-config>

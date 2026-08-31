@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP is refused app-wide. There are no per-domain cleartext exceptions.
+
+  Why no LAN exception, given that self-hosted Plex is often plain http:// on a LAN:
+
+  Plex issues a wildcard certificate for *.plex.direct and publishes DNS that maps a
+  hyphenated-IP subdomain to the address behind it, so a server on 192.168.1.7 is
+  reachable as https://192-168-1-7.<hash>.plex.direct with a valid certificate. HTTPS on
+  the local network is therefore genuinely available, not a compromise — which removes
+  the reason to allow cleartext at all.
+
+  Why an exception could not have been scoped anyway: Android matches <domain> by exact
+  string or dot-boundary suffix (ApplicationConfig.getConfigForHostname). It does not
+  parse CIDR or numeric ranges, so "10.0.0.0/8" is treated as a literal hostname and
+  matches nothing — it would sit in this file looking like a LAN allowance while
+  permitting exactly nothing. LAN addresses are DHCP-assigned and cannot be enumerated
+  at build time, so no correct static list exists.
+
+  Consequence, stated plainly: a server with Secure Connections set to "Disabled" will
+  no longer connect over its LAN address. That is deliberate — the fix is to enable
+  secure connections on the server, which Plex defaults to. See cu-42.
+
+  Loopback is not listed here on purpose. The platform grants localhost its own config
+  (ApplicationConfig.mLocalhostConfig), but only behind the networkSecurityConfigLocalhost
+  flag on recent releases, so the debug override declares 127.0.0.1 explicitly for the
+  mock Plex server rather than depending on it.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

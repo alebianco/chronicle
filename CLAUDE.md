@@ -84,6 +84,15 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.
+- **Cleartext HTTP is refused app-wide** (cu-42). `res/xml/network_security_config.xml` sets
+  `cleartextTrafficPermitted="false"` with **no exceptions**; a debug-only override in
+  `app/src/debug/res/xml/` adds loopback for the mock server. Plex serves LAN connections over
+  HTTPS via its `*.plex.direct` wildcard cert (`https://192-168-1-7.<hash>.plex.direct`), so no LAN
+  exception is needed. **Trap:** `<domain>` matches by exact string or dot-boundary suffix only —
+  it does **not** parse CIDR. `10.0.0.0/8` builds without a warning and matches nothing, so a
+  "LAN allowance" written that way silently permits nothing and breaks LAN connections at runtime.
+  Also note resource shrinking renames the file in release (`res/8G.xml`), so verifying it in an
+  APK by its original path returns empty and proves nothing.
 - **ViewBinding, not DataBinding** (cu-58). Layouts have no `<layout>` wrapper and no `@{...}` expressions; view state is
   set from Kotlin. Two traps when converting or reviewing UI code: a view whose visibility is Kotlin-driven needs
   `android:visibility="gone"` in XML or it flashes its default for a frame; and a binding-adapter-backed type such as
