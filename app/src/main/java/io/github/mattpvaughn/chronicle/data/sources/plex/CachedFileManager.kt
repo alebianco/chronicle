@@ -21,8 +21,8 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.features.download.DownloadNotificationWorker
 import io.github.mattpvaughn.chronicle.features.download.FetchGroupStartFinishListener
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -72,6 +72,8 @@ class CachedFileManager
     private val bookRepository: IBookRepository,
     private val plexConfig: PlexConfig,
     private val applicationContext: Context,
+    private val dispatchers: DispatcherProvider,
+    private val externalScope: CoroutineScope,
   ) : ICachedFileManager {
     private val externalFileDirs = Injector.get().externalDeviceDirs()
 
@@ -109,7 +111,7 @@ class CachedFileManager
     }
 
     override suspend fun hasUserCachedTracks(): Boolean {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         trackRepository.getCachedTracks().isNotEmpty()
       }
     }
@@ -119,7 +121,7 @@ class CachedFileManager
       bookTitle: String,
     ) {
       // Add downloads to Fetch
-      GlobalScope.launch {
+      externalScope.launch {
         fetch.enqueue(makeRequests(bookId, bookTitle)) {
           val errors =
             it.mapNotNull { (_, error) ->
@@ -235,8 +237,8 @@ class CachedFileManager
     override suspend fun deleteCachedBook(bookId: Int) {
       Timber.i("Deleting downloaded book: $bookId")
       fetch.deleteGroup(bookId)
-      GlobalScope.launch {
-        withContext(Dispatchers.IO) {
+      externalScope.launch {
+        withContext(dispatchers.io) {
           val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
           tracks.forEach {
             val trackFile = File(prefsRepo.cachedMediaDir, it.getCachedFileName())
@@ -322,8 +324,8 @@ class CachedFileManager
             val downloadSuccess =
               downloads.all { it.error == Error.NONE } && downloads.isNotEmpty()
             if (downloadSuccess) {
-              GlobalScope.launch {
-                withContext(Dispatchers.IO) {
+              externalScope.launch {
+                withContext(dispatchers.io) {
                   Timber.i("Book download success for ($groupId)")
                   bookRepository.updateCachedStatus(groupId, true)
                 }
