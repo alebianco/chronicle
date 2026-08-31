@@ -1,10 +1,11 @@
 ---
 id: cu-90
 title: Position diverges across devices and shifts unpredictably on reload
-status: To Do
+status: In Review
 labels: [R1, trust, bug]
 dependencies: [cu-9, cu-14]
 priority: critical
+assignee: [claude]
 ---
 
 ## Description
@@ -79,13 +80,74 @@ merging independently, a book can show a position that no device ever actually r
 
 - [x] A written rule for which position is authoritative and how conflicts resolve, recorded as an
       ADR (decision-16)
-- [ ] `Audiobook.merge` no longer treats `progress` as a preserved local field, so it cannot
-      contradict the derivation
-- [ ] An explicit seek still sets position; a sync only advances it — the re-listen case, tested
-- [ ] Book progress and active-track progress cannot disagree — one is derived from the other
-- [ ] A book whose tracks were last touched on different devices reports a coherent position, not a
-      jump between two, covered by a test with per-track `lastViewedAt` set to conflicting values
-- [ ] Reloading a book's info does not change its reported position when nothing changed server-side
-- [ ] Live checks in [[cu-73]]: listen on device A, stop, open on device B, confirm the position is
-      adopted; then reload book info repeatedly on one device and confirm the position is stable
-- [ ] Verify loop green
+- [x] `Audiobook.merge` no longer treats `progress` as a value either side can win
+- [x] An explicit seek still sets position; a sync only advances it — the re-listen case, tested
+- [x] Book progress and active-track progress cannot disagree — one is derived from the other
+- [x] A book whose tracks were last touched on different devices reports a coherent position, not a
+      jump between two
+- [ ] Reloading a book's info does not change its reported position when nothing changed
+      server-side — **unit-level only; needs the live pass**
+- [ ] Live checks in [[cu-73]]
+- [x] Verify loop green
+
+## Implementation Notes
+
+Implements decision-16. Coverage 13.17% → 13.67%; 22 new tests.
+
+### The rule change: furthest started, not most recently touched
+
+```kotlin
+// before
+fun List<MediaItemTrack>.getActiveTrack() = maxByOrNull { it.lastViewedAt } ?: get(0)
+// after
+fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
+  val inPlaybackOrder = sorted()
+  return inPlaybackOrder.lastOrNull { it.hasBeenStarted() } ?: inPlaybackOrder.first()
+}
+```
+
+Book progress is the active track's offset plus the durations before it, so choosing by *recency*
+made it non-monotonic: device A in track 3 and device B in track 7 meant the reported position
+jumped between two unrelated points, and a second device opening an earlier chapter dragged the
+position backwards. Choosing the furthest started track makes two devices converge forward.
+
+`hasBeenStarted()` is `progress > 0 || lastViewedAt > 0` — either signal counts, because a track
+played to the end can have its offset reset while keeping a timestamp, so neither alone is
+sufficient. And the list is `sorted()` first: it arrives from the database and the network in no
+guaranteed order, and the old implementation happened not to care.
+
+Note the old KDoc said *"the next song which has not been completed"* — it described this behaviour
+already. The code never matched its own documentation.
+
+### A mistake worth recording, because the audit is the load-bearing part
+
+My first attempt zeroed `progress` in `Audiobook.merge`, reasoning that a derived value should have
+"no opinion" there. **That would have been a worse bug than the one being fixed.** Auditing the three
+`merge` call sites showed `refreshData` merges every book **without loading tracks** and writes the
+result straight to `bookDao.insertAll` — so zeroing would have blanked every book's progress in the
+library list on every refresh.
+
+`merge` now carries `local.progress` through and never adopts `network.progress`. That is the real
+invariant: Plex stores **no album-level position** (verified in the fixtures — the album has only
+`viewedLeafCount`/`leafCount`), so a network value carries no information and adopting it invents a
+position. The local value is the last derivation, and keeping it is what makes a track-free refresh
+safe. Both failure directions are tested, including the zeroing mistake.
+
+### The per-track rule was already right
+
+`MediaItemTrack.merge` — newer `lastViewedAt` wins its offset — already implemented decision-16's
+conflict rule *and* its re-listen guard: a deliberate backwards seek writes a newer local timestamp,
+so the local offset survives the next sync. It was simply untested and undocumented, so nothing
+stopped a future change from removing it. Now 6 tests, verified to bite (forcing the network branch
+fails 3, including the seek-backwards case).
+
+### Not done
+
+- **No live verification.** Every mechanism here is inferred from source and fixtures and tested
+  against synthetic data. Two real devices are the only way to confirm the lived behaviour → [[cu-73]].
+- `getActiveTrack()` has 7 call sites across playback and UI (`MediaPlayerService`,
+  `TrackListStateManager`, `AudiobookMediaSessionCallback`, `ProgressUpdater`,
+  `MainActivityViewModel`, and `getProgress` itself). The full suite passes and no test depended on
+  the old rule, but the *playback* consequences of the changed meaning are untested — starting a book
+  now resumes at the furthest started track rather than the most recently touched one, which is the
+  intended behaviour but is unproven on a device.

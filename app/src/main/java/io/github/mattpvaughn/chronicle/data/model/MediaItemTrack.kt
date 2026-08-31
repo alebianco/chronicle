@@ -239,12 +239,37 @@ fun List<MediaItemTrack>.getProgressPercentage(): Int {
 }
 
 /**
- * Find the next song in the [List] which has not been completed. Returns the first element
+ * The track the book is currently at: the **furthest started** one, in playback order.
+ *
+ * This used to be `maxByOrNull { it.lastViewedAt }` — the most recently *touched* track — which
+ * makes book position non-monotonic across devices. With device A listening in track 3 and device B
+ * in track 7, the reported position jumped between two unrelated points depending on which
+ * `lastViewedAt` was larger, and a second device opening an earlier chapter dragged the position
+ * backwards. That is the "wildly different positions across devices" report; decision-16 replaced
+ * the rule.
+ *
+ * A track counts as started if it has a non-zero offset or has been viewed. The result is the
+ * *last* such track in playback order, so a run of played-through tracks whose offsets have been
+ * reset to zero does not pull the position back to the start.
+ *
+ * Falls back to the first track in playback order for an untouched book. Ordering comes from
+ * [MediaItemTrack.compareTo] (disc, then index), never from the list's own order, which arrives
+ * from the database and from the network in no guaranteed sequence.
  */
 fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
   check(this.isNotEmpty()) { "Cannot get active track of empty list!" }
-  return maxByOrNull { it.lastViewedAt } ?: get(0)
+  val inPlaybackOrder = sorted()
+  return inPlaybackOrder.lastOrNull { it.hasBeenStarted() } ?: inPlaybackOrder.first()
 }
+
+/**
+ * Whether the listener has reached this track at all.
+ *
+ * `lastViewedAt` alone is not enough: a track played to the end can have its offset reset to 0
+ * while keeping a timestamp. `progress` alone is not enough either, for the same reason. Either
+ * signal means the track has been reached.
+ */
+private fun MediaItemTrack.hasBeenStarted(): Boolean = progress > 0L || lastViewedAt > 0L
 
 /** Converts the metadata of a [MediaItemTrack] to a [MediaMetadataCompat]. */
 fun MediaItemTrack.toMediaMetadata(plexConfig: PlexConfig): MediaMetadataCompat {

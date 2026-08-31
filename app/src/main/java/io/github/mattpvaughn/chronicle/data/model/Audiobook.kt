@@ -87,20 +87,30 @@ data class Audiobook(
      * [lastViewedAt] from the local copy is preferred.
      *
      * Always retain fields from local copy: [duration], [isCached], [favorited], [chapters],
-     * [source]. We retain [chapters], [duration], and [progress] because they can be calculated
-     * only when all child [MediaItemTrack]'s of the Audiobook are loaded. We retain [duration],
-     * [source], and [isCached] because they are explicitly local values, they do not even exist
-     * on the server.
+     * [source]. [chapters] and [duration] are retained because they can be calculated only when
+     * all child [MediaItemTrack]s are loaded; [duration], [source] and [isCached] because they are
+     * local values that do not exist on the server.
+     *
+     * **[progress] is carried from the local copy and never from the network.** Plex stores no
+     * position on an album — only per-track `viewOffset` — so `network.progress` carries no
+     * information. The local value is the most recent derivation from the tracks (decision-16), and
+     * keeping it matters because a library refresh merges *without* loading tracks: zeroing it here
+     * would blank every book's progress in the library list. Recomputation happens where the tracks
+     * are available, in `syncAudiobook`, which is the only writer of a fresh value.
      */
     fun merge(
       network: Audiobook,
       local: Audiobook,
       forceNetwork: Boolean = false,
     ): Audiobook {
+      // progress always comes from the local copy, never the network. Plex stores no position on
+      // an album, so `network.progress` is meaningless here — it is whatever `Audiobook.from`
+      // defaulted. The local value is the last derivation from the tracks (decision-16); keeping it
+      // means a library refresh, which merges without loading tracks, preserves what the user sees.
       return if (network.lastViewedAt > local.lastViewedAt || forceNetwork) {
         network.copy(
-          duration = local.duration,
           progress = local.progress,
+          duration = local.duration,
           isCached = local.isCached,
           favorited = local.favorited,
           chapters = local.chapters,
@@ -108,8 +118,8 @@ data class Audiobook(
         )
       } else {
         network.copy(
-          duration = local.duration,
           progress = local.progress,
+          duration = local.duration,
           source = local.source,
           isCached = local.isCached,
           lastViewedAt = local.lastViewedAt,
