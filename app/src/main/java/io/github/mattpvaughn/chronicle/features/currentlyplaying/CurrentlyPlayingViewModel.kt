@@ -175,6 +175,48 @@ class CurrentlyPlayingViewModel(
   val currentTrack: LiveData<MediaItemTrack> =
     currentlyPlaying.track.asLiveData(viewModelScope.coroutineContext)
 
+  // cachedChapter and activeChapter are declared here, above their first use in chapterDuration
+  // below, and not further down the file. Kotlin initialises properties in declaration order, so a
+  // `get()` alias that resolves to a property declared later reads null during construction — which
+  // crashed MainActivity on launch with "Parameter specified as non-null is null" from
+  // Transformations.map. Nothing in the unit suite constructs this ViewModel, so only the app
+  // caught it (cu-87).
+  private val cachedChapter =
+    DoubleLiveData(
+      chapters,
+      tracks,
+    ) { _chapters: List<Chapter>?, _tracks: List<MediaItemTrack>? ->
+      Timber.i("Cached chapters: $_chapters")
+      Timber.i("Cached progress: ${_tracks?.getProgress()}")
+
+      if (_tracks != null && _chapters != null) {
+        var offsetRemaining = _tracks.getProgress()
+        var currChapter: Chapter? = null
+        for (chapter in _chapters) {
+          if (offsetRemaining < chapter.endTimeOffset) {
+            currChapter = chapter
+            break
+          }
+          offsetRemaining -= (chapter.endTimeOffset - chapter.startTimeOffset)
+        }
+        currChapter ?: EMPTY_CHAPTER
+      } else {
+        EMPTY_CHAPTER
+      }
+    }.asFlow()
+
+  val activeChapter =
+    currentlyPlaying.chapter.combine(
+      cachedChapter,
+    ) { activeChapter: Chapter, cachedChapter: Chapter ->
+      Timber.i("Cached: $cachedChapter, active: $activeChapter")
+      if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
+        activeChapter
+      } else {
+        cachedChapter
+      }
+    }.asLiveData(viewModelScope.coroutineContext)
+
   /**
    * The chapter the book is at, for the timeline readout.
    *
@@ -281,42 +323,6 @@ class CurrentlyPlayingViewModel(
     tracks.map { tracks: List<MediaItemTrack> ->
       return@map "${tracks.getProgressPercentage()}%"
     }
-
-  private val cachedChapter =
-    DoubleLiveData(
-      chapters,
-      tracks,
-    ) { _chapters: List<Chapter>?, _tracks: List<MediaItemTrack>? ->
-      Timber.i("Cached chapters: $_chapters")
-      Timber.i("Cached progress: ${_tracks?.getProgress()}")
-
-      if (_tracks != null && _chapters != null) {
-        var offsetRemaining = _tracks.getProgress()
-        var currChapter: Chapter? = null
-        for (chapter in _chapters) {
-          if (offsetRemaining < chapter.endTimeOffset) {
-            currChapter = chapter
-            break
-          }
-          offsetRemaining -= (chapter.endTimeOffset - chapter.startTimeOffset)
-        }
-        currChapter ?: EMPTY_CHAPTER
-      } else {
-        EMPTY_CHAPTER
-      }
-    }.asFlow()
-
-  val activeChapter =
-    currentlyPlaying.chapter.combine(
-      cachedChapter,
-    ) { activeChapter: Chapter, cachedChapter: Chapter ->
-      Timber.i("Cached: $cachedChapter, active: $activeChapter")
-      if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
-        activeChapter
-      } else {
-        cachedChapter
-      }
-    }.asLiveData(viewModelScope.coroutineContext)
 
   private var _isLoadingTracks = MutableLiveData(false)
   val isLoadingTracks: LiveData<Boolean>

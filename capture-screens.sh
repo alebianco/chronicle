@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/b#!/usr/bin/env bash
 #
 # capture-screens.sh — screenshot the main screens against the cu-16 mock server.
 #
@@ -62,6 +62,24 @@ tap 1280 1424
 shot library 5
 tap 1615 1424
 shot settings 4
+
+# A capture that is byte-identical to the previous one means the tap did not change the screen —
+# a stale AVD foregrounding another app, or coordinates landing on the tablet taskbar drawn over
+# the app's own nav bar. Both happened, and the run still reported "captured" for each screen.
+prev=""
+dupes=0
+for f in "$OUT"/*.png; do
+  sum=$(md5 -q "$f" 2>/dev/null || md5sum "$f" | cut -d' ' -f1)
+  if [ -n "$prev" ] && [ "$sum" = "$prev" ]; then
+    echo "WARNING: $(basename "$f") is identical to the previous capture — the screen did not change."
+    dupes=$((dupes + 1))
+  fi
+  prev="$sum"
+done
+if [ "$dupes" -gt 0 ]; then
+  echo "ERROR: $dupes duplicate capture(s). Screens were not navigated; do not trust this run."
+  exit 1
+fi
 
 # A screenshot is only evidence if the app was actually in the foreground.
 FG=$(adb shell dumpsys activity activities | grep -m1 "ResumedActivity" || true)
