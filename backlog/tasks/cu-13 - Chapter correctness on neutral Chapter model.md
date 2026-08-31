@@ -1,7 +1,7 @@
 ---
 id: cu-13
 title: Chapter correctness on neutral Chapter model
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
@@ -71,7 +71,8 @@ prefer it.
 
 ### Stale analysis file
 
-`backlog/docs/analysis/M4-chapter-management-refactor-plan.md` is linked from [[cu-49]], not this
+`backlog/docs/analysis/archive/M4-chapter-management-refactor-plan.md` (now archived) is linked
+from [[cu-49]], not this
 task, and is in poor shape: its sections are in **reverse order** (Problem Statement last, Phase 6
 before Phase 1) and its code blocks are shredded. Its premise is also partly stale — it proposes
 creating `ChapterDatabase`/`ChapterDao`, which now exist (migrated to v2 in [[cu-71]]) but are

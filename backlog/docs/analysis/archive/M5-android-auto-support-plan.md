@@ -1,5 +1,11 @@
 # Task M5: Android Auto Support Completion Resolution Plan
 
+> **Archived 2026-08-31.** Superseded by [[cu-89]], which records what was actually verified in
+> the code (service type, session activation, audio focus, MediaStyle, caller allowlist) and what
+> the real symptom is — another app holding the media card while Chronicle plays. This file's
+> premise ("unclear what works") is answered there, it contains no findings cu-89 lacks, and its
+> code blocks are corrupted (lines out of order).
+
 **Task ID**: M5  
 **Priority**: 🟡 Medium (Feature)  
 **Created**: 2025-11-28  

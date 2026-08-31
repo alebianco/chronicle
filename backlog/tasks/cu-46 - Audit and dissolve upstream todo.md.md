@@ -14,7 +14,8 @@ milestone: m-0
 
 H7: upstream's freeform todo.md — audit every open item, convert live ones to tasks/drafts (Ported-from note), let DONE history stay in git. Done 2026-07-13 as part of the tracking-consolidation: live items became tasks 47-51 + M2/M3 drafts; todo.md deleted.
 
-Analysis: [`H7-todo-audit-plan.md`](../docs/analysis/H7-todo-audit-plan.md).
+Analysis: [`archive/H7-todo-audit-plan.md`](../docs/analysis/archive/H7-todo-audit-plan.md)
+(archived: `todo.md` no longer exists).
 
 ## Acceptance Criteria
 

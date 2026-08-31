@@ -1,4 +1,7 @@
 ─────┬──────────────────────────────────────────────────────────────────────────
+
+> **Archived.** Its task [[cu-53]] is Won't Do; kept as historical context, not part of the
+> active reference set.
      │ STDIN
      │ Size: -
 ─────┼──────────────────────────────────────────────────────────────────────────

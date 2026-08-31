@@ -1,7 +1,7 @@
 ---
 id: cu-10
 title: Silent re-auth on 401 + token validation on launch
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
@@ -106,4 +106,4 @@ the second honestly.
       `FakePlexServer`. Driving it through MockWebServer would test OkHttp's retry machinery
       instead. `FakePlexServer.stubUnauthorized` (already present from cu-16) is the right
       tool for an end-to-end pass; added to [[cu-73]] rather than skipped
-- [ ] **Live-server confirmation** — a real rotated token recovering silently is on [[cu-73]]
+- [>] **Live-server confirmation** — a real rotated token recovering silently is on [[cu-73]]

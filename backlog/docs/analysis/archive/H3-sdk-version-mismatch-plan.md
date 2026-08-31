@@ -1,5 +1,7 @@
 # Task H3: SDK Version Mismatch Resolution Plan
 
+> **Archived.** Kept as historical context, not part of the active reference set.
+
 **Task ID**: H3  
 **Priority**: 🟠 High (Documentation Accuracy)  
 **Created**: 2025-11-28  

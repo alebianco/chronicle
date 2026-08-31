@@ -1,4 +1,9 @@
 # Task M4: Chapter Management Refactoring Resolution Plan
+
+> **Archived 2026-08-31.** Superseded by [[cu-49]]'s Implementation Plan. Not usable as written:
+> every section's lines are in reverse order (Problem Statement last, Phase 6 before Phase 1) and
+> its code blocks are shredded. Its premise is also stale — it proposes creating a `ChapterDao`
+> that already existed.
 *Estimated Completion: 1-2 weeks*
 *Owner: Architecture Team*  
 *Created: 2025-11-28*  

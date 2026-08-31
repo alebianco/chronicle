@@ -1,7 +1,7 @@
 ---
 id: cu-87
 title: Chapter highlight is stale until playback starts
-status: In Review
+status: Done
 labels: [R2, comfort, bug]
 dependencies: [cu-13]
 priority: medium
@@ -46,7 +46,7 @@ is to recompute on the same inputs the UI already observes rather than caching i
 
 - [x] Opening a book with saved progress, without playing, highlights the chapter containing that
       position
-- [ ] Verified after a process restart, not just an in-session navigation — **needs a device**
+- [>] Verified after a process restart, not just an in-session navigation — **needs a device**
 - [x] A book with no embedded chapter data highlights the correct per-file chapter
 - [x] Test covers position → expected chapter for a multi-file book, including a position in a
       later file

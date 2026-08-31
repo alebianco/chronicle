@@ -1,5 +1,9 @@
 # Task H1: Inadequate Test Coverage Resolution Plan
 
+> **Archived 2026-08-31.** [[cu-44]] is Done. Its own reasoning against DAO tests on in-memory
+> Room was later overtaken by [[cu-49]]'s `RoomSchemaTest`; see cu-44's Implementation Notes for
+> the correction.
+
 **Task ID**: H1  
 **Priority**: 🟠 High (Quality Assurance)  
 **Created**: 2025-11-28  

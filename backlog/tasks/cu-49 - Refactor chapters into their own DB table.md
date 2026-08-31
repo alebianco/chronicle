@@ -1,7 +1,7 @@
 ---
 id: cu-49
 title: Refactor chapters into their own DB table
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, architecture]
@@ -86,7 +86,7 @@ mechanical; 7 is optional cleanup.
 
 ### Analysis file
 
-[`M4-chapter-management-refactor-plan.md`](../docs/analysis/M4-chapter-management-refactor-plan.md)
+[`archive/M4-chapter-management-refactor-plan.md`](../docs/analysis/archive/M4-chapter-management-refactor-plan.md)
 is **not usable as written**: every section's lines are in reverse order (Problem Statement last,
 Phase 6 before Phase 1, bullet lists inverted) and its code blocks are shredded. Its content is
 also generic and partly stale — it hedges that "chapters [are] likely stored as part of tracks or
@@ -103,7 +103,8 @@ archive it when this task closes rather than repairing it.
 - [x] `ChapterDao` can fetch the chapters for one book
 - [x] `ChapterDatabase` + `ChapterRepository` provided in Dagger and actually injected
 - [x] Chapters are written to the table by the live fetch path
-- [ ] Playback + UI read chapters from the DB, with the `asChapterList()` fallback preserved —
+- [>] Playback + UI read chapters from the DB, with the `asChapterList()` fallback preserved →
+      **[[cu-82]]** —
       **not done, see "Step 6" below**
 - [x] Every new migration has a file-backed test in `RoomSchemaTest`, each verified to bite by
       deliberate sabotage

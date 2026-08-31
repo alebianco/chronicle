@@ -1,7 +1,7 @@
 ---
 id: cu-86
 title: Mark as read leaves progress untouched, and lists show no finished state
-status: In Review
+status: Done
 labels: [R1, trust, bug]
 dependencies: []
 priority: high
@@ -74,9 +74,9 @@ resetting progress. This is the deliberate user-initiated path.
 - [x] "Mark as unread" is its exact inverse
 - [x] The library list distinguishes not-started, in-progress and finished
 - [x] `isCompleted()` returns something correct; no caller gets the 0%-means-finished answer
-- [ ] A sync after marking read does not revert the state (server and local agree) — **unit-level
-      only; the server round trip needs the live pass**
-- [ ] Live check in [[cu-73]]
+- [>] A sync after marking read does not revert the state (server and local agree) → **[[cu-73]]**
+      — unit-level only here; the server round trip needs a real account
+- [>] Live check in [[cu-73]]
 - [x] Verify loop green
 
 ## Implementation Notes

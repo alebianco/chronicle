@@ -1,4 +1,7 @@
 # Task H6: Delicate API Usage Without Suppression Resolution Plan
+
+> **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the
+> active reference set.
 *Estimated Completion: 1 day (after C4/C5)*
 *Owner: Engineering Team*  
 *Created: 2025-11-28*  

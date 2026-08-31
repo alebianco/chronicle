@@ -1,7 +1,7 @@
 ---
 id: cu-88
 title: Skip silence is too aggressive to listen through
-status: In Review
+status: Done
 labels: [R2, playback, bug]
 dependencies: []
 priority: medium
@@ -100,7 +100,7 @@ out not to produce a listenable result.
 - [x] A custom `SilenceSkippingAudioProcessor` is installed via `setAudioProcessorChain`, with a
       test proving it is in the chain and carries retuned values — a test that fails if the wiring
       is dropped and the defaults return
-- [ ] Speech is not clipped mid-sentence on a real book, and pauses are shortened rather than
+- [>] Speech is not clipped mid-sentence on a real book, and pauses are shortened rather than
       removed ([[cu-73]], with a quiet-voiced narrator among the samples) — **the values are
       starting points, not measured**
 - [x] `skipSilence = false` still behaves exactly as today (no processor active)

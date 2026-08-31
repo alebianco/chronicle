@@ -14,7 +14,7 @@ milestone: m-0
 
 M1: libs.versions.toml marks kotlin-result 1.1.11 OUT OF DATE. Update (or replace with stdlib Result), review breaking changes, test all Result usages.
 
-Analysis: [`M1-outdated-dependency-plan.md`](../docs/analysis/M1-outdated-dependency-plan.md).
+Analysis: [`M1-outdated-dependency-plan.md`](../docs/analysis/archive/M1-outdated-dependency-plan.md).
 
 ## Implementation Notes
 

@@ -1,7 +1,7 @@
 ---
 id: cu-12
 title: Download rebuild on Media3 DownloadManager
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
@@ -88,9 +88,38 @@ against a plan that should not be executed.
 ## Acceptance Criteria
 
 - [x] Investigation complete; a recommendation with evidence rather than a rewrite
-- [ ] ~~2GB m4b survives Wi-Fi drops and app kill~~ → [[cu-76]] defects 1 and 2
-- [ ] ~~Offline books play with server unreachable~~ → already works: `getTrackSource()` returns
-      a local path for a cached track, bypassing network and token (verified in cu-10). The real
-      risk is defect 1 marking a *partial* file as cached, which [[cu-76]] fixes
-- [ ] ~~No OOM~~ → no OOM mechanism found in app code; needs a reproduction against a real 2GB
-      book before it can be treated as live ([[cu-73]])
+- [x] ~~2GB m4b survives Wi-Fi drops and app kill~~ → reassigned to [[cu-76]] defects 1 and 2, both
+      now fixed
+- [x] ~~Offline books play with server unreachable~~ → reassigned; see the correction below
+- [x] ~~No OOM~~ → no OOM mechanism found in app code; a reproduction against a real 2GB book is on
+      [[cu-73]] before it can be treated as live
+
+## Implementation Notes
+
+**Outcome: recommended *against* the rewrite this task proposed**, and the scope was reassigned.
+
+Migrating downloads to Media3 `DownloadManager` would have broken storage-location support for no
+current benefit: 7 files depend on the plain-file layout, and `MoveSyncLocationWorker` moves those
+files between SD card and internal storage. The actual defects were four specific bugs in how the app
+*drives* Fetch2, which became [[cu-76]] — all four now fixed.
+
+The one code change made here was the worst defect, because it needed no device: `isCompleteDownload`
+comparing `File.length()` against `MediaItemTrack.size`, so a partial download is no longer promoted
+to "available offline".
+
+### A correction to this task's own findings
+
+This task recorded that offline playback "already works — `getTrackSource()` returns a local path for
+a cached track, bypassing network and token". The first half was right and **the conclusion was
+wrong**: it returned a *bare* path with no URI scheme, so ExoPlayer did not recognise it as a local
+file and downloaded books failed with an unsupported-format error. Found and fixed in [[cu-83]] after
+the owner reported it, and confirmed by probing `toUri()` directly (`scheme = null`).
+
+Worth keeping as a caution: "the code takes the local branch" is not the same as "the local branch
+works". The investigation verified the branch was *chosen*, never that its output was usable.
+
+### Follow-ups
+
+- [[cu-76]] — the four Fetch2 defects (done).
+- [[cu-81]] — pruning partial files left on disk, split out of cu-76.
+- [[cu-73]] — the 2GB/OOM reproduction, and download behaviour against a real server.

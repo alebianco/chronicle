@@ -1,7 +1,7 @@
 ---
 id: cu-83
 title: Cached track URI has no scheme, so downloaded books fail to play
-status: In Review
+status: Done
 labels: [R1, trust, bug]
 dependencies: []
 priority: critical
@@ -49,7 +49,7 @@ branches converge.
 - [x] The uncached branch still yields the `https` server URL
 - [x] Round-trip test: the string `getTrackSource()` returns parses back to a URI whose scheme is
       non-null in both branches
-- [ ] Live check added to [[cu-73]]: download a book, force-quit, relaunch, play offline — no
+- [>] Live check added to [[cu-73]]: download a book, force-quit, relaunch, play offline — no
       format error
 - [x] Verify loop green
 

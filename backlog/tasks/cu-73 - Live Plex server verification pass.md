@@ -159,6 +159,47 @@ Grouped by what breaks if the real server disagrees.
       listen on this device with no other client active, refresh, and confirm the position
       does not jump backwards.
 
+### Owner-reported issues fixed blind (cu-83 to cu-90)
+
+Eight functional issues the owner reported from real use on 2026-08-31. Every one was traced to a
+mechanism in the code and fixed, but **every fix is unit-tested only** — none has run against a real
+library, a real upgrade, or a second device. These are the checks that turn "the mechanism is right"
+into "the symptom is gone".
+
+- [ ] **A downloaded book plays after a force-quit and relaunch, offline** ([[cu-83]]). The cached
+      track URI now carries a `file://` scheme; the symptom was an unsupported-format error on
+      downloaded books only. Try a book whose sync directory path contains a **space or a non-ASCII
+      character**, since that is what the percent-encoding half of the fix is for.
+- [ ] **Cached status survives repeated relaunches** ([[cu-85]]), and — the case that matters — with
+      downloads on an **SD card, eject it**: the books must read as unavailable, *not* as
+      never-downloaded, and must come back when it is reinserted. Also confirm
+      `MoveSyncLocationWorker` does not leave a stale path in prefs after moving storage; that
+      interaction was not audited.
+- [ ] **Two devices converge on one position** ([[cu-90]]). Listen on A into a *later* track, then
+      open the book on B which last touched an *earlier* track. B must not drag the position
+      backwards. Then reload book info repeatedly on one device: the position must not move.
+- [ ] **A deliberate seek backwards survives a sync** ([[cu-90]]). Seek back a chapter, wait for a
+      refresh, confirm it is not pulled forward again. This is the edge decision-16 flags as sharpest.
+- [ ] **Mark as read, then unread, is a clean round trip** ([[cu-86]]) — including that a sync
+      afterwards does not revert it, which is where local and server semantics could still disagree.
+      Check the library list shows finished / in-progress / not-started correctly for each.
+- [ ] **Chapter highlight matches the timeline on a cold start** ([[cu-87]]). Open a part-listened
+      book after force-quitting the app, *without* pressing play. Also check skip-to-next-chapter and
+      skip-to-previous-chapter land correctly before any playback, since `PlayerExt` reads the same
+      value.
+- [ ] **Skip silence is listenable** ([[cu-88]]). The retuned values (800 ms minimum, 0.55 retention)
+      are reasoned starting points, **not measured** — this check is what sets them. Use a
+      quiet-voiced narrator and check chapter boundaries as well as mid-sentence pauses. Expect to
+      revise the constants.
+- [ ] **An expired token is noticed and recoverable** ([[cu-84]]). Invalidate the token server-side
+      (password change with "sign out connected devices"), then confirm: the app says the login
+      expired rather than showing an empty library, cached books still play, and "Sign in again"
+      restores sync **without** re-picking the server and library or losing downloads.
+- [ ] **Being offline is not reported as being signed out** ([[cu-84]]). Aeroplane mode must not
+      produce the signed-out state. This is the failure that would nag every user on a train.
+- [ ] **Which media session owns the card** ([[cu-89]]). Reproduce on the phone first — see that
+      task; Auto may not be needed. Note the session-flag change only affects API 27.
+
 ### Unofficial endpoints
 
 - [ ] **`/:/timeline`, scrobble, websockets.** Community-documented, not guaranteed

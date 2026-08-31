@@ -1,5 +1,8 @@
 # Task C2: KAPT to KSP Migration Plan
 
+> **Archived.** Its task [[cu-8]] is Done; kept as historical context, not part of the
+> active reference set.
+
 **Task ID**: C2  
 **Priority**: 🔴 Critical  
 **Created**: 2025-11-28  

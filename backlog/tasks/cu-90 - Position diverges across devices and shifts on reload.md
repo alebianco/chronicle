@@ -1,7 +1,7 @@
 ---
 id: cu-90
 title: Position diverges across devices and shifts unpredictably on reload
-status: In Review
+status: Done
 labels: [R1, trust, bug]
 dependencies: [cu-9, cu-14]
 priority: critical
@@ -85,9 +85,9 @@ merging independently, a book can show a position that no device ever actually r
 - [x] Book progress and active-track progress cannot disagree — one is derived from the other
 - [x] A book whose tracks were last touched on different devices reports a coherent position, not a
       jump between two
-- [ ] Reloading a book's info does not change its reported position when nothing changed
-      server-side — **unit-level only; needs the live pass**
-- [ ] Live checks in [[cu-73]]
+- [>] Reloading a book's info does not change its reported position when nothing changed
+      server-side → **[[cu-73]]** — unit-level only here; needs a real server
+- [>] Live checks in [[cu-73]]
 - [x] Verify loop green
 
 ## Implementation Notes

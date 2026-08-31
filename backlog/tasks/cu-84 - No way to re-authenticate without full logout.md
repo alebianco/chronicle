@@ -1,7 +1,7 @@
 ---
 id: cu-84
 title: No way to re-authenticate without a full logout
-status: In Review
+status: Done
 labels: [R1, trust, bug]
 dependencies: [cu-10]
 priority: critical
@@ -55,7 +55,7 @@ token, but an account token needs a human at an OAuth PIN, and its tests pin tha
 - [x] A re-auth affordance exists that keeps the chosen user, server and library
 - [x] Cached books still play while the account is signed out (unchanged from cu-10)
 - [x] No retry loop against plex.tv (the cu-10 tests that assert giving up still pass)
-- [ ] Live check in [[cu-73]]: invalidate the token server-side, confirm the app says so and
+- [>] Live check in [[cu-73]]: invalidate the token server-side, confirm the app says so and
       recovers without a full re-login
 - [x] Verify loop green
 

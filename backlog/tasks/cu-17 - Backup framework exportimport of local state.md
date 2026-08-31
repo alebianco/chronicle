@@ -1,7 +1,7 @@
 ---
 id: cu-17
 title: Backup framework: export/import of local state
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
@@ -93,5 +93,5 @@ Worth doing; not needed for correctness here. Noted on [[cu-77]].
       exclusion (verified in the APK). Both directions covered
 - [x] Schema versioned and forward-compatible — older files accepted, newer refused, unknown
       keys ignored
-- [ ] Wipe app, restore file: identical state minus auth → [[cu-77]], which needs the SAF picker
+- [>] Wipe app, restore file: identical state minus auth → [[cu-77]], which needs the SAF picker
       and a device

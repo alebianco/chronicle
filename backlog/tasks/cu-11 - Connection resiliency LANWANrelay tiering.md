@@ -1,7 +1,7 @@
 ---
 id: cu-11
 title: Connection resiliency: LAN/WAN/relay tiering
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]

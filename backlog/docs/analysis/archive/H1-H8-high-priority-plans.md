@@ -1,5 +1,9 @@
 # High Priority Tasks (H1-H8) - Resolution Plans
 
+> **Archived 2026-08-31.** A redundant aggregate: every H-item has its own file (H2–H6 archived
+> alongside this one, H8 still active as cu-47's reference). Its code blocks are corrupted (lines
+> out of order), so it is not usable even as history.
+
 **Document Status**: Planning - Awaiting Approval  
 **Created**: 2025-11-28  
 **Purpose**: Comprehensive plans for resolving High Priority technical debt items

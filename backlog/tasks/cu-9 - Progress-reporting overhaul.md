@@ -1,7 +1,7 @@
 ---
 id: cu-9
 title: Progress-reporting overhaul
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]

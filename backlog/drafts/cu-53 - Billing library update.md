@@ -14,7 +14,7 @@ milestone: m-4
 
 M3: Play Billing library update. DORMANT by D4/D9 — the IAP gate ships disabled and the billing plumbing is on the never-touch list. Only becomes a task if D9's revisit triggers fire (≥5k MAU, differentiators shipped, P.IVA willingness, employer cleared). Kept as a draft so the context isn't lost.
 
-Analysis: [`M3-billing-library-update-plan.md`](../docs/analysis/M3-billing-library-update-plan.md).
+Analysis: [`M3-billing-library-update-plan.md`](../docs/analysis/archive/M3-billing-library-update-plan.md).
 
 ## Won't do (2026-08-31)
 

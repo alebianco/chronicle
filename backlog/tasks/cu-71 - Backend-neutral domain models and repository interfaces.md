@@ -1,7 +1,7 @@
 ---
 id: cu-71
 title: Backend-neutral domain models and repository interfaces
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-08-31'
 labels: [R1, architecture]
@@ -59,8 +59,8 @@ depends on both.
       deliberately breaking a migration and observing the failure
 - [x] Round-trip test: a book with saved progress survives the migration with its
       position intact (the failure mode that matters to the user)
-- [ ] `Injector.` removed from domain/model code — **not done, deferred**
-- [ ] `BookRepository`/`TrackRepository` interfaces extracted; `SourceManager` gains
+- [>] `Injector.` removed from domain/model code — **not done, deferred**
+- [>] `BookRepository`/`TrackRepository` interfaces extracted; `SourceManager` gains
       the ingestion API it needs — **not done, deferred**
 - [x] Verify loop green; coverage not regressed
 

@@ -18,6 +18,20 @@ All project knowledge that isn't code lives here as markdown (decision D13 / [[d
 
 `To Do → In Progress → In Review → Done` (drafts sit at `Draft` until promoted). Lifecycle and definition-of-done: see [`/CLAUDE.md`](../CLAUDE.md) §Workflow.
 
+### Acceptance-criteria markers
+
+- `- [ ]` not done
+- `- [x]` done
+- `- [>]` **delegated** — the work is genuinely not done here, and the criterion names the task that
+  now owns it. Used so a task can close without either lying (ticking it) or staying open forever
+  waiting on something outside its scope, which is what leaves a board full of stale `In Review`.
+  A `[>]` is only legitimate when the text names its destination; otherwise leave it `[ ]`.
+- `- [~]` partially met, with the shortfall stated inline. Prefer `[>]` when the remainder has an
+  owner; `[~]` is for "true in principle, unverified in practice".
+
+`[>]` and `[~]` are local conventions, not Backlog.md's — the CLI treats them as unchecked, which is
+the safe reading. The files are canonical (D13), so a human diff is the point.
+
 ## Where the old files went (2026-07-13 consolidation)
 
 - `PRODUCT_BACKLOG.md` → decisions D1–D14 became `decisions/decision-1..14`; framing/release-map/won't-do/risks are captured across those decisions (esp. [[decision-9]], [[decision-11]], [[decision-14]]); the release grouping is just the `R0`–`R4` labels on tasks.

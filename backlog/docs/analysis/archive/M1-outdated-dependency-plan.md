@@ -1,5 +1,8 @@
 # Task M1: Outdated Dependency (kotlin-result) Resolution Plan
 
+> **Archived.** Its task [[cu-48]] is Done; kept as historical context, not part of the
+> active reference set.
+
 **Task ID**: M1  
 **Priority**: 🟡 Medium (Maintenance)  
 **Created**: 2025-11-28  

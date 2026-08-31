@@ -1,5 +1,8 @@
 # Task C5: InternalCoroutinesApi Usage Removal Plan
 
+> **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the
+> active reference set.
+
 **Task ID**: C5  
 **Priority**: 🔴 Critical  
 **Created**: 2025-11-28  

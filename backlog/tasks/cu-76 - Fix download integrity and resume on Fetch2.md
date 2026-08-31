@@ -1,7 +1,7 @@
 ---
 id: cu-76
 title: Fix download integrity and resume on Fetch2
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-08-31'
 labels: [R1, trust]

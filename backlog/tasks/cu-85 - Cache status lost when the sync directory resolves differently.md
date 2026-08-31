@@ -1,7 +1,7 @@
 ---
 id: cu-85
 title: Cache status lost when the sync directory resolves differently
-status: In Review
+status: Done
 labels: [R1, trust, bug]
 dependencies: [cu-76]
 priority: high
@@ -58,9 +58,8 @@ silently reading as not-downloaded.
 - [x] An unreadable or missing sync directory leaves cached status **unchanged**
 - [x] A readable, empty directory still un-caches (the legitimate case) — both directions tested
 - [x] The default sync-directory choice does not depend on `externalDeviceDirs()` ordering
-- [ ] `MoveSyncLocationWorker` interaction checked: moving storage must not leave the old path in
-      prefs
-- [ ] Live checks in [[cu-73]]: download a book, relaunch several times, confirm status sticks; and
+- [x] `MoveSyncLocationWorker` interaction checked — audited; see below
+- [>] Live checks in [[cu-73]]: download a book, relaunch several times, confirm status sticks; and
       with downloads on an SD card, unmount it and confirm the app does not report them gone forever
 - [x] Verify loop green
 
@@ -101,6 +100,23 @@ consulted exactly once in the app's lifetime.
 null in defiance of its own type. Now `filterNotNull()`.
 
 7 tests for the scan distinction, verified to bite by restoring `?: emptyList()` (3 fail).
+
+### `MoveSyncLocationWorker` interaction: audited, compatible
+
+Checked because returning the *stored* path unchanged (change 2) could in principle have stranded
+downloads after a storage move. It does not:
+
+`doWork()` reads `prefsRepo.cachedMediaDir` as the **destination** and moves files into it from every
+*other* directory in `externalDeviceDirs()`. The pref is written by `cachedMediaDir`'s setter before
+the worker runs, so the worker always sees the new location and there is no stale path to leave
+behind.
+
+One real limitation, unchanged by this task but worth writing down: the worker only sweeps
+directories **currently present** in `externalDeviceDirs()`. Files on a volume that is not mounted
+when the move runs are not migrated — they stay where they are. With this task's change that is now
+the *benign* outcome (the books read as unavailable rather than as never-downloaded, and reappear
+when the volume returns) instead of a silent un-cache, but nothing re-runs the move when the volume
+comes back. Worth a follow-up only if it is ever observed; it is not the reported symptom.
 
 ### Not done
 

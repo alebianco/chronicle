@@ -1,5 +1,8 @@
 # Task H2: Missing ProGuard Rules Resolution Plan
 
+> **Archived.** Its task [[cu-45]] is Done; kept as historical context, not part of the
+> active reference set.
+
 **Task ID**: H2  
 **Priority**: 🟠 High (Release Build Issues)  
 **Created**: 2025-11-28  

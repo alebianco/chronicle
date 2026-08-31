@@ -1,5 +1,8 @@
 # Task H5: Hardcoded Dispatcher Usage Resolution Plan
 
+> **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the
+> active reference set.
+
 **Task ID**: H5  
 **Priority**: 🟠 High (Testability)  
 **Created**: 2025-11-28  

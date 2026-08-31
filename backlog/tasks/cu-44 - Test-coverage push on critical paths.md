@@ -1,7 +1,7 @@
 ---
 id: cu-44
 title: Test-coverage push on critical paths
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, agentic]
@@ -14,7 +14,7 @@ milestone: m-1
 
 H1: standing effort to raise coverage where it unblocks autonomous work — ViewModels, repositories, DAOs (in-memory Room), sync/progress/download logic. Not one PR: the JaCoCo ratchet (cu-3) enforces it per-PR; this task tracks the initial backfill on the R1 risk surface, fixture-backed (cu-16).
 
-Analysis: [`H1-test-coverage-plan.md`](../docs/analysis/H1-test-coverage-plan.md).
+Analysis: [`archive/H1-test-coverage-plan.md`](../docs/analysis/archive/H1-test-coverage-plan.md).
 
 ## Implementation Notes
 
@@ -54,7 +54,19 @@ local library alone**. That last one is the `?: return` after the catch — repl
 `emptyList()` makes a failed fetch read as "the server has no books" and deletes the whole local
 library. Verified by sabotage.
 
-### DAO tests on in-memory Room: not done, deliberately
+### DAO tests on in-memory Room: partly done since, by another task
+
+**Update (2026-08-31):** the argument below has been overtaken. [[cu-49]] added `RoomSchemaTest`,
+which opens all four databases through Room in-memory and exercises real DAO methods —
+`chapterDao.insertAll`, `getChapters`, `getChaptersForBook`, `removeAllForBook`, `bookDao.getAudiobooks`
+— because it needed to prove a composite primary key actually prevents a cross-book collision. That
+is exactly a DAO test on in-memory Room, arrived at because a *behavioural* question demanded it
+rather than as a coverage exercise, which is the distinction the reasoning below was really drawing.
+
+What remains untested is the wider DAO surface (queries with no behavioural question attached). The
+reasoning below still applies to those.
+
+### The original reasoning
 
 `RoomMigrationTest` already drives all four databases through real SQLite under Robolectric, so
 the schema and migration chains are covered. Adding per-DAO CRUD tests would mostly assert that
@@ -78,7 +90,7 @@ does not close it and should not be read as having done so.
       (`BookRepositoryRefreshTest`), progress (`ProgressUpdaterTest`, `ProgressReporterTest`
       from cu-9), download integrity (`DownloadIntegrityTest` from cu-12), dispatchers
       (`RepositoryDispatcherTest` from cu-15)
-- [ ] DAO tests on in-memory Room — **not done, with reasons above.** `RoomMigrationTest`
+- [~] DAO tests on in-memory Room — **partly done since, by another task.** `RoomMigrationTest`
       covers the schema; per-DAO CRUD would test Room's codegen
 - [x] Coverage baseline established and ratcheting in CI — since cu-3; it has ratcheted eleven
       times during R1, which is the mechanism working

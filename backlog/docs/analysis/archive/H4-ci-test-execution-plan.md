@@ -1,5 +1,7 @@
 # Task H4: No CI Test Execution Resolution Plan
 
+> **Archived.** Kept as historical context, not part of the active reference set.
+
 **Task ID**: H4  
 **Priority**: 🟠 High (CI/CD Infrastructure)  
 **Created**: 2025-11-28  

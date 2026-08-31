@@ -1,7 +1,7 @@
 ---
 id: cu-78
 title: Chapter serialization crashes on a delimiter in the title
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-08-31'
 labels: [R1, trust]

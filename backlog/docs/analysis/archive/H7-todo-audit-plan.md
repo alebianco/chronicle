@@ -1,5 +1,8 @@
 # Task H7: TODO Items in Critical Paths Resolution Plan
 
+> **Archived 2026-08-31.** [[cu-46]] is Done and the `todo.md` this analyses no longer exists, so
+> the file describes a state that cannot recur.
+
 **Task ID**: H7  
 **Priority**: 🟠 High (Incomplete Features)  
 **Created**: 2025-11-28  

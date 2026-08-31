@@ -1,5 +1,8 @@
 # Task C3: Deprecated Fresco API Migration Plan
 
+> **Archived.** Its task [[cu-43]] is Done; kept as historical context, not part of the
+> active reference set.
+
 **Task ID**: C3  
 **Priority**: 🔴 Critical  
 **Created**: 2025-11-28  

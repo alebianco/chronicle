@@ -1,7 +1,7 @@
 ---
 id: cu-14
 title: Sync drift-check + force-sync affordance
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
@@ -66,4 +66,4 @@ Also on [[cu-73]].
       like units, so a newer server `lastViewedAt` wins. Six tests, verified to bite
 - [x] Explicit force-sync affordance — already existed (`forceSyncBook`, details menu); no work
       needed, recorded so it is not rebuilt
-- [ ] **Live two-device confirmation** — on [[cu-73]]
+- [>] **Live two-device confirmation** — on [[cu-73]]

@@ -14,7 +14,7 @@ milestone: m-0
 
 Room, Dagger, Moshi-codegen to KSP; drop kotlin-kapt. The biggest agent-iteration-speed lever (D10).
 
-Analysis: [`C2-kapt-to-ksp-migration-plan.md`](../docs/analysis/C2-kapt-to-ksp-migration-plan.md).
+Analysis: [`C2-kapt-to-ksp-migration-plan.md`](../docs/analysis/archive/C2-kapt-to-ksp-migration-plan.md).
 
 **BLOCKED on cu-58 (DataBinding → ViewBinding).** Attempted 2026-08-30; migration is functionally
 correct but makes builds *slower*, and cannot succeed while DataBinding remains. Findings below so this

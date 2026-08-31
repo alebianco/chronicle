@@ -14,7 +14,7 @@ milestone: m-0
 
 C3: deprecated Fresco DraweeView API in use; app also carries Glide (duplication). Consolidate on Coil (Kotlin-first, coroutine-native, 16KB-clean — supports cu-6). Replace ChronicleDraweeView + BindingAdapters image bindings; drop the redundant library.
 
-Analysis: [`C3-fresco-to-coil-migration-plan.md`](../docs/analysis/C3-fresco-to-coil-migration-plan.md).
+Analysis: [`C3-fresco-to-coil-migration-plan.md`](../docs/analysis/archive/C3-fresco-to-coil-migration-plan.md).
 
 ## Implementation Notes
 

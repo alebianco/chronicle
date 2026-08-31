@@ -14,7 +14,7 @@ milestone: m-0
 
 H2: release builds use R8 but keep rules were minimal (Room/Retrofit/Moshi/Dagger/Media3 all reflection-adjacent). In-flight uncommitted work exists (~170 lines + test_release_build.sh). Finish, commit, and gate: every dependency needing keep rules covered; release build smoke-tested.
 
-Analysis: [`H2-proguard-rules-plan.md`](../docs/analysis/H2-proguard-rules-plan.md).
+Analysis: [`H2-proguard-rules-plan.md`](../docs/analysis/archive/H2-proguard-rules-plan.md).
 
 ## Implementation Notes
 
