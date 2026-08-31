@@ -74,6 +74,20 @@ Grouped by what breaks if the real server disagrees.
       and that it does **not** appear during ordinary playback, which is the failure mode
       that would make it worthless.
 
+### Authentication
+
+- [ ] **cu-10 — a rotated server token recovers silently.** Rotate the server's token
+      (reset `PlexOnlineToken`, or re-claim the server) while the app holds a stale one,
+      then play something. The 401 should be invisible: refreshed and retried, no message.
+- [ ] **cu-10 — an invalidated account token degrades honestly.** Change the Plex password
+      with "sign out connected devices", then play. Expect the sign-in-expired message,
+      **no login wall**, downloaded books still playing, and — importantly — *no repeated
+      401 storm* against plex.tv. The retry-once guard is unit-tested but never seen against
+      a real server.
+- [ ] **cu-10 — end-to-end 401 handling via `FakePlexServer.stubUnauthorized`.** The
+      authenticator's tests exercise the decision, not the wiring; an integration test
+      through MockWebServer would confirm the `AppModule` hookup actually fires.
+
 ### Unofficial endpoints
 
 - [ ] **`/:/timeline`, scrobble, websockets.** Community-documented, not guaranteed

@@ -80,7 +80,17 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - **Four separate Room databases** (`BookDatabase` v8, `TrackDatabase` v4, `ChapterDatabase` v1, `CollectionsDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration.
 - **KSP** — build errors in generated code usually mean an annotation problem upstream; don't loop blindly. KSP errors are
   clearer than KAPT's were, but a DataBinding-style opaque failure is gone with DataBinding itself.
-- **No 401 re-auth exists** — an expired Plex token surfaces as a UI error string (`MainActivity`), not a refresh. Fixing = task cu-10.
+- **401 re-auth covers the server token only** (cu-10). `PlexTokenAuthenticator` on the media
+  OkHttp client re-fetches the server access token from `/api/v2/resources` and retries **once**.
+  It cannot recover an *account* token: Plex has no refresh token, and a new one needs a human
+  approving an OAuth PIN in a browser. A 401 that survives the retry means the account is signed
+  out — the app says so and keeps playing cached files. **Don't add a retry loop here**: most of
+  that class's tests assert it gives up, because looping would hammer plex.tv. Plex tokens never
+  expire on a timer; they are invalidated by an event (password change with "sign out connected
+  devices", server re-claim).
+- **Never log an auth token.** `TokenLoggingTest` fails the build on any `Timber` call that
+  interpolates one — it caught three live leaks, including one logging *two* tokens per media
+  item. Logging *presence* (`token.isNotEmpty()`) is fine and is what the guard permits.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.
