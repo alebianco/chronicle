@@ -116,6 +116,17 @@ Grouped by what breaks if the real server disagrees.
       tracks resolve to a local path), but confirm the UI does not block on a connection check.
 - [ ] **Which route a download takes** once `OkHttpDownloader` is wired ([[cu-76]] item 3):
       downloads should get the same tier as playback, not a relay while playback uses LAN.
+- [ ] **Range resume genuinely continues rather than restarting.** Watch the transferred byte
+      count across an interruption: Fetch2 claims HTTP-Range resume, but nothing in the repo
+      proves the server honours it for these URLs. A restart-from-zero on a 2GB book is a very
+      different user experience from a resume, and both look like "it downloaded eventually".
+- [ ] **A download stranded at `FAILED` before the fix is retried on next launch.**
+      `ResumePlan.idsToRetry` is unit-tested against mocked state; what is unverified is that a
+      real exhausted-retry download actually presents as `FAILED` (rather than `CANCELLED` or
+      `REMOVED`) — the whole resume path hinges on that status being the one Fetch2 reports.
+- [ ] **A rotated server token mid-download recovers.** cu-10's re-auth now sits in the download
+      path via `OkHttpDownloader`; that combination has never run. Rotate the token during a
+      download and expect a retry that succeeds, not a failed book.
 
 ### Sync drift (cu-14)
 

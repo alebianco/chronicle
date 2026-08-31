@@ -1,7 +1,7 @@
 ---
 id: cu-76
 title: Fix download integrity and resume on Fetch2
-status: In Progress
+status: In Review
 assignee: [claude]
 created_date: '2026-08-31'
 labels: [R1, trust]
@@ -95,10 +95,78 @@ dependency. This app is `targetSdk 36`. Cheap upgrade, plausibly a live symptom.
 - [x] A file shorter than `MediaItemTrack.size` is never marked cached; covered by a test
       using a temp directory
 - [x] `size == 0L` (Plex reported none) handled explicitly rather than accidentally
-- [ ] `cachedFilePattern` tightened — still `\d*\..+`, which matches more than it should
-- [ ] Interrupted downloads resume on launch or on network return, with the retry count raised
-- [ ] `onError` distinguishable from `onCompleted` in both listeners
-- [ ] `OkHttpDownloader` wired, so downloads inherit re-auth, tiering and interceptors — or a
-      written reason why it cannot be
-- [ ] Fetch2 on 3.4.1
-- [ ] Verify loop green; live-download checks added to [[cu-73]]
+- [x] `cachedFilePattern` tightened — now `\d+\.[^.]+`, so a leading-dot name and a
+      `.mp3.part` double extension are both rejected
+- [x] Interrupted downloads resume on launch or on network return, with the retry count raised
+- [x] `onError` distinguishable from `onCompleted` in both listeners
+- [x] `OkHttpDownloader` wired, so downloads inherit re-auth, tiering and interceptors
+- [x] Fetch2 on 3.4.1
+- [x] Verify loop green; live-download checks added to [[cu-73]]
+
+## Implementation Notes
+
+Landed across three sittings; this note reconciles the task file with the code, because
+several criteria were done in passing and left unticked.
+
+### Items 1, 3 and 4 — done earlier
+
+- **Truncated downloads** (item 1): `isCompleteDownload(file, expectedSize)` compares
+  `File.length()` against `MediaItemTrack.size`, rejecting a mismatch in *either* direction.
+  `size == 0L` falls back to "non-empty". 7 tests, verified to bite.
+- **`cachedFilePattern`**: tightened from `\d*\..+` to `\d+\.[^.]+`. The old pattern
+  matched `.hidden` (leading `\d*` allows empty, then `getTrackIdFromFileName` produced an
+  empty id) and `3001.mp3.part` (`.+` accepted a second dot, so a *partial* file read as a
+  finished track). Covered by `CachedFilePatternTest`.
+- **`OkHttpDownloader`** (item 3): wired. The original "broken when I set up Fetch" TODO had a
+  mundane cause — the `fetch2okhttp` artifact was never declared, so the class did not exist.
+  Downloads now inherit `PlexInterceptor`'s headers, cu-10's 401 re-auth and cu-11's tiering.
+- **Fetch2 3.4.1** (item 4): done, with the `fetch2okhttp` artifact added alongside.
+
+### Item 2 — resume, finished here
+
+`setAutoRetryMaxAttempts` raised from 1, and `resumeInterruptedDownloads()` is called both on
+launch and on connectivity return (`ChronicleApplication`).
+
+The subtle half is that **`resumeAll()` is not enough**. It covers `PAUSED`, but a download
+abandoned by the old single-retry limit sits at `FAILED`, and Fetch2 will never touch it again
+without an explicit `retry`. Raising the retry count only helps while the process is alive; the
+already-stranded downloads needed naming.
+
+That decision is now `ResumePlan.idsToRetry`, extracted so it is testable at all —
+`CachedFileManager` resolves `Injector.get().externalDeviceDirs()` in a field initialiser, so
+constructing one needs the whole Dagger graph (the same reason `ProgressReporter` was split out
+of `PlexSyncScrobbleWorker` in cu-9). 8 tests, verified to bite in **both** directions:
+
+| Sabotage | Caught |
+|---|---|
+| retry nothing (the original bug) | 3 tests |
+| retry everything not `COMPLETED` | 4 tests |
+
+The second direction matters as much as the first: `CANCELLED` is excluded on purpose, because
+a cancel is a user decision and resuming it would mean a download the user deliberately stopped
+starts again on next launch.
+
+### Correction to this task's own analysis
+
+Item 2 claimed `onError` routing to `onFinished` left the DB update unguarded. That was
+**wrong** for the live listener: `CachedFileManager`'s `onFinished` already gated
+`updateCachedStatus` on `downloads.all { it.error == Error.NONE }`, and `DownloadNotificationWorker`
+already posts failure notifications with their own strings and icons. Nothing was silently
+marking failed downloads as cached.
+
+The finding was real for `FetchFinishedListener`, which routed `onError` straight to
+`onFinished` with no status available to callers — but that class had **no implementations at
+all**. It was deleted rather than fixed: an unused abstraction whose only behaviour is a trap is
+worth less than nothing. `FetchGroupStartFinishListener.onFinished` keeps its name (it is
+Fetch2-shaped) but its KDoc now states plainly that it fires on failure too, and names the check
+an implementation must do.
+
+### Follow-ups
+
+- Items 2–4 still have **no live-download verification**: every check here is a unit test
+  against mocked Fetch2 state. Resume-across-restart, Range resume actually continuing rather
+  than restarting, and OkHttp-path re-auth all need a real server and a real interruption →
+  [[cu-73]].
+- A rejected partial file is still **left on disk** rather than deleted. That is deliberate —
+  Fetch2 resumes via HTTP Range, so the bytes are worth keeping — but nothing prunes a partial
+  whose download was abandoned for good, so `cachedMediaDir` can accumulate. → new draft.

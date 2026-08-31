@@ -22,6 +22,7 @@ import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.model.isCompleteDownload
 import io.github.mattpvaughn.chronicle.features.download.DownloadNotificationWorker
 import io.github.mattpvaughn.chronicle.features.download.FetchGroupStartFinishListener
+import io.github.mattpvaughn.chronicle.features.download.ResumePlan
 import io.github.mattpvaughn.chronicle.features.download.bookIdOrNull
 import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
@@ -115,13 +116,15 @@ class CachedFileManager
     override fun resumeInterruptedDownloads() {
       // resumeAll covers PAUSED downloads; FAILED ones need an explicit retry, and a
       // download abandoned by the old single-retry limit is FAILED rather than paused.
+      // Which ids qualify is ResumePlan's call, so it can be tested without this class.
       fetch.resumeAll()
-      fetch.getDownloadsWithStatus(Status.FAILED) { failed ->
-        if (failed.isEmpty()) {
-          return@getDownloadsWithStatus
+      fetch.getDownloads { all ->
+        val toRetry = ResumePlan.idsToRetry(all)
+        if (toRetry.isEmpty()) {
+          return@getDownloads
         }
-        Timber.i("Retrying ${failed.size} failed download(s)")
-        fetch.retry(failed.map { it.id })
+        Timber.i("Retrying ${toRetry.size} interrupted download(s)")
+        fetch.retry(toRetry)
       }
     }
 

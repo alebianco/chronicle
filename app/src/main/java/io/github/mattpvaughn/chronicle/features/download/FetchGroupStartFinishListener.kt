@@ -10,7 +10,14 @@ abstract class FetchGroupStartFinishListener : AbstractFetchGroupListener() {
   )
 
   /**
-   * All downloads with group id [groupId] have finished (by error, completion, or other means)
+   * Every download in [groupId] has reached a terminal state — **including failure**.
+   *
+   * "Finished" here means "no longer in flight", not "succeeded". An implementation must inspect
+   * [FetchGroup.downloads] before treating the group as downloaded; `fetchGroup.downloads.all
+   * { it.error == Error.NONE }` is the check. A sibling class conflated the two and was deleted
+   * in cu-76: it routed `onError` straight to `onFinished`, leaving callers no way to tell a
+   * failed download from a complete one, which is how a truncated book gets marked available
+   * offline.
    */
   abstract fun onFinished(
     groupId: Int,
