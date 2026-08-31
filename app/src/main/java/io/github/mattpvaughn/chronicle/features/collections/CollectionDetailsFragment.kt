@@ -21,6 +21,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionDetailsBind
 import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
@@ -133,6 +134,10 @@ class CollectionDetailsFragment : Fragment() {
     binding.toolbar.setNavigationOnClickListener {
       requireActivity().onBackPressed()
     }
+
+    // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
+
+    binding.toolbarLayout.applyTopSystemBarInset()
 
     return binding.root
   }

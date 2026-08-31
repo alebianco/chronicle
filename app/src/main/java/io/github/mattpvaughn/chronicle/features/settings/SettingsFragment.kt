@@ -23,6 +23,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.FragmentSettingsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.views.getString
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import javax.inject.Inject
@@ -120,6 +121,10 @@ class SettingsFragment : Fragment() {
         }
       },
     )
+
+    // Settings has no toolbar, so the list itself takes the top inset (cu-63).
+
+    binding.settingsList.applyTopSystemBarInset()
 
     return binding.root
   }

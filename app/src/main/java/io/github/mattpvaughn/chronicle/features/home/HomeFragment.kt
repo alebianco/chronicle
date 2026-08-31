@@ -25,6 +25,7 @@ import io.github.mattpvaughn.chronicle.features.library.AudiobookSearchAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
 import io.github.mattpvaughn.chronicle.features.library.bindRecyclerView
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import javax.inject.Inject
 
 class HomeFragment : Fragment() {
@@ -128,6 +129,10 @@ class HomeFragment : Fragment() {
     )
 
     (activity as MainActivity).setSupportActionBar(binding.toolbar)
+
+    // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
+
+    binding.toolbarLayout.applyTopSystemBarInset()
 
     return binding.root
   }

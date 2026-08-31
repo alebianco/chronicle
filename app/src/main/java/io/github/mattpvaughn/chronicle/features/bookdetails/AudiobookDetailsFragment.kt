@@ -28,6 +28,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionSt
 import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
@@ -246,6 +247,10 @@ class AudiobookDetailsFragment : Fragment() {
       Timber.d("isWatchedIcon.observe called")
       binding.detailsToolbar.menu.findItem(R.id.toggle_watched).setIcon(icon)
     }
+
+    // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
+
+    binding.appBarLayout.applyTopSystemBarInset()
 
     return binding.root
   }

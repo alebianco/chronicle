@@ -35,6 +35,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
 import io.github.mattpvaughn.chronicle.features.search.bindSearchRecyclerView
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.views.checkRadioButtonWithTag
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.Dispatchers
@@ -344,6 +345,10 @@ class LibraryFragment : Fragment() {
       viewLifecycleOwner,
       Lifecycle.State.RESUMED,
     )
+
+    // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
+
+    binding.toolbarLayout.applyTopSystemBarInset()
 
     return binding.root
   }

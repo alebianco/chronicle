@@ -32,6 +32,7 @@ import io.github.mattpvaughn.chronicle.features.library.AudiobookSearchAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
 import io.github.mattpvaughn.chronicle.features.search.bindSearchRecyclerView
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -249,6 +250,10 @@ class CollectionsFragment : Fragment() {
       viewLifecycleOwner,
       Lifecycle.State.RESUMED,
     )
+
+    // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
+
+    binding.toolbarLayout.applyTopSystemBarInset()
 
     return binding.root
   }

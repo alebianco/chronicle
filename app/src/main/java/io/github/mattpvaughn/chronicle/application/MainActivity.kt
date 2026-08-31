@@ -12,7 +12,10 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -116,6 +119,8 @@ class MainActivity : AppCompatActivity() {
 
     val binding =
       ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
+
+    applyWindowInsets(binding)
 
     // Was binding expressions in activity_main.xml.
     viewModel.currentlyPlayingLayoutState.observe(this) { state ->
@@ -263,6 +268,30 @@ class MainActivity : AppCompatActivity() {
     Timber.i("MainActivity onStop()")
     localBroadcastManager.unregisterReceiver(onPlaybackError)
     super.onStop()
+  }
+
+  /**
+   * Insets the app content for the system bars.
+   *
+   * `targetSdk 36` enforces edge-to-edge: Android no longer insets content, so
+   * without this the toolbar draws under the status bar and the bottom nav under
+   * the gesture bar (cu-63, a regression shipped by cu-6).
+   *
+   * Applied once here rather than per-screen: every fragment is hosted inside
+   * `main_root`, so padding the shared chrome covers all of them and there is one
+   * place to reason about instead of nine. Fragments with their own toolbar get
+   * top padding via [applyTopInsetToToolbar] as they are created.
+   */
+  private fun applyWindowInsets(binding: ActivityMainBinding) {
+    ViewCompat.setOnApplyWindowInsetsListener(binding.mainRoot) { view, windowInsets ->
+      val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+      // Left/right matter in landscape and on devices with a cutout; the bottom
+      // nav takes the bottom inset so it sits above the gesture bar.
+      view.updatePadding(left = bars.left, right = bars.right)
+      binding.bottomNav.updatePadding(bottom = bars.bottom)
+      // Consume nothing: fragments still need the top inset for their toolbars.
+      windowInsets
+    }
   }
 
   override fun onNewIntent(intent: Intent?) {

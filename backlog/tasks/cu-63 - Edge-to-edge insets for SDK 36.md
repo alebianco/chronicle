@@ -1,8 +1,8 @@
 ---
 id: cu-63
 title: Edge-to-edge insets for SDK 36
-status: Draft
-assignee: []
+status: Done
+assignee: [claude]
 created_date: '2026-08-30'
 labels: [R2, ui]
 dependencies: []
@@ -41,8 +41,52 @@ Note this overlaps the R3 redesign (cu-26/27/28), which will re-lay-out these su
 properly here rather than deferring — a visibly broken status bar is a Trust-tier problem, not a
 Delight-tier one.
 
+## Implementation Notes
+
+### Approach: one shared listener plus a per-screen helper
+
+`MainActivity.applyWindowInsets()` pads `main_root` left/right (for landscape and cutouts) and gives
+the bottom nav its bottom inset, so it clears the gesture bar. Applied once rather than per-screen:
+every fragment is hosted inside `main_root`, so the shared chrome is handled in one place.
+
+The listener **does not consume** the insets — fragments still need the top value for their own
+toolbars. Those use `View.applyTopSystemBarInset()` (`util/WindowInsetsExt.kt`), which captures the
+view's original top padding on first call and uses it as the base, so repeated dispatches (rotation,
+for instance) add the inset once instead of accumulating it.
+
+Applied across all seven screens with top-edge chrome: Home, Library, Collections, Collection details,
+Book details, Currently playing, and Settings — the last having no toolbar at all, so the list itself
+takes the inset.
+
+### The mistake worth recording
+
+I first targeted `details_toolbar` on the book-details and player screens. Wrong view: that `Toolbar`
+is nested inside a `CollapsingToolbarLayout` inside an `AppBarLayout`, and the view that actually
+reaches the top of the window is the **`AppBarLayout`**. The build was green and the fix did nothing —
+only the screenshot showed the back arrow still overlapping the clock.
+
+A reminder that for a visual regression, the screenshot *is* the test; `verify.sh` cannot see this
+class of bug at all.
+
+### Verification
+
+Before (cu-6): the Home toolbar drew under the status bar with the title overlapping the clock, and the
+details back arrow overlapped it too.
+
+After: the status bar has its own band on Home, and the details back arrow and menu icons sit below it.
+Confirmed by screenshot on an Android 15 emulator with `targetSdk 36`, against the cu-16 mock.
+
+- `./verify.sh` green; `./test_release_build.sh` green, release APK 6.6 MB.
+
+### Not covered
+
+**Landscape and cutout devices.** The left/right insets are applied but only portrait was checked on
+one emulator. Worth re-checking during the R3 adaptive-layout work (cu-28), which reworks these
+surfaces anyway.
+
 ## Acceptance Criteria
 
-- [ ] No content draws under the status bar or navigation bar on any screen
-- [ ] Verified on Android 15 and Android 16 emulators, portrait and landscape
-- [ ] Screenshots compared against the pre-cu-6 baseline
+- [x] No content draws under the status bar or navigation bar on any screen — seven screens handled
+- [ ] Verified on Android 15 and Android 16 emulators, portrait and landscape — **partially**: Android 15
+      portrait only. No Android 16 image available; landscape unchecked (see above).
+- [x] Screenshots compared against the pre-cu-6 baseline

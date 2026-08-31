@@ -25,6 +25,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentCurrentlyPlayingBindi
 import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter
 import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
@@ -249,6 +250,10 @@ class CurrentlyPlayingFragment : Fragment() {
         eventShowChooser.getContentIfNotHandled()
       }
     }
+
+    // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
+
+    binding.appBarLayout.applyTopSystemBarInset()
 
     return binding.root
   }
