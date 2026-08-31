@@ -1,8 +1,8 @@
 ---
 id: cu-76
 title: Fix download integrity and resume on Fetch2
-status: To Do
-assignee: []
+status: In Progress
+assignee: [claude]
 created_date: '2026-08-31'
 labels: [R1, trust]
 dependencies: [cu-12]

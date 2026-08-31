@@ -12,7 +12,7 @@ moshi = "1.15.2"
 media3 = "1.11.0"
 media = "1.7.0"
 kotlinReflect = "2.2.10"
-fetch = "3.3.0"
+fetch = "3.4.1"
 work = "2.11.2"
 result = "2.0.1"
 retrofit = "2.11.0"
@@ -56,6 +56,9 @@ media3-session = { group = "androidx.media3", name = "media3-session", version.r
 media3-datasource = { group = "androidx.media3", name = "media3-datasource", version.ref = "media3" }
 media3-cast = { group = "androidx.media3", name = "media3-cast", version.ref = "media3" }
 fetch = { group = "com.github.tonyofrancis.Fetch", name = "fetch2", version.ref = "fetch" }
+# Lets Fetch2 download through the app's own OkHttp client, so downloads inherit the
+# Plex interceptor, cu-10 re-auth and cu-11 tiering (cu-76).
+fetch-okhttp = { group = "com.github.tonyofrancis.Fetch", name = "fetch2okhttp", version.ref = "fetch" }
 work = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 work-testing = { group = "androidx.work", name = "work-testing", version.ref = "work" }
 result = { group = "com.michael-bull.kotlin-result", name = "kotlin-result", version.ref = "result" }

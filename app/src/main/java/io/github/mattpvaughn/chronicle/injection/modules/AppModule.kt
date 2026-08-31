@@ -10,6 +10,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.tonyodev.fetch2.Fetch
 import com.tonyodev.fetch2.FetchConfiguration
+import com.tonyodev.fetch2okhttp.OkHttpDownloader
 import dagger.Module
 import dagger.Provides
 import io.github.mattpvaughn.chronicle.application.LOG_NETWORK_REQUESTS
@@ -54,6 +55,14 @@ class AppModule(private val app: Application) {
      * timeout.
      */
     const val READ_TIMEOUT_SECONDS = 15L
+
+    /**
+     * How many times Fetch2 retries a failed download before giving up.
+     *
+     * Retries resume via HTTP Range rather than restarting, so this is cheap; the previous
+     * value of 1 meant a single network blip ended a download permanently (cu-76).
+     */
+    const val DOWNLOAD_RETRY_ATTEMPTS = 5
   }
 
   @Provides
@@ -141,9 +150,15 @@ class AppModule(private val app: Application) {
       .setDownloadConcurrentLimit(3)
       .createDownloadFileOnEnqueue(false)
       .enableAutoStart(false)
-      .setAutoRetryMaxAttempts(1)
-      // TODO: this was broken when I set up Fetch, maybe figure it out at some point?
-//            .setHttpDownloader(OkHttpDownloader(okHttpClient))
+      // Was 1: a single retry meant a Wi-Fi blip mid-download ended it for good, and
+      // nothing re-enqueued it (cu-76). Fetch2 resumes via HTTP Range, so a retry picks up
+      // where it stopped rather than restarting a 2GB file.
+      .setAutoRetryMaxAttempts(DOWNLOAD_RETRY_ATTEMPTS)
+      // Download through the app's own OkHttp client, so downloads inherit the Plex
+      // interceptor's headers, cu-10's 401 re-auth and cu-11's connection tiering. This was
+      // commented out with a "broken when I set up Fetch" TODO; the cause was simply that
+      // the fetch2okhttp artifact was never declared, so OkHttpDownloader did not exist.
+      .setHttpDownloader(OkHttpDownloader(okHttpClient))
       .enableLogging(true)
       .build()
 

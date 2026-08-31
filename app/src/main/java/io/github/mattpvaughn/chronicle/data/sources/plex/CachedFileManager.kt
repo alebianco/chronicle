@@ -52,6 +52,17 @@ interface ICachedFileManager {
   suspend fun hasUserCachedTracks(): Boolean
 
   suspend fun refreshTrackDownloadedStatus()
+
+  /**
+   * Resumes downloads that stopped without finishing.
+   *
+   * Nothing did this before: `setAutoRetryMaxAttempts(1)` gave a download one retry and then
+   * abandoned it, so a Wi-Fi blip ended it permanently and the book stayed partially
+   * downloaded with no way back except re-requesting it by hand (cu-76).
+   *
+   * Safe to call repeatedly — Fetch2 ignores downloads that are already running or complete.
+   */
+  fun resumeInterruptedDownloads()
 }
 
 interface SimpleSet<T> {
@@ -102,6 +113,19 @@ class CachedFileManager
           }
         }
       }
+
+    override fun resumeInterruptedDownloads() {
+      // resumeAll covers PAUSED downloads; FAILED ones need an explicit retry, and a
+      // download abandoned by the old single-retry limit is FAILED rather than paused.
+      fetch.resumeAll()
+      fetch.getDownloadsWithStatus(Status.FAILED) { failed ->
+        if (failed.isEmpty()) {
+          return@getDownloadsWithStatus
+        }
+        Timber.i("Retrying ${failed.size} failed download(s)")
+        fetch.retry(failed.map { it.id })
+      }
+    }
 
     override fun cancelGroup(id: Int) {
       fetch.cancelGroup(id)

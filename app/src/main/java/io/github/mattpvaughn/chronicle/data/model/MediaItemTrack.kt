@@ -61,8 +61,16 @@ data class MediaItemTrack(
 
     val EMPTY_TRACK = MediaItemTrack(TRACK_NOT_FOUND)
 
-    /** The pattern representing a downloaded track on the file system */
-    val cachedFilePattern = Regex("\\d*\\..+")
+    /**
+     * A downloaded track on the file system: `<trackId>.<extension>`, nothing else.
+     *
+     * Was `\d*\..+`, where `\d*` matches **zero** digits — so `.nomedia` and `.DS_Store`
+     * matched and [getTrackIdFromFileName] then threw on `"".toInt()`. `.+` also accepted a
+     * second dot, so `3001.mp3.part` read as a finished track. The scan runs over a
+     * user-writable directory that MoveSyncLocationWorker shuffles files through, so stray
+     * names are ordinary (cu-76).
+     */
+    val cachedFilePattern = Regex("""\d+\.[^.]+""")
 
     fun getTrackIdFromFileName(fileName: String): Int {
       return fileName.substringBefore('.').toInt()

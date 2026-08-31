@@ -128,6 +128,10 @@ open class ChronicleApplication :
       withContext(Dispatchers.IO) {
         cachedFileManager.refreshTrackDownloadedStatus()
       }
+      // A download interrupted by a Wi-Fi drop or a process death used to stay abandoned:
+      // one retry, then nothing re-enqueued it (cu-76). Launch is the first chance to pick
+      // it back up.
+      cachedFileManager.resumeInterruptedDownloads()
     }
   }
 
@@ -159,6 +163,9 @@ open class ChronicleApplication :
           ConnectivityManager.NetworkCallback() {
           override fun onAvailable(network: Network) {
             connectToServer()
+            // The other moment an abandoned download can make progress. Fetch2 ignores
+            // downloads already running, so calling this on every network change is safe.
+            cachedFileManager.resumeInterruptedDownloads()
             super.onAvailable(network)
           }
 
