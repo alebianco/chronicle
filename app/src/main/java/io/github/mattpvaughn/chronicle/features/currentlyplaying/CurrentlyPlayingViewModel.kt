@@ -175,7 +175,17 @@ class CurrentlyPlayingViewModel(
   val currentTrack: LiveData<MediaItemTrack> =
     currentlyPlaying.track.asLiveData(viewModelScope.coroutineContext)
 
-  val currentChapter = currentlyPlaying.chapter.asLiveData(viewModelScope.coroutineContext)
+  /**
+   * The chapter the book is at, for the timeline readout.
+   *
+   * Deliberately the *same* value as [activeChapter], which the chapter list highlights. These used
+   * to differ: this was the raw `currentlyPlaying.chapter`, which starts at `EMPTY_CHAPTER` and is
+   * only recomputed by `CurrentlyPlayingSingleton.update()` — called from playback callbacks only.
+   * So on returning to the screen without playing, the timeline read from a stale or empty chapter
+   * while the list highlighted the one derived from saved progress, and the two disagreed until
+   * playback started (cu-87).
+   */
+  val currentChapter: LiveData<Chapter> get() = activeChapter
 
   val chapterProgress =
     currentlyPlaying.chapter.combine(

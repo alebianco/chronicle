@@ -68,7 +68,16 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
       }
 
     if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
-      val chapter = chapters.getChapterAt(track.id, track.progress)
+      // Falls back to the position derived from saved progress when the exact lookup misses.
+      // getChapterAt matches on trackId *and* a timestamp inside the chapter's span, so it returns
+      // EMPTY_CHAPTER whenever the two disagree — and EMPTY_CHAPTER used to be published, leaving
+      // every consumer stale. That matters beyond display: PlayerExt drives skip-to-next-chapter
+      // and skip-to-previous-chapter off this value, so a stale one skips to the wrong place
+      // (cu-87).
+      val chapter =
+        chapters.getChapterAt(track.id, track.progress)
+          .takeIf { it != EMPTY_CHAPTER }
+          ?: chapters.chapterAtBookProgress(tracks.getProgress())
       if (this.chapter.value != chapter) {
         this.chapter.value = chapter
         listener?.onChapterChange(chapter)

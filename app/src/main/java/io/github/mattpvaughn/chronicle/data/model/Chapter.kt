@@ -75,6 +75,27 @@ fun List<Chapter>.getChapterAt(
 }
 
 /**
+ * The chapter containing [bookProgress] millis from the start of the book.
+ *
+ * The counterpart to [getChapterAt], which needs a track id *and* a timestamp inside that chapter's
+ * span and returns [EMPTY_CHAPTER] when either does not match. This one needs only the book-level
+ * position, so it answers for a book the user has not started playing in this session — where
+ * `CurrentlyPlayingSingleton` has no current track to match on (cu-87).
+ *
+ * Offsets are absolute within the book (see [asChapterList]), so this is a plain range check.
+ * Chapters are sorted first because the list arrives from the database and the network in no
+ * guaranteed order. Returns the last chapter for a position at or past the end, rather than
+ * [EMPTY_CHAPTER], so a finished book still reports where it finished.
+ */
+fun List<Chapter>.chapterAtBookProgress(bookProgress: Long): Chapter {
+  if (isEmpty()) {
+    return EMPTY_CHAPTER
+  }
+  val ordered = sorted()
+  return ordered.firstOrNull { bookProgress < it.endTimeOffset } ?: ordered.last()
+}
+
+/**
  * Persists a chapter list into a single Room column.
  *
  * The format joins fields with [FIELD_SEPARATOR] and records with [RECORD_SEPARATOR]. Those
