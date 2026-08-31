@@ -67,6 +67,12 @@ Grouped by what breaks if the real server disagrees.
       survive an app restart, a track boundary, and playback from a second client. This
       is the position-loss family (#88/#112/#68) and the fixture cannot prove it, since
       the mock accepts any timeline write without modelling server-side state.
+- [ ] **cu-9 — the "position not synced" badge on screen.** Its state is unit-tested and
+      the terminal-failure path is confirmed in logcat, but the badge has never been
+      *seen*: the currently-playing sheet did not lay out during the emulator run. Pull
+      the player up on a real phone with the server unreachable and confirm it appears —
+      and that it does **not** appear during ordinary playback, which is the failure mode
+      that would make it worthless.
 
 ### Unofficial endpoints
 

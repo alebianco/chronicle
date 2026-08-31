@@ -1,7 +1,7 @@
 ---
 id: cu-67
 title: ProgressUpdater is unscoped — two update loops run concurrently
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-08-31'
 labels: [R1, playback]
@@ -40,8 +40,37 @@ Adding `@ServiceScope` is the obvious change, but confirm the lifecycle first: t
 have relied on separate `mediaController` assignments, and sharing one instance changes which
 controller wins.
 
+## Implementation Notes
+
+Fixed in [[cu-9]] by adding `@ServiceScope`. **But this draft's diagnosis was wrong, and the
+correction matters more than the fix.**
+
+The claim was "two independent 1-second loops run concurrently, doubling local DB writes and
+scrobble traffic". Only `MediaPlayerService` calls `startRegularProgressUpdates()`. The
+`AudiobookMediaSessionCallback` instance is used for one-shot pause/seek reports through
+`PlayerExt`, and never starts a loop. **There was one loop, and traffic was not doubled.**
+
+The error came from reasoning about the DI graph — two injection points, one unscoped
+provider, therefore two of everything — without checking which consumer actually drives the
+timer. The generated `DaggerServiceComponent` confirmed two *instances*; that is not the same
+as two loops.
+
+The real consequence, which is worth having fixed: `tickCounter` is per-instance and gates
+the network report at `tickCounter % NETWORK_CALL_FREQUENCY == 0`, so the callback instance's
+**first** one-shot call always had `tickCounter == 0` and therefore always forced a scrobble,
+while the service instance's ticks advanced independently. And `cancel()` on one instance
+could not stop the other's pending `postDelayed`.
+
+Sharing one instance is safe because `mediaController` is itself `@ServiceScope`d, so both
+consumers were already handed the same controller — verified before making the change, since
+sharing an updater across two different controllers would report progress for the wrong
+session.
+
 ## Acceptance Criteria
 
-- [ ] One `ProgressUpdater` per service, or a written justification for why two are correct
-- [ ] Verified: a single progress loop, one scrobble per `NETWORK_CALL_FREQUENCY` ticks
-- [ ] Checked against cu-9's position-loss symptoms before closing
+- [x] One `ProgressUpdater` per service — `@ServiceScope` added; confirmed in generated code,
+      where the provider is now `DoubleCheck.provider(...)` rather than a bare `create(...)`
+- [x] Verified: a single progress loop — and it was always single; see above
+- [x] Checked against cu-9's position-loss symptoms — not a contributor. The actual causes
+      were the cancelled teardown save, the missing `Result.retry()`, and the ungated
+      finished-early check, all fixed in [[cu-9]]
