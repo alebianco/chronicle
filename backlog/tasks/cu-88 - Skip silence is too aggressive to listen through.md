@@ -1,10 +1,11 @@
 ---
 id: cu-88
 title: Skip silence is too aggressive to listen through
-status: To Do
+status: In Review
 labels: [R2, playback, bug]
 dependencies: []
 priority: medium
+assignee: [claude]
 ---
 
 ## Description
@@ -95,12 +96,56 @@ out not to produce a listenable result.
 
 ## Acceptance Criteria
 
-- [ ] A decision is recorded (tune or remove) with its reasoning
-- [ ] If tuned: a custom `SilenceSkippingAudioProcessor` is installed via
-      `setAudioProcessorChain`, with a test proving it is in the chain and carries the configured
-      values — a test that fails if the wiring is dropped and the defaults return
-- [ ] If tuned: speech is not clipped mid-sentence on a real book, and pauses are shortened rather
-      than removed ([[cu-73]], with a quiet-voiced narrator among the samples)
-- [ ] If removed: the preference, its settings-screen entry and its string resource are all gone
-- [ ] `skipSilence = false` still behaves exactly as today (no processor active)
-- [ ] Verify loop green
+- [x] A decision is recorded (tune) with its reasoning
+- [x] A custom `SilenceSkippingAudioProcessor` is installed via `setAudioProcessorChain`, with a
+      test proving it is in the chain and carries retuned values — a test that fails if the wiring
+      is dropped and the defaults return
+- [ ] Speech is not clipped mid-sentence on a real book, and pauses are shortened rather than
+      removed ([[cu-73]], with a quiet-voiced narrator among the samples) — **the values are
+      starting points, not measured**
+- [x] `skipSilence = false` still behaves exactly as today (no processor active)
+- [x] Verify loop green
+
+## Implementation Notes
+
+**Decision: tune, not remove.** Tunability was confirmed by reading the artifact rather than assumed,
+and the injection point exists.
+
+`AudiobookRenderersFactory` overrides `DefaultRenderersFactory.buildAudioSink` and installs a
+`DefaultAudioProcessorChain` with a configured `SilenceSkippingAudioProcessor`. Wired in
+`ServiceModule.exoPlayer()` via `setRenderersFactory`.
+
+### Values, and why they are not measured
+
+| Parameter | Library default | Here | Reason |
+|---|---|---|---|
+| `minimumSilenceDurationUs` | 100 ms | **800 ms** | 100 ms is shorter than ordinary gaps *between words*, so the default fires mid-sentence. This is the core defect. |
+| `silenceRetentionRatio` | 0.2 | **0.55** | Shorten pauses rather than strip them; sentence and paragraph pacing survives. |
+| `maxSilenceToKeepDurationUs` | 2 s | 2 s | Already reasonable for speech. |
+| `minVolumeToKeepPercentage` | 10 | 10 | Unchanged. |
+| `silenceThresholdLevel` | 1024 | 1024 | Raising it would treat quiet narration as silence; lowering only helps if room noise is being *kept*, which is the opposite problem. |
+
+These are **starting points chosen against the defaults' known failure modes**, not measured values.
+Whether a book is listenable is a judgement about audio that no unit test can make, so the numbers
+are expected to be revised after the live pass.
+
+### What the tests actually pin
+
+Not the values' correctness — that would be false confidence. They pin that the tuning is **not
+inert**: the processor is in the chain, the thresholds are meaningfully above the library defaults
+(reverting to them fails 2 tests), and — importantly — `SonicAudioProcessor` is still present.
+
+That last one is the trap this could easily have introduced: `SonicAudioProcessor` implements
+playback speed and pitch, so a chain built without it would leave the player unable to change speed,
+the most-used feature in an audiobook app, with no error anywhere. A test asserts a 1.5× speed is
+honoured by the chain.
+
+The library defaults are duplicated in the test on purpose: a Media3 bump that changes them should
+fail here and prompt a re-read, rather than silently comparing against a moved target.
+
+### Not done
+
+- **The values are unverified against real audio** → [[cu-73]], including a quiet-voiced narrator and
+  chapter boundaries as well as mid-sentence pauses.
+- `skipSilence` still defaults to `false`, so nobody is affected unless they enable it. Worth
+  reconsidering the default only once the tuning is confirmed good.

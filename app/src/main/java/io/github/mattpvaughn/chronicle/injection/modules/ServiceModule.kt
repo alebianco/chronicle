@@ -55,17 +55,21 @@ class ServiceModule(private val service: MediaPlayerService) {
   @Provides
   @ServiceScope
   fun exoPlayer(): ExoPlayer =
-    ExoPlayer.Builder(service).setLoadControl(
-      // increase buffer size across the board as ExoPlayer defaults are set for video
-      DefaultLoadControl.Builder().setBackBuffer(EXOPLAYER_BACK_BUFFER_DURATION_MILLIS, true)
-        .setBufferDurationsMs(
-          EXOPLAYER_MIN_BUFFER_DURATION_MILLIS,
-          EXOPLAYER_MAX_BUFFER_DURATION_MILLIS,
-          DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
-          DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
-        )
-        .build(),
-    ).build()
+    // AudiobookRenderersFactory retunes silence skipping for narration: ExoPlayer's defaults
+    // collapse pauses shorter than the gaps between ordinary words (cu-88).
+    ExoPlayer.Builder(service)
+      .setRenderersFactory(AudiobookRenderersFactory(service))
+      .setLoadControl(
+        // increase buffer size across the board as ExoPlayer defaults are set for video
+        DefaultLoadControl.Builder().setBackBuffer(EXOPLAYER_BACK_BUFFER_DURATION_MILLIS, true)
+          .setBufferDurationsMs(
+            EXOPLAYER_MIN_BUFFER_DURATION_MILLIS,
+            EXOPLAYER_MAX_BUFFER_DURATION_MILLIS,
+            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
+          )
+          .build(),
+      ).build()
 
   @Provides
   @ServiceScope
