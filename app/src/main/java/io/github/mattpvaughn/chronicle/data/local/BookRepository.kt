@@ -9,7 +9,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.toChapter
-import kotlinx.coroutines.Dispatchers
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -155,6 +155,7 @@ class BookRepository
     private val prefsRepo: PrefsRepo,
     private val plexPrefsRepo: PlexPrefsRepo,
     private val plexMediaService: PlexMediaService,
+    private val dispatchers: DispatcherProvider,
   ) : IBookRepository {
     // TODO: observe prefsRepo.offlineMode?
 
@@ -169,7 +170,7 @@ class BookRepository
     }
 
     override suspend fun getBookCount(): Int {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.getBookCount()
       }
     }
@@ -181,7 +182,7 @@ class BookRepository
       }
       prefsRepo.lastRefreshTimeStamp = System.currentTimeMillis()
       val networkBooks: List<Audiobook> =
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
           try {
             plexMediaService.retrieveAllAlbums(plexPrefsRepo.library!!.id).plexMediaContainer.asAudiobooks()
           } catch (t: Throwable) {
@@ -191,7 +192,7 @@ class BookRepository
         } ?: return
       //    ^^^ quit on network failure- nothing below matters without new books from server
 
-      val localBooks = withContext(Dispatchers.IO) { bookDao.getAudiobooks() }
+      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
 
       val mergedBooks =
         networkBooks.map { networkBook ->
@@ -212,7 +213,7 @@ class BookRepository
         }
 
       Timber.i("Removed from network: ${removedFromNetwork.map { it.title }}")
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         val removed = bookDao.removeAll(removedFromNetwork.map { it.id.toString() })
         Timber.i("Removed $removed items from DB")
 
@@ -229,7 +230,7 @@ class BookRepository
 
       prefsRepo.lastRefreshTimeStamp = System.currentTimeMillis()
       val networkBooks: MutableList<Audiobook> = mutableListOf()
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         try {
           val libraryId = plexPrefsRepo.library?.id ?: return@withContext
           var booksLeft = 1L
@@ -253,7 +254,7 @@ class BookRepository
       }
       //    ^^^ quit on network failure- nothing below matters without new books from server
 
-      val localBooks = withContext(Dispatchers.IO) { bookDao.getAudiobooks() }
+      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
 
       val mergedBooks =
         networkBooks.map { networkBook ->
@@ -274,7 +275,7 @@ class BookRepository
         }
 
       Timber.i("Removed from network: ${removedFromNetwork.map { it.title }}")
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         val removed = bookDao.removeAll(removedFromNetwork.map { it.id.toString() })
         Timber.i("Removed $removed items from DB")
 
@@ -284,7 +285,7 @@ class BookRepository
     }
 
     override suspend fun clear() {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         bookDao.clear()
       }
     }
@@ -295,7 +296,7 @@ class BookRepository
       bookDuration: Long,
       trackCount: Int,
     ) {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         bookDao.updateTrackData(bookId, bookProgress, bookDuration, trackCount)
       }
     }
@@ -309,7 +310,7 @@ class BookRepository
     }
 
     override suspend fun getRecentlyAddedAsync(): List<Audiobook> {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.getRecentlyAddedAsync(limitReturnCount, prefsRepo.offlineMode)
       }
     }
@@ -319,7 +320,7 @@ class BookRepository
     }
 
     override suspend fun getRecentlyListenedAsync(): List<Audiobook> {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.getRecentlyListenedAsync(limitReturnCount, prefsRepo.offlineMode)
       }
     }
@@ -329,13 +330,13 @@ class BookRepository
       currentTime: Long,
       progress: Long,
     ) {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         bookDao.updateProgress(bookId, currentTime, progress)
       }
     }
 
     override suspend fun searchAsync(query: String): List<Audiobook> {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.searchAsync("%$query%", prefsRepo.offlineMode)
       }
     }
@@ -345,7 +346,7 @@ class BookRepository
     }
 
     override suspend fun update(audiobook: Audiobook) {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         // set the chapters stored in the db to also be cached
         bookDao.update(audiobook)
       }
@@ -355,7 +356,7 @@ class BookRepository
       bookId: Int,
       isCached: Boolean,
     ) {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         // set the chapters stored in the db to also be cached
         bookDao.updateCachedStatus(bookId, isCached)
         val audiobook = bookDao.getAudiobookAsync(bookId)
@@ -368,7 +369,7 @@ class BookRepository
     }
 
     override suspend fun setWatched(bookId: Int) {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         try {
           plexMediaService.watched(bookId.toString())
           bookDao.setWatched(bookId)
@@ -380,7 +381,7 @@ class BookRepository
     }
 
     override suspend fun setUnwatched(bookId: Int) {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         try {
           plexMediaService.unwatched(bookId.toString())
           bookDao.setUnwatched(bookId)
@@ -395,7 +396,7 @@ class BookRepository
     }
 
     override suspend fun getAudiobookAsync(bookId: Int): Audiobook? {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.getAudiobookAsync(bookId)
       }
     }
@@ -405,25 +406,25 @@ class BookRepository
     }
 
     override suspend fun getCachedAudiobooksAsync(): List<Audiobook> {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.getCachedAudiobooksAsync()
       }
     }
 
     override suspend fun uncacheAll() {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         bookDao.uncacheAll()
       }
     }
 
     override suspend fun getAllBooksAsync(): List<Audiobook> {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.getAllBooksAsync(prefsRepo.offlineMode)
       }
     }
 
     override suspend fun getRandomBookAsync(): Audiobook {
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         bookDao.getRandomBookAsync() ?: EMPTY_AUDIOBOOK
       }
     }
@@ -438,7 +439,7 @@ class BookRepository
           if (audiobook.isCached) "cached" else "uncached"
         }, tracks are $tracks",
       )
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         val chapters: List<Chapter> =
           try {
             tracks.flatMap { track ->
@@ -491,7 +492,7 @@ class BookRepository
     }
 
     override suspend fun fetchBookAsync(bookId: Int): Audiobook? =
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         plexMediaService.retrieveAlbum(bookId)
           .plexMediaContainer
           .asAudiobooks()

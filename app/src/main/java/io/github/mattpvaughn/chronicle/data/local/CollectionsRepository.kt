@@ -7,6 +7,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asCollections
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import timber.log.Timber
 import javax.inject.Inject
@@ -20,6 +21,7 @@ class CollectionsRepository
     private val prefsRepo: PrefsRepo,
     private val plexPrefsRepo: PlexPrefsRepo,
     private val collectionsDao: CollectionsDao,
+    private val dispatchers: DispatcherProvider,
   ) {
     // TODO: handle collections sorting!
     suspend fun getChildIds(collectionId: Int): List<Long> {
@@ -38,7 +40,7 @@ class CollectionsRepository
     suspend fun refreshCollectionsPaginated() {
       prefsRepo.lastRefreshTimeStamp = System.currentTimeMillis()
       val networkCollections: MutableList<Collection> = mutableListOf()
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         try {
           val libraryId = plexPrefsRepo.library?.id ?: return@withContext
           var chaptersLeft = 1L
@@ -61,7 +63,7 @@ class CollectionsRepository
         }
       }
 
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         try {
           val collectionsWithChildIds =
             networkCollections.map {

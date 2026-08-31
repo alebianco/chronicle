@@ -7,7 +7,7 @@ import io.github.mattpvaughn.chronicle.data.model.asChapter
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.toChapter
-import kotlinx.coroutines.Dispatchers
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -39,11 +39,12 @@ class ChapterRepository
     private val prefsRepo: PrefsRepo,
     private val plexPrefsRepo: PlexPrefsRepo,
     private val plexMediaService: PlexMediaService,
+    private val dispatchers: DispatcherProvider,
   ) : IChapterRepository {
     override suspend fun loadChapterData(
       isAudiobookCached: Boolean,
       tracks: List<MediaItemTrack>,
-    ) = withContext(Dispatchers.IO) {
+    ) = withContext(dispatchers.io) {
       Timber.i("Loading chapter data for tracks: $tracks")
       val chapters: List<Chapter> =
         try {

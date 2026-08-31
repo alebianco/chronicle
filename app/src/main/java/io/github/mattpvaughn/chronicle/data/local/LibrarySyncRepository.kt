@@ -7,8 +7,8 @@ import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.model.getProgress
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,9 +21,10 @@ class LibrarySyncRepository
     private val bookRepository: BookRepository,
     private val trackRepository: TrackRepository,
     private val collectionsRepository: CollectionsRepository,
+    private val dispatchers: DispatcherProvider,
   ) {
     private var repoJob = Job()
-    private val repoScope = CoroutineScope(repoJob + Dispatchers.IO)
+    private val repoScope = CoroutineScope(repoJob + dispatchers.io)
 
     private var _isRefreshing = MutableLiveData<Boolean>()
     val isRefreshing: LiveData<Boolean>
