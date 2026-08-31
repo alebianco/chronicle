@@ -15,7 +15,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 import io.github.mattpvaughn.chronicle.features.player.*
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 @TypeConverters(ChapterListConverter::class)
 @Entity
@@ -196,9 +195,33 @@ fun Audiobook.toMediaItem(plexConfig: PlexConfig): MediaBrowserCompat.MediaItem 
   return MediaBrowserCompat.MediaItem(mediaDescription.build(), FLAG_PLAYABLE)
 }
 
+/**
+ * Whether the book has been finished.
+ *
+ * Completion is an **explicit fact, separate from position** (decision-16): a non-zero [viewCount]
+ * means the user marked it played, and that is authoritative wherever the position happens to sit.
+ * Otherwise a position within [BOOK_FINISHED_END_WINDOW] of the end counts, since nobody listens
+ * through the closing credits.
+ *
+ * The first clause used to be `progress < 10.seconds`, which reported an **unstarted** book as
+ * completed — that is the 0% case, not the finished one. It had no callers, so it was latent rather
+ * than live, but it is the helper anyone would reach for when adding a finished state to the library
+ * list.
+ */
 fun Audiobook.isCompleted(): Boolean {
-  return progress < 10.seconds.inWholeMilliseconds || progress > (duration - 2.minutes.inWholeMilliseconds)
+  if (viewCount > 0L) {
+    return true
+  }
+  // A book whose duration is not loaded yet has duration 0, which would make the window check
+  // trivially true for any progress.
+  if (duration <= 0L) {
+    return false
+  }
+  return progress >= duration - BOOK_FINISHED_END_WINDOW
 }
+
+/** How close to the end counts as finished. */
+val BOOK_FINISHED_END_WINDOW = 2.minutes.inWholeMilliseconds
 
 /**
  * The id of "no book".

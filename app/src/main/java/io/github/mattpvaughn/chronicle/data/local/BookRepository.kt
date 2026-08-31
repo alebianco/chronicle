@@ -386,6 +386,9 @@ class BookRepository
         try {
           plexMediaService.unwatched(bookId)
           bookDao.setUnwatched(bookId)
+          // The inverse of setWatched, which also resets progress. Without this the book kept the
+          // position it was marked played at, so "unread" showed a part-finished book (cu-86).
+          bookDao.resetBookProgress(bookId)
         } catch (t: Throwable) {
           Timber.e("Failed to update watched status: $t")
         }

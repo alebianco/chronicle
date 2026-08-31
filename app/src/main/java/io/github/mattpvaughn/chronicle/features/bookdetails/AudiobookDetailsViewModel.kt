@@ -590,6 +590,9 @@ class AudiobookDetailsViewModel(
   private fun setAudiobookUnwatched() {
     Timber.i("Marking audiobook as unwatched")
     viewModelScope.launch {
+      // Mirrors setAudiobookWatched: both halves, or the tracks keep a state the book does not
+      // and which one shows depends on the order things ran in (cu-86).
+      trackRepository.markTracksInBookAsUnwatched(inputAudiobook.id)
       bookRepository.setUnwatched(inputAudiobook.id)
     }
     val toast =

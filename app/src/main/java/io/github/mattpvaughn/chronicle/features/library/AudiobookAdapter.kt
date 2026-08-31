@@ -2,7 +2,9 @@ package io.github.mattpvaughn.chronicle.features.library
 
 import android.text.format.DateUtils
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import android.widget.ProgressBar
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -12,6 +14,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_DETAILS_LIST
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_TEXT_LIST
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.isCompleted
 import io.github.mattpvaughn.chronicle.databinding.GridItemAudiobookBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookTextOnlyBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookWithDetailsBinding
@@ -119,10 +122,7 @@ class AudiobookAdapter(
       binding.author.text = audiobook.author
       binding.bookCoverImg.contentDescription = audiobook.title
       bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected)
-      binding.notPlayedDogEar.isVisible = audiobook.viewCount == 0L && audiobook.progress == 0L
-      binding.bookProgress.max = audiobook.duration.toInt()
-      binding.bookProgress.progress = audiobook.progress.toInt()
-      binding.bookProgress.isVisible = audiobook.progress > 0L
+      bindProgressIndicators(binding.notPlayedDogEar, binding.bookProgress, audiobook)
     }
 
     companion object {
@@ -171,6 +171,38 @@ private fun formatProgress(audiobook: Audiobook): String {
     DateUtils.formatElapsedTime(audiobook.duration / 1000)
 }
 
+/**
+ * Binds the two progress indicators for a book, in one place for both the grid and the list.
+ *
+ * Three states, where there used to be two. A finished book previously rendered as *in progress* at
+ * whatever position it held — and after "mark as read" reset the position to 0, it rendered as
+ * **not played**, indistinguishable from a book never opened. That is the owner's report that the
+ * list state is not what they expect (cu-86).
+ *
+ * - **not started** — the dog-ear, as before.
+ * - **finished** — a full progress bar. [Audiobook.isCompleted] is authoritative: it honours an
+ *   explicit `viewCount` regardless of position (decision-16), so a marked-as-read book at 0%
+ *   shows complete rather than untouched.
+ * - **in progress** — the bar at its real position.
+ *
+ * A full bar is a deliberately modest way to show "finished": a distinct badge is a visual-design
+ * decision, and this keeps the fix to behaviour rather than inventing UI.
+ */
+internal fun bindProgressIndicators(
+  notPlayedDogEar: View,
+  bookProgress: ProgressBar,
+  audiobook: Audiobook,
+) {
+  val isCompleted = audiobook.isCompleted()
+  val isUnstarted = !isCompleted && audiobook.viewCount == 0L && audiobook.progress == 0L
+
+  notPlayedDogEar.isVisible = isUnstarted
+  val barMax = audiobook.duration.toInt().coerceAtLeast(1)
+  bookProgress.max = barMax
+  bookProgress.progress = if (isCompleted) barMax else audiobook.progress.toInt()
+  bookProgress.isVisible = isCompleted || audiobook.progress > 0L
+}
+
 class DetailsStyleViewHolder(
   val binding: ListItemAudiobookWithDetailsBinding,
   val isSquare: Boolean,
@@ -188,10 +220,7 @@ class DetailsStyleViewHolder(
     binding.bookProgressString.text = formatProgress(audiobook)
     binding.bookCoverImg.contentDescription = audiobook.title
     bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected)
-    binding.notPlayedDogEar.isVisible = audiobook.viewCount == 0L && audiobook.progress == 0L
-    binding.bookProgress.max = audiobook.duration.toInt()
-    binding.bookProgress.progress = audiobook.progress.toInt()
-    binding.bookProgress.isVisible = audiobook.progress > 0L
+    bindProgressIndicators(binding.notPlayedDogEar, binding.bookProgress, audiobook)
   }
 
   companion object {

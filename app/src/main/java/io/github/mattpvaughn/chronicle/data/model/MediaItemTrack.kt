@@ -248,9 +248,9 @@ fun List<MediaItemTrack>.getProgressPercentage(): Int {
  * backwards. That is the "wildly different positions across devices" report; decision-16 replaced
  * the rule.
  *
- * A track counts as started if it has a non-zero offset or has been viewed. The result is the
- * *last* such track in playback order, so a run of played-through tracks whose offsets have been
- * reset to zero does not pull the position back to the start.
+ * A track counts if it has a non-zero offset — see [hasProgress] for why a timestamp or a view
+ * count must not qualify. The result is the *last* such track in playback order, so an earlier track
+ * that was recently opened does not pull the position backwards.
  *
  * Falls back to the first track in playback order for an untouched book. Ordering comes from
  * [MediaItemTrack.compareTo] (disc, then index), never from the list's own order, which arrives
@@ -259,17 +259,28 @@ fun List<MediaItemTrack>.getProgressPercentage(): Int {
 fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
   check(this.isNotEmpty()) { "Cannot get active track of empty list!" }
   val inPlaybackOrder = sorted()
-  return inPlaybackOrder.lastOrNull { it.hasBeenStarted() } ?: inPlaybackOrder.first()
+  return inPlaybackOrder.lastOrNull { it.hasProgress() } ?: inPlaybackOrder.first()
 }
 
 /**
- * Whether the listener has reached this track at all.
+ * Whether the listener is *positioned* in this track — i.e. it has a real offset to resume from.
  *
- * `lastViewedAt` alone is not enough: a track played to the end can have its offset reset to 0
- * while keeping a timestamp. `progress` alone is not enough either, for the same reason. Either
- * signal means the track has been reached.
+ * Deliberately only `progress > 0`. Two rejected alternatives, both of which produce a wrong
+ * position:
+ *
+ * - **`lastViewedAt > 0` as well.** `markTracksInBookAsWatched` sets *every* track in a book to
+ *   `progress = 0, lastViewedAt = now`, so every track would count as started, [getActiveTrack]
+ *   would return the **last** one, and a book just marked as read would report a position part way
+ *   through it — 50% of the way, for a three-track book. That is the owner's "sometimes it brings to
+ *   0%, sometimes at a different position".
+ * - **A track's `viewCount`.** Same problem: marking a book played sets it on every track, so it
+ *   says nothing about where the listener is.
+ *
+ * A track played to the end and reset to `progress = 0` is therefore *not* a position, which is
+ * correct — the position is in whatever later track has a real offset, and if none does the book is
+ * either finished (see [Audiobook.isCompleted]) or back at its start.
  */
-private fun MediaItemTrack.hasBeenStarted(): Boolean = progress > 0L || lastViewedAt > 0L
+private fun MediaItemTrack.hasProgress(): Boolean = progress > 0L
 
 /** Converts the metadata of a [MediaItemTrack] to a [MediaMetadataCompat]. */
 fun MediaItemTrack.toMediaMetadata(plexConfig: PlexConfig): MediaMetadataCompat {

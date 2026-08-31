@@ -122,8 +122,24 @@ interface ITrackRepository {
     forceUseNetwork: Boolean = false,
   ): List<MediaItemTrack>
 
-  /** Marks tracks in book as watched by setting the progress in all to 0 */
+  /**
+   * Marks every track in the book as played: `viewCount = 1`, offsets reset to 0.
+   *
+   * `viewCount` is what makes completion an explicit fact rather than something inferred from
+   * position (decision-16). Resetting the offsets is what "start over" means, and it is why
+   * `getActiveTrack` must not treat a mere timestamp as a position — otherwise a book just marked
+   * played reports itself part way through.
+   */
   suspend fun markTracksInBookAsWatched(bookId: String)
+
+  /**
+   * The exact inverse: `viewCount = 0`, offsets reset to 0, timestamps cleared.
+   *
+   * Added because the pair was asymmetrical. `setWatched` marked the book *and* its tracks, while
+   * `setUnwatched` touched only the book — so the tracks kept `viewCount` and their timestamps, and
+   * the book's state depended on which of the two had run last (cu-86).
+   */
+  suspend fun markTracksInBookAsUnwatched(bookId: String)
 
   companion object {
     /**
@@ -227,7 +243,21 @@ class TrackRepository
         val currentTime = System.currentTimeMillis()
         val updatedTracks =
           tracks.map {
-            it.copy(progress = 0L, lastViewedAt = currentTime)
+            it.copy(progress = 0L, lastViewedAt = currentTime, viewCount = 1L)
+          }
+        trackDao.insertAll(updatedTracks)
+      }
+    }
+
+    override suspend fun markTracksInBookAsUnwatched(bookId: String) {
+      withContext(dispatchers.io) {
+        val tracks = getTracksForAudiobookAsync(bookId)
+        // lastViewedAt is cleared too, so the book reads as genuinely untouched rather than as
+        // "listened to just now with no progress" — which would win every subsequent merge against
+        // the server and keep re-clearing a position set on another device.
+        val updatedTracks =
+          tracks.map {
+            it.copy(progress = 0L, lastViewedAt = 0L, viewCount = 0L)
           }
         trackDao.insertAll(updatedTracks)
       }
