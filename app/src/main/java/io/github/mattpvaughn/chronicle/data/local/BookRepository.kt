@@ -443,7 +443,11 @@ class BookRepository
           if (audiobook.isCached) "cached" else "uncached"
         }, tracks are $tracks",
       )
-      withContext(dispatchers.io) {
+      // `return withContext(...)`, not a bare statement: the three failure paths below use
+      // `return@withContext false`, which returns from the *lambda*. With the result discarded the
+      // function fell through to `return true`, so a sync that fetched nothing reported success —
+      // and the book-details "sync now" button showed "sync successful" on every network failure.
+      return withContext(dispatchers.io) {
         val chapters: List<Chapter> =
           try {
             // assembleChapters carries the running offset. This used to fall back to
@@ -502,8 +506,8 @@ class BookRepository
             chapters = chapters,
           )
         bookDao.update(merged)
+        true
       }
-      return true
     }
 
     override suspend fun fetchBookAsync(bookId: String): Audiobook? =
