@@ -17,7 +17,11 @@ import io.github.mattpvaughn.chronicle.data.local.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingSingleton
+import io.github.mattpvaughn.chronicle.util.DefaultDispatcherProvider
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
@@ -51,6 +55,22 @@ class AppModule(private val app: Application) {
   @Provides
   @Singleton
   fun providePrefsRepo(prefsImpl: SharedPreferencesPrefsRepo): PrefsRepo = prefsImpl
+
+  @Provides
+  @Singleton
+  fun provideDispatcherProvider(impl: DefaultDispatcherProvider): DispatcherProvider = impl
+
+  /**
+   * A long-lived scope for work that must outlive the caller — a download finishing
+   * after its screen closes, say.
+   *
+   * [SupervisorJob] so one failed child does not cancel the rest: these are
+   * independent operations, and cancelling unrelated downloads because one failed
+   * would be a regression, not cleanup.
+   */
+  @Provides
+  @Singleton
+  fun provideExternalScope(dispatchers: DispatcherProvider): CoroutineScope = CoroutineScope(SupervisorJob() + dispatchers.io)
 
   @Provides
   @Singleton
