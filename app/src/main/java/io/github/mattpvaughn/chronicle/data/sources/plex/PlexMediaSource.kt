@@ -36,6 +36,13 @@ class PlexMediaSource
 
     override val isDownloadable: Boolean = true
 
+    // Plex carries all three: narrator via Style tags and series via Mood tags (the
+    // Audnexus/seanap convention, not music semantics), and progress server-side via
+    // viewOffset.
+    override val hasNarrator: Boolean = true
+    override val hasSeries: Boolean = true
+    override val hasServerProgress: Boolean = true
+
     override suspend fun fetchAudiobooks(): Result<List<Audiobook>, Throwable> {
       TODO("Not yet implemented")
     }

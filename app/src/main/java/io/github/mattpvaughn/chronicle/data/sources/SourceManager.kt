@@ -2,8 +2,6 @@ package io.github.mattpvaughn.chronicle.data.sources
 
 import io.github.mattpvaughn.chronicle.data.local.BookRepository
 import io.github.mattpvaughn.chronicle.data.local.TrackRepository
-import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import javax.inject.Inject
 
 class SourceManager
@@ -33,21 +31,26 @@ class SourceManager
     }
 
     /**
-     * Calls [MediaSource.fetchAudiobooks] and [MediaSource.fetchTracks] respectively, for all
-     * [MediaSource]s in [sources]. Updates the local [bookRepository] to reflect the [Audiobook]s
-     * and [MediaItemTrack]s returned
+     * Would fetch from every registered [MediaSource] and merge the results into the
+     * local repositories.
      *
-     * Failures to fetch data by a [MediaSource] will result in local data being retained, rather
-     * than being deleted
+     * **Not implemented, and deliberately not stubbed as a no-op.** The previous body
+     * fetched books and tracks and then discarded both, so a refresh silently persisted
+     * nothing — it only escaped notice because [sources] is never populated.
+     *
+     * Making it work is not a small fix: neither [bookRepository] nor [trackRepository]
+     * accepts a caller-supplied list. Each owns its own sync from Plex, so ingesting a
+     * merged multi-source list needs a repository API that does not exist yet. That
+     * arrives with the second backend (cu-33), which is also the first time this method
+     * has anything to merge.
+     *
+     * Until then this fails loudly the moment a source is added, rather than pretending
+     * to work.
      */
     suspend fun refreshBooks() {
-      val books =
-        sources.map { source ->
-          source.fetchAudiobooks().component1() ?: emptyList()
-        }
-      val tracks =
-        sources.map { source ->
-          source.fetchTracks().component1() ?: emptyList()
-        }
+      check(sources.isEmpty()) {
+        "SourceManager cannot persist fetched media yet: the repositories expose no " +
+          "bulk-insert API. See cu-33 before registering a MediaSource."
+      }
     }
   }

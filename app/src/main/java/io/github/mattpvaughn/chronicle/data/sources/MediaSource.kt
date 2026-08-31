@@ -27,6 +27,28 @@ interface MediaSource {
    */
   val isDownloadable: Boolean
 
+  /**
+   * Whether the source carries narrator metadata.
+   *
+   * Backends differ in what they know about a book, so the UI reads these flags to
+   * degrade gracefully rather than rendering a blank field that looks like missing
+   * data (decision-11). Plex encodes narrator in `Style` tags by convention; a bare
+   * folder of MP3s knows nothing until tags are read (cu-33.2).
+   */
+  val hasNarrator: Boolean
+
+  /** Whether the source carries series/sequence metadata. */
+  val hasSeries: Boolean
+
+  /**
+   * Whether the source stores playback progress server-side.
+   *
+   * When false, local progress is authoritative and there is nothing to sync or to
+   * drift against — which is what [io.github.mattpvaughn.chronicle.data.local.BookRepository]
+   * and the sync paths need to know.
+   */
+  val hasServerProgress: Boolean
+
   companion object {
     const val NO_SOURCE_FOUND = -1L
   }

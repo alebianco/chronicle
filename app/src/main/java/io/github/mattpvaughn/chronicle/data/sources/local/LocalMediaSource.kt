@@ -28,4 +28,10 @@ class LocalMediaSource : MediaSource {
   }
 
   override val isDownloadable: Boolean = false
+
+  // Files on disk carry no narrator or series metadata until a tag reader lands, and
+  // there is no server to hold progress (cu-33.2).
+  override val hasNarrator: Boolean = false
+  override val hasSeries: Boolean = false
+  override val hasServerProgress: Boolean = false
 }
