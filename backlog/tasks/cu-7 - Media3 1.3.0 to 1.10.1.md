@@ -60,9 +60,13 @@ behaviour under `targetSdk 36`.
 there is nothing to decode. Everything up to and including player construction is confirmed; the
 decode/render path is not. That needs a live Plex server or an audio fixture in cu-16.
 
+**Update:** cu-64 added that fixture and closed this gap — the decode/render path is now verified
+without credentials.
+
 ## Acceptance Criteria
 
 - [x] Media3 upgraded — 1.3.0 → **1.11.0** (past the 1.10.1 in the title), zero source changes
 - [x] Playback engine initialises and the service starts — verified from logs on an emulator
-- [ ] Audio decode/render verified — **not done**: the cu-16 mock serves no audio. Needs a live server
-      or an audio fixture.
+- [x] Audio decode/render verified — closed by **cu-64**'s audio fixture: all three track parts are
+      fetched from the mock and decoded, with `AudioFlinger` confirming 15.000s rendered. No live Plex
+      server needed.

@@ -1,7 +1,7 @@
 ---
 id: cu-64
 title: Audio fixture for end-to-end playback verification
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-08-30'
 labels: [R1, agentic]
@@ -71,10 +71,10 @@ exact slice sizes on a bounded range, open-ended ranges, graceful handling of an
 and that **all three** track parts serve audio — track transitions being where position loss
 historically occurred. Verified to bite: removing the `Accept-Ranges` header fails the suite.
 
-### What is verified, and what is not
+### What is verified
 
-**Verified:** the fixture server delivers a real, seekable audio stream over HTTP, and the app reaches
-ExoPlayer construction with `MediaBrowserService` running under `targetSdk 36`.
+The fixture server delivers a real, seekable audio stream over HTTP; the app fetches all three track
+parts from it and decodes them, with `MediaBrowserService` running under `targetSdk 36`.
 
 ### The debug playback intent (added)
 
@@ -103,20 +103,31 @@ I OnMediaChangedCallback: Playback state changed to STATE_PLAYING
 The track list, durations, saved progress and resolved media URI are all correct, and the session
 reaches `STATE_PLAYING`.
 
-### The remaining gap
+### The "remaining gap" was an instrumentation defect, not a playback bug
 
-**No request for the audio ever reaches the mock server** — `MockPlexServer` logs zero
-`/library/parts/` hits despite the player reporting `STATE_PLAYING`. So the session state machine is
-satisfied while nothing is being fetched or decoded.
+This task was first closed claiming **no request for the audio ever reached the mock server**. That
+conclusion was wrong, and the way it was wrong is the most useful thing recorded here.
 
-Untested hypotheses, roughly in order of likelihood: ExoPlayer's `DataSource` is not the OkHttp client
-the mock is bound to and is failing silently against a stale/unreachable host; or the player is
-resolving to a cached-file path (`CachedFileManager` is active in the logs) and finding nothing; or the
-error is being swallowed before it reaches logcat at the level I filtered.
+`MockPlexServer.dispatch` logged the incoming request *below* its `/photo/` and `/library/parts/`
+early returns. Those two paths therefore returned before ever reaching the log line: they were served
+correctly and were simply invisible. The measurement had a hole in exactly the shape of the thing
+being measured, so "zero audio requests in the log" was read as "zero audio requests", and a full
+diagnostic run was spent chasing three hypotheses about ExoPlayer's `DataSource` — none of which were
+real.
 
-This is a real diagnosis job rather than a small fix, and it belongs with cu-9 (progress reporting),
-which has to understand this path anyway. **What is delivered here is the transport layer and a
-reliable trigger; what is not is proof that bytes flow.** Recorded plainly rather than claimed.
+Hoisting the log above the branches (found by the R0-close adversarial review) showed the app had been
+fetching all three track parts the entire time. `AudioFlinger` independently confirms 330,750 frames
+delivered at 22.05kHz mono — exactly 15.000s, i.e. all three 5s tracks decoded and rendered, including
+the track transitions this fixture exists to exercise.
+
+**Bytes flow, and always did.** The lesson is the recurring one in this release: a check that cannot
+fail proves nothing, and that applies to diagnostic logging just as much as to tests.
+
+### One genuine gap remains
+
+ExoPlayer fetched with `range=null` — it read the streams sequentially and never seeked, so the 206 /
+`Content-Range` path is implemented and unit-tested (`AudioFixtureTest`) but not yet exercised
+end-to-end by the app. Proving that needs a scripted seek, which belongs with cu-9.
 
 ## Acceptance Criteria
 
@@ -124,6 +135,7 @@ reliable trigger; what is not is proof that bytes flow.** Recorded plainly rathe
       and the test server, covered by 6 tests
 - [x] A scripted run reaches playback without tap coordinates — `--el play_book <id>` drives
       `playFromMediaId` directly; the session reports `STATE_BUFFERING` then `STATE_PLAYING`
-- [ ] Audio confirmed fetched from the fixture server — **not done**: the player reports playing but no
-      request reaches the mock. See "The remaining gap" below.
+- [x] Audio confirmed fetched from the fixture server — all three track parts requested and served;
+      `AudioFlinger` confirms 330,750 frames = 15.000s decoded. The earlier "no requests" finding was a
+      logging blind spot, not a bug; see the Implementation Notes.
 - [x] Fixture audio is generated or licence-clean; no third-party media committed — generated sine tone

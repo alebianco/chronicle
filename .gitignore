@@ -50,3 +50,6 @@ docs/superpowers/
 
 # Kotlin build tooling session data
 .kotlin/
+
+# Git worktrees (owner convention: .worktree/<branch-name>)
+.worktree/
