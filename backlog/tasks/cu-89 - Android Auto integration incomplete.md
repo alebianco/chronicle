@@ -58,19 +58,62 @@ too (a separate, manifest-level concern) or only from the absent card.
 
 ## Approach
 
-Diagnose on hardware first, as part of [[cu-73]]. Do not write speculative fixes against a manifest
-and session setup that already read as correct — that is how this stays broken.
+**Reproduce on the phone first — Android Auto is probably not needed.** The symptom is about which
+session the *system* considers active, and that is decided on the device, not by the car. So try:
 
-Concretely: play a book in Chronicle with another media app (Pocket Casts) recently active, then
-dump `adb shell dumpsys media_session` to see which session the system considers active and whether
-Chronicle's appears at all. Log audio-focus transitions alongside it. The Auto simulator is already
-in the caller allowlist, and mock-Plex mode (`--ez mock_plex true`) plus the generated audio tone
-give a server-free way to reproduce.
+1. Play something in another media app (Pocket Casts). Pause it.
+2. Start a book in Chronicle and leave it playing.
+3. Look at the lockscreen / notification shade media controls.
+
+If the other app still owns those controls while Chronicle is playing, the bug is reproduced with no
+car involved, and everything below can be done at a desk. If Chronicle *does* take the controls on
+the phone but not in Auto, the problem is Auto-specific after all and the browse/session interaction
+needs looking at instead.
+
+### Capturing the evidence
+
+```bash
+adb shell dumpsys media_session
+```
+
+**`dumpsys media_session` is a live snapshot, not a log.** It lists the sessions that exist *at that
+moment* plus a short recent-history tail — not sessions from previous days. A session dies with its
+service, so Chronicle only appears while `MediaPlayerService` is running. Therefore:
+
+- Run it **while Chronicle is actively playing**, with the other app having played recently.
+- Capture it twice for contrast: once with only Chronicle playing, once after the other app has
+  played, so the difference in the media-button owner is visible.
+
+What to read in the output:
+
+- **Sessions Stack** — is Chronicle's session listed at all? Is it marked active?
+- **The media button session** — this is the one that owns the card. If it names the other app while
+  Chronicle is playing, that is the bug, stated precisely.
+- **More than one Chronicle session** — would mean the service registers a session per start without
+  releasing the previous one (lead 1).
+
+Worth capturing alongside:
+
+```bash
+# Audio focus owner — lead 2. Chronicle should hold focus while playing.
+adb shell dumpsys audio | sed -n '/Audio Focus stack/,/^$/p'
+```
+
+If focus is requested but immediately lost back to the other app, the system's notion of "who is
+playing" never moves, and no amount of session configuration will fix it.
+
+Mock-Plex mode gives a server-free way to reproduce:
+`adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity --ez mock_plex true`,
+then `--es play_book <id>` to start playback without tapping.
+
+Only after that evidence exists should any further code change be made.
 
 ## Acceptance Criteria
 
-- [ ] Diagnosis recorded with `dumpsys media_session` evidence: whether Chronicle's session is
-      registered, active, and whether a competing session holds the card
+- [ ] Established whether the bug reproduces **on the phone** (lockscreen/shade media controls) or
+      only in Auto — this decides whether it is a session problem or an Auto-specific one
+- [ ] Diagnosis recorded with `dumpsys media_session` evidence *captured while playing*: whether
+      Chronicle's session is registered, active, and which app owns the media button session
 - [ ] Chronicle holds the media playback card while it is playing, displacing any previously active
       app
 - [ ] The app icon appears in the card (and separately, in the Auto launcher)
