@@ -114,7 +114,10 @@
     <string name="pause_play_button">Pause/Play button</string>
     <string name="warning_jump_to_chapter_will_clear_progress">This will clear your saved progress. Continue?</string>
     <string name="playback_error">Playback error: %1$s</string>
-    <string name="playback_error_401">Playback error (401): Not authorized</string>
+    <!-- A 401 that survives the automatic token refresh means the account itself is
+         signed out (a password change with "sign out connected devices"), which only the
+         user can fix. Names the cause and what still works, rather than an error code. -->
+    <string name="playback_error_401">Your Plex sign-in has expired. Downloaded books still play; sign in again to stream.</string>
     <string name="playback_error_503">Playback error (503): Server unavailable</string>
     <string name="playback_error_404">Playback error (404): Track not found</string>
 

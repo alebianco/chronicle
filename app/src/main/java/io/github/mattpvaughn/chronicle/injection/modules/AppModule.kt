@@ -14,6 +14,7 @@ import dagger.Module
 import dagger.Provides
 import io.github.mattpvaughn.chronicle.application.LOG_NETWORK_REQUESTS
 import io.github.mattpvaughn.chronicle.data.local.*
+import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingSingleton
@@ -31,6 +32,7 @@ import timber.log.Timber
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
+import javax.inject.Provider
 import javax.inject.Singleton
 
 @Module
@@ -150,6 +152,11 @@ class AppModule(private val app: Application) {
   fun mediaOkHttpClient(
     plexConfig: PlexConfig,
     loggingInterceptor: HttpLoggingInterceptor,
+    plexPrefsRepo: PlexPrefsRepo,
+    // Provider, not the service: resolving PlexLoginService here would tie the media
+    // client's construction to the login Retrofit's. There is no cycle today, but a lazy
+    // edge keeps it that way if the login branch ever grows a media dependency.
+    plexLoginService: Provider<PlexLoginService>,
   ): OkHttpClient =
     OkHttpClient.Builder()
       .connectTimeout(15, TimeUnit.SECONDS)
@@ -158,6 +165,18 @@ class AppModule(private val app: Application) {
       .protocols(listOf(Protocol.HTTP_1_1, Protocol.QUIC))
       .addInterceptor(plexConfig.plexMediaInterceptor)
       .addInterceptor(loggingInterceptor)
+      // Recovers a rotated server token on a 401 and retries once (cu-10). Media client
+      // only: a 401 from the *login* client means the account token is dead, and
+      // re-fetching resources with that same dead token cannot help.
+      .authenticator(
+        PlexTokenAuthenticator(plexPrefsRepo) {
+          val cached = plexPrefsRepo.server ?: return@PlexTokenAuthenticator null
+          plexLoginService.get().resources()
+            .filter { it.provides.contains("server") }
+            .map { it.asServer() }
+            .firstOrNull { it.serverId == cached.serverId }
+        },
+      )
       .build()
 
   @Provides

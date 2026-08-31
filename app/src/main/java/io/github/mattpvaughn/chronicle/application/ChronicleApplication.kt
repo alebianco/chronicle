@@ -16,9 +16,10 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.model.asServer
+import io.github.mattpvaughn.chronicle.data.model.mergeServerRefresh
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
-import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.injection.components.AppComponent
 import io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent
@@ -136,6 +137,13 @@ open class ChronicleApplication :
   }
 
   companion object {
+    /**
+     * How long to wait for a `/api/v2/resources` refresh before launching with the
+     * cached server. Short on purpose: this is on the startup path, and a stale
+     * connection list is far better than a slow cold start.
+     */
+    private const val RESOURCE_REFRESH_TIMEOUT_MS = 4000L
+
     private var INSTANCE: ChronicleApplication? = null
 
     @JvmStatic
@@ -180,30 +188,28 @@ open class ChronicleApplication :
     if (server != null) {
       plexConfig.setPotentialConnections(server.connections)
       applicationScope.launch(unhandledExceptionHandler) {
-        val retrievedConnections: List<Connection> =
-          withTimeoutOrNull(4000L) {
+        // Keep the whole refreshed server, not just its connections: asServer() carries a
+        // fresh accessToken, and dropping it meant a rotated server token was re-fetched
+        // and discarded on every launch (cu-10).
+        val fetched: ServerModel? =
+          withTimeoutOrNull(RESOURCE_REFRESH_TIMEOUT_MS) {
             try {
               plexLoginService.resources()
                 .filter { it.provides.contains("server") }
                 .map { it.asServer() }
-                .filter { it.serverId == server.serverId }
-                .flatMap { it.connections }
+                .firstOrNull { it.serverId == server.serverId }
             } catch (e: Exception) {
-              Timber.e("Failed to retrieve new connections: $e")
-              emptyList()
+              // Launching offline is ordinary; keep the cached credentials.
+              Timber.w(e, "Could not refresh server resources; keeping cached server")
+              null
             }
-          } ?: emptyList()
-        Timber.i("Updated new connections: $retrievedConnections")
-        plexPrefs.server =
-          server.copy(
-            connections = server.connections + retrievedConnections,
-          )
-        Timber.i("Retrieved new connections: $retrievedConnections")
+          }
+        plexPrefs.server = mergeServerRefresh(server, fetched)
+        Timber.i("Server refresh applied (fetched = ${fetched != null})")
         try {
-          Timber.i("Connection to server!")
           plexConfig.connectToServer(plexMediaService)
         } catch (t: Throwable) {
-          Timber.e("Exception in chooseViableConnections in ChronicleApplication: $t")
+          Timber.e(t, "Failed to connect to server after refresh")
         }
       }
     }
