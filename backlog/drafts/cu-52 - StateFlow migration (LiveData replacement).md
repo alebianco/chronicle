@@ -5,10 +5,14 @@ status: Draft
 assignee: []
 created_date: '2026-07-13'
 labels: [R4, architecture]
-dependencies: [cu-58]
+dependencies: []
 priority: low
 milestone: m-4
 ---
+
+## Blocker cleared (2026-08-31)
+
+cu-58 is Done, so this is unblocked — but it still needs an owner decision on *whether* to migrate at all (see below).
 
 ## Description
 

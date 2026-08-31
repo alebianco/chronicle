@@ -1,17 +1,22 @@
 # Debt Analysis (reference)
 
-*Optional* deep-reference for the 26 technical-debt items originally catalogued in the (now dissolved) `docs/09-project-analysis-and-tasks.md` — problem statement, current-state code audit, risk. **These are background reference, not the tracker.** A task's own plan and notes live *inside the task file* (Backlog.md `plan`/`notes`); the execution plan is drafted with `superpowers:writing-plans` as gitignored scratch and summarized into the task (see `/CLAUDE.md` §Workflow). Read the analysis file for a task when one is linked; many tasks need none. Files here are from 2025-11 (pre-consolidation) — treat the code snippets as informative, not prescriptive, and move a file to `archive/` once its task is Done and the content no longer matches the code. Each debt code below maps to the task(s) that carry it:
+*Optional* deep-reference for the 26 technical-debt items originally catalogued in the (now dissolved) `docs/09-project-analysis-and-tasks.md` — problem statement, current-state code audit, risk. **These are background reference, not the tracker.** A task's own plan and notes live *inside the task file* (Backlog.md `plan`/`notes`); the execution plan is drafted with `superpowers:writing-plans` as gitignored scratch and summarized into the task (see `/CLAUDE.md` §Workflow). Read the analysis file for a task when one is linked; many tasks need none. Files here are from 2025-11 (pre-consolidation) — treat the code snippets as informative, not prescriptive, and move a file to `archive/` once its task is Done and the content no longer matches the code.
+
+**Archived 2026-08-31 (R0 close):** C2, C3, H2, H3, H4, M1, M3. Several were not merely stale but
+*wrong* by the time their task ran — C2 called the version catalog's fake KSP entry "good news", H4
+proposed Codecov (barred by D12 rule 7), and H2 assumed the ProGuard rules were minimal when the real
+defect was that they were far too broad. Read any remaining file as a starting hypothesis, not a spec. Each debt code below maps to the task(s) that carry it:
 
 | Debt | Plan | Tracked as |
 |---|---|---|
 | C1 cleartext traffic | `C1-...md` | cu-42 |
-| C2 KAPT→KSP | `C2-...md` | cu-8 |
-| C3 Fresco→Coil | `C3-...md` | cu-43 |
+| C2 KAPT→KSP | `C2-...md` | cu-8 ✅ **archived** — asserts KAPT is current; KSP landed in cu-8/cu-58 |
+| C3 Fresco→Coil | `C3-...md` | cu-43 ✅ **archived** |
 | C4 GlobalScope · C5 InternalCoroutinesApi · H5 dispatchers · C6 LocalMediaSource · H6 delicate API | `C4/C5/H5/C6/H6-...md` | cu-15 (ride-along refactor folds all five) |
 | H1 test coverage | `H1-...md` | cu-44 (+ gate in cu-3, fixtures in cu-16) |
-| H2 ProGuard | `H2-...md` | cu-45 |
-| H3 SDK/doc mismatch | `H3-...md` | cu-2 (docs) + cu-6 (SDK bump) |
-| H4 CI test execution | `H4-...md` | cu-3 |
+| H2 ProGuard | `H2-...md` | cu-45 ✅ **archived** — proposed rules; cu-45 found the opposite problem (rules too broad) |
+| H3 SDK/doc mismatch | `H3-...md` | cu-2 + cu-6 ✅ **archived** |
+| H4 CI test execution | `H4-...md` | cu-3 ✅ **archived** — proposed Codecov, which D12 rule 7 forbids |
 | H7 TODO audit | `H7-...md` | cu-46 (done) |
 | H8 accessibility | `H8-...md` | cu-47 |
 | M1 kotlin-result | `M1-...md` | cu-48 |

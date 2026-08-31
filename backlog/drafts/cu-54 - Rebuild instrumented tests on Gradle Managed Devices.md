@@ -5,9 +5,13 @@ status: Draft
 assignee: []
 created_date: '2026-08-30'
 labels: [R1, agentic]
-dependencies: [cu-16]
+dependencies: []
 priority: medium
 ---
+
+## Blocker cleared (2026-08-31)
+
+cu-16 is Done, so the hermetic fixture server this depended on now exists and this is unblocked.
 
 ## Description
 

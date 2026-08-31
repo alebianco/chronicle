@@ -1,7 +1,7 @@
 ---
 id: cu-53
 title: Billing library update
-status: Draft
+status: Won't Do
 assignee: []
 created_date: '2026-07-13'
 labels: [R4, governance]
@@ -16,11 +16,14 @@ M3: Play Billing library update. DORMANT by D4/D9 — the IAP gate ships disable
 
 Analysis: [`M3-billing-library-update-plan.md`](../docs/analysis/M3-billing-library-update-plan.md).
 
-## Open question / why this is a draft
+## Won't do (2026-08-31)
 
-Needs an owner decision before it becomes a tracked task (see below).
+Obsolete. This draft assumed the IAP plumbing stayed dormant-but-present and would need updating if
+D9's revisit triggers ever fired.
 
-## Acceptance Criteria (provisional)
+Neither premise holds. [[decision-15]] withdrew those triggers permanently — no monetization of any
+kind, ever — and cu-60 deleted the billing code outright: `ChronicleBillingManager`, `PREMIUM_IAP_SKU`,
+the Google-IAP dependency, its ProGuard rules and the Play Billing manifest declaration. A grep for
+`billing` across `app/src/main` and the version catalog now returns zero hits.
 
-- [ ] Only actioned if D9 triggers fire
-- [ ] If actioned: billing lib current, purchase/subscription flows tested
+There is no library left to update. Closed rather than left as a draft that reads like pending work.

@@ -28,7 +28,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - Release builds: `./test_release_build.sh` (R8/ProGuard smoke test; see CONTRIBUTING.md "Release Builds & ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (Moshi models, Room entities), or dependencies. It asserts against the **dex** that Room/Retrofit/Dagger/Moshi classes survived R8 — these fail at runtime, not build time. Keep rules are deliberately narrow (cu-45): prefer adding one precise rule over widening a blanket `-keep`, which silently exempts code from R8.
 - **Instrumented tests are quarantined, not just disabled**: the sources in `app/src/androidTest` no longer compile — they target an `OnboardingActivity` and strings removed when onboarding became Fragments (`9e89270`). `DebugAndroidTest` tasks are force-disabled in `app/build.gradle.kts`; the fake CI emulator job was deleted in cu-3. **There is no instrumented coverage — never claim any.** Rebuilding the suite is task cu-54.
 
-## Project snapshot (truthful as of 2026-07-13 — verify against build files if in doubt)
+## Project snapshot (truthful as of 2026-08-31 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin **2.2.10**, minSdk 27, target/compileSdk **36** (cu-6). Gradle 9.5.1 + AGP 8.13.2 — note AGP 8.x cannot use Gradle >= 9.6.0, and AGP 9.x absorbs the Kotlin plugin (its own migration).
 - MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · LiveData + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
@@ -41,7 +41,13 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   (records the flag and restarts; it must apply before `setupNetwork()`). Use it to see and screenshot
   UI states without credentials. The machinery lives in `app/src/debug/`, with a no-op twin in
   `app/src/release/`, so it is not compiled into release builds at all.
-- Tests: 3 unit-test files (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+  The mock also serves cover art and a generated audio tone with HTTP range support (cu-64), and
+  `--el play_book <id>` starts playback via `playFromMediaId` without needing tap coordinates. Caveat:
+  the player reaches `STATE_PLAYING` but no request for the audio reaches the mock, so bytes-flowing is
+  **not** yet proven — see cu-64. `./capture-screens.sh <dir>` drives the app and screenshots the main
+  screens; it asserts the app was actually foregrounded, because an earlier version silently captured
+  the launcher.
+- Tests: 8 unit-test files, **55 tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
