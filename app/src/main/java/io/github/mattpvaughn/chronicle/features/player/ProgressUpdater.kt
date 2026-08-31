@@ -16,9 +16,10 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.BOOK_FINISHED_END_OFFSET_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.NETWORK_CALL_FREQUENCY
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -50,6 +51,21 @@ interface ProgressUpdater {
   /** Update progress without providing any parameters */
   fun updateProgressWithoutParameters()
 
+  /**
+   * Writes progress and returns only once the local write has completed.
+   *
+   * Exists for service teardown. [updateProgress] launches into the service scope, and
+   * `MediaPlayerService.onDestroy` cancelled that scope on the line after asking for a
+   * final update — the repository writes are `suspend` + `withContext`, so cancellation
+   * landed on them and the last known position never reached the database. This variant
+   * is bound to its caller instead, so the write survives the service dying.
+   */
+  suspend fun updateProgressBlocking(
+    trackId: Int,
+    playbackState: String,
+    progress: Long,
+  )
+
   /** Cancels regular progress updates */
   fun cancel()
 
@@ -73,6 +89,7 @@ class SimpleProgressUpdater
     private val workManager: WorkManager,
     private val prefsRepo: PrefsRepo,
     private val currentlyPlaying: CurrentlyPlaying,
+    private val dispatchers: DispatcherProvider,
   ) : ProgressUpdater {
     var mediaController: MediaControllerCompat? = null
 
@@ -94,7 +111,7 @@ class SimpleProgressUpdater
     override fun startRegularProgressUpdates() {
       requireNotNull(mediaController).let { controller ->
         if (controller.playbackState?.isPlaying != false) {
-          serviceScope.launch(context = serviceScope.coroutineContext + Dispatchers.IO) {
+          serviceScope.launch(context = serviceScope.coroutineContext + dispatchers.io) {
             updateProgress(
               controller.metadata?.id?.toInt() ?: TRACK_NOT_FOUND,
               MediaPlayerService.PLEX_STATE_PLAYING,
@@ -132,54 +149,84 @@ class SimpleProgressUpdater
       progress: Long,
       forceNetworkUpdate: Boolean,
     ) {
-      Timber.i("Updating progress")
       if (trackId == TRACK_NOT_FOUND) {
         return
       }
+      serviceScope.launch(context = serviceScope.coroutineContext + dispatchers.io) {
+        writeProgress(trackId, playbackState, progress, forceNetworkUpdate)
+      }
+    }
+
+    override suspend fun updateProgressBlocking(
+      trackId: Int,
+      playbackState: String,
+      progress: Long,
+    ) {
+      if (trackId == TRACK_NOT_FOUND) {
+        return
+      }
+      // withContext, not serviceScope.launch: the caller's lifetime governs this write,
+      // so a dying service cannot cancel it out from under us. Always forces the network
+      // report, since there will be no later tick to carry the position.
+      withContext(dispatchers.io) {
+        writeProgress(trackId, playbackState, progress, forceNetworkUpdate = true)
+      }
+    }
+
+    /**
+     * The shared body of both update paths. Suspends until the local write is done; the
+     * network report is handed to WorkManager, which survives process death by design.
+     */
+    private suspend fun writeProgress(
+      trackId: Int,
+      playbackState: String,
+      progress: Long,
+      forceNetworkUpdate: Boolean,
+    ) {
+      Timber.i("Updating progress")
       val currentTime = System.currentTimeMillis()
-      serviceScope.launch(context = serviceScope.coroutineContext + Dispatchers.IO) {
-        val bookId: Int = trackRepository.getBookIdForTrack(trackId)
-        val track: MediaItemTrack = trackRepository.getTrackAsync(trackId) ?: EMPTY_TRACK
+      val bookId: Int = trackRepository.getBookIdForTrack(trackId)
+      val track: MediaItemTrack = trackRepository.getTrackAsync(trackId) ?: EMPTY_TRACK
 
-        // No reason to update if the track or book doesn't exist in the DB
-        if (trackId == TRACK_NOT_FOUND || bookId == NO_AUDIOBOOK_FOUND_ID) {
-          return@launch
-        }
+      // No reason to update if the track or book doesn't exist in the DB
+      if (trackId == TRACK_NOT_FOUND || bookId == NO_AUDIOBOOK_FOUND_ID) {
+        return
+      }
 
-        val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
-        val book = bookRepository.getAudiobookAsync(bookId)
-        val bookProgress = tracks.getTrackStartTime(track) + progress
-        val bookDuration = tracks.getDuration()
+      val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
+      val book = bookRepository.getAudiobookAsync(bookId)
+      val bookProgress = tracks.getTrackStartTime(track) + progress
+      val bookDuration = tracks.getDuration()
 
-        currentlyPlaying.update(
-          book = book ?: EMPTY_AUDIOBOOK,
-          track = tracks.getActiveTrack(),
+      currentlyPlaying.update(
+        book = book ?: EMPTY_AUDIOBOOK,
+        track = tracks.getActiveTrack(),
+        tracks = tracks,
+      )
+
+      // Update local DB
+      if (!prefsRepo.debugOnlyDisableLocalProgressTracking) {
+        updateLocalProgress(
+          bookId = bookId,
+          currentTime = currentTime,
+          trackProgress = progress,
+          trackId = trackId,
+          bookProgress = bookProgress,
           tracks = tracks,
+          bookDuration = bookDuration,
+          playbackState = playbackState,
         )
+      }
 
-        // Update local DB
-        if (!prefsRepo.debugOnlyDisableLocalProgressTracking) {
-          updateLocalProgress(
-            bookId = bookId,
-            currentTime = currentTime,
-            trackProgress = progress,
-            trackId = trackId,
-            bookProgress = bookProgress,
-            tracks = tracks,
-            bookDuration = bookDuration,
-          )
-        }
-
-        // Update server once every [networkCallFrequency] calls, or when manual updates
-        // have been specifically requested
-        if (forceNetworkUpdate || tickCounter % NETWORK_CALL_FREQUENCY == 0L) {
-          updateNetworkProgress(
-            trackId,
-            playbackState,
-            progress,
-            bookProgress,
-          )
-        }
+      // Update server once every [networkCallFrequency] calls, or when manual updates
+      // have been specifically requested
+      if (forceNetworkUpdate || tickCounter % NETWORK_CALL_FREQUENCY == 0L) {
+        updateNetworkProgress(
+          trackId,
+          playbackState,
+          progress,
+          bookProgress,
+        )
       }
     }
 
@@ -222,6 +269,7 @@ class SimpleProgressUpdater
       bookProgress: Long,
       tracks: List<MediaItemTrack>,
       bookDuration: Long,
+      playbackState: String,
     ) {
       tickCounter++
       bookRepository.updateProgress(bookId, currentTime, trackProgress)
@@ -232,7 +280,16 @@ class SimpleProgressUpdater
         tracks.getDuration(),
         tracks.size,
       )
-      if (bookDuration - bookProgress <= BOOK_FINISHED_END_OFFSET_MILLIS) {
+
+      // Being near the end is not the same as being finished. This check used to run on
+      // every tick, so listening through the last two minutes marked the book complete
+      // while it was still playing — and setWatched resets progress, which presents as
+      // the book jumping back to the start (#67). PlexSyncScrobbleWorker already gated
+      // the same rule on playback having ended; the local path did not.
+      val hasUserEndedPlayback =
+        playbackState == MediaPlayerService.PLEX_STATE_PAUSED ||
+          playbackState == MediaPlayerService.PLEX_STATE_STOPPED
+      if (hasUserEndedPlayback && bookDuration - bookProgress <= BOOK_FINISHED_END_OFFSET_MILLIS) {
         Timber.i("Marking $bookId as finished")
         bookRepository.setWatched(bookId)
       }

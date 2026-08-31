@@ -472,12 +472,18 @@ class MediaPlayerService :
     val trackId = mediaController.metadata.id
     if (trackId != null && trackId.toInt() != TRACK_NOT_FOUND) {
       val finalPosition = currentPlayer?.currentPosition ?: 0L
-      progressUpdater.updateProgress(
-        trackId.toInt(),
-        PLEX_STATE_STOPPED,
-        finalPosition,
-        true,
-      )
+      // runBlocking, deliberately. onDestroy has no continuation to suspend into and the
+      // process may die the moment it returns, so the write has to finish here. This
+      // previously called the fire-and-forget updateProgress and then cancelled
+      // serviceJob on the next line, which cancelled the write before it landed — the
+      // swipe-away half of the position-loss family.
+      runBlocking {
+        progressUpdater.updateProgressBlocking(
+          trackId.toInt(),
+          PLEX_STATE_STOPPED,
+          finalPosition,
+        )
+      }
     }
     progressUpdater.cancel()
     serviceJob.cancel()

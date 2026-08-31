@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.features.login.ChooseUserFragment
 import io.github.mattpvaughn.chronicle.features.login.LoginFragment
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule.Companion.OKHTTP_CLIENT_MEDIA
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineExceptionHandler
 import okhttp3.OkHttpClient
 import java.io.File
@@ -58,6 +59,12 @@ interface AppComponent {
   fun bookRepos(): BookRepository
 
   fun workManager(): WorkManager
+
+  /**
+   * Exposed because ServiceComponent and ActivityComponent depend on this component
+   * rather than being subcomponents, so they can only inject what is declared here.
+   */
+  fun dispatchers(): DispatcherProvider
 
   fun unhandledExceptionHandler(): CoroutineExceptionHandler
 

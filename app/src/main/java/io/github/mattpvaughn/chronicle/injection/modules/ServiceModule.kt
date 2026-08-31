@@ -107,6 +107,7 @@ class ServiceModule(private val service: MediaPlayerService) {
   fun sleepTimer(simpleSleepTimer: SimpleSleepTimer): SleepTimer = simpleSleepTimer
 
   @Provides
+  @ServiceScope
   fun provideProgressUpdater(
     updater: SimpleProgressUpdater,
     mediaControllerCompat: MediaControllerCompat,
