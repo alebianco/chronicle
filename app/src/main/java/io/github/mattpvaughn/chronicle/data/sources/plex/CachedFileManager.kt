@@ -26,6 +26,8 @@ import io.github.mattpvaughn.chronicle.features.download.FetchGroupStartFinishLi
 import io.github.mattpvaughn.chronicle.features.download.ResumePlan
 import io.github.mattpvaughn.chronicle.features.download.bookIdOrNull
 import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
+import io.github.mattpvaughn.chronicle.features.download.isBookFullyCached
+import io.github.mattpvaughn.chronicle.features.download.reconcileCachedTracks
 import io.github.mattpvaughn.chronicle.features.download.scanCachedMediaDir
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
@@ -432,21 +434,22 @@ class CachedFileManager
 
       val reportedCachedKeys = trackRepository.getCachedTracks().map { it.id }
 
+      // The set arithmetic lives in `reconcileCachedTracks` so it can be tested without Fetch, a
+      // Context or the Injector — see CacheReconciliation.
+      val reconciliation =
+        reconcileCachedTracks(onDisk = trackIdsFoundOnDisk, reportedCached = reportedCachedKeys)
+
       val alteredTracks = mutableListOf<String>()
 
       // Exists in DB but not in cache- remove from DB!
-      reportedCachedKeys.filter {
-        !trackIdsFoundOnDisk.contains(it)
-      }.forEach {
+      reconciliation.toMarkUncached.forEach {
         Timber.i("Removed track: $it")
         alteredTracks.add(it)
         trackRepository.updateCachedStatus(it, false)
       }
 
       // Exists in cache but not in DB- add to DB!
-      trackIdsFoundOnDisk.filter {
-        !reportedCachedKeys.contains(it)
-      }.forEach {
+      reconciliation.toMarkCached.forEach {
         val rowsUpdated = trackRepository.updateCachedStatus(it, true)
         if (rowsUpdated == 0) {
           // TODO: this will be relevant when multiple sources is implemented, but for now
@@ -469,7 +472,7 @@ class CachedFileManager
         val bookTrackCacheCount =
           trackRepository.getCachedTrackCountForBookAsync(bookId)
         val bookTrackCount = trackRepository.getTrackCountForBookAsync(bookId)
-        val isBookCached = bookTrackCacheCount == bookTrackCount && bookTrackCount > 0
+        val isBookCached = isBookFullyCached(bookTrackCacheCount, bookTrackCount)
         val book = bookRepository.getAudiobookAsync(bookId)
         if (book != null) {
           bookRepository.update(
