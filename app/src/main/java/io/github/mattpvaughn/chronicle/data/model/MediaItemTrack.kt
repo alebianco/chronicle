@@ -104,7 +104,8 @@ data class MediaItemTrack(
         progress = networkTrack.viewOffset,
         media = networkTrack.media[0].part[0].key,
         album = networkTrack.parentTitle,
-        lastViewedAt = networkTrack.lastViewedAt,
+        // Plex reports seconds; the local DB stores millis (cu-14).
+        lastViewedAt = plexTimestampToMillis(networkTrack.lastViewedAt),
         updatedAt = networkTrack.updatedAt,
         size = networkTrack.media[0].part[0].size,
       )
@@ -263,6 +264,34 @@ fun MediaItemTrack.uniqueId(): Int {
 }
 
 val EMPTY_TRACK = MediaItemTrack(id = TRACK_NOT_FOUND)
+
+/**
+ * Converts a Plex `lastViewedAt` to the millisecond epoch the local database uses.
+ *
+ * Plex reports Unix **seconds**; `ProgressUpdater` writes `System.currentTimeMillis()`. Both
+ * `MediaItemTrack.merge` and `Audiobook.merge` decide which side is newer with
+ * `network.lastViewedAt > local.lastViewedAt`, so mixing the units meant the server value was
+ * ~1000x smaller and could never win — a position set on a second device was silently
+ * discarded on every refresh (cu-14).
+ *
+ * Values already large enough to be milliseconds are passed through unchanged: converting
+ * twice would push the timestamp tens of thousands of years out and make the server always
+ * win, which is the same bug with the sign flipped.
+ *
+ * Zero means "never viewed" and stays zero rather than becoming a real 1970 ordering.
+ */
+fun plexTimestampToMillis(plexLastViewedAt: Long): Long =
+  when {
+    plexLastViewedAt <= 0L -> 0L
+    plexLastViewedAt >= SECONDS_MILLIS_THRESHOLD -> plexLastViewedAt
+    else -> plexLastViewedAt * 1_000L
+  }
+
+/**
+ * Above this, a value cannot plausibly be Unix seconds — 10^11 seconds is the year 5138, while
+ * 10^11 millis is 1973. Anything larger is therefore already milliseconds.
+ */
+private const val SECONDS_MILLIS_THRESHOLD = 100_000_000_000L
 
 /**
  * Whether [file] holds a *complete* download of a track whose expected size is [expectedSize].

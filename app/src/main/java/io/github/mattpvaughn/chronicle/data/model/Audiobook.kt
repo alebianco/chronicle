@@ -71,7 +71,8 @@ data class Audiobook(
         year = dir.year.takeIf { it != 0 } ?: dir.parentYear,
         addedAt = dir.addedAt,
         updatedAt = dir.updatedAt,
-        lastViewedAt = dir.lastViewedAt,
+        // Plex reports seconds; the local DB stores millis (cu-14).
+        lastViewedAt = plexTimestampToMillis(dir.lastViewedAt),
         viewedLeafCount = dir.viewedLeafCount,
         leafCount = dir.leafCount,
         viewCount = dir.viewCount,

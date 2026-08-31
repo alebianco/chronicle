@@ -1,8 +1,8 @@
 ---
 id: cu-14
 title: Sync drift-check + force-sync affordance
-status: To Do
-assignee: []
+status: In Progress
+assignee: [claude]
 created_date: '2026-07-13'
 labels: [R1, trust]
 dependencies: [cu-9]
