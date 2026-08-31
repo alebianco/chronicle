@@ -103,6 +103,20 @@ Grouped by what breaks if the real server disagrees.
       authenticator's tests exercise the decision, not the wiring; an integration test
       through MockWebServer would confirm the `AppModule` hookup actually fires.
 
+### Downloads (cu-12 / cu-76)
+
+- [ ] **A large book (ideally ~2GB m4b) downloads to completion**, and memory is watched
+      while it does. [[cu-12]] found no OOM mechanism in app code, so #83 is either in
+      Fetch2's internals or stale — this is what decides which.
+- [ ] **Wi-Fi drop mid-download, then reconnect.** Expect resume, not a silent stop. Then
+      check the book is *not* marked available offline while incomplete — that promotion of
+      partial files is [[cu-76]]'s first defect.
+- [ ] **Kill the app mid-download and relaunch.** Same expectation.
+- [ ] **A downloaded book plays with the server unreachable.** Should already work (cached
+      tracks resolve to a local path), but confirm the UI does not block on a connection check.
+- [ ] **Which route a download takes** once `OkHttpDownloader` is wired ([[cu-76]] item 3):
+      downloads should get the same tier as playback, not a relay while playback uses LAN.
+
 ### Unofficial endpoints
 
 - [ ] **`/:/timeline`, scrobble, websockets.** Community-documented, not guaranteed

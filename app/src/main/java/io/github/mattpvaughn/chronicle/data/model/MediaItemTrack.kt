@@ -263,3 +263,27 @@ fun MediaItemTrack.uniqueId(): Int {
 }
 
 val EMPTY_TRACK = MediaItemTrack(id = TRACK_NOT_FOUND)
+
+/**
+ * Whether [file] holds a *complete* download of a track whose expected size is [expectedSize].
+ *
+ * Exists because the cached-file scan marked every file matching `<id>.<ext>` as downloaded
+ * with no size check, while [MediaItemTrack.size] — populated from Plex and persisted in Room
+ * — was read nowhere. A Wi-Fi drop mid-download therefore left a partial file that the next
+ * launch promoted to "available offline", and the book played truncated (cu-76).
+ *
+ * A size mismatch in *either* direction is rejected: a longer file means the metadata and the
+ * bytes disagree, and trusting it would hide whichever is wrong.
+ *
+ * @param expectedSize 0 when Plex reported no size. The check then falls back to "non-empty",
+ *   which preserves the old behaviour for those tracks rather than making them permanently
+ *   un-cacheable — an empty file is still rejected.
+ */
+fun isCompleteDownload(
+  file: File,
+  expectedSize: Long,
+): Boolean {
+  if (!file.exists()) return false
+  val actual = file.length()
+  return if (expectedSize > 0L) actual == expectedSize else actual > 0L
+}

@@ -19,6 +19,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
+import io.github.mattpvaughn.chronicle.data.model.isCompleteDownload
 import io.github.mattpvaughn.chronicle.features.download.DownloadNotificationWorker
 import io.github.mattpvaughn.chronicle.features.download.FetchGroupStartFinishListener
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
@@ -344,16 +345,30 @@ class CachedFileManager
      */
     override suspend fun refreshTrackDownloadedStatus() {
       val idToFileMap = HashMap<Int, File>()
-      val trackIdsFoundOnDisk =
+      val filesOnDisk =
         prefsRepo.cachedMediaDir.listFiles(
           FileFilter {
             MediaItemTrack.cachedFilePattern.matches(it.name)
           },
-        )?.map {
-          val id = MediaItemTrack.getTrackIdFromFileName(it.name)
-          idToFileMap[id] = it
+        )?.toList() ?: emptyList()
+
+      // A file's presence is not proof it finished downloading. This scan used to mark any
+      // matching file as cached, so a Wi-Fi drop mid-download left a partial file that the
+      // next launch promoted to "available offline" — and the book played truncated. The
+      // expected size has always been in the database; it was simply never read (cu-76).
+      val trackIdsFoundOnDisk =
+        filesOnDisk.mapNotNull { file ->
+          val id = MediaItemTrack.getTrackIdFromFileName(file.name)
+          val expectedSize = trackRepository.getTrackAsync(id)?.size ?: 0L
+          if (!isCompleteDownload(file, expectedSize)) {
+            Timber.i(
+              "Ignoring incomplete download for track $id: ${file.length()} of $expectedSize bytes",
+            )
+            return@mapNotNull null
+          }
+          idToFileMap[id] = file
           id
-        } ?: emptyList()
+        }
 
       val reportedCachedKeys = trackRepository.getCachedTracks().map { it.id }
 
