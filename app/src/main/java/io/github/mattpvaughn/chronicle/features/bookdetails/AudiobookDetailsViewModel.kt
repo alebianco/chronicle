@@ -237,7 +237,6 @@ class AudiobookDetailsViewModel(
       if (_summaryLinesShown.value == lineCountSummaryMinimized) lineCountSummaryMaximized else lineCountSummaryMinimized
   }
 
-  @InternalCoroutinesApi
   fun connectToServer() {
     viewModelScope.launch(Dispatchers.IO) {
       plexConfig.connectToServer(plexMediaService)

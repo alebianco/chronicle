@@ -33,12 +33,10 @@ import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.InternalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
-@OptIn(InternalCoroutinesApi::class)
 class AudiobookDetailsFragment : Fragment() {
   companion object {
     fun newInstance() = AudiobookDetailsFragment()

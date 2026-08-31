@@ -171,7 +171,6 @@ class PlexConfig
 
     private var prevConnectToServerJob: CompletableJob? = null
 
-    @InternalCoroutinesApi
     fun connectToServer(plexMediaService: PlexMediaService) {
       prevConnectToServerJob?.cancel("Killing previous connection attempt")
       _connectionState.postValue(CONNECTING)
@@ -233,7 +232,6 @@ class PlexConfig
      *
      * If no connections are made within 15 seconds, return a [ConnectionResult.Failure].
      */
-    @InternalCoroutinesApi
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun chooseViableConnections(plexMediaService: PlexMediaService): ConnectionResult {
       val timeoutFailureReason = "Connection timed out"

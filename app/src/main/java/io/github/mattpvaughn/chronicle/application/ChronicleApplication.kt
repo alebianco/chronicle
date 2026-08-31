@@ -142,7 +142,6 @@ open class ChronicleApplication :
     fun get(): ChronicleApplication = INSTANCE!!
   }
 
-  @OptIn(InternalCoroutinesApi::class)
   private fun setupNetwork(plexPrefs: PlexPrefsRepo) {
     val connectivityManager =
       getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -210,7 +209,6 @@ open class ChronicleApplication :
     }
   }
 
-  @InternalCoroutinesApi
   private val networkStateListener =
     object : BroadcastReceiver() {
       override fun onReceive(
@@ -227,7 +225,6 @@ open class ChronicleApplication :
     }
 
   // Connect to the first connection which can establish a connection
-  @InternalCoroutinesApi
   private fun connectToServer() {
     plexConfig.connectToServer(plexMediaService)
   }

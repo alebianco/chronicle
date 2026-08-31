@@ -12,13 +12,11 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.asLibrary
 import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.postEvent
-import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.*
 import javax.inject.Inject
 
-@OptIn(InternalCoroutinesApi::class)
 class ChooseLibraryViewModel
   @Inject
   constructor(
