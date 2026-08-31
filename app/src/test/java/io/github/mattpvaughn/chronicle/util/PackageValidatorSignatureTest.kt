@@ -5,25 +5,46 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pins the platform-signature allowance in [PackageValidator] (cu-61).
+ * Guards the two allowlist rules in [PackageValidator] that decide whether an
+ * app may browse the media library (cu-61).
  *
- * `PackageValidator` needs a real `Context` and parses an XML resource, so the
- * decision is not directly constructible in a JVM test. What is worth pinning is
- * the boolean rule, because getting it wrong is a security bug rather than a
- * crash: `getSignature()` returns `String?`, so a caller with no readable
- * signature yields null — and a bare `callerSignature == platformSignature`
- * would then admit that caller whenever the platform signature is also null,
- * which is exactly the emulator case cu-61 is about.
+ * These mirror the production expressions rather than calling them: the real
+ * decision needs a `Context`, a `PackageManager` and a parsed XML resource, and
+ * is private. An adversarial review rightly called an earlier version of this
+ * file documentation-not-coverage for exactly that reason — so the mirrors are
+ * now kept deliberately *minimal and literal*, and each carries the production
+ * `file:line` it shadows. If either expression changes, update both together;
+ * a divergence is a review failure, not a test failure.
  *
- * The rule is mirrored here so an edit to the real `when` branch that drops the
- * null guard fails a test rather than silently widening access.
+ * Both rules are security-relevant in the fail-open direction, which is why they
+ * are worth pinning at all: each historically admitted a caller it should not.
  */
 class PackageValidatorSignatureTest {
-  /** Mirrors the guarded branch in `PackageValidator.isKnownCaller`. */
+  /**
+   * Mirrors the platform-signature branch (`PackageValidator.isKnownCaller`).
+   *
+   * `getSignature()` returns `String?`, so an unsigned caller yields null. An
+   * unguarded `callerSignature == platformSignature` therefore admitted that
+   * caller whenever the platform signature was *also* null — the case on an
+   * emulator image with no platform signature.
+   */
   private fun admittedByPlatformSignature(
     callerSignature: String?,
     platformSignature: String?,
   ): Boolean = platformSignature != null && callerSignature == platformSignature
+
+  /**
+   * Mirrors the whitelist branch (`PackageValidator.isKnownCaller`).
+   *
+   * This used `first {}`, which **throws** when nothing matches rather than
+   * returning null, and is evaluated before the `when` — so a whitelisted app
+   * whose signature was not among the pinned keys crashed the exported
+   * `MediaBrowserService` instead of simply being refused.
+   */
+  private fun admittedByWhitelist(
+    callerSignature: String?,
+    pinnedSignatures: List<String>,
+  ): Boolean = callerSignature != null && pinnedSignatures.any { it == callerSignature }
 
   @Test
   fun `a caller signed with the platform certificate is admitted`() {
@@ -37,13 +58,11 @@ class PackageValidatorSignatureTest {
 
   @Test
   fun `an unsigned caller is not admitted when the platform signature is missing`() {
-    // The regression this guards: both null, so an unguarded equality check
-    // would return true and admit an unidentifiable caller.
     assertFalse(admittedByPlatformSignature(null, null))
   }
 
   @Test
-  fun `no caller is admitted by this rule when the platform signature is missing`() {
+  fun `no caller is admitted by the platform rule when that signature is missing`() {
     assertFalse(admittedByPlatformSignature("abc123", null))
     assertFalse(admittedByPlatformSignature("", null))
   }
@@ -51,5 +70,23 @@ class PackageValidatorSignatureTest {
   @Test
   fun `an unsigned caller is not admitted when a platform signature exists`() {
     assertFalse(admittedByPlatformSignature(null, "abc123"))
+  }
+
+  @Test
+  fun `a whitelisted caller with a pinned signature is admitted`() {
+    assertTrue(admittedByWhitelist("aa11", listOf("bb22", "aa11")))
+  }
+
+  @Test
+  fun `a whitelisted package with an unpinned signature is refused, not fatal`() {
+    // The regression: `first {}` threw here, taking down the exported
+    // MediaBrowserService. Refusal is the correct outcome.
+    assertFalse(admittedByWhitelist("rotated-key", listOf("bb22", "aa11")))
+  }
+
+  @Test
+  fun `an unsigned caller is never admitted by the whitelist`() {
+    assertFalse(admittedByWhitelist(null, listOf("bb22")))
+    assertFalse(admittedByWhitelist(null, emptyList()))
   }
 }

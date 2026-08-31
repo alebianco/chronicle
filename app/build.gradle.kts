@@ -124,6 +124,15 @@ dependencies {
   implementation(libs.dagger)
   ksp(libs.dagger.compiler)
 
+  // Declared explicitly: 23 files import android.support.v4.media / androidx.media
+  // (MediaSessionCompat, PlaybackStateCompat, MediaBrowserServiceCompat...), which
+  // arrived only transitively via media3-session. Media3 is migrating callers off
+  // that compat bridge, so the release that drops it would break playback wholesale
+  // — the same failure mode as cu-60 (lifecycle) and cu-65 (localbroadcastmanager).
+  implementation(libs.media)
+  // Moshi runs in reflection mode (no codegen), so all @JsonClass models need this
+  // at runtime; it was resolving to 1.8.22 under a 2.2.10 compiler.
+  implementation(libs.kotlin.reflect)
   implementation(libs.media3.exoplayer)
   implementation(libs.media3.ui)
   implementation(libs.media3.session)

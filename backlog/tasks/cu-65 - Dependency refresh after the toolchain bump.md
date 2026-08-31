@@ -50,6 +50,24 @@ Upgraded in three batches by risk, building between each so a failure was attrib
 | material | 1.9.0 | 1.14.0 | Brings the inset helpers cu-63 needs |
 | coil | 3.0.4 | **3.3.0** | 3.4+ needs Kotlin 2.3; 3.6 needs compileSdk 37 |
 
+### Correction (R0-close review, 2026-08-31)
+
+**Two of the three ceilings I recorded below were wrong**, though the resulting version choices were
+right. Recorded so the next bump is not misled:
+
+- **Coil**: "3.4+ needs Kotlin 2.3" is false — 3.4.0 needs only compileSdk 35 and 3.5.0 needs 36, both
+  satisfied. The real blocker is that 3.5.0 drags **kotlin-stdlib 2.4.0**, whose metadata the 2.2.10
+  compiler cannot read. ("3.6 needs compileSdk 37" is correct — verified `minCompileSdk=37`.)
+- **lifecycle**: "2.11 needs compileSdk 37" is false — `lifecycle-runtime-android:2.11.0` declares
+  `minCompileSdk=34`. The genuine blocker is `lifecycle-runtime-compose-android:2.11.0` requiring
+  **AGP 9.1.0** (we are on 8.13.2), for a Compose artifact this app does not even use.
+- **kotlin-result** (from cu-48): the recorded "2.0.2+ needs stdlib 2.2" is stale — the build now
+  resolves stdlib 2.2.20. But the pin still holds for a different, previously unrecorded reason: 2.1.0
+  adds an opt-in requirement on `Result.value`, producing 8 errors at already-`isOk`-guarded call
+  sites. Mechanical to fix, but not free.
+
+Also declared two more packages that were only arriving transitively — see below.
+
 ### Two ceilings worth recording
 
 **compileSdk 37 is the new blocker.** Both lifecycle 2.11.0 and Coil 3.6.0 refuse to build against
@@ -67,8 +85,19 @@ the ceiling simply moved up rather than disappearing.
 resolved`. There are **19 usages** in the app, all relying on a transitive that was never declared.
 
 Now declared explicitly. This is the second instance this session of a core class arriving only
-transitively — cu-60 found the same with `androidx.lifecycle` coming via the billing SDK. Worth a
-periodic audit of what the app uses versus what it declares.
+transitively — cu-60 found the same with `androidx.lifecycle` coming via the billing SDK.
+
+**The R0-close review then did that audit, and found a third and larger case**: `androidx.media:media`
+(the `MediaSessionCompat`/`PlaybackStateCompat`/`MediaBrowserServiceCompat` compat layer) is imported
+by **23 files** and arrived only through `media3-session`. Media3 is actively migrating callers off
+that bridge, so the release dropping it would have broken the entire playback layer. Also undeclared:
+`kotlin-reflect`, which every `@JsonClass` model needs since Moshi runs in reflection mode, and which
+was resolving to 1.8.22 under a 2.2.10 compiler. Both now declared; the orphaned `moshi-codegen`
+catalog entry was dropped.
+
+`androidx.core`, `recyclerview`, `fragment` and `constraintlayout` are also undeclared but arrive from
+appcompat/material, which are far less likely to drop them. Left as a follow-up rather than churned
+now.
 
 ### Deliberately not done
 

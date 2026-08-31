@@ -144,11 +144,17 @@ class MainActivity : AppCompatActivity() {
       )
     }
     viewModel.isPlaying.observe(this) { playing ->
+      // A button shows the action a tap performs, not the current state: while
+      // playing it must offer pause. The drawables are state-named, which is how
+      // this got inverted during the cu-58 conversion — the other two play/pause
+      // buttons (CurrentlyPlayingFragment, AudiobookDetailsFragment) both map
+      // playing -> pause icon, and NotificationBuilder is not a counterexample
+      // because that is a status icon rather than a button.
       binding.pausePlayButton.setImageResource(
         if (playing == true) {
-          R.drawable.ic_notification_icon_playing
-        } else {
           R.drawable.ic_notification_icon_paused
+        } else {
+          R.drawable.ic_notification_icon_playing
         },
       )
     }

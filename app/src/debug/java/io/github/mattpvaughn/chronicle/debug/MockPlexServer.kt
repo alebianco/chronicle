@@ -32,6 +32,11 @@ class MockPlexServer(private val context: Context) {
       object : Dispatcher() {
         override fun dispatch(request: RecordedRequest): MockResponse {
           val path = request.path.orEmpty()
+          // Log before any early return. This line used to sit below the photo
+          // and audio branches, so those requests were served but never logged —
+          // which made playback look like it was never fetching audio and cost a
+          // full diagnostic run to disprove (cu-64).
+          Timber.i("MockPlexServer: ${request.method} $path range=${request.headers["Range"]}")
           // Cover art: serve a real (solid-colour) PNG so image loading is
           // actually exercised end-to-end rather than always falling back to the
           // placeholder.
@@ -44,7 +49,7 @@ class MockPlexServer(private val context: Context) {
             return audioResponse(request.headers["Range"])
           }
           val fixture = fixtureFor(path)
-          Timber.i("MockPlexServer: $path -> ${fixture ?: "(empty 200)"}")
+          Timber.i("MockPlexServer: -> ${fixture ?: "(empty 200)"}")
           if (fixture == null) {
             return MockResponse().setResponseCode(200).setBody("")
           }

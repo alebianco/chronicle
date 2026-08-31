@@ -119,10 +119,20 @@ class PackageValidator(
     }
 
     val callerSignature = callerPackageInfo.signature
+    // `first {}` THROWS NoSuchElementException when nothing matches — the
+    // `!= null` it used to be compared against was misleading, since `first`
+    // never returns null. It is evaluated eagerly here, before the `when`, so an
+    // allowlisted package whose signature is not among the pinned keys (most
+    // realistically after a Google key rotation) crashed onGetRoot — and
+    // MediaBrowserService is exported, so that took playback down.
+    //
+    // Latent since the UAMP import, but only reachable after cu-61: the previous
+    // constructor-time throw killed the service before this line could run.
     val isPackageInWhitelist =
-      certificateWhitelist[callingPackage]?.signatures?.first {
-        it.signature == callerSignature
-      } != null
+      callerSignature != null &&
+        certificateWhitelist[callingPackage]?.signatures?.any {
+          it.signature == callerSignature
+        } == true
 
     val isCallerKnown =
       when {
