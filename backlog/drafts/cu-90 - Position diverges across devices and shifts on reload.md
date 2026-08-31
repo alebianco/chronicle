@@ -61,13 +61,27 @@ merging independently, a book can show a position that no device ever actually r
   against — the app may be recomputing something the server already answers.
 - Watch the interaction with [[cu-9]]: progress reports are now awaited and retried, so a
   second device's writes land more reliably than before, which can make this *more* visible.
-- Worth an ADR in `backlog/decisions/` — this is a durable architectural choice about where
-  listening position is owned, not a local fix.
+- **The rule is now decided**: see
+  [`decision-16`](../decisions/decision-16%20-%20Track%20viewOffset%20is%20the%20single%20source%20of%20truth%20for%20listening%20position.md).
+  Per-track `viewOffset` is authoritative; book progress is derived and never stored as independent
+  state; conflicts resolve per track on `lastViewedAt`; "current position" is the furthest started
+  track, not the most recently touched one.
+- **Verified against the fixtures:** the Plex *album* carries no `viewOffset` at all — only
+  `viewedLeafCount`/`leafCount`. Position exists only on tracks, so `Audiobook.progress` is purely
+  a local derivation and any disagreement is the app's own.
+- **The sharp edge** the ADR flags: a user deliberately re-listening to an earlier chapter must not
+  be dragged forward. Likely split — an explicit seek sets position, a sync only moves it forward.
+  Get this wrong and the fix is worse than the bug.
+- `getActiveTrack()` has other callers (playback start, `CurrentlyPlaying`), so changing its meaning
+  touches the player. Give it tests before the position work rides on it.
 
 ## Acceptance Criteria
 
-- [ ] A written rule for which position is authoritative and how conflicts resolve, recorded as an
-      ADR
+- [x] A written rule for which position is authoritative and how conflicts resolve, recorded as an
+      ADR (decision-16)
+- [ ] `Audiobook.merge` no longer treats `progress` as a preserved local field, so it cannot
+      contradict the derivation
+- [ ] An explicit seek still sets position; a sync only advances it — the re-listen case, tested
 - [ ] Book progress and active-track progress cannot disagree — one is derived from the other
 - [ ] A book whose tracks were last touched on different devices reports a coherent position, not a
       jump between two, covered by a test with per-track `lastViewedAt` set to conflicting values

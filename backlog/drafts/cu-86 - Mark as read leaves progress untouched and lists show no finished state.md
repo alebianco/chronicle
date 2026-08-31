@@ -54,9 +54,14 @@ resetting progress. This is the deliberate user-initiated path.
 
 ## Design notes
 
-- Decide and write down what "mark as read" means: position at 100%, or position untouched with a
-  finished flag? Server semantics matter — Plex's `/scrobble` marks watched and the app also has
-  `markWatched`. The local and server notions must agree or the next sync undoes the local change.
+- **The framing is decided**: see
+  [`decision-16`](../decisions/decision-16%20-%20Track%20viewOffset%20is%20the%20single%20source%20of%20truth%20for%20listening%20position.md).
+  Completion is an **explicit fact, separate from position** — a book is finished because it was
+  marked finished, not because its position is near the end. Verified in the fixtures: Plex keeps
+  `viewOffset` and `viewCount` independent (track 2001 has offset 1500 with viewCount 0).
+- What remains for this task is the *behaviour*: what "mark as read" does to position. Pick one and
+  make "mark as unread" its exact inverse. The local and server notions must agree, or the next sync
+  undoes the local change.
 - Whatever is chosen, "mark as unread" must be its exact inverse; the current pair is not
   symmetrical.
 - `viewCount` is a Plex concept. Consider whether the local finished state should be derived from it
