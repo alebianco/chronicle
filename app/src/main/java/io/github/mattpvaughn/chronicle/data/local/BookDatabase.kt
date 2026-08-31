@@ -19,15 +19,7 @@ fun getBookDatabase(context: Context): BookDatabase {
           context.applicationContext,
           BookDatabase::class.java,
           BOOK_DATABASE_NAME,
-        ).addMigrations(
-          BOOK_MIGRATION_1_2,
-          BOOK_MIGRATION_2_3,
-          BOOK_MIGRATION_3_4,
-          BOOK_MIGRATION_4_5,
-          BOOK_MIGRATION_5_6,
-          BOOK_MIGRATION_6_7,
-          BOOK_MIGRATION_7_8,
-        ).build()
+        ).addMigrations(*BOOK_MIGRATIONS).build()
     }
   }
   return INSTANCE
@@ -83,6 +75,24 @@ val BOOK_MIGRATION_7_8 =
       db.execSQL("ALTER TABLE Audiobook ADD COLUMN year INTEGER NOT NULL DEFAULT 0")
     }
   }
+
+/**
+ * Every migration, in order, as one list.
+ *
+ * Named rather than inlined into the builder so a test can open a real database file at an older
+ * schema and run the same migrations production runs — which is the only way to catch a migration
+ * that disagrees with its entity, since Room validates on open (see `RoomSchemaTest`).
+ */
+val BOOK_MIGRATIONS =
+  arrayOf(
+    BOOK_MIGRATION_1_2,
+    BOOK_MIGRATION_2_3,
+    BOOK_MIGRATION_3_4,
+    BOOK_MIGRATION_4_5,
+    BOOK_MIGRATION_5_6,
+    BOOK_MIGRATION_6_7,
+    BOOK_MIGRATION_7_8,
+  )
 
 @Database(entities = [Audiobook::class], version = 8, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
