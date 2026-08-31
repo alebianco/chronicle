@@ -103,6 +103,12 @@ data class MediaItemTrack(
         parentKey = networkTrack.parentRatingKey.toString(),
         title = networkTrack.title,
         artist = networkTrack.grandparentTitle,
+        // Plex's per-track `thumb`. For audiobooks this usually points at the *album's* art
+        // (the fixture's track thumb is `/library/metadata/1001/thumb/...`, the book's
+        // ratingKey), which is what the player wants. Where a server does give a track its own
+        // art, the player would show chapter art instead of the cover — issue #119. That case
+        // cannot be reproduced from the fixture pack, so it is a live-server check in cu-73
+        // rather than a speculative `parentThumb` field here.
         thumb = networkTrack.thumb,
         index = networkTrack.index,
         discNumber = networkTrack.parentIndex,
@@ -240,16 +246,35 @@ fun MediaItemTrack.toMediaMetadata(plexConfig: PlexConfig): MediaMetadataCompat 
   return metadataBuilder.build()
 }
 
+/**
+ * One chapter per track, for a book with no embedded chapter data.
+ *
+ * Every consumer of chapters falls back to this when `Audiobook.chapters` is empty
+ * (`CurrentlyPlayingSingleton`, `CurrentlyPlayingViewModel`, `AudiobookDetailsViewModel`,
+ * `MainActivityViewModel`). It used to build each chapter and **throw it away** — nothing was
+ * ever added to the returned list — so such a book showed no chapters at all rather than one
+ * per file (cu-13).
+ *
+ * Offsets are cumulative across the whole book, because that is the coordinate space
+ * [getChapterAt] and the seek bar work in.
+ */
 fun List<MediaItemTrack>.asChapterList(): List<Chapter> {
   val outList = mutableListOf<Chapter>()
   var cumStartOffset = 0L
   for (track in this) {
-    track.asChapter(cumStartOffset)
+    outList.add(track.asChapter(cumStartOffset))
     cumStartOffset += track.duration
   }
   return outList
 }
 
+/**
+ * Represents this track as a single chapter starting at [startOffset].
+ *
+ * [Chapter.endTimeOffset] is `startOffset + duration`, not `duration`: offsets are absolute
+ * within the book, so using the raw duration made every chapter after the first report an end
+ * earlier than its own start, and [getChapterAt] then matched nothing.
+ */
 fun MediaItemTrack.asChapter(startOffset: Long): Chapter {
   return Chapter(
     title = title,
@@ -257,7 +282,7 @@ fun MediaItemTrack.asChapter(startOffset: Long): Chapter {
     index = index.toLong(),
     discNumber = discNumber,
     startTimeOffset = startOffset,
-    endTimeOffset = duration,
+    endTimeOffset = startOffset + duration,
     downloaded = cached,
     trackId = id,
   )

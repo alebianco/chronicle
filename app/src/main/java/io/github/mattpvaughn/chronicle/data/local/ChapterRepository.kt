@@ -14,12 +14,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * A repository abstracting all [Chapter]s
+ * A repository abstracting all [Chapter]s.
  *
- * TODO: this is a work in progress- usage is not recommended. Eventually we will silently move
- *       all chapters from being an attribute of [Audiobook] into this repo
+ * **Scaffolding, not load-bearing.** Nothing injects this, and no Dagger module provides it or
+ * [ChapterDatabase]. Chapters currently live serialized inside `Audiobook.chapters` via
+ * `ChapterListConverter`, and the live chapter fetch is in `BookRepository.loadChapterData`.
  *
- * */
+ * [[cu-49]] moves chapters into their own table and makes this real. Until then, treat it the
+ * way CLAUDE.md describes the `MediaSource` seam: don't call it, don't delete it.
+ *
+ * It is also why cu-13's "chapter logic has no Plex imports" holds only for the *live* path —
+ * `Chapter.kt` itself is Plex-free, but this dead file still fetches through `PlexMediaService`.
+ * cu-49 should take its data through the source seam rather than inherit these imports.
+ */
 interface IChapterRepository {
   /**
    * Loads m4b chapter data and any other audiobook details which are not loaded in by default

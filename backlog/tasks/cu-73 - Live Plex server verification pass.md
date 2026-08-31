@@ -128,6 +128,23 @@ Grouped by what breaks if the real server disagrees.
       path via `OkHttpDownloader`; that combination has never run. Rotate the token during a
       download and expect a retry that succeeds, not a failed book.
 
+### Chapters and artwork (cu-13)
+
+- [ ] **Do the chapters shown match the m4b's embedded chapters?** Chapters come from Plex's
+      `retrieveChapterInfo`, which is Plex's own read of the file — so this verifies Plex's
+      parse as much as the app's. Compare against the file's chapter list read directly (e.g.
+      `ffprobe -show_chapters`). Check a book with many short chapters and one with none.
+- [ ] **A book with no embedded chapters falls back to one chapter per file.** Fixed in cu-13
+      (`asChapterList` built its chapters and discarded them, so such books showed none at
+      all); unit-tested, but never seen against a real library.
+- [ ] **Which artwork the player shows for each track** (#119). `MediaItemTrack.thumb` is
+      Plex's per-track thumb; in the fixture pack it happens to point at the *album's* art, so
+      the bug cannot be reproduced offline. On a real server, check whether any track carries
+      its own art — if so the lockscreen/Auto shows chapter art instead of the book cover, and
+      the fix is to model `parentThumb` and prefer it.
+- [ ] **Chapter highlight tracks playback** across a track boundary, and jumping to a chapter
+      in a later file seeks to the right place.
+
 ### Sync drift (cu-14)
 
 - [ ] **A second device's position is adopted.** Listen on device A, stop, then open the book
