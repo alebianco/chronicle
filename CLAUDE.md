@@ -42,12 +42,14 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   UI states without credentials. The machinery lives in `app/src/debug/`, with a no-op twin in
   `app/src/release/`, so it is not compiled into release builds at all.
   The mock also serves cover art and a generated audio tone with HTTP range support (cu-64), and
-  `--el play_book <id>` starts playback via `playFromMediaId` without needing tap coordinates. Caveat:
-  the player reaches `STATE_PLAYING` but no request for the audio reaches the mock, so bytes-flowing is
-  **not** yet proven — see cu-64. `./capture-screens.sh <dir>` drives the app and screenshots the main
+  `--el play_book <id>` starts playback via `playFromMediaId` without needing tap coordinates. Audio
+  really does flow: all three track parts are fetched and decoded (`AudioFlinger` confirms 15.000s).
+  An earlier claim that no request reached the mock was a logging blind spot, not a bug — the log sat
+  below the early returns (cu-64). Seeks are still unexercised end-to-end, so the 206/range path is
+  unit-tested only. `./capture-screens.sh <dir>` drives the app and screenshots the main
   screens; it asserts the app was actually foregrounded, because an earlier version silently captured
   the launcher.
-- Tests: 8 unit-test files, **55 tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: 14 unit-test files, **73 tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only). ~7 androidTest files, quarantined (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -56,7 +58,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - `application/ChronicleApplication.kt`, `application/MainActivity.kt` — entry points + DI root
 - `injection/` — Dagger components/modules/scopes
 - `data/local/` — Room DBs, DAOs · `data/sources/plex/` — Plex API (`PlexService.kt`), login/config, `CachedFileManager.kt`
-- `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — **dead multi-backend scaffolding, all `TODO()`, not in DI**; being resurrected per D11 (task cu-15). Don't call it; don't delete it.
+- `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — multi-backend scaffolding, **declared but not yet load-bearing**. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made `SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`. Don't call it; don't delete it (cu-33 resurrects it properly).
 - `features/` — Fragment + ViewModel + adapters per feature (27 files import `data.sources.plex.*` directly — known debt, task cu-33)
 - `navigation/Navigator.kt` — centralized navigation · `views/BindingAdapters.kt` — reusable bindings
 
@@ -65,7 +67,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 1. DI via constructor `@Inject`/factories; respect scopes (`@Singleton`, `@ActivityScope`, `@ServiceScope`); never instantiate singletons manually.
 2. UI logic in Fragments/XML; business logic in ViewModels/Repositories; DB never accessed from UI.
 3. LiveData for UI state: private `MutableLiveData`, public immutable `LiveData`. (StateFlow migration is future work — don't mix ad hoc.)
-4. Coroutines: IO on `Dispatchers.IO`, UI on Main via `viewModelScope`. Known debt: `GlobalScope` in `CachedFileManager` and hardcoded dispatchers (items C4/H5, backlog 12) — don't add more of either.
+4. Coroutines: **inject `DispatcherProvider`** (cu-15) rather than referencing `Dispatchers.*` directly; UI on Main via `viewModelScope`. `GlobalScope` is gone and stays gone — three tests pin this (`CachedFileManagerScopeTest`, `RepositoryDispatcherTest`, `InternalApiUsageTest`). The five repositories are converted; ViewModels, workers and the player service still hardcode dispatchers (cu-72) — don't add more.
 5. User-facing text in `res/values/strings.xml`, always.
 6. Room schema change ⇒ bump DB version + write a migration in the same PR.
 7. Navigation through `Navigator.kt`; data via Bundles/args.
