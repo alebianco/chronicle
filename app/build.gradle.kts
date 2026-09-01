@@ -72,6 +72,36 @@ android {
       // unit-test classpath.
       isIncludeAndroidResources = true
     }
+
+    // Gradle Managed Devices (cu-54): the emulator is declared here and provisioned by Gradle, so
+    // `./gradlew instrumentedCheckGroupDebugAndroidTest` is the same command on a laptop and on any
+    // CI — no emulator-runner action, no forge lock-in (D12 rule 6).
+    managedDevices {
+      localDevices {
+        // The minSdk floor. Catches a new API called without a version guard, which is a live risk
+        // at minSdk 27 with Media3 — and the kind of break that only shows on an old device.
+        create("api27") {
+          device = "Pixel 2"
+          apiLevel = 27
+          // AOSP has no Play Services; nothing here needs them, and the images are smaller.
+          systemImageSource = "aosp"
+        }
+        // A recent level, close to compileSdk 36. "aosp" rather than "aosp-atd": the plain image
+        // is the one already installed and licensed on the owner's machine, so a local run needs
+        // no download. ATD is smaller and faster in CI — switch there if the licence is accepted.
+        create("api35") {
+          device = "Pixel 6"
+          apiLevel = 35
+          systemImageSource = "aosp"
+        }
+      }
+      groups {
+        create("instrumentedCheckGroup") {
+          targetDevices.add(localDevices["api27"])
+          targetDevices.add(localDevices["api35"])
+        }
+      }
+    }
   }
 }
 
@@ -180,20 +210,6 @@ dependencies {
   androidTestImplementation(libs.androidx.test.rules)
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.ext.junit.ktx)
-}
-
-// Instrumented tests are QUARANTINED, not merely disabled: the sources under
-// app/src/androidTest no longer compile. They target an `OnboardingActivity` and
-// string resources that ceased to exist when onboarding was refactored into
-// Fragments (LoginFragment/ChooseServerFragment/ChooseUserFragment/
-// ChooseLibraryFragment) in 9e89270. Removing this block yields ~15 unresolved
-// references, not a passing suite.
-//
-// They are kept in-tree as the raw material for the rewrite (see backlog task
-// cu-54, "Rebuild instrumented tests on Gradle Managed Devices"). Until that
-// lands, THERE IS NO INSTRUMENTED COVERAGE — do not claim any.
-tasks.matching { it.name.contains("DebugAndroidTest") && !it.name.contains("Lint") }.configureEach {
-  enabled = false
 }
 
 jacoco {

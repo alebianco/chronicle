@@ -122,6 +122,19 @@ object DebugHooks : DebugHooksContract {
     MockPlexMode.setFailProgressReports(intent.getBooleanExtra(EXTRA_FAIL_SYNC, false))
   }
 
+  /**
+   * Turns mock mode on before `Application.onCreate` reads it.
+   *
+   * The instrumented suite (cu-54) needs the flag set from `AndroidJUnitRunner.onCreate`, which is
+   * the only hook that runs before the application starts. Exposed here rather than duplicating
+   * the file and key names in the test, where they would drift silently — the flag not being read
+   * looks exactly like mock mode being off.
+   */
+  fun setMockPlexEnabled(
+    context: Context,
+    enabled: Boolean,
+  ) = setEnabled(context, enabled)
+
   private fun isEnabled(context: Context): Boolean =
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
       .getBoolean(KEY_MOCK_PLEX, false)

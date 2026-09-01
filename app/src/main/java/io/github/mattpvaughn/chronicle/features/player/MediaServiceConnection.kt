@@ -24,9 +24,22 @@ class MediaServiceConnection
     val playbackState = MutableLiveData(EMPTY_PLAYBACK_STATE)
     val nowPlaying = MutableLiveData(NOTHING_PLAYING)
 
+    /**
+     * True between calling [MediaBrowserCompat.connect] and one of its three terminal callbacks.
+     *
+     * `MediaBrowserCompat.connect()` **throws** if it is called while already connecting or
+     * connected, and it exposes no "connecting" state to check — `isConnected` is false for the
+     * whole handshake. Two `MainActivity.onCreate`s close together therefore crashed the app with
+     * "connect() called while neither disconnecting nor disconnected", which is what an Activity
+     * recreation does: a rotation, a theme change, or coming back to a process the system kept
+     * (cu-54 found it via `ActivityScenario.recreate`).
+     */
+    private var isConnecting = false
+
     private val connectionCallbacks =
       object : MediaBrowserCompat.ConnectionCallback() {
         override fun onConnected() {
+          isConnecting = false
           isConnected.postValue(true)
 
           // Create a MediaControllerCompat from the session token
@@ -51,12 +64,14 @@ class MediaServiceConnection
         override fun onConnectionSuspended() {
           // The Service has crashed. Disable transport controls until it automatically reconnects
           Timber.i("Service connection suspended")
+          isConnecting = false
           isConnected.postValue(false)
         }
 
         override fun onConnectionFailed() {
           // The Service has refused our connection
           Timber.i("Service connection failed")
+          isConnecting = false
           isConnected.postValue(false)
         }
       }
@@ -111,6 +126,7 @@ class MediaServiceConnection
 
     fun disconnect() {
       Timber.i("Disconnecting MediaServiceConnection")
+      isConnecting = false
       isConnected.postValue(false)
       mediaControllerCallback.onConnected = {}
       mediaController?.unregisterCallback(mediaControllerCallback)
@@ -118,12 +134,29 @@ class MediaServiceConnection
     }
 
     fun connect() {
-      mediaBrowser.connect()
+      connectIfIdle()
     }
 
     fun connect(onConnected: () -> Unit?) {
-      mediaBrowser.connect()
+      // The callback is registered even when a connection is already in flight, so a caller
+      // waiting on it is not stranded by another caller having asked first.
       mediaControllerCallback.onConnected = onConnected
+      connectIfIdle()
+    }
+
+    /**
+     * Starts a connection only when one is neither established nor in flight.
+     *
+     * See [isConnecting]: `MediaBrowserCompat.connect()` throws rather than ignoring a redundant
+     * call, so this guard is what keeps an Activity recreation from crashing the app.
+     */
+    private fun connectIfIdle() {
+      if (isConnecting || isConnected.value == true) {
+        Timber.i("Already connected or connecting; skipping redundant connect()")
+        return
+      }
+      isConnecting = true
+      mediaBrowser.connect()
     }
   }
 
