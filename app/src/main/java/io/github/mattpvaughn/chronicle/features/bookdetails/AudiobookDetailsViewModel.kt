@@ -253,8 +253,9 @@ class AudiobookDetailsViewModel(
       chapters,
       tracks,
     ) { _chapters: List<Chapter>?, _tracks: List<MediaItemTrack>? ->
-      Timber.i("Cached chapters: $_chapters")
-      Timber.i("Cached progress: ${_tracks?.getProgress()}")
+      // Deliberately not logged. These lines serialised the entire chapter list — 40+ objects —
+      // several times a second on a real book, which is a measurable cost in a debug build and
+      // drowned the log when diagnosing the seek churn (cu-93).
 
       // See the same fix in CurrentlyPlayingViewModel: the hand-rolled walk this replaces mixed
       // relative and absolute chapter offsets and resolved the wrong chapter (cu-73).
@@ -269,7 +270,6 @@ class AudiobookDetailsViewModel(
     currentlyPlaying.chapter.combine(
       cachedChapter,
     ) { activeChapter: Chapter, cachedChapter: Chapter ->
-      Timber.i("Cached: $cachedChapter, active: $activeChapter")
       if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
         activeChapter
       } else {

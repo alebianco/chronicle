@@ -38,11 +38,16 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @ExperimentalCoroutinesApi
 class CurrentlyPlayingViewModel(
@@ -186,8 +191,9 @@ class CurrentlyPlayingViewModel(
       chapters,
       tracks,
     ) { _chapters: List<Chapter>?, _tracks: List<MediaItemTrack>? ->
-      Timber.i("Cached chapters: $_chapters")
-      Timber.i("Cached progress: ${_tracks?.getProgress()}")
+      // Deliberately not logged. These lines serialised the entire chapter list — 40+ objects —
+      // several times a second on a real book, which is a measurable cost in a debug build and
+      // drowned the log when diagnosing the seek churn (cu-93).
 
       // `chapterAtBookProgress`, not a hand-rolled walk. The loop this replaces subtracted each
       // chapter's *duration* from a running offset while comparing against the **absolute**
@@ -208,13 +214,12 @@ class CurrentlyPlayingViewModel(
     currentlyPlaying.chapter.combine(
       cachedChapter,
     ) { activeChapter: Chapter, cachedChapter: Chapter ->
-      Timber.i("Cached: $cachedChapter, active: $activeChapter")
       if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
         activeChapter
       } else {
         cachedChapter
       }
-    }.asLiveData(viewModelScope.coroutineContext)
+    }.distinctUntilChanged().asLiveData(viewModelScope.coroutineContext)
 
   /**
    * The chapter the book is at, for the timeline readout.
@@ -248,12 +253,20 @@ class CurrentlyPlayingViewModel(
       currentlyPlaying.track,
     ) { chapter: Chapter, track: MediaItemTrack ->
       track.progress - chapter.startTimeOffset
-    }.filter { !isSliding }.asLiveData(viewModelScope.coroutineContext)
+    }.filter { !isSliding }
+      // distinctUntilChanged, because `currentlyPlaying` publishes book, track *and* chapter on
+      // every progress tick and each fans out through this combine. The device logged 228
+      // recomputations in one minute — four a second for a value that changes once a second — and
+      // every one of them wrote to the slider. That churn is what made seeking feel unstable
+      // however well the in-flight guard worked (cu-93).
+      .distinctUntilChanged()
+      .asLiveData(viewModelScope.coroutineContext)
 
   val trackProgressForSlider =
     currentlyPlaying.track
       .filter { !isSliding }
       .map { it.progress }
+      .distinctUntilChanged()
       .asLiveData(viewModelScope.coroutineContext)
 
   val chapterDuration =
@@ -269,7 +282,46 @@ class CurrentlyPlayingViewModel(
       )
     }
 
+  /**
+   * Suppresses slider writes while the user owns the position.
+   *
+   * True from touch-down until the seek has actually landed — **not** until touch-up. Releasing it
+   * on touch-up left a window of up to one progress tick in which the old position was written
+   * back, so the thumb snapped to where it was before jumping forward when the seek completed. The
+   * owner described exactly that: *"seeking moves the timeline where I clicked, then back at the
+   * previous place, then starts playing and goes back to where I requested"* (cu-93).
+   *
+   * [awaitSeek] closes it again once the reported position is near the requested one.
+   */
   var isSliding = false
+    private set
+
+  /** Where the user asked to be, while a seek is in flight. Null when no seek is pending. */
+  private var pendingSeekTarget: Long? = null
+
+  fun onSlideStart() {
+    isSliding = true
+  }
+
+  /**
+   * Holds the guard until playback reports a position near [target], or until [SEEK_SETTLE_TIMEOUT]
+   * passes.
+   *
+   * The timeout matters: a seek that never lands — a dead network on a streamed book — must not
+   * freeze the slider forever. Releasing late looks like a brief lag; never releasing looks broken.
+   */
+  private fun awaitSeek(target: Long) {
+    pendingSeekTarget = target
+    viewModelScope.launch {
+      withTimeoutOrNull(SEEK_SETTLE_TIMEOUT) {
+        currentlyPlaying.track.first { track ->
+          abs(track.progress - target) < SEEK_SETTLE_TOLERANCE
+        }
+      }
+      pendingSeekTarget = null
+      isSliding = false
+    }
+  }
 
   private var _isSleepTimerActive = MutableLiveData(false)
   val isSleepTimerActive: LiveData<Boolean>
@@ -318,9 +370,30 @@ class CurrentlyPlayingViewModel(
       return@map "$progressStr/$durationStr"
     }
 
+  /**
+   * The book's completion percentage, derived from the **same** source as the timeline.
+   *
+   * It used to read `tracks` straight from Room, which the progress loop writes every second,
+   * while the timeline reads `currentlyPlaying.track`, refreshed only by playback callbacks. The
+   * database write lands first, so the percentage visibly moved before the timeline did — two
+   * readouts of one fact, disagreeing (cu-94). Same split cu-87 fixed for the chapter list.
+   *
+   * The track list still supplies the *total* duration, which does not change during playback; only
+   * the position now comes from `currentlyPlaying`.
+   */
   val progressPercentageString =
-    tracks.map { tracks: List<MediaItemTrack> ->
-      return@map "${tracks.getProgressPercentage()}%"
+    DoubleLiveData(
+      tracks,
+      currentlyPlaying.track.asLiveData(viewModelScope.coroutineContext),
+    ) { _tracks: List<MediaItemTrack>?, playing: MediaItemTrack? ->
+      val total = _tracks?.getDuration() ?: 0L
+      if (_tracks.isNullOrEmpty() || total == 0L || playing == null) {
+        return@DoubleLiveData "0%"
+      }
+      // Position of the playing track's start, plus how far into it playback has reached.
+      val before = _tracks.sorted().takeWhile { it.id != playing.id }.sumOf { it.duration }
+      val percent = (((before + playing.progress) / total.toDouble()) * 100).roundToInt()
+      return@DoubleLiveData "${percent.coerceIn(0, 100)}%"
     }
 
   private var _isLoadingTracks = MutableLiveData(false)
@@ -479,7 +552,26 @@ class CurrentlyPlayingViewModel(
       if (connection.nowPlaying.value != NOTHING_PLAYING) {
         // Service will be alive, so we can let it handle the action
         Timber.i("Seeking!")
+        // Predict where the service will land and hold the slider there. The chapter buttons
+        // showed the same snap-back as the slider: the readout moved to the new chapter, reverted
+        // for a tick, then moved again once the seek completed (cu-93).
+        val chapters = currentlyPlaying.book.value.chapters
+        val here = chapters.indexOf(currentlyPlaying.chapter.value)
+        val target =
+          if (forward) {
+            chapters.getOrNull(here + 1)?.startTimeOffset
+          } else {
+            // Matches the service's rule: past the threshold, restart the current chapter.
+            val current = currentlyPlaying.chapter.value
+            val intoChapter = currentlyPlaying.track.value.progress - current.startTimeOffset
+            if (intoChapter < SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS) {
+              chapters.getOrNull(here - 1)?.startTimeOffset
+            } else {
+              current.startTimeOffset
+            }
+          }
         transportControls?.sendCustomAction(action, null)
+        target?.let { awaitSeek(it) }
       } else {
         val currentChapterIndex =
           currentlyPlaying.book.value.chapters.indexOf(
@@ -837,6 +929,9 @@ class CurrentlyPlayingViewModel(
             putString(KEY_SEEK_TO_TRACK_WITH_ID, curr.id)
           }
         mediaServiceConnection.transportControls?.playFromMediaId(id, extras)
+        // Same hold as the chapter branch; without it the guard is released while the restart is
+        // still in flight.
+        awaitSeek(curr.progress)
       }
     } else {
       // Seeking by chapter length
@@ -845,6 +940,9 @@ class CurrentlyPlayingViewModel(
         val chapterDuration = chapter.endTimeOffset - chapter.startTimeOffset
         val offset = chapter.startTimeOffset + (percentProgress * chapterDuration).toLong()
         mediaServiceConnection.transportControls?.seekTo(offset)
+        // Keep the slider on the requested position until playback reports it. Without this the
+        // next progress tick overwrites the thumb with the pre-seek position (cu-93).
+        awaitSeek(offset)
       }
     }
   }
@@ -854,5 +952,19 @@ class CurrentlyPlayingViewModel(
     const val PLAYBACK_SPEED_MIN = 0.5f
     const val PLAYBACK_SPEED_DEFAULT = 1.0f
     const val PLAYBACK_SPEED_MAX = 3.0f
+
+    /** How close a reported position must be to the requested one to count as "landed". */
+    private const val SEEK_SETTLE_TOLERANCE = 2_000L
+
+    /** Never hold the slider hostage to a seek that will not complete. */
+    private const val SEEK_SETTLE_TIMEOUT = 5_000L
+
+    /**
+     * Mirrors `SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS` in the service: within this far into a
+     * chapter, "previous" means the chapter before; past it, restart the current one. Duplicated
+     * deliberately rather than shared, because the two are allowed to diverge — but they should be
+     * changed together, so both carry this note.
+     */
+    private const val SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS = 30_000L
   }
 }

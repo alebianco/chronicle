@@ -135,6 +135,13 @@ class CurrentlyPlayingFragment : Fragment() {
     // must be set before value: Material's Slider throws if value falls outside
     // the current range, which DataBinding handled internally.
     fun refreshSlider() {
+      // The guard belongs *here*, at the write, not on the sources. Four observers call this and
+      // only two of them carried the `isSliding` filter — `currentTrack` and `chapterDuration` are
+      // unfiltered and fire on every playback tick, so the stale position reached the thumb anyway.
+      // Filtering the flows was not enough; this is the single line that moves the slider (cu-93).
+      if (viewModel.isSliding) {
+        return
+      }
       val chapterDuration = viewModel.chapterDuration.value ?: 0L
       val trackDuration = viewModel.currentTrack.value?.duration ?: 0L
       val max = (if (chapterDuration == 0L) trackDuration else chapterDuration).toFloat()
@@ -210,11 +217,12 @@ class CurrentlyPlayingFragment : Fragment() {
     binding.chapterProgressSeekbar.addOnSliderTouchListener(
       object : Slider.OnSliderTouchListener {
         override fun onStartTrackingTouch(slider: Slider) {
-          viewModel.isSliding = true
+          viewModel.onSlideStart()
         }
 
         override fun onStopTrackingTouch(slider: Slider) {
-          viewModel.isSliding = false
+          // The guard is *not* cleared here — `seekTo` holds it until playback reports the new
+          // position, so the thumb does not snap back to where it was (cu-93).
           viewModel.seekTo(slider.value.toDouble() / slider.valueTo)
         }
       },

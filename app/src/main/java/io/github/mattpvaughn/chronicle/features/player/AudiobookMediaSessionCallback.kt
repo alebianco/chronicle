@@ -209,6 +209,24 @@ class AudiobookMediaSessionCallback
     override fun onSeekTo(pos: Long) {
       Timber.i("Seeking to: ${DateUtils.formatElapsedTime(pos)}")
       currentPlayer.seekTo(pos)
+      // Publish the new position at once instead of waiting for the next scheduled tick, which is a
+      // second away and left the time labels showing a position the player had already left
+      // (cu-93).
+      //
+      // The position comes from `currentPlayer`, **not** from the controller's playback state:
+      // `updateProgressWithoutParameters` reads the session state, which the seek has not updated
+      // yet, so calling it here would report the *pre-seek* position — the same race that had the
+      // app writing `time=0` to Plex on playback start. ExoPlayer's own position is correct
+      // synchronously.
+      val trackId = mediaController.metadata?.id
+      if (trackId != null) {
+        progressUpdater.updateProgress(
+          trackId,
+          MediaPlayerService.PLEX_STATE_PLAYING,
+          currentPlayer.currentPosition,
+          false,
+        )
+      }
     }
 
     override fun onCustomAction(
