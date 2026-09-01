@@ -65,6 +65,9 @@ class AudiobookMediaSessionCallback
     // Default to ExoPlayer to prevent having a nullable field
     var currentPlayer: Player = defaultPlayer
 
+    /** The pending resume observer, if a resume is waiting for a server connection. */
+    private var resumeConnectedObserver: Observer<Boolean>? = null
+
     companion object {
       const val ACTION_SEEK = "seek"
       const val OFFSET_MS = "offset"
@@ -545,6 +548,12 @@ class AudiobookMediaSessionCallback
      * refreshing data.
      */
     private fun resumePlayFromEmpty(playWhenReady: Boolean) {
+      // Held so [onStop] can detach it. `removeObserver` used to be called only from inside
+      // `onChanged`, on the connected path — so if the server was never reached the observer stayed
+      // registered on a process-lifetime LiveData with no lifecycle to release it. Repeated resume
+      // attempts stacked up more of them, each holding this callback and its sixteen collaborators.
+      resumeConnectedObserver?.let { plexConfig.isConnected.removeObserver(it) }
+
       val connectedObserver =
         object : Observer<Boolean> {
           override fun onChanged(isConnected: Boolean) {
@@ -554,7 +563,7 @@ class AudiobookMediaSessionCallback
             }
 
             // Only run these resume methods once after reconnecting
-            plexConfig.isConnected.removeObserver(this)
+            clearResumeObserver()
 
             serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
               val mostRecentBook = bookRepository.getMostRecentlyPlayed()
@@ -570,13 +579,22 @@ class AudiobookMediaSessionCallback
           }
         }
 
+      resumeConnectedObserver = connectedObserver
       plexConfig.isConnected.observeForever(connectedObserver)
+    }
+
+    /** Detaches the resume observer if one is registered. Safe to call when none is. */
+    private fun clearResumeObserver() {
+      resumeConnectedObserver?.let { plexConfig.isConnected.removeObserver(it) }
+      resumeConnectedObserver = null
     }
 
     // Kill the playback service when stop() is called, so Service can be recreated when needed
     // with the correct info from global storage
     override fun onStop() {
       Timber.i("Stopping media playback")
+      // A resume that never connected would otherwise outlive the service it was resuming.
+      clearResumeObserver()
       currentPlayer.stop()
       mediaSession.setPlaybackState(EMPTY_PLAYBACK_STATE)
       foregroundServiceController.stopForegroundService(true)

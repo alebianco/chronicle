@@ -25,14 +25,6 @@ xmlns:tools="http://schemas.android.com/tools"
             android:lines="1"
             android:textAllCaps="true"
             tools:text="01" />
-
-        <!--            <ImageView-->
-        <!--                android:layout_width="@dimen/track_list_item_indicator_size"-->
-        <!--                android:layout_height="@dimen/track_list_item_indicator_size"-->
-        <!--                android:tint="@{track.cached ? @color/iconActive : @color/icon}"-->
-        <!--                android:src="@drawable/ic_playing"-->
-        <!--                android:scaleType="centerInside"-->
-        <!--                android:visibility="@{track.id == activeTrackId ? View.VISIBLE : View.GONE}" />-->
     </FrameLayout>
 
     <TextView

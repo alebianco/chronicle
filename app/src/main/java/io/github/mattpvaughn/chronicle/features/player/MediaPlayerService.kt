@@ -45,7 +45,6 @@ import io.github.mattpvaughn.chronicle.data.model.toMediaItem
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
-import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_ACTION
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
@@ -95,9 +94,6 @@ class MediaPlayerService :
   lateinit var exoPlayer: ExoPlayer
 
   @Inject
-  lateinit var currentlyPlaying: CurrentlyPlaying
-
-  @Inject
   lateinit var bookRepository: IBookRepository
 
   @Inject
@@ -111,9 +107,6 @@ class MediaPlayerService :
 
   @Inject
   lateinit var prefsRepo: PrefsRepo
-
-  @Inject
-  lateinit var plexPrefs: PlexPrefsRepo
 
   @Inject
   lateinit var plexLoginRepo: IPlexLoginRepo

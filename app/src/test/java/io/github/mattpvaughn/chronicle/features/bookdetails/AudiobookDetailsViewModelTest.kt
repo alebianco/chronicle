@@ -4,7 +4,6 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
@@ -12,7 +11,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
-import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.mockk.coVerify
 import io.mockk.every
@@ -266,9 +264,7 @@ class AudiobookDetailsViewModelTest {
       cachedFileManager = cachedFileManager,
       inputAudiobook = book,
       mediaServiceConnection = mediaServiceConnection,
-      progressUpdater = mockk<ProgressUpdater>(relaxed = true),
       plexConfig = plexConfig,
-      prefsRepo = mockk<PrefsRepo>(relaxed = true),
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
     )

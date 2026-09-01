@@ -6,7 +6,6 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
@@ -16,7 +15,6 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayin
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
-import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.mockk.every
 import io.mockk.mockk
@@ -121,12 +119,10 @@ class AudiobookDetailsPlaybackTest {
         },
       inputAudiobook = book,
       mediaServiceConnection = mediaServiceConnection,
-      progressUpdater = mockk<ProgressUpdater>(relaxed = true),
       plexConfig =
         mockk<PlexConfig>(relaxed = true) {
           every { isConnected } returns MutableLiveData(true)
         },
-      prefsRepo = mockk<PrefsRepo>(relaxed = true),
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
     )

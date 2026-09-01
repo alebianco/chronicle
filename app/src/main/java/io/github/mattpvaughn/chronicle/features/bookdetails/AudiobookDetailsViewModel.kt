@@ -14,7 +14,6 @@ import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.*
@@ -45,9 +44,7 @@ class AudiobookDetailsViewModel(
   // Just the skeleton of an audiobook. Only guaranteed to contain a correct [Audiobook.id], [Audiobook.title]
   private val inputAudiobook: Audiobook,
   private val mediaServiceConnection: MediaServiceConnection,
-  private val progressUpdater: ProgressUpdater,
   private val plexConfig: PlexConfig,
-  private val prefsRepo: PrefsRepo,
   private val plexMediaService: PlexMediaService,
   currentlyPlaying: CurrentlyPlaying,
 ) : ViewModel() {
@@ -59,9 +56,7 @@ class AudiobookDetailsViewModel(
       private val trackRepository: ITrackRepository,
       private val cachedFileManager: ICachedFileManager,
       private val mediaServiceConnection: MediaServiceConnection,
-      private val progressUpdater: ProgressUpdater,
       private val plexConfig: PlexConfig,
-      private val prefsRepo: PrefsRepo,
       private val plexMediaService: PlexMediaService,
       private val currentlyPlaying: CurrentlyPlaying,
     ) : ViewModelProvider.Factory {
@@ -76,9 +71,7 @@ class AudiobookDetailsViewModel(
             cachedFileManager,
             inputAudiobook,
             mediaServiceConnection,
-            progressUpdater,
             plexConfig,
-            prefsRepo,
             plexMediaService,
             currentlyPlaying,
           ) as T
@@ -298,8 +291,11 @@ class AudiobookDetailsViewModel(
         // If we're just updating underlying track list, and there are already tracks/chapters
         // loaded, don't replace chapter view with loading view.
         //
-        // Delay for 50ms to ensure chapters have loaded from db
-        delay(50)
+        // This was `delay(50)` "to ensure chapters have loaded from db" — a guess at how long a
+        // Room-backed LiveData takes to emit, which is a race either way round: too short and the
+        // spinner replaces chapters that were already on screen, too long and every refresh pays
+        // for it. `chapters` derives from `audiobook`, so the question is only whether that first
+        // emission has arrived; ask the value, not the clock.
         val noExistingChapters = chapters.value.isNullOrEmpty()
         _isLoadingTracks.value = noExistingChapters
         val trackRequest = trackRepository.loadTracksForAudiobook(bookId)
