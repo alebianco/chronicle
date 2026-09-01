@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.testing
 
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.UsersResponse
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
@@ -23,7 +22,7 @@ import org.junit.Test
  * *values*, so a mismatch fails loudly.
  */
 class PlexFixtureContractTest {
-  private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+  private val moshi = Moshi.Builder().build()
 
   private fun container(fixture: String): PlexMediaContainerWrapper =
     moshi.adapter(PlexMediaContainerWrapper::class.java)
@@ -133,5 +132,60 @@ class PlexFixtureContractTest {
     assertTrue("admin user is present", users.users.any { it.admin })
     // A PIN-protected managed user is the case the user picker must handle.
     assertTrue("pin-protected user is present", users.users.any { it.hasPassword })
+  }
+
+  /**
+   * The leniency question cu-62 turned on: generated adapters are stricter than reflection about
+   * absent and null fields, and these models parse live Plex responses whose shape varies by server
+   * version. A missing key must fall back to the Kotlin default, not throw.
+   */
+  @Test
+  fun `a directory with most fields absent still parses`() {
+    val sparse =
+      """{"MediaContainer":{"size":1,"Metadata":[{"ratingKey":"1001","title":"Sparse Book"}]}}"""
+
+    val parsed =
+      moshi.adapter(PlexMediaContainerWrapper::class.java).fromJson(sparse)
+        ?: error("sparse container failed to parse")
+
+    val book = parsed.plexMediaContainer.metadata.single()
+    assertEquals("1001", book.ratingKey)
+    assertEquals("Sparse Book", book.title)
+    // Absent, so the Kotlin defaults must apply rather than the parse failing.
+    assertEquals(0L, book.duration)
+    assertTrue(book.plexChapters.isEmpty())
+  }
+
+  /**
+   * An explicit JSON `null` on a non-null Kotlin field is the case where codegen and reflection
+   * genuinely differ — codegen throws. Pinning the behaviour so a server that starts sending nulls
+   * produces a known failure rather than a mystery.
+   */
+  @Test
+  fun `an explicit null on a non-null field is rejected, not silently defaulted`() {
+    val withNull =
+      """{"MediaContainer":{"size":1,"Metadata":[{"ratingKey":"1001","title":null}]}}"""
+
+    val failure =
+      runCatching {
+        moshi.adapter(PlexMediaContainerWrapper::class.java).fromJson(withNull)
+      }.exceptionOrNull()
+
+    assertTrue(
+      "a null on a non-null field must fail loudly, not parse as empty: $failure",
+      failure != null,
+    )
+  }
+
+  /** An empty container must parse to nothing rather than throwing — the offline/empty-library case. */
+  @Test
+  fun `a container with no metadata parses to an empty list`() {
+    val empty = """{"MediaContainer":{"size":0}}"""
+
+    val parsed =
+      moshi.adapter(PlexMediaContainerWrapper::class.java).fromJson(empty)
+        ?: error("empty container failed to parse")
+
+    assertTrue(parsed.plexMediaContainer.metadata.isEmpty())
   }
 }

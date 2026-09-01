@@ -158,7 +158,9 @@ dependencies {
   implementation(libs.okhttp3.logging)
 
   implementation(libs.moshi)
-  // Removed moshi-codegen KAPT processor - deprecated for Kotlin 2.x
+  // Codegen, not reflection (cu-62). The old KAPT processor was dropped in cu-8; this is the KSP
+  // one, which is what `@JsonClass(generateAdapter = true)` has been asking for ever since.
+  ksp(libs.moshi.codegen)
   // Moshi will use reflection-based adapters instead
 
   implementation(libs.coil)

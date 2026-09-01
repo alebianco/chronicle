@@ -7,7 +7,6 @@ import android.content.SharedPreferences
 import androidx.core.content.ContextCompat
 import androidx.work.WorkManager
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.tonyodev.fetch2.Fetch
 import com.tonyodev.fetch2.FetchConfiguration
 import com.tonyodev.fetch2okhttp.OkHttpDownloader
@@ -276,10 +275,11 @@ class AppModule(private val app: Application) {
   @Provides
   @Singleton
   fun moshi(): Moshi =
-    Moshi.Builder()
-      // Use Kotlin reflection adapter for Moshi since codegen is disabled
-      .add(KotlinJsonAdapterFactory())
-      .build()
+    // No `KotlinJsonAdapterFactory` (cu-62): every model carries
+    // `@JsonClass(generateAdapter = true)` and the KSP processor now generates a real adapter for
+    // each, so the reflective fallback is dead weight — and worse, it would mask a model that
+    // *lost* its annotation by silently handling it reflectively.
+    Moshi.Builder().build()
 
   @Provides
   @Singleton

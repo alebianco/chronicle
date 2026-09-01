@@ -1,8 +1,8 @@
 ---
 id: cu-62
 title: Moshi reflection to codegen
-status: To Do
-assignee: []
+status: Done
+assignee: [claude]
 created_date: '2026-08-30'
 labels: [R1, performance]
 dependencies: []
@@ -41,7 +41,35 @@ fields are on the [[cu-73]] live-server checklist.
 
 ## Acceptance Criteria
 
-- [ ] `ksp(moshi-codegen)` wired; `KotlinJsonAdapterFactory` removed
-- [ ] cu-16 contract tests pass unchanged
-- [ ] Fixtures extended with absent/null-field cases
-- [ ] `./test_release_build.sh` green; APK size delta recorded
+- [x] `ksp(moshi-codegen)` wired; `KotlinJsonAdapterFactory` removed
+- [x] cu-16 contract tests pass unchanged
+- [x] Fixtures extended with absent/null-field cases
+- [x] `./test_release_build.sh` green; APK size delta recorded
+
+## Implementation Notes
+
+`ksp(libs.moshi.codegen)` wired, `KotlinJsonAdapterFactory` removed from `AppModule`. The feared
+leniency differences did not materialise on fixture data — the cu-16 contract tests passed unchanged.
+
+**The important finding is why that reassurance was nearly worthless.** `PlexFixtureContractTest`
+built its *own* Moshi with `KotlinJsonAdapterFactory`, so it was still exercising reflection after
+the production path had switched. It would have passed even if codegen were entirely broken or a
+model had lost its annotation. It now builds Moshi the way `AppModule` does, which is what makes it
+a real check of the switch.
+
+Three tests added for the case reflection and codegen genuinely differ:
+
+- a directory with most fields absent still parses to Kotlin defaults;
+- an explicit JSON `null` on a non-null field is **rejected** rather than silently defaulted — pinned
+  so a server that starts sending nulls fails loudly rather than mysteriously;
+- an empty container parses to an empty list.
+
+R8: `./test_release_build.sh` passes, all reflection-dependent classes survive the dex check, and the
+release APK is 6.7M. Existing keep rules already cover generated adapters (`-keep class **JsonAdapter`).
+Some of the Moshi rules are arguably now over-broad, since codegen removes reflection over the models —
+narrowing them is separate work and carries its own release risk, so left alone deliberately.
+
+Coverage 22.55% → 24.47%, largely because generated adapters count as covered code.
+
+The install step of `test_release_build.sh` fails with `INSTALL_PARSE_FAILED_NO_CERTIFICATES` — the
+APK is unsigned by design. Unrelated to this task; the R8 verification it exists for passed.
