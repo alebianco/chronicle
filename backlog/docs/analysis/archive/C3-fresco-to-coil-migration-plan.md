@@ -576,7 +576,7 @@ Code:
 
 **Documentation to Add**:
 
-```markdown
+````markdown
 ## Image Loading: Fresco → Coil Migration
 
 We've migrated from Fresco to Coil for image loading.
@@ -620,6 +620,7 @@ imageView.load(url) {
 imageLoader.diskCache?.clear()
 imageLoader.memoryCache?.clear()
 ```
+````
 
 ---
 

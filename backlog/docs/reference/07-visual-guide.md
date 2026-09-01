@@ -88,7 +88,7 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph ChronicleApplication - @Singleton
+    subgraph "ChronicleApplication - @Singleton"
         A[AppComponent<br/>Lifetime: Entire app]
         A1[Repositories<br/>BookRepository, TrackRepository]
         A2[Databases - Room]
@@ -102,7 +102,7 @@ graph TB
         A --> A5
     end
     
-    subgraph MainActivity - @ActivityScope
+    subgraph "MainActivity - @ActivityScope"
         B[ActivityComponent<br/>Lifetime: While Activity exists]
         B1[ViewModelFactories]
         B2[Navigator]
@@ -112,7 +112,7 @@ graph TB
         B --> B3
     end
     
-    subgraph MediaPlayerService - @ServiceScope
+    subgraph "MediaPlayerService - @ServiceScope"
         C[ServiceComponent<br/>Lifetime: While Service exists]
         C1[ExoPlayer]
         C2[MediaSession]
