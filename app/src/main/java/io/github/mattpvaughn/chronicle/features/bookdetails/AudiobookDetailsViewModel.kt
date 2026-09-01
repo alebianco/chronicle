@@ -256,17 +256,10 @@ class AudiobookDetailsViewModel(
       Timber.i("Cached chapters: $_chapters")
       Timber.i("Cached progress: ${_tracks?.getProgress()}")
 
+      // See the same fix in CurrentlyPlayingViewModel: the hand-rolled walk this replaces mixed
+      // relative and absolute chapter offsets and resolved the wrong chapter (cu-73).
       if (_tracks != null && _chapters != null) {
-        var offsetRemaining = _tracks.getProgress()
-        var currChapter: Chapter? = null
-        for (chapter in _chapters) {
-          if (offsetRemaining < chapter.endTimeOffset) {
-            currChapter = chapter
-            break
-          }
-          offsetRemaining -= (chapter.endTimeOffset - chapter.startTimeOffset)
-        }
-        currChapter ?: EMPTY_CHAPTER
+        _chapters.chapterAtBookProgress(_tracks.getProgress())
       } else {
         EMPTY_CHAPTER
       }

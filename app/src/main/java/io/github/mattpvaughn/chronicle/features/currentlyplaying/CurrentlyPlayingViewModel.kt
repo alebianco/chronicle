@@ -189,17 +189,16 @@ class CurrentlyPlayingViewModel(
       Timber.i("Cached chapters: $_chapters")
       Timber.i("Cached progress: ${_tracks?.getProgress()}")
 
+      // `chapterAtBookProgress`, not a hand-rolled walk. The loop this replaces subtracted each
+      // chapter's *duration* from a running offset while comparing against the **absolute**
+      // `endTimeOffset` — mixing relative and absolute coordinates, the same defect as cu-13 and
+      // cu-49. At 28,359,976ms in a real book it picked Chapter 12 (ending 15,803,900) instead of
+      // Chapter 20, so a cold start showed the wrong chapter until playback corrected it (cu-73).
+      //
+      // The helper also sorts, which matters: the list arrives from the DB and the network in no
+      // guaranteed order, and the old walk trusted the given order.
       if (_tracks != null && _chapters != null) {
-        var offsetRemaining = _tracks.getProgress()
-        var currChapter: Chapter? = null
-        for (chapter in _chapters) {
-          if (offsetRemaining < chapter.endTimeOffset) {
-            currChapter = chapter
-            break
-          }
-          offsetRemaining -= (chapter.endTimeOffset - chapter.startTimeOffset)
-        }
-        currChapter ?: EMPTY_CHAPTER
+        _chapters.chapterAtBookProgress(_tracks.getProgress())
       } else {
         EMPTY_CHAPTER
       }

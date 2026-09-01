@@ -86,4 +86,35 @@ class ChapterAtBookProgressTest {
   fun `an empty chapter list yields the empty chapter`() {
     assertEquals(EMPTY_CHAPTER, emptyList<Chapter>().chapterAtBookProgress(1_000L))
   }
+
+  /**
+   * The exact case that reached the owner's device (cu-73).
+   *
+   * A hand-rolled walk in two ViewModels subtracted each chapter's *duration* from a running offset
+   * while comparing against the **absolute** `endTimeOffset`. At 28,359,976ms in a real 40-chapter
+   * book it resolved Chapter 12 (ending 15,803,900) instead of Chapter 20 — a cold start showed the
+   * wrong chapter until playback corrected it.
+   *
+   * The numbers here are the real ones from that book, so this fails if anyone reintroduces the
+   * relative-offset walk.
+   */
+  @Test
+  fun `a late position in a long book resolves its real chapter`() {
+    val realBook =
+      listOf(
+        chapter("Chapter 11", index = 11L, start = 13_411_400L, end = 14_711_100L),
+        chapter("Chapter 12", index = 12L, start = 14_711_100L, end = 15_803_900L),
+        chapter("Chapter 19", index = 19L, start = 25_024_800L, end = 26_879_000L),
+        chapter("Chapter 20", index = 20L, start = 26_879_000L, end = 29_184_600L),
+        chapter("Chapter 21", index = 21L, start = 29_184_600L, end = 31_300_300L),
+      )
+
+    val resolved = realBook.chapterAtBookProgress(28_359_976L)
+
+    assertEquals(
+      "offsets are absolute; subtracting durations picks a far earlier chapter",
+      "Chapter 20",
+      resolved.title,
+    )
+  }
 }
