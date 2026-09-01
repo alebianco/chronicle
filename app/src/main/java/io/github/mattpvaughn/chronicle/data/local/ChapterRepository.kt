@@ -77,7 +77,7 @@ class ChapterRepository
             }
           }
         } catch (t: Throwable) {
-          Timber.e("Failed to load chapters: $t")
+          Timber.e(t, "Failed to load chapters")
           emptyList()
         }
       chapterDao.insertAll(chapters)

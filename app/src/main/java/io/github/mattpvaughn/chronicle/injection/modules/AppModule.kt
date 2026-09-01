@@ -297,7 +297,7 @@ class AppModule(private val app: Application) {
   @Singleton
   fun exceptionHandler(): CoroutineExceptionHandler =
     CoroutineExceptionHandler { _, e ->
-      Timber.e("Caught unhandled exception! $e")
+      Timber.e(e, "Caught unhandled exception!")
     }
 
   @Provides

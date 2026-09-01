@@ -100,7 +100,7 @@ class PlexLoginRepo
         plexPrefsRepo.oAuthTempId = pin.id
         pin
       } catch (e: Throwable) {
-        Timber.e("Failed to log in: $e")
+        Timber.e(e, "Failed to log in")
         _loginState.postEvent(FAILED_TO_LOG_IN)
         null
       }

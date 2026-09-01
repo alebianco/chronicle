@@ -511,7 +511,7 @@ class CurrentlyPlayingViewModel(
         }
         _isLoadingTracks.value = false
       } catch (e: Throwable) {
-        Timber.e("Failed to load tracks for audiobook $bookId: $e")
+        Timber.e(e, "Failed to load tracks for audiobook $bookId")
         _isLoadingTracks.value = false
       }
     }

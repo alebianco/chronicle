@@ -312,7 +312,7 @@ class AudiobookDetailsViewModel(
         }
         _isLoadingTracks.value = false
       } catch (e: Throwable) {
-        Timber.e("Failed to load tracks for audiobook $bookId: $e")
+        Timber.e(e, "Failed to load tracks for audiobook $bookId")
         _isLoadingTracks.value = false
       }
     }
@@ -534,19 +534,21 @@ class AudiobookDetailsViewModel(
   private fun setAudiobookWatched() {
     Timber.i("Marking audiobook as watched")
     viewModelScope.launch {
-      // Plex will set tracks as unwatched if their parent becomes unwatched, so no need
-      // for [ITrackRepository.setWatched]
-      trackRepository.markTracksInBookAsWatched(inputAudiobook.id)
-      bookRepository.setWatched(inputAudiobook.id)
+      // Symmetrical with setAudiobookUnwatched: report what actually happened, and do not let a
+      // server failure escape the coroutine.
+      val message =
+        try {
+          // Plex will set tracks as unwatched if their parent becomes unwatched, so no need
+          // for [ITrackRepository.setWatched]
+          trackRepository.markTracksInBookAsWatched(inputAudiobook.id)
+          bookRepository.setWatched(inputAudiobook.id)
+          R.string.marked_as_played
+        } catch (t: Throwable) {
+          Timber.e(t, "Failed to mark book ${inputAudiobook.id} as played")
+          R.string.mark_as_played_failed
+        }
+      showToast(message)
     }
-    val toast =
-      Toast.makeText(
-        Injector.get().applicationContext(),
-        R.string.marked_as_played,
-        Toast.LENGTH_LONG,
-      )
-    toast.setGravity(Gravity.BOTTOM, 0, 200)
-    toast.show()
   }
 
   private fun setAudiobookUnwatched() {

@@ -16,10 +16,12 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -219,15 +221,34 @@ class BookRepositorySyncTest {
   /**
    * A server rejection must not leave the local state changed: the two sides would then disagree
    * permanently, which is the cross-device inconsistency the owner reported.
+   *
+   * It must also **reach the caller**. This used to be logged and swallowed, so the caller went on
+   * to show "Marked audiobook as played" for a change the server had refused (cu-98).
    */
   @Test
-  fun `a rejected mark-as-read does not change local state`() =
+  fun `a rejected mark-as-read does not change local state and is reported`() =
     runTest {
       coEvery { plexMediaService.watched(any()) } throws IOException("offline")
 
-      repository().setWatched("1001")
+      assertThrows(IOException::class.java) {
+        runBlocking { repository().setWatched("1001") }
+      }
 
       coVerify(exactly = 0) { bookDao.setWatched(any()) }
+      coVerify(exactly = 0) { bookDao.resetBookProgress(any()) }
+    }
+
+  /** The same for the inverse, which is the one that repairs a damaged book (cu-98). */
+  @Test
+  fun `a rejected mark-as-unread does not change local state and is reported`() =
+    runTest {
+      coEvery { plexMediaService.unwatched(any()) } throws IOException("offline")
+
+      assertThrows(IOException::class.java) {
+        runBlocking { repository().setUnwatched("1001") }
+      }
+
+      coVerify(exactly = 0) { bookDao.setUnwatched(any()) }
       coVerify(exactly = 0) { bookDao.resetBookProgress(any()) }
     }
 

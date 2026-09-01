@@ -369,29 +369,25 @@ class BookRepository
       }
     }
 
+    // Both of these let a failure propagate rather than logging and returning. The server call
+    // comes first, so a failure leaves the local DB untouched and the two sides still agree — but
+    // swallowing it told the caller the change had been made, and the caller shows a success
+    // message. Since cu-98 the caller reports the real outcome, which only works if it is told.
     override suspend fun setWatched(bookId: String) {
       withContext(dispatchers.io) {
-        try {
-          plexMediaService.watched(bookId)
-          bookDao.setWatched(bookId)
-          bookDao.resetBookProgress(bookId)
-        } catch (t: Throwable) {
-          Timber.e("Failed to update watched status: $t")
-        }
+        plexMediaService.watched(bookId)
+        bookDao.setWatched(bookId)
+        bookDao.resetBookProgress(bookId)
       }
     }
 
     override suspend fun setUnwatched(bookId: String) {
       withContext(dispatchers.io) {
-        try {
-          plexMediaService.unwatched(bookId)
-          bookDao.setUnwatched(bookId)
-          // The inverse of setWatched, which also resets progress. Without this the book kept the
-          // position it was marked played at, so "unread" showed a part-finished book (cu-86).
-          bookDao.resetBookProgress(bookId)
-        } catch (t: Throwable) {
-          Timber.e("Failed to update watched status: $t")
-        }
+        plexMediaService.unwatched(bookId)
+        bookDao.setUnwatched(bookId)
+        // The inverse of setWatched, which also resets progress. Without this the book kept the
+        // position it was marked played at, so "unread" showed a part-finished book (cu-86).
+        bookDao.resetBookProgress(bookId)
       }
     }
 
@@ -472,7 +468,7 @@ class BookRepository
               }
             }
           } catch (t: Throwable) {
-            Timber.e("Failed to load chapters: $t")
+            Timber.e(t, "Failed to load chapters")
             return@withContext false
           }
 

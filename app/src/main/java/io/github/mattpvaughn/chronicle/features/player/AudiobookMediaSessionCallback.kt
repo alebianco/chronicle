@@ -469,7 +469,7 @@ class AudiobookMediaSessionCallback
               getMediaItemUri(serverId, bookId),
             )
           } catch (e: Throwable) {
-            Timber.e("Failed to start media session: $e")
+            Timber.e(e, "Failed to start media session")
           }
         }
       }

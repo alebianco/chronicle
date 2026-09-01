@@ -699,7 +699,7 @@ class MediaPlayerService :
   private val playerEventListener =
     object : Player.Listener {
       override fun onPlayerError(error: PlaybackException) {
-        Timber.e("Exoplayer playback error: $error")
+        Timber.e(error, "Exoplayer playback error")
         val errorIntent = Intent(ACTION_PLAYBACK_ERROR)
         errorIntent.putExtra(PLAYBACK_ERROR_MESSAGE, error.message)
         localBroadcastManager.sendBroadcast(errorIntent)

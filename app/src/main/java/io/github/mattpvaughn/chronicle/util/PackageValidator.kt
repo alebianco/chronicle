@@ -390,7 +390,7 @@ class PackageValidator(
     try {
       md = MessageDigest.getInstance("SHA256")
     } catch (noSuchAlgorithmException: NoSuchAlgorithmException) {
-      Timber.e("No such algorithm: $noSuchAlgorithmException")
+      Timber.e(noSuchAlgorithmException, "No such algorithm")
       throw RuntimeException("Could not find SHA256 hash algorithm", noSuchAlgorithmException)
     }
     md.update(certificate)

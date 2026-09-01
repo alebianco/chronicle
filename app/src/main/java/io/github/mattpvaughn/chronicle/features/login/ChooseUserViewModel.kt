@@ -80,7 +80,7 @@ class ChooseUserViewModel(
         _users.postValue(usersResponse.users)
         _usersLoadingStatus.value = LoadingStatus.DONE
       } catch (e: Throwable) {
-        Timber.e("Failed to get users: $e")
+        Timber.e(e, "Failed to get users")
         _userMessage.postEvent("Failed to load users: ${e.message}")
         _usersLoadingStatus.value = LoadingStatus.ERROR
       }
@@ -131,7 +131,7 @@ class ChooseUserViewModel(
       _pinLoadingStatus.postValue(LoadingStatus.ERROR)
     } catch (t: Throwable) {
       _userMessage.postEvent("Error occurred when submitting pin. Try again")
-      Timber.e("Failed to submit pin: $t")
+      Timber.e(t, "Failed to submit pin")
       _pinLoadingStatus.postValue(LoadingStatus.ERROR)
     }
   }

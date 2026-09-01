@@ -197,7 +197,7 @@ class TrackRepository
             i++
           }
         } catch (t: Throwable) {
-          Timber.e("Failed to load tracks: $t")
+          Timber.e(t, "Failed to load tracks")
         }
 
         val localTracks = trackDao.getAllTracksAsync()
@@ -401,7 +401,7 @@ class TrackRepository
           trackDao.insertAll(mergedTracks)
           return@withContext mergedTracks
         } catch (t: Throwable) {
-          Timber.e("Failed to load tracks: $t")
+          Timber.e(t, "Failed to load tracks")
           emptyList()
         }
       }
@@ -462,7 +462,7 @@ class TrackRepository
             try {
               cachedFile.renameTo(newFileName)
             } catch (t: Throwable) {
-              Timber.e("Failed to rename downloaded track: $t")
+              Timber.e(t, "Failed to rename downloaded track")
             }
           }
         }

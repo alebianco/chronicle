@@ -315,7 +315,11 @@ class SimpleProgressUpdater
           playbackState == MediaPlayerService.PLEX_STATE_STOPPED
       if (hasUserEndedPlayback && bookDuration - bookProgress <= BOOK_FINISHED_END_OFFSET_MILLIS) {
         Timber.i("Marking $bookId as finished")
-        bookRepository.setWatched(bookId)
+        // `setWatched` propagates a server failure since cu-98. Caught here rather than left to
+        // escape: this runs on the progress-reporting path, and failing to mark a finished book
+        // must not take down the reporting that keeps the listener's position.
+        runCatching { bookRepository.setWatched(bookId) }
+          .onFailure { Timber.e(it, "Failed to mark $bookId as finished") }
       }
     }
 
