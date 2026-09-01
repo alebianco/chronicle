@@ -44,6 +44,12 @@ class PlexSyncScrobbleWorker(
         lookupBookDuration = { bookId ->
           trackRepository.getTracksForAudiobookAsync(bookId).getDuration()
         },
+        // Reads the local copy rather than the server's: it is what `syncAudiobook` last wrote,
+        // and one extra network round-trip per progress tick to answer "is this already finished"
+        // would cost more than the duplicate scrobble it prevents.
+        lookupBookViewCount = { bookId ->
+          Injector.get().bookRepo().getAudiobookAsync(bookId)?.viewCount ?: 0L
+        },
       )
 
     val request =

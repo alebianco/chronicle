@@ -33,6 +33,59 @@ class MarkFinishedBoundaryTest {
     )
 
   /**
+   * The scrobble must fire **once**, not on every progress report (cu-73).
+   *
+   * Plex's `/:/scrobble` increments `viewCount` rather than setting a flag, and it clears
+   * `viewOffset` as a side effect. Progress is reported every ten ticks during playback, and these
+   * books are often a *single* multi-hour file — so once playback passed the track's final second,
+   * every later report re-fired it. The owner's real library showed `viewCount` of 183, 129 and 126
+   * on single tracks of books played at most a few times, and a book he was **still listening to**
+   * had `viewOffset = 0` because the last scrobble wiped his position.
+   */
+  @Test
+  fun `an already-watched track is not scrobbled again`() {
+    val api = FakeProgressApi()
+
+    reportAt(
+      trackProgress = 10 * 60_000L,
+      trackViewCount = 1L,
+      api = api,
+    )
+
+    assertEquals(
+      "re-scrobbling inflates viewCount and destroys the listener's position",
+      0,
+      api.watchedCalls,
+    )
+  }
+
+  /** The first pass must still mark it — the guard suppresses repeats, not the initial scrobble. */
+  @Test
+  fun `an unwatched track at the end is scrobbled once`() {
+    val api = FakeProgressApi()
+
+    reportAt(trackProgress = 10 * 60_000L, trackViewCount = 0L, api = api)
+
+    assertEquals(1, api.watchedCalls)
+  }
+
+  /** Same one-shot rule for the book: repeated pauses near the end must not scrobble repeatedly. */
+  @Test
+  fun `an already-watched book is not scrobbled again`() {
+    val api = FakeProgressApi()
+
+    reportAt(
+      trackProgress = 0L,
+      bookProgress = 10 * 60_000L,
+      bookDuration = 10 * 60_000L,
+      bookViewCount = 2L,
+      api = api,
+    )
+
+    assertEquals(0, api.watchedCalls)
+  }
+
+  /**
    * `trackProgress > duration - TRACK_FINISHED_WINDOW_MILLIS`, i.e. > 4000 for a 5s track.
    *
    * The book defaults keep the *book* far from its end so the track assertions are not polluted by
@@ -40,18 +93,23 @@ class MarkFinishedBoundaryTest {
    * `60000 - 0 < 120000` — **inside** the two-minute finished window, so every track test would
    * also mark the book. The book window is longer than many test fixtures are.
    */
+
   private fun reportAt(
     trackProgress: Long,
     bookProgress: Long = 0L,
     playbackState: String = PLEX_STATE_PAUSED,
     bookDuration: Long = 10 * 60_000L,
+    // Unfinished by default, so the existing boundary cases still exercise a first scrobble.
+    bookViewCount: Long = 0L,
+    trackViewCount: Long = 0L,
+    api: FakeProgressApi = FakeProgressApi(),
   ): FakeProgressApi {
-    val api = FakeProgressApi()
     val reporter =
       ProgressReporter(
         api = api,
-        lookupTrack = { track },
+        lookupTrack = { track.copy(viewCount = trackViewCount) },
         lookupBookDuration = { bookDuration },
+        lookupBookViewCount = { bookViewCount },
       )
     kotlinx.coroutines.runBlocking {
       reporter.report(

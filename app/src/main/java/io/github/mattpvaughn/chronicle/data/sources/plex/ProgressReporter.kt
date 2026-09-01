@@ -25,6 +25,7 @@ class ProgressReporter(
   private val api: ProgressApi,
   private val lookupTrack: suspend (String) -> MediaItemTrack?,
   private val lookupBookDuration: suspend (String) -> Long,
+  private val lookupBookViewCount: suspend (String) -> Long,
 ) {
   /** What the caller should tell WorkManager. */
   enum class Outcome {
@@ -106,12 +107,27 @@ class ProgressReporter(
     val hasUserEndedPlayback =
       request.playbackState == PLEX_STATE_STOPPED || request.playbackState == PLEX_STATE_PAUSED
 
-    if (request.trackProgress > track.duration - TRACK_FINISHED_WINDOW_MILLIS) {
+    // `viewCount == 0L` is the guard that makes this fire **once**. Plex's `/:/scrobble`
+    // increments `viewCount` rather than setting a flag, and it clears `viewOffset` as a side
+    // effect — so re-scrobbling an already-watched track both inflates the count and destroys the
+    // listener's position.
+    //
+    // Progress is reported to the server every ten ticks during playback, and these books are
+    // frequently a *single* multi-hour file. Once playback passed the final second of that one
+    // track, every later report re-fired this call: the owner's library carried `viewCount` of
+    // 183, 129 and 126 on single tracks of books played at most a few times, and a book still
+    // being listened to had `viewOffset = 0` because the last scrobble wiped it (cu-73).
+    if (track.viewCount == 0L && request.trackProgress > track.duration - TRACK_FINISHED_WINDOW_MILLIS) {
       runCatching { api.markWatched(track.id) }
         .onFailure { Timber.e(it, "Failed to mark track ${track.id} watched") }
     }
 
     if (!hasUserEndedPlayback) return
+
+    // Same one-shot guard as the track above. A pause inside the final two minutes is reported
+    // every time, so without this a listener who pauses repeatedly near the end scrobbles the book
+    // once per pause.
+    if (lookupBookViewCount(bookId) > 0L) return
 
     val bookDuration = lookupBookDuration(bookId)
     if (bookDuration - request.bookProgress < BOOK_FINISHED_END_OFFSET_MILLIS) {

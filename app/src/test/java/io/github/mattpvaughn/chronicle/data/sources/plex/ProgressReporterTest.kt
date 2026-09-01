@@ -120,6 +120,8 @@ class ProgressReporterTest {
     api = api,
     lookupTrack = { track },
     lookupBookDuration = { if (trackProgressAtEnd) 5_000L else 60_000L },
+    // Unfinished by default: the one-shot guard must not suppress a first, legitimate scrobble.
+    lookupBookViewCount = { 0L },
   )
 
   private fun httpException(code: Int) =
