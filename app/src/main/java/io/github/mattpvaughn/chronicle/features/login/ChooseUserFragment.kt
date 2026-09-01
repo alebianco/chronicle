@@ -108,6 +108,14 @@ class ChooseUserFragment : Fragment() {
       tempBinding.pinChooser.isVisible = showPin == true
     }
 
+    // Was `app:users="@{viewModel.users}"` on the list. Missed when cu-58 converted this screen
+    // off DataBinding, so the adapter was set and the list made visible but never given any data —
+    // "choose user" rendered permanently empty against a real account, while the mock's
+    // single-user path looked fine. Found on the owner's phone during cu-73.
+    viewModel.users.observe(viewLifecycleOwner) { users ->
+      userListAdapter.submitList(users)
+    }
+
     // Was three `app:loadingStatus` bindings on the user list.
     viewModel.usersLoadingStatus.observe(viewLifecycleOwner) { status ->
       tempBinding.userList.isVisible = status == LoadingStatus.DONE
