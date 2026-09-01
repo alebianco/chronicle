@@ -11,6 +11,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -123,6 +124,7 @@ class MainActivity : AppCompatActivity() {
       ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
 
     applyWindowInsets(binding)
+    registerBackHandler(binding)
 
     // Was binding expressions in activity_main.xml.
     viewModel.currentlyPlayingLayoutState.observe(this) { state ->
@@ -159,6 +161,12 @@ class MainActivity : AppCompatActivity() {
           R.drawable.ic_notification_icon_playing
         },
       )
+    }
+    viewModel.isAudioLoading.observe(this) { loading ->
+      // Spinner instead of the icon, INVISIBLE so the mini player's layout does not reflow — the
+      // same treatment as the expanded player (cu-95).
+      binding.miniAudioLoadingSpinner.isVisible = loading == true
+      binding.pausePlayButton.visibility = if (loading == true) View.INVISIBLE else View.VISIBLE
     }
     binding.pausePlayButton.setOnClickListener { viewModel.pausePlayButtonClicked() }
 
@@ -207,23 +215,51 @@ class MainActivity : AppCompatActivity() {
     handleNotificationIntent(intent)
   }
 
-  override fun onBackPressed() {
-    // If currently playing view is over fragments, close it via back button
-    if (viewModel.currentlyPlayingLayoutState.value == EXPANDED) {
-      viewModel.setBottomSheetState(COLLAPSED)
-      return
-    }
-    // default to activity back stack if navigator did not handle anything
-    if (!navigator.onBackPressed()) {
-      Timber.i("MainActivity super.onBackPressed()")
-      if (supportFragmentManager.backStackEntryCount == 0) {
-        // The prevent Q+ from leaking the activity internally, don't call
-        // super.onBackPressed() if at base fragment, manually end...
-        finishAfterTransition()
-      } else {
-        super.onBackPressed()
-      }
-    }
+  /**
+   * Back handling, registered with [androidx.activity.OnBackPressedDispatcher].
+   *
+   * **Not** an `onBackPressed()` override. At `targetSdk` 36 on Android 16 the platform's
+   * predictive-back gesture is mandatory and the legacy override is never called — so every branch
+   * below, including collapsing the player and the onboarding navigation, was silently dead. A back
+   * press went straight to the platform default and quit the app (cu-73).
+   *
+   * Registered in `onCreate` so it is active for the activity's whole life.
+   */
+  private fun registerBackHandler(binding: ActivityMainBinding) {
+    onBackPressedDispatcher.addCallback(
+      this,
+      object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+          // The expanded player is over the fragments, so back closes it first.
+          if (viewModel.currentlyPlayingLayoutState.value == EXPANDED) {
+            viewModel.setBottomSheetState(COLLAPSED)
+            return
+          }
+
+          if (navigator.onBackPressed()) {
+            return
+          }
+
+          // Tabs are swapped with `replace(...).commit()` and never added to the back stack, so it
+          // is always empty. Home is the root: from anywhere else, back goes there first rather
+          // than leaving the app.
+          if (binding.bottomNav.selectedItemId != R.id.nav_home) {
+            binding.bottomNav.selectedItemId = R.id.nav_home
+            return
+          }
+
+          if (supportFragmentManager.backStackEntryCount > 0) {
+            supportFragmentManager.popBackStack()
+            return
+          }
+
+          // Nothing left to unwind. Disable this callback and let the platform take the press, so
+          // the predictive-back animation runs instead of a bare finish().
+          isEnabled = false
+          onBackPressedDispatcher.onBackPressed()
+        }
+      },
+    )
   }
 
   @SuppressLint("ClickableViewAccessibility")
