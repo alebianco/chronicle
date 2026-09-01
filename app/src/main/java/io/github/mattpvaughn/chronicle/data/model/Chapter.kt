@@ -67,11 +67,21 @@ fun List<Chapter>.getChapterAt(
   timeStamp: Long,
 ): Chapter {
   for (chapter in this) {
-    if (chapter.trackId == trackId && timeStamp in chapter.startTimeOffset..chapter.endTimeOffset) {
+    // Half-open: `start <= t < end`. The range used to be inclusive at *both* ends, so a position
+    // exactly on a boundary matched the **earlier** chapter — and the loop returns the first match.
+    // Seeking to a chapter start lands precisely on that boundary, so pressing previous-chapter
+    // seeked correctly to Chapter 20's start and then displayed "Chapter 19", which reads as the
+    // button going to the end of the previous chapter (cu-93).
+    //
+    // This now agrees with [chapterAtBookProgress], which was already half-open. Two lookups over
+    // the same data disagreeing at a boundary is the actual defect; the inclusive end was it.
+    if (chapter.trackId == trackId && timeStamp >= chapter.startTimeOffset && timeStamp < chapter.endTimeOffset) {
       return chapter
     }
   }
-  return EMPTY_CHAPTER
+  // The final chapter's own end is a real position — a book paused at its very last millisecond is
+  // in the last chapter, not nowhere. Half-open excludes it, so accept it explicitly.
+  return lastOrNull { it.trackId == trackId && timeStamp == it.endTimeOffset } ?: EMPTY_CHAPTER
 }
 
 /**
