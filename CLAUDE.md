@@ -53,7 +53,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   unit-tested only. `./capture-screens.sh <dir>` drives the app and screenshots the main
   screens; it asserts the app was actually foregrounded, because an earlier version silently captured
   the launcher.
-- Tests: **424 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **446 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -63,7 +63,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - `injection/` — Dagger components/modules/scopes
 - `data/local/` — Room DBs, DAOs · `data/sources/plex/` — Plex API (`PlexService.kt`), login/config, `CachedFileManager.kt`
 - `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — multi-backend scaffolding, **declared but not yet load-bearing**. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made `SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`. Don't call it; don't delete it (cu-33 resurrects it properly).
-- `features/` — Fragment + ViewModel + adapters per feature (27 files import `data.sources.plex.*` directly — known debt, task cu-33)
+- `features/` — Fragment + ViewModel + adapters per feature (28 files import `data.sources.plex.*` directly — known debt, task cu-33)
 - `navigation/Navigator.kt` — centralized navigation · `views/BindingAdapters.kt` — reusable bindings
 
 ## Conventions (the golden rules)
