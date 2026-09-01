@@ -49,6 +49,28 @@ decoder, between the mixer and the Bluetooth encoder.
 So this task is worth doing for battery, GC pressure and general hygiene — **not** on a promise that
 it fixes crackling. Any claim that it does must be measured.
 
+## Pending discriminator: wired playback on the M300 (owner, 2026-09-02)
+
+The crackle has only been observed over Bluetooth (soundcore P20i, A2DP/AAC) on the A33. The owner
+will test **wired** playback on the HiBy M300 next.
+
+The M300 is the better instrument for this: a dedicated audio player whose primary output is wired,
+running a different OEM Android build (13 / API 33), so it varies the transport while holding the
+app constant.
+
+What each outcome means:
+
+- **No crackle wired** — confirms A2DP encoder starvation. Chronicle is a bystander; nothing in our
+  audio path is implicated and this task stays purely a hygiene/battery item. Any remaining work is
+  about not adding to system load, not about fixing playback.
+- **Crackle wired too** — the hypothesis is wrong and this needs reopening from scratch. Look at the
+  decoder and the renderer next, starting with `AudiobookRenderersFactory` (cu-88 retuned silence
+  skipping there, and a mis-tuned skip is audible as a click). Do **not** assume this task is the
+  cause even then; measure.
+
+Note the M300 runs API 33, so the cu-103 Doze/FGS fix is inert there — a stall on that device is a
+*different* bug and needs its own log pull, not an assumption.
+
 ## Approach (to be validated by measurement first)
 
 1. **Measure before changing.** Fixed playback window with the mock server; record allocation rate,
