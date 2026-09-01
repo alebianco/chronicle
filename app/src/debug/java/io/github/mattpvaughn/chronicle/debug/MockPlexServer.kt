@@ -6,6 +6,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import timber.log.Timber
+import java.net.InetAddress
 import kotlin.concurrent.thread
 
 /**
@@ -86,12 +87,24 @@ class MockPlexServer(private val context: Context) {
     // lookup, both of which Android forbids on the main thread. Do the work on a
     // background thread and join, so callers still get a usable baseUrl on return.
     var port = 0
+    var failure: Throwable? = null
     val worker =
       thread(name = "MockPlexServer") {
-        server.start()
-        port = server.port
+        runCatching {
+          // Bind an explicit loopback address rather than the no-arg start(), which resolves the
+          // hostname "localhost" — an AOSP emulator image has no DNS entry for it and the lookup
+          // throws UnknownHostException. On a background thread that killed the whole process with
+          // an empty crash buffer, which is a miserable thing to debug (cu-54).
+          server.start(InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)), 0)
+          port = server.port
+        }.onFailure { failure = it }
       }
     worker.join()
+    failure?.let {
+      // Loud, not silent: every fixture-backed request fails without the server, and a null
+      // baseUrl surfaces far away from the cause.
+      throw IllegalStateException("MockPlexServer failed to start", it)
+    }
     // Build the url by hand rather than calling server.url(), which resolves the
     // canonical hostname and would hit the network again.
     baseUrl = "http://127.0.0.1:$port"

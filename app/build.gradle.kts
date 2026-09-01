@@ -67,6 +67,10 @@ android {
   }
 
   testOptions {
+    // Espresso refuses to click while window/transition animations are on — the device-side
+    // setting, not a Gradle one. Managed Devices do not disable it for us (cu-54).
+    animationsDisabled = true
+
     unitTests {
       // Robolectric needs the merged android resources/manifest on the
       // unit-test classpath.
@@ -90,6 +94,9 @@ android {
         // is the one already installed and licensed on the owner's machine, so a local run needs
         // no download. ATD is smaller and faster in CI — switch there if the licence is accepted.
         create("api35") {
+          // A phone, not a tablet: on the 2560x1600 tablet profile the system taskbar overlaps the
+          // bottom nav, so Espresso refuses to click it ("covers at least 90 percent of the view's
+          // area"). The same overlap bit `capture-screens.sh` — see the note in CLAUDE.md.
           device = "Pixel 6"
           apiLevel = 35
           systemImageSource = "aosp"
@@ -204,6 +211,12 @@ dependencies {
   androidTestImplementation(libs.junit)
   androidTestImplementation(libs.mockk)
   androidTestImplementation(libs.coroutines.test)
+  // Espresso's ViewMatchers reference org.hamcrest.Matchers at runtime, and it does not arrive
+  // transitively. `hamcrest-all:1.3` is *not* enough on its own: it drags in hamcrest-library,
+  // which Gradle resolves to 2.2 against a 1.3 core, and org.hamcrest.Matchers then lands in
+  // neither merged dex — withId() dies with NoClassDefFoundError while the dependency looks
+  // present in the resolved classpath. Pin the modern coordinates instead (cu-54).
+  androidTestImplementation(libs.hamcrest.modern)
   androidTestImplementation(libs.espresso.core)
   androidTestImplementation(libs.espresso.contrib)
   androidTestImplementation(libs.androidx.test.runner)
