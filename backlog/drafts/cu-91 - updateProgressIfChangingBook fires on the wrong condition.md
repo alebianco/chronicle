@@ -1,7 +1,7 @@
 ---
 id: cu-91
 title: updateProgressIfChangingBook fires on the wrong condition
-status: To Do
+status: Draft
 labels: [R1, trust, bug]
 dependencies: []
 priority: high

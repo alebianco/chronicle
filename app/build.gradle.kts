@@ -335,6 +335,7 @@ pitest {
       "io.github.mattpvaughn.chronicle.features.library.ProgressIndicatorTest",
       "io.github.mattpvaughn.chronicle.views.ColorContrastTest",
       "io.github.mattpvaughn.chronicle.data.sources.plex.ReauthenticationTest*",
+      "io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsPlaybackTest",
     ),
   )
 }

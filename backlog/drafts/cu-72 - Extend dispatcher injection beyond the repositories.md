@@ -5,7 +5,7 @@ status: Draft
 assignee: []
 created_date: '2026-08-31'
 labels: [R1, architecture]
-dependencies: [cu-15]
+dependencies: [cu-15, cu-54]
 priority: medium
 ---
 
@@ -43,9 +43,20 @@ wrong scope there causes leaks or dropped work rather than a compile error.
 
 ### Recommendation
 
-Do the **player group as part of cu-9**, where the tests that justify it are being
-written anyway. The ViewModel and application groups are cosmetic; do them only if
-they block something. The worker group deserves its own investigation.
+**Superseded (2026-09-01).** The original plan was to do the player group inside cu-9, where the
+tests justifying it would be written anyway. cu-9 closed Done without converting them, so that
+plan is stranded and this task now stands alone.
+
+Owner decision, 2026-09-01: **defer until playback tests exist.** Converting untested playback
+code has no safety net — a wrong scope in `MediaPlayerService` or
+`AudiobookMediaSessionCallback` leaks or drops work rather than failing to compile, and nothing
+would catch it. The honest sequence is tests first, injection second, so this now depends on
+[[cu-54]] (or a dedicated player-test task, if one is split out first).
+
+`ProgressUpdater` has since been converted, leaving **13** files. The ViewModel and application
+groups remain cosmetic — they already have `viewModelScope`, so the dispatcher is redundant rather
+than wrong. The worker group still deserves its own investigation against WorkManager's executor
+contract.
 
 ## Acceptance Criteria
 

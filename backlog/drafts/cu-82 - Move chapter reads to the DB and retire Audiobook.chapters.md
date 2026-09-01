@@ -1,7 +1,7 @@
 ---
 id: cu-82
 title: Move chapter reads to the DB and retire Audiobook.chapters
-status: To Do
+status: Draft
 labels: [R2, architecture]
 dependencies: [cu-49]
 priority: medium

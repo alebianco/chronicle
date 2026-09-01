@@ -1,7 +1,7 @@
 ---
 id: cu-81
 title: Prune abandoned partial downloads
-status: To Do
+status: Draft
 labels: [R2, trust, debt]
 dependencies: [cu-76]
 priority: low

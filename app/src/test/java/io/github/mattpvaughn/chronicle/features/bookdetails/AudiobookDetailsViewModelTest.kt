@@ -19,6 +19,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -146,6 +147,94 @@ class AudiobookDetailsViewModelTest {
     viewModel().forceSyncBook(hasUserConfirmation = true)
 
     coVerify(exactly = 0) { trackRepository.syncTracksInBook(any(), any()) }
+  }
+
+  /**
+   * cu-59 behaviour 5: pressing cache *while caching* cancels the download rather than starting a
+   * second one. `cacheStatus` is driven through its real input (`activeBookDownloads`) as the task
+   * requires, not stubbed directly — the derivation is part of what is under test.
+   */
+  @Test
+  fun `pressing cache while a download is running cancels it`() {
+    val cachedFileManager =
+      mockk<ICachedFileManager>(relaxed = true) {
+        every { activeBookDownloads } returns MutableLiveData(setOf("1001"))
+      }
+    val viewModel = viewModel(cachedFileManager = cachedFileManager)
+    viewModel.cacheStatus.observeForever { }
+
+    viewModel.onCacheButtonClick()
+
+    verify(exactly = 1) { cachedFileManager.cancelGroup("1001") }
+    verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
+  }
+
+  /** A download for a *different* book must not make this one look like it is caching. */
+  @Test
+  fun `another book downloading does not cancel this one`() {
+    val cachedFileManager =
+      mockk<ICachedFileManager>(relaxed = true) {
+        every { activeBookDownloads } returns MutableLiveData(setOf("9999"))
+      }
+    val viewModel = viewModel(cachedFileManager = cachedFileManager)
+    viewModel.cacheStatus.observeForever { }
+
+    viewModel.onCacheButtonClick()
+
+    verify(exactly = 0) { cachedFileManager.cancelGroup(any()) }
+    verify { cachedFileManager.downloadTracks("1001", "Dune") }
+  }
+
+  /**
+   * cu-59 behaviour 4: pressing cache on an already-downloaded book starts no download and asks
+   * before deleting. Deleting a download without confirmation would be a data-loss action on a
+   * single tap.
+   */
+  @Test
+  fun `pressing cache on a downloaded book prompts instead of downloading`() {
+    every { bookRepository.getAudiobook("1001") } returns
+      MutableLiveData(book.copy(isCached = true))
+    val cachedFileManager = cacheManager()
+    val viewModel = viewModel(cachedFileManager = cachedFileManager)
+    viewModel.cacheStatus.observeForever { }
+
+    viewModel.onCacheButtonClick()
+
+    verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
+    coVerify(exactly = 0) { cachedFileManager.deleteCachedBook(any()) }
+    assertTrue(
+      "deleting a download must be confirmed, not done on one tap",
+      viewModel.bottomChooserState.value?.shouldShow == true,
+    )
+  }
+
+  /**
+   * cu-59 behaviour 2: jump-to-chapter warns before clearing progress. Without confirmation it must
+   * show the prompt and reach neither the player nor the connection.
+   */
+  @Test
+  fun `jumping to a chapter asks before clearing progress`() {
+    every { mediaServiceConnection.isConnected } returns MutableLiveData(true)
+    val viewModel = viewModel()
+
+    viewModel.jumpToChapter(offset = 5_000L, trackId = "2001")
+
+    assertTrue(
+      "a jump discards the current position, so it must be confirmed",
+      viewModel.bottomChooserState.value?.shouldShow == true,
+    )
+    verify(exactly = 0) { mediaServiceConnection.transportControls }
+  }
+
+  /** With confirmation it proceeds, connecting first when the service is not up. */
+  @Test
+  fun `a confirmed jump connects and plays`() {
+    every { mediaServiceConnection.isConnected } returns MutableLiveData(false)
+    val viewModel = viewModel()
+
+    viewModel.jumpToChapter(offset = 5_000L, trackId = "2001", hasUserConfirmation = true)
+
+    verify { mediaServiceConnection.connect(any()) }
   }
 
   private fun cacheManager() =
