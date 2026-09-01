@@ -1,5 +1,5 @@
 ---
-id: cu-66
+id: DRAFT-66
 title: OkHttp 5 and Retrofit 3 migration
 status: Draft
 assignee: []
@@ -9,6 +9,10 @@ dependencies: [cu-9, cu-10, cu-11]
 priority: low
 milestone: m-2
 ---
+
+> **Draft id note.** Filed as `DRAFT-66` so the Backlog.md drafts view can see it —
+> the tool keys drafts on the `DRAFT-` id prefix, not the directory or the status field.
+> On promotion it becomes a `cu-` task again. Existing references to **cu-66** mean this file.
 
 ## Description
 

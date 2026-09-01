@@ -1,5 +1,5 @@
 ---
-id: cu-72
+id: DRAFT-72
 title: Extend dispatcher injection beyond the repositories
 status: Draft
 assignee: []
@@ -9,6 +9,10 @@ dependencies: [cu-15, cu-54]
 priority: medium
 milestone: m-1
 ---
+
+> **Draft id note.** Filed as `DRAFT-72` so the Backlog.md drafts view can see it —
+> the tool keys drafts on the `DRAFT-` id prefix, not the directory or the status field.
+> On promotion it becomes a `cu-` task again. Existing references to **cu-72** mean this file.
 
 ## Description
 

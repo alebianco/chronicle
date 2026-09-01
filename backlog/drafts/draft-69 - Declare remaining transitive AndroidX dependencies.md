@@ -1,5 +1,5 @@
 ---
-id: cu-69
+id: DRAFT-69
 title: Declare the remaining transitive AndroidX dependencies
 status: Draft
 assignee: []
@@ -9,6 +9,10 @@ dependencies: []
 priority: low
 milestone: m-2
 ---
+
+> **Draft id note.** Filed as `DRAFT-69` so the Backlog.md drafts view can see it —
+> the tool keys drafts on the `DRAFT-` id prefix, not the directory or the status field.
+> On promotion it becomes a `cu-` task again. Existing references to **cu-69** mean this file.
 
 ## Description
 

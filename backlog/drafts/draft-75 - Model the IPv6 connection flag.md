@@ -1,5 +1,5 @@
 ---
-id: cu-75
+id: DRAFT-75
 title: Model the IPv6 connection flag
 status: Draft
 assignee: []
@@ -9,6 +9,10 @@ dependencies: [cu-11]
 priority: low
 milestone: m-2
 ---
+
+> **Draft id note.** Filed as `DRAFT-75` so the Backlog.md drafts view can see it —
+> the tool keys drafts on the `DRAFT-` id prefix, not the directory or the status field.
+> On promotion it becomes a `cu-` task again. Existing references to **cu-75** mean this file.
 
 ## Description
 

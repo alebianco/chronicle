@@ -196,7 +196,11 @@ Tasks are markdown files in **`backlog/tasks/`** (Backlog.md format: `task-<id> 
 **Two layers, not three.** A task's plan and notes live **inside the task file** (Backlog.md's native `plan`/`notes` fields) — the task is the single committed home for a unit of work. Superpowers is the drafting *tool*; everything it writes under `docs/superpowers/` (plans *and* brainstorming specs) is gitignored scratch — its durable content is redirected into `backlog/` (plan → task `## Implementation Plan`; spec → mostly the task, with an ADR spun off only for a durable architectural choice — see the `docs/superpowers/` map entry). `backlog/docs/analysis/` is *optional* deep-reference for the debt items whose understanding is too large to inline — linked from a task only when it earns its place, archived when stale.
 
 **Docs map** (everything non-code is under `backlog/` — see `backlog/README.md`):
-- `backlog/tasks/` — the work (one file per task). `backlog/drafts/` — uncommitted ideas awaiting owner triage.
+- `backlog/tasks/` — the work (one file per task). `backlog/drafts/` — uncommitted ideas awaiting owner
+  triage. **A draft's `id` must use the `DRAFT-<n>` prefix**, not `cu-<n>`: Backlog.md keys its drafts
+  view on that prefix, not on the directory or on `status: Draft`, so a draft filed as `cu-<n>` is
+  invisible in the board and to `backlog draft list`. Keep `<n>` from the cu number it will take, and
+  `backlog draft promote DRAFT-<n>` turns it back into a `cu-` task on promotion.
 - `backlog/decisions/` — decision records `decision-<n> - <Title>.md` (context → decision → consequences): product decisions D1–D14 (owner-only) + technical ADRs (agents may add). Framing, won't-do, and risks live here (decision-9/11/14).
 - `backlog/docs/reference/` — architecture knowledge base (project overview, architecture, data flow, components, glossary); keep in sync with behavior.
 - `backlog/docs/analysis/` — *optional* deep-reference for debt items (C1–C6, H1–H8, M1–M7): problem/current-state/risk, linked from a task only when the understanding is too large to inline. `analysis/archive/` holds ones whose task is Done and content is stale. These are *analysis*, not execution plans.
