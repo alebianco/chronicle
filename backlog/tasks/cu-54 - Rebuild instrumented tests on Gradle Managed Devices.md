@@ -1,7 +1,7 @@
 ---
 id: cu-54
 title: Rebuild instrumented tests on Gradle Managed Devices
-status: In Progress
+status: Done
 assignee: [claude]
 created_date: '2026-08-30'
 labels: [R1, agentic]
@@ -40,14 +40,12 @@ tests would require real Plex credentials and would be flaky by construction.
 
 - [x] `app/src/androidTest` compiles
 - [x] Onboarding flow covered against the current Fragment implementation
-- [ ] Suite runs headless via Gradle Managed Devices, offline, no credentials — **devices declared
-      and the emulator boots, but the instrumentation process still dies before collecting tests**
+- [x] Suite runs headless via Gradle Managed Devices, offline, no credentials
 - [x] Quarantine block removed from `app/build.gradle.kts`
-- [ ] CLAUDE.md no longer states instrumented tests are dead — deferred until the suite actually
-      passes; claiming coverage that does not run is exactly what cu-3 refused to do
-- [ ] Add the instrumented stage to `verify.sh` behind a flag
+- [x] CLAUDE.md no longer states instrumented tests are dead
+- [x] Add the instrumented stage to `verify.sh` behind a flag
 
-## Progress (2026-09-01)
+## Implementation Notes (2026-09-01)
 
 Owner decision: **two devices, API 27 and 35** — the minSdk floor plus a recent level, to catch a
 new API called without a version guard.
@@ -102,15 +100,44 @@ when a connection is already in flight, so a waiting caller is not stranded.
 Not unit-tested: `MediaServiceConnection` builds its `MediaBrowserCompat` inline from a `Context`,
 so constructing one needs a device. Verified by the instrumented run that found it.
 
-### Still failing
+### Green on both devices
 
-The instrumentation process dies before collecting any test — "Starting 0 tests", then
-"Instrumentation run failed due to Process crashed" with an **empty logcat crash buffer**. An empty
-buffer points at a `Runtime.exit()` rather than an exception, and `DebugHooks.onMainActivityIntent`
-calls exactly that when the mock flag changes; the launch intent carries no `mock_plex` extra so it
-should return early, but that is the next thing to rule out. The emulator is torn down after each
-run, which makes capturing the log awkward — run with the emulator kept alive, or add a
-`--no-daemon` run with logcat streaming in parallel.
+`./gradlew instrumentedCheckGroupGroupDebugAndroidTest` → **3 tests on api27, 3 on api35, zero
+failures**. Added to `verify.sh` as an opt-in 7th stage (`--instrumented`), deliberately not in the
+default gate: two emulators take minutes where the unit gate takes seconds, and the inner loop has
+to stay fast.
 
-Next: confirm whether the process exits in `DebugHooks`, then whether `MockPlexMode.enable` throws
-when the fixture assets are missing from the test APK's asset path.
+### Four obstacles, and what each cost
+
+1. **`MockWebServer.start()` resolved the hostname `"localhost"`**, which an AOSP emulator image has
+   no DNS entry for. It threw on a background thread, so the process died with an **empty logcat
+   crash buffer** — which is why earlier runs reported "Starting 0 tests" with nothing to read. It
+   now binds `127.0.0.1` explicitly and rethrows on the calling thread rather than leaving a null
+   `baseUrl`. My first hypothesis (a `Runtime.exit()` in `DebugHooks`) was wrong; the empty buffer
+   was a background-thread throw, not an exit.
+2. **Espresso needs `org.hamcrest.Matchers` at runtime and it does not arrive transitively.**
+   `hamcrest-all:1.3` was *not* enough: it pulls `hamcrest-library`, Gradle resolves that to 2.2
+   against a 1.3 core, and `Matchers` landed in **none of the five dex files** while looking present
+   on the resolved classpath. Pinned to `hamcrest:2.2` (`libs.hamcrest.modern`).
+3. **`testOptions.animationsDisabled` was unset** — Espresso refuses to click while animations run.
+4. **A bad assertion of mine**: the app opens on **Home**, not Library, so `library_coordinator` was
+   legitimately absent.
+
+### Deliberately not covered
+
+Tab navigation. A `BottomNavigationItemView` sits partly under the system bars, so Espresso's stock
+`click()` refuses it ("covers at least 90 percent of the view's area"), and matching by content
+description opened the currently-playing sheet instead. Both are matcher problems rather than app
+problems — chasing them would have traded a suite that runs for one that is subtly wrong. Worth its
+own task once the harness has earned trust.
+
+### The app bug this found
+
+`MediaServiceConnection.connect()` crashing on Activity recreation (see above) — a rotation or theme
+change. No unit test could reach it, and it was caught on the very first run that executed.
+
+### Note for CI
+
+API 35 uses `systemImageSource = "aosp"` rather than `aosp-atd` because ATD's licence is not accepted
+on the owner's machine while the plain image was already installed. ATD is smaller and faster; switch
+in CI once its licence is accepted. API 27's `aosp` licence needed no acceptance.

@@ -11,6 +11,7 @@
 #   ./verify.sh --quick      inner loop: ktlint + unit tests only
 #   ./verify.sh --format     run ktlintFormat first, then the full gate
 #   ./verify.sh --no-coverage  skip the JaCoCo report + ratchet
+#   ./verify.sh --instrumented add the Espresso suite on two managed emulators
 #
 set -euo pipefail
 
@@ -19,13 +20,15 @@ cd "$(dirname "$0")"
 QUICK=false
 FORMAT=false
 COVERAGE=true
+INSTRUMENTED=false
 
 for arg in "$@"; do
   case "$arg" in
     --quick) QUICK=true ;;
     --format) FORMAT=true ;;
     --no-coverage) COVERAGE=false ;;
-    -h|--help) sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --instrumented) INSTRUMENTED=true ;;
+    -h|--help) sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "verify.sh: unknown option '$arg' (try --help)" >&2; exit 2 ;;
   esac
 done
@@ -79,6 +82,15 @@ stage "lintDebug — Android lint"
 # so without this a release-only break lands green and fails the first release build (cu-70).
 stage "compileReleaseKotlin — release variant compiles"
 "$GRADLE" compileReleaseKotlin
+
+# Opt-in, not part of the default gate: it provisions two emulators and takes minutes rather
+# than seconds, which would wreck the inner loop. The unit gate must stay fast enough to run on
+# every edit. Run this before a release, or when touching Activity/Fragment lifecycle, the media
+# session, or anything the unit suite structurally cannot reach (cu-54).
+if [ "$INSTRUMENTED" = true ]; then
+  stage "instrumentedCheckGroup — Espresso on API 27 and 35"
+  "$GRADLE" instrumentedCheckGroupGroupDebugAndroidTest
+fi
 
 echo ""
 echo "=============================================================="
