@@ -130,6 +130,12 @@ class AudiobookDetailsFragment : Fragment() {
       // INVISIBLE, not GONE: the icon keeps its slot while the spinner overlays it.
       binding.download.visibility =
         if (status == CacheStatus.CACHING) View.INVISIBLE else View.VISIBLE
+      // Disabled until the status is known, so a press cannot be silently swallowed (cu-92).
+      // `android:enabled="false"` in the layout is the matching default — without it the button
+      // renders enabled for a frame before this first fires.
+      val statusKnown = status != null
+      binding.download.isEnabled = statusKnown
+      binding.cachingTracksSpinner.isEnabled = statusKnown
     }
     viewModel.cacheIconDrawable.observe(viewLifecycleOwner) { binding.download.setImageResource(it) }
     viewModel.cacheIconTint.observe(viewLifecycleOwner) { tint ->

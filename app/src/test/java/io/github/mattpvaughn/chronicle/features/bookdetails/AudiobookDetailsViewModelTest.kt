@@ -237,6 +237,23 @@ class AudiobookDetailsViewModelTest {
     verify { mediaServiceConnection.connect(any()) }
   }
 
+  /**
+   * cu-92: a press before `cacheStatus` resolves must do nothing, not crash.
+   *
+   * `cacheStatus` is a MediatorLiveData with no value until it has an active observer *and* both
+   * sources have emitted — so this test deliberately does **not** observe it. It previously threw
+   * NoWhenBranchMatchedException, an uncaught exception on a main-screen control.
+   */
+  @Test
+  fun `pressing cache before the status resolves does nothing`() {
+    val cachedFileManager = cacheManager()
+
+    viewModel(cachedFileManager = cachedFileManager).onCacheButtonClick()
+
+    verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
+    verify(exactly = 0) { cachedFileManager.cancelGroup(any()) }
+  }
+
   private fun cacheManager() =
     mockk<ICachedFileManager>(relaxed = true) {
       every { activeBookDownloads } returns MutableLiveData(emptySet())

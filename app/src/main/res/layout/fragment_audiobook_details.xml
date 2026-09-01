@@ -86,7 +86,8 @@ xmlns:tools="http://schemas.android.com/tools"
                         android:id="@+id/download"
                         android:layout_width="@dimen/list_icon_size"
                         android:layout_height="@dimen/list_icon_size"
-                        android:contentDescription="@string/download" />
+                        android:contentDescription="@string/download"
+                        android:enabled="false" />
 
                 </FrameLayout>
 

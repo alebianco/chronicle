@@ -342,9 +342,11 @@ class AudiobookDetailsViewModel(
         Timber.i("Cancelling download: ${inputAudiobook.id}")
         cachedFileManager.cancelGroup(inputAudiobook.id)
       }
-      else -> throw NoWhenBranchMatchedException(
-        "Unknown cache status. Don't know how to proceed",
-      )
+      // null until `cacheStatus` has an observer *and* both its sources have emitted. That is
+      // "not known yet", not an error — throwing here crashed a main-screen control (cu-92). The
+      // Fragment also keeps the button disabled until the status resolves, so this is the backstop
+      // rather than the only guard.
+      null -> Timber.i("Cache button pressed before the status resolved; ignoring")
     }
   }
 
