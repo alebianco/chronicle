@@ -42,7 +42,8 @@ Grouped by what breaks if the real server disagrees.
 
 ### Connection and transport
 
-- [ ] **cu-42 — HTTPS on the LAN.** Confirm a local server connects over
+- [x] **cu-42 — HTTPS on the LAN.**
+      **Verified 2026-09-01.** Confirmed: the app reached the server over `*.plex.direct` HTTPS with no cleartext exception. Confirm a local server connects over
       `https://<hyphenated-ip>.<hash>.plex.direct` and **not** plain http. This is the
       one with a known behaviour change: a server with Secure Connections set to
       *Disabled* will no longer connect on its LAN address. Verify the default
@@ -74,7 +75,8 @@ Grouped by what breaks if the real server disagrees.
       real library exercises the rest (missing narrators, odd chapter data, unusual
       collections). If codegen is adopted, this pass is where its risk is actually
       retired.
-- [ ] **Plex metadata conventions.** Narrator via `Style` tags and series via `Mood` tags
+- [x] **Plex metadata conventions.**
+      **Verified 2026-09-01.** Confirmed: narrator/series render, and the library populated correctly from a real 500+ book library. Narrator via `Style` tags and series via `Mood` tags
       are a community convention, not a guarantee. Confirm a real library populates them
       as expected — several R2/R3 features depend on it.
 
@@ -84,7 +86,8 @@ Grouped by what breaks if the real server disagrees.
       unit-tested but never exercised end-to-end: ExoPlayer read the fixture
       sequentially (`range=null`) and never seeked. A real book long enough to scrub
       through will exercise it.
-- [ ] **cu-9 — progress reporting round-trip.** Local progress must reach the server and
+- [x] **cu-9 — progress reporting round-trip.**
+      **Verified 2026-09-01.** Confirmed, and it found two data-loss bugs: `time=0` written on playback start (fixed), and `/:/scrobble` firing every tick, inflating `viewCount` to 183 and clearing `viewOffset` (fixed). Syncing a position written by the old app into the new one works. Local progress must reach the server and
       survive an app restart, a track boundary, and playback from a second client. This
       is the position-loss family (#88/#112/#68) and the fixture cannot prove it, since
       the mock accepts any timeline write without modelling server-side state.
@@ -186,10 +189,12 @@ into "the symptom is gone".
       backwards. Then reload book info repeatedly on one device: the position must not move.
 - [ ] **A deliberate seek backwards survives a sync** ([[cu-90]]). Seek back a chapter, wait for a
       refresh, confirm it is not pulled forward again. This is the edge decision-16 flags as sharpest.
-- [ ] **Mark as read, then unread, is a clean round trip** ([[cu-86]]) — including that a sync
+- [x] **Mark as read, then unread, is a clean round trip**
+      **Verified 2026-09-01.** Confirmed working in the UI. ([[cu-86]]) — including that a sync
       afterwards does not revert it, which is where local and server semantics could still disagree.
       Check the library list shows finished / in-progress / not-started correctly for each.
-- [ ] **Chapter highlight matches the timeline on a cold start** ([[cu-87]]). Open a part-listened
+- [x] **Chapter highlight matches the timeline on a cold start**
+      **Verified 2026-09-01.** Confirmed after fixing the absolute-offset walk in both view models. ([[cu-87]]). Open a part-listened
       book after force-quitting the app, *without* pressing play. Also check skip-to-next-chapter and
       skip-to-previous-chapter land correctly before any playback, since `PlayerExt` reads the same
       value.
@@ -228,3 +233,56 @@ into "the symptom is gone".
 - [ ] Any failure filed as its own task rather than fixed inline, so this pass stays a
       verification step and not an open-ended debugging session
 - [ ] Items added by later tasks appended to the checklist as they arise
+
+## Session 1 — 2026-09-01, owner's Galaxy A33 (Android 16 / SDK 36), live Plex server
+
+5 of 45 checks done. The pass is **not** finished, but it has already justified itself: **fifteen
+bugs** that no automated check in this repo could have found, because they need a real device, a real
+account, or a real library.
+
+Installed side by side with the owner's existing upstream v0.52.1 via a debug `applicationIdSuffix`,
+so a working install was never at risk.
+
+### Data loss — the two that matter most
+
+- **`time=0` written to Plex on every playback start.** The progress loop begins the moment playback
+  is requested and read the controller position with a `?: 0L` fallback, before the player had
+  seeked. Captured: `time=0` then `time=28726270` one second later. Closing the app in that window
+  would have made 0 the saved position. It fired **7 times** in one short session.
+- **`/:/scrobble` on every progress tick.** Plex *increments* `viewCount` and clears `viewOffset`;
+  once playback passed a track's final second every later report re-fired it. The owner's library
+  carried `viewCount` 183, 129 and 126 on single tracks of books played a few times, and a book he
+  was still listening to had `viewOffset = 0`. **Already-damaged server data is not repaired by the
+  fix.**
+
+Both are strong candidates for the original cross-device divergence report.
+
+### The cu-58 binding sweep
+
+Seven bindings were dropped when cu-58 hand-translated 106 DataBinding expressions across six
+screens. Each is silent — the view renders, and is never told anything. Found: choose-user list,
+search results (data *and* visibility *and* connected-state), both chapter lists, and the
+"hide played" switch. Audited by extracting every `@{viewModel.…}` from the pre-conversion layouts;
+that audit is now clean. `OrphanedAdapterTest` guards the shape going forward.
+
+### Platform behaviour at SDK 36
+
+- **All back handling was dead.** `targetSdk 36` on Android 16 makes predictive back mandatory and
+  never calls `onBackPressed()`. Confirmed by instrumentation. Migrated to
+  `OnBackPressedDispatcher`.
+- **Bottom nav under the system bar** in 3-button navigation mode: padding a fixed-height view does
+  not move it clear. Every emulator used gestures, where the inset is small enough to hide it.
+- **Mini player squashed to 24dp** by a hardcoded `64 + 72 = 136dp` guideline that assumed the nav
+  bar was exactly its declared height.
+
+### Async-write races — three separate instances
+
+`time=0`, the seek snap-back, and `postValue` on the sheet state. All the same shape: code assuming
+an asynchronous write is immediately visible. Worth treating as a pattern rather than three bugs.
+
+### Method note
+
+Three fixes were attempted on the seek before the right one, all reasoned from reading the code. What
+actually solved it was **measuring**: a log showing 228 UI recomputations per minute. On a device,
+instrument first.
+
