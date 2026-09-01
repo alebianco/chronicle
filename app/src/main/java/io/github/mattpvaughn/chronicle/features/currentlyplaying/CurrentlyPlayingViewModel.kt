@@ -334,6 +334,25 @@ class CurrentlyPlayingViewModel(
       return@map DateUtils.formatElapsedTime(StringBuilder(), it / 1000)
     }
 
+  /**
+   * True while the player is buffering or connecting, i.e. play was asked for but no audio is
+   * flowing yet.
+   *
+   * Mirrors `AudiobookDetailsViewModel.isAudioLoading` rather than inventing a second rule — the
+   * two screens showing different things for the same state is what cu-94 was about. The player had
+   * no such state at all: pressing play on a streamed book looked identical to pressing play on a
+   * stalled one, with only the play/pause icon to go on (cu-95).
+   *
+   * Note this covers the *initial* buffer. Media3 reports a mid-book stall as STATE_PLAYING once
+   * playback has started, so a starved stream partway through still shows as normal playback; that
+   * is recorded in cu-95 as a separate question.
+   */
+  val isAudioLoading: LiveData<Boolean> =
+    mediaServiceConnection.playbackState.map { state ->
+      state.state == PlaybackStateCompat.STATE_BUFFERING ||
+        state.state == PlaybackStateCompat.STATE_CONNECTING
+    }
+
   val isPlaying: LiveData<Boolean> =
     mediaServiceConnection.playbackState.map { state ->
       return@map state.isPlaying

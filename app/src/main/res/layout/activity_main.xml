@@ -94,6 +94,23 @@ xmlns:tools="http://schemas.android.com/tools"
                 app:layout_constraintRight_toRightOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 tools:src="@drawable/ic_notification_icon_paused" />
+
+            <!--
+              Buffering indicator over the mini player's play control (cu-95). Padded to match the
+              button's own padding so the spinner is the same visual size as the icon it replaces.
+              `gone` by default because the visibility is Kotlin-driven.
+            -->
+            <ProgressBar
+                android:id="@+id/mini_audio_loading_spinner"
+                android:layout_width="@dimen/app_bar_height"
+                android:layout_height="@dimen/app_bar_height"
+                android:contentDescription="@string/buffering"
+                android:padding="@dimen/margin_normal"
+                android:visibility="gone"
+                app:layout_constraintBottom_toBottomOf="@id/pause_play_button"
+                app:layout_constraintLeft_toLeftOf="@id/pause_play_button"
+                app:layout_constraintRight_toRightOf="@id/pause_play_button"
+                app:layout_constraintTop_toTopOf="@id/pause_play_button" />
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <FrameLayout

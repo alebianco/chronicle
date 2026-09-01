@@ -131,6 +131,19 @@ class MainActivityViewModel(
       it.isPlaying
     }
 
+  /**
+   * True while the player is buffering or connecting.
+   *
+   * The same derivation as the player and details screens. The mini player is often the only
+   * playback control on screen, so without this a stalled start there looks identical to a paused
+   * book (cu-95).
+   */
+  val isAudioLoading =
+    mediaServiceConnection.playbackState.map { state ->
+      state.state == PlaybackStateCompat.STATE_BUFFERING ||
+        state.state == PlaybackStateCompat.STATE_CONNECTING
+    }
+
   private val metadataObserver =
     Observer<MediaMetadataCompat> { metadata ->
       metadata.id?.let { trackId ->

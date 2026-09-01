@@ -66,6 +66,24 @@ xmlns:tools="http://schemas.android.com/tools"
                     app:layout_constraintTop_toBottomOf="@id/book_title"
                     tools:src="@drawable/ic_pause_button_large_colored" />
 
+                <!--
+                  Buffering indicator, sized and positioned to sit over the play/pause control
+                  (cu-95). `gone` by default and driven from `isAudioLoading` in Kotlin: without
+                  the XML default it renders for a frame before the observer first fires, which is
+                  the ViewBinding trap in CLAUDE.md.
+                -->
+                <ProgressBar
+                    android:id="@+id/audio_loading_spinner"
+                    android:layout_width="@dimen/details_play_button"
+                    android:layout_height="@dimen/details_play_button"
+                    android:layout_margin="@dimen/margin_normal"
+                    android:contentDescription="@string/buffering"
+                    android:visibility="gone"
+                    app:layout_constraintBottom_toBottomOf="@id/details_pause_play"
+                    app:layout_constraintLeft_toLeftOf="@id/details_pause_play"
+                    app:layout_constraintRight_toRightOf="@id/details_pause_play"
+                    app:layout_constraintTop_toTopOf="@id/details_pause_play" />
+
                 <ImageView
                     android:id="@+id/skip_forward_button"
                     android:layout_width="@dimen/list_icon_size"

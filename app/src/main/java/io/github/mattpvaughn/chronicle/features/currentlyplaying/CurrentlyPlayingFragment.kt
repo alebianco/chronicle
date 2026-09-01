@@ -114,6 +114,18 @@ class CurrentlyPlayingFragment : Fragment() {
         },
       )
     }
+
+    // Buffering: show the spinner *instead of* the play/pause icon rather than over it, so the two
+    // do not overlap. INVISIBLE, not GONE — the icon keeps its slot so the row does not reflow, the
+    // same reasoning as the download spinner on the details screen (cu-95).
+    //
+    // The control stays clickable while buffering: cancelling a stalled start is exactly when a
+    // listener wants to press it.
+    viewModel.isAudioLoading.observe(viewLifecycleOwner) { loading ->
+      binding.audioLoadingSpinner.isVisible = loading == true
+      binding.detailsPausePlay.visibility =
+        if (loading == true) View.INVISIBLE else View.VISIBLE
+    }
     viewModel.playbackSpeedString.observe(viewLifecycleOwner) {
       binding.changeSpeedButton.text = it
     }
