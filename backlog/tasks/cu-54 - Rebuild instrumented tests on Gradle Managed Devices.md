@@ -7,6 +7,7 @@ created_date: '2026-08-30'
 labels: [R1, agentic]
 dependencies: []
 priority: medium
+milestone: m-1
 ---
 
 ## Blocker cleared (2026-08-31)

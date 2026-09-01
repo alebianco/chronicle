@@ -5,6 +5,7 @@ status: Draft
 labels: [R2, trust, debt]
 dependencies: [cu-76]
 priority: low
+milestone: m-2
 ---
 
 ## Description

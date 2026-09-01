@@ -1,11 +1,19 @@
 ---
 id: cu-89
-title: Android Auto integration incomplete (no icon, no media card)
+title: 'Android Auto integration incomplete (no icon, no media card)'
 status: In Progress
-labels: [R2, comfort, bug]
-dependencies: [cu-73]
+assignee:
+  - claude
+created_date: ''
+labels:
+  - R2
+  - comfort
+  - bug
+dependencies:
+  - cu-73
 priority: medium
-assignee: [claude]
+milestone: m-2
+ordinal: 1000
 ---
 
 ## Description

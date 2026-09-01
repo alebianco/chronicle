@@ -7,6 +7,7 @@ created_date: '2026-08-31'
 labels: [R2, ui]
 dependencies: []
 priority: medium
+milestone: m-2
 ---
 
 ## Description

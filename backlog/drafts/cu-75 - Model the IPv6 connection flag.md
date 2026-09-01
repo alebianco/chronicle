@@ -7,6 +7,7 @@ created_date: '2026-08-31'
 labels: [R2, architecture]
 dependencies: [cu-11]
 priority: low
+milestone: m-2
 ---
 
 ## Description

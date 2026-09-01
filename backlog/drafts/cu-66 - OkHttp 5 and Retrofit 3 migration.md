@@ -7,6 +7,7 @@ created_date: '2026-08-31'
 labels: [R2, hygiene]
 dependencies: [cu-9, cu-10, cu-11]
 priority: low
+milestone: m-2
 ---
 
 ## Description

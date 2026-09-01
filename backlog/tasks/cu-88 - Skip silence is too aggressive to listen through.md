@@ -5,6 +5,7 @@ status: Done
 labels: [R2, playback, bug]
 dependencies: []
 priority: medium
+milestone: m-2
 assignee: [claude]
 ---
 

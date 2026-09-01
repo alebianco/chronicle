@@ -5,6 +5,7 @@ status: Done
 labels: [R1, trust, bug]
 dependencies: []
 priority: medium
+milestone: m-1
 assignee: [claude]
 ---
 

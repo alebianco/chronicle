@@ -7,6 +7,7 @@ created_date: '2026-08-30'
 labels: [R1, agentic]
 dependencies: [cu-44]
 priority: medium
+milestone: m-1
 ---
 
 ## Description

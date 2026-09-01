@@ -5,6 +5,7 @@ status: Draft
 labels: [R2, architecture]
 dependencies: [cu-49]
 priority: medium
+milestone: m-2
 ---
 
 ## Description

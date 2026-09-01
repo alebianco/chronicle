@@ -5,6 +5,7 @@ status: Draft
 labels: [R2, architecture, debt]
 dependencies: [cu-71]
 priority: medium
+milestone: m-2
 ---
 
 ## Description

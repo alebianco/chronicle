@@ -5,6 +5,7 @@ status: Done
 labels: [R2, comfort, bug]
 dependencies: [cu-13]
 priority: medium
+milestone: m-2
 assignee: [claude]
 ---
 

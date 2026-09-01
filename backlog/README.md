@@ -6,7 +6,7 @@ All project knowledge that isn't code lives here as markdown (decision D13 / [[d
 
 | Path | What | Who writes it |
 |---|---|---|
-| `tasks/` | The work. One file per task (`task-<id> - <Title>.md`): frontmatter (status/labels/dependencies/priority) + acceptance criteria. Labels carry the release (`R0`–`R4`) and area. | agents + owner |
+| `tasks/` | The work. One file per task (`task-<id> - <Title>.md`): frontmatter (status/labels/dependencies/priority/**milestone**) + acceptance criteria. Labels carry the release (`R0`–`R4`) and area. **`milestone: m-<n>` must mirror the `R<n>` label** — they are the same fact in the two places the Backlog.md CLI reads it, and 31 files had drifted to label-only before this was written down. | agents + owner |
 | `drafts/` | Ideas not yet committed to tracked work — need an owner decision before promotion to `tasks/`. | agents propose, owner triages |
 | `decisions/` | Decision records (`decision-<n> - <Title>.md`): context → decision → consequences. Product decisions (D1–D14) and technical ADRs both live here. | **owner only** for product decisions; agents may add technical ADRs |
 | `docs/reference/` | Architecture knowledge base (project overview, architecture, data flow, components, glossary) — explains the code *as it is*. | agents keep in sync with behavior |

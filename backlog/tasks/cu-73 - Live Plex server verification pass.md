@@ -1,12 +1,18 @@
 ---
 id: cu-73
 title: Live Plex server verification pass
-status: To Do
+status: In Progress
 assignee: []
-labels: [R1, agentic, verification]
+created_date: '2026-08-31'
+updated_date: '2026-09-01 08:28'
+labels:
+  - R1
+  - agentic
+  - verification
 dependencies: []
 priority: high
-created_date: '2026-08-31'
+milestone: m-1
+ordinal: 4000
 ---
 
 ## Description

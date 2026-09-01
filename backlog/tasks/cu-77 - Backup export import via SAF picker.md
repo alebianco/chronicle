@@ -1,13 +1,18 @@
 ---
 id: cu-77
 title: Backup export/import via SAF picker
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-31'
-labels: [R1, trust]
-dependencies: [cu-17]
-priority: high
+updated_date: '2026-09-01 08:29'
+labels:
+  - R1
+  - trust
 milestone: m-1
+dependencies:
+  - cu-17
+priority: high
+ordinal: 3000
 ---
 
 ## Description
