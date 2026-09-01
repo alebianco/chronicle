@@ -33,6 +33,14 @@ android {
     debug {
       // Required for JaCoCo to emit execution data from unit tests.
       enableUnitTestCoverage = true
+
+      // A debug build installs alongside a release one rather than replacing it. The owner's phone
+      // carried upstream's signed v0.52.1, which a debug APK cannot upgrade (different signing
+      // key), and uninstalling it to make room would have destroyed a working install to test a
+      // throwaway build. Debug only: the release applicationId is untouched, and choosing the
+      // fork's permanent id is a separate owner decision (branding is sign-off-only per CLAUDE.md).
+      applicationIdSuffix = ".debug"
+      versionNameSuffix = "-debug"
     }
     release {
       isMinifyEnabled = true

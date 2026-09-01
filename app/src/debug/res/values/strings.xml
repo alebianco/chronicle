@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!--
+    Distinguishes the debug build in the launcher and the app switcher.
+
+    With applicationIdSuffix ".debug" both builds install side by side, and two identically named
+    icons are worse than useless — you cannot tell which one you are testing. Debug source set
+    only; the release label is untouched.
+  -->
+  <string name="app_name">Chronicle (debug)</string>
+</resources>
