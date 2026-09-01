@@ -3,7 +3,6 @@ id: cu-57
 title: Mutation testing pilot (PIT) after cu-44
 status: In Review
 assignee: [claude]
-assignee: []
 created_date: '2026-08-30'
 labels: [R1, agentic]
 dependencies: [cu-44]

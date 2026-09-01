@@ -37,6 +37,7 @@ import io.github.mattpvaughn.chronicle.util.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -296,8 +297,15 @@ class CurrentlyPlayingViewModel(
   var isSliding = false
     private set
 
-  /** Where the user asked to be, while a seek is in flight. Null when no seek is pending. */
-  private var pendingSeekTarget: Long? = null
+  /**
+   * The settle job for the seek currently in flight, so a second seek can cancel the first.
+   *
+   * Without this, rapid taps released the guard too early: tap one starts waiting for target A,
+   * tap two starts waiting for B, and whichever *arrives* first clears `isSliding` for both. The
+   * A-waiter then also fires and clears the guard while B is still travelling, which is the
+   * snap-back this guard exists to prevent — just narrower, so it survived the cu-93 fix.
+   */
+  private var seekSettleJob: Job? = null
 
   fun onSlideStart() {
     isSliding = true
@@ -311,16 +319,17 @@ class CurrentlyPlayingViewModel(
    * freeze the slider forever. Releasing late looks like a brief lag; never releasing looks broken.
    */
   private fun awaitSeek(target: Long) {
-    pendingSeekTarget = target
-    viewModelScope.launch {
-      withTimeoutOrNull(SEEK_SETTLE_TIMEOUT) {
-        currentlyPlaying.track.first { track ->
-          abs(track.progress - target) < SEEK_SETTLE_TOLERANCE
+    // Only the newest seek may release the guard; see [seekSettleJob].
+    seekSettleJob?.cancel()
+    seekSettleJob =
+      viewModelScope.launch {
+        withTimeoutOrNull(SEEK_SETTLE_TIMEOUT) {
+          currentlyPlaying.track.first { track ->
+            abs(track.progress - target) < SEEK_SETTLE_TOLERANCE
+          }
         }
+        isSliding = false
       }
-      pendingSeekTarget = null
-      isSliding = false
-    }
   }
 
   private var _isSleepTimerActive = MutableLiveData(false)
