@@ -225,19 +225,29 @@ class PackageValidator(
    * @return [PackageInfo] for the package name or null if it's not found.
    */
   private fun getPackageInfo(callingPackage: String): PackageInfo? =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      packageManager.getPackageInfo(
-        callingPackage,
-        PackageManager.PackageInfoFlags.of(
-          (PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES).toLong(),
-        ),
-      )
-    } else {
-      @Suppress("DEPRECATION")
-      packageManager.getPackageInfo(
-        callingPackage,
-        PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES,
-      )
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        packageManager.getPackageInfo(
+          callingPackage,
+          PackageManager.PackageInfoFlags.of(
+            (PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES).toLong(),
+          ),
+        )
+      } else {
+        @Suppress("DEPRECATION")
+        packageManager.getPackageInfo(
+          callingPackage,
+          PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNING_CERTIFICATES,
+        )
+      }
+    } catch (e: PackageManager.NameNotFoundException) {
+      // The nullable return type only became true here (cu-100). `getPackageInfo` *throws* for an
+      // unknown package, so every `?:` fallback downstream was unreachable — including the one in
+      // [getSystemSignature] written specifically to tolerate a missing platform package and
+      // degrade the allowance. Instead the throw escaped the constructor and took the exported
+      // service down, which is the failure mode cu-61 set out to remove.
+      Timber.i(e, "Package not found: $callingPackage")
+      null
     }
 
   /**
