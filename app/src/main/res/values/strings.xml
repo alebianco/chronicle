@@ -82,6 +82,7 @@
     <string name="prompt_mark_as_unplayed">Mark as unplayed?</string>
     <string name="marked_as_played">Marked audiobook as played.</string>
     <string name="marked_as_unplayed">Marked audiobook as unplayed.</string>
+    <string name="mark_as_unplayed_failed">Could not mark as unplayed. Check your connection and try again.</string>
     <string name="cannot_play_media_no_server">Cannot play media- not connected to any server!</string>
     <string name="prompt_mark_as_unwatched">Mark as unwatched?</string>
     <string name="failed_to_sync_progress">Failed to sync progress</string>

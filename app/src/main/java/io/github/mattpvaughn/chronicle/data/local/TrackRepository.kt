@@ -260,6 +260,21 @@ class TrackRepository
             it.copy(progress = 0L, lastViewedAt = 0L, viewCount = 0L)
           }
         trackDao.insertAll(updatedTracks)
+
+        // Clear the server's per-track viewCount too (cu-98). This was local-only, so the album
+        // was unscrobbled by `BookRepository.setUnwatched` while every track kept the count it
+        // had — and completion is owned by the *tracks* (decision-16), so the next sync could
+        // read the book back as finished. It also matters as a repair: the per-tick scrobble bug
+        // left real libraries with track counts in the hundreds, and mark-unread is the only
+        // route back. `/:/unscrobble` accepts a track key as well as an album one.
+        //
+        // Deliberately not wrapped per track: a partial failure must surface, not leave half the
+        // book repaired and report success.
+        if (!prefsRepo.offlineMode) {
+          updatedTracks.forEach { track ->
+            plexMediaService.unwatched(track.id)
+          }
+        }
       }
     }
 

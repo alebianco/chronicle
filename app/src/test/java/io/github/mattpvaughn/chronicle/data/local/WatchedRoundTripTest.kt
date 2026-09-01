@@ -6,6 +6,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -135,6 +137,63 @@ class WatchedRoundTripTest {
         "marking a book read must not invent a position inside it",
         0L,
         written().getProgress(),
+      )
+    }
+
+  /**
+   * The server half of the repair (cu-98).
+   *
+   * `markTracksInBookAsUnwatched` was local-only: the *album* was unscrobbled by
+   * `BookRepository.setUnwatched`, but every track kept the `viewCount` it had on the server. Since
+   * completion is owned by the tracks (decision-16), the next sync could read the book straight back
+   * as finished — and mark-unread is the only route back from the per-tick scrobble bug, which left
+   * real libraries with track counts of 183, 129 and 126.
+   */
+  @Test
+  fun `un-marking a book unscrobbles every track on the server`() =
+    runTest {
+      val (dao, _) = daoReturning(tracks)
+      val api = mockk<PlexMediaService>(relaxed = true)
+      val unscrobbled = mutableListOf<String>()
+      coEvery { api.unwatched(capture(unscrobbled), any()) } returns Unit
+
+      TrackRepository(
+        trackDao = dao,
+        prefsRepo = mockk(relaxed = true) { every { offlineMode } returns false },
+        plexMediaService = api,
+        plexPrefs = mockk<PlexPrefsRepo>(relaxed = true),
+        dispatchers = TestDispatcherProvider(testScheduler),
+      ).markTracksInBookAsUnwatched("1001")
+
+      assertEquals(
+        "every track must be cleared, or the book syncs back as finished",
+        listOf("1", "2", "3"),
+        unscrobbled.toList(),
+      )
+    }
+
+  /**
+   * Offline, the local clear must still happen and no request may be attempted — the same rule the
+   * rest of the repository follows. Without this the repair would throw with no network.
+   */
+  @Test
+  fun `un-marking a book offline touches no network`() =
+    runTest {
+      val (dao, written) = daoReturning(tracks)
+      val api = mockk<PlexMediaService>(relaxed = true)
+
+      TrackRepository(
+        trackDao = dao,
+        prefsRepo = mockk(relaxed = true) { every { offlineMode } returns true },
+        plexMediaService = api,
+        plexPrefs = mockk<PlexPrefsRepo>(relaxed = true),
+        dispatchers = TestDispatcherProvider(testScheduler),
+      ).markTracksInBookAsUnwatched("1001")
+
+      coVerify(exactly = 0) { api.unwatched(any(), any()) }
+      assertTrue(
+        "the local clear must happen offline; only the server call is deferred",
+        written().all { it.viewCount == 0L },
       )
     }
 }

@@ -7,6 +7,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.text.format.DateUtils
 import android.view.Gravity
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.lifecycle.*
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
@@ -551,15 +552,33 @@ class AudiobookDetailsViewModel(
   private fun setAudiobookUnwatched() {
     Timber.i("Marking audiobook as unwatched")
     viewModelScope.launch {
-      // Mirrors setAudiobookWatched: both halves, or the tracks keep a state the book does not
-      // and which one shows depends on the order things ran in (cu-86).
-      trackRepository.markTracksInBookAsUnwatched(inputAudiobook.id)
-      bookRepository.setUnwatched(inputAudiobook.id)
+      // The track half now talks to the server (cu-98), so it can fail. Reporting success before
+      // knowing the outcome would tell the user a book was repaired when it was not — and an
+      // uncaught throw here would skip `setUnwatched` entirely, leaving the two halves disagreeing,
+      // which is the cu-86 split this pairing exists to prevent.
+      val message =
+        try {
+          // Mirrors setAudiobookWatched: both halves, or the tracks keep a state the book does not
+          // and which one shows depends on the order things ran in (cu-86).
+          trackRepository.markTracksInBookAsUnwatched(inputAudiobook.id)
+          bookRepository.setUnwatched(inputAudiobook.id)
+          R.string.marked_as_unplayed
+        } catch (t: Throwable) {
+          Timber.e(t, "Failed to mark book ${inputAudiobook.id} as unplayed")
+          R.string.mark_as_unplayed_failed
+        }
+      showToast(message)
     }
+  }
+
+  /** Bottom-anchored toast, matching the placement the other playback messages use. */
+  private fun showToast(
+    @StringRes message: Int,
+  ) {
     val toast =
       Toast.makeText(
         Injector.get().applicationContext(),
-        R.string.marked_as_unplayed,
+        message,
         Toast.LENGTH_LONG,
       )
     toast.setGravity(Gravity.BOTTOM, 0, 200)
