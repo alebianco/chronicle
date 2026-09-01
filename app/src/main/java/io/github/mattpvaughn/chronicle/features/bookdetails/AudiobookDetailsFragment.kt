@@ -200,6 +200,14 @@ class AudiobookDetailsFragment : Fragment() {
       )
     binding.tracks.adapter = adapter
 
+    // Was `chapterList="@{viewModel.chapters}"` on the list, dropped when cu-58 converted this
+    // screen off DataBinding, so the chapter list rendered empty (cu-73). `submitChapters`, not
+    // `submitList`: the adapter inserts section headers, and `submitList` is overridden to route
+    // through it.
+    viewModel.chapters.observe(viewLifecycleOwner) { chapters ->
+      adapter.submitChapters(chapters)
+    }
+
     // TODO casting
 //        val menu = binding.detailsToolbar.menu
 //        val mediaRouteButton = menu.findItem(R.id.media_route_menu_item).actionView

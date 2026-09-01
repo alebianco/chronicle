@@ -240,6 +240,17 @@ class CurrentlyPlayingFragment : Fragment() {
 
     binding.tracks.adapter = adapter
 
+    // Same omission as the details screen: the `chapterList` binding was dropped in the cu-58
+    // conversion and nothing fed this adapter, so the chapter list was empty while playing (cu-73).
+    viewModel.chapters.observe(viewLifecycleOwner) { chapters ->
+      adapter.submitChapters(chapters)
+    }
+
+    // Keeps the highlighted row in step with playback; the adapter diffs on the active flag.
+    viewModel.currentChapter.observe(viewLifecycleOwner) { chapter ->
+      adapter.updateCurrentChapter(chapter.trackId, chapter.discNumber, chapter.index)
+    }
+
     binding.detailsToolbar.setNavigationOnClickListener {
       currentlyPlayingInterface.setBottomSheetState(COLLAPSED)
     }

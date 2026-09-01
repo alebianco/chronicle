@@ -99,7 +99,7 @@ class HomeFragment : Fragment() {
     binding.onDeckRecyclerview.itemAnimator?.changeDuration = 0
     binding.downloadedRecyclerview.adapter = makeAudiobookAdapter()
     binding.downloadedRecyclerview.itemAnimator?.changeDuration = 0
-    binding.searchResultsList.adapter =
+    val searchAdapter =
       AudiobookSearchAdapter(
         object : AudiobookClick {
           override fun onClick(audiobook: Audiobook) {
@@ -107,6 +107,33 @@ class HomeFragment : Fragment() {
           }
         },
       )
+    binding.searchResultsList.adapter = searchAdapter
+
+    // Was `searchBookList="@{viewModel.searchResults}"` on the list. Missed when cu-58 converted
+    // this screen off DataBinding — the adapter was set and never given any data, so search
+    // returned nothing however well the query worked. Same omission as the choose-user list; both
+    // were found on the owner's device during cu-73.
+    viewModel.searchResults.observe(viewLifecycleOwner) { results ->
+      searchAdapter.submitList(results)
+    }
+
+    // The old layout carried *three* bindings on this list and the cu-58 conversion dropped all
+    // of them: the data above, this visibility toggle, and a connected-state one. Without the
+    // toggle the list stays at its XML default of `gone`, so search returned results into an
+    // invisible view — fixing the data alone changed nothing on screen (cu-73).
+    //
+    // `gone` in XML is the correct default and stays: it is what stops the list flashing over the
+    // shelves for a frame before this observer first fires.
+    viewModel.isSearchActive.observe(viewLifecycleOwner) { isActive ->
+      binding.searchResultsList.isVisible = isActive == true
+    }
+
+    // The third dropped binding, `serverConnectedSearch`. The shelves above get this through
+    // `bindRecyclerView` in the isConnected observer, which runs before this adapter exists — so
+    // the search list needs its own. It gates cover-art loading when the server is unreachable.
+    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+      searchAdapter.setServerConnected(connected == true)
+    }
 
     binding.swipeToRefresh.setOnRefreshListener {
       viewModel.refreshData()

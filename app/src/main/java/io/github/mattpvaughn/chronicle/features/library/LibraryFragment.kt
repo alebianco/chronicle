@@ -262,6 +262,18 @@ class LibraryFragment : Fragment() {
       },
     )
 
+    // Was `android:checked="@{viewModel.arePlayedAudiobooksHidden}"` plus
+    // `android:onClick="@{() -> viewModel.toggleHidePlayedAudiobooks()}"`. Both were dropped in the
+    // cu-58 conversion, leaving the "hide played" switch inert — it moved when tapped and changed
+    // nothing, and never reflected the stored preference. The filtering behind it always worked
+    // (cu-73).
+    viewModel.arePlayedAudiobooksHidden.observe(viewLifecycleOwner) { hidden ->
+      if (binding.hidePlayed.isChecked != hidden) {
+        binding.hidePlayed.isChecked = hidden
+      }
+    }
+    binding.hidePlayed.setOnClickListener { viewModel.toggleHidePlayedAudiobooks() }
+
     viewModel.isFilterShown.observe(viewLifecycleOwner) { isFilterShown ->
       Timber.i("Showing filter view: $isFilterShown")
       val filterBottomSheetState =
