@@ -49,14 +49,18 @@ decoder, between the mixer and the Bluetooth encoder.
 So this task is worth doing for battery, GC pressure and general hygiene — **not** on a promise that
 it fixes crackling. Any claim that it does must be measured.
 
-## Pending discriminator: wired playback on the M300 (owner, 2026-09-02)
+## Pending discriminator: wired playback (owner, 2026-09-02)
 
-The crackle has only been observed over Bluetooth (soundcore P20i, A2DP/AAC) on the A33. The owner
-will test **wired** playback on the HiBy M300 next.
+The crackle has only been observed over Bluetooth (soundcore P20i, A2DP/AAC) on the A33.
 
-The M300 is the better instrument for this: a dedicated audio player whose primary output is wired,
-running a different OEM Android build (13 / API 33), so it varies the transport while holding the
-app constant.
+**Test on the A33, not the M300.** The first plan was to test wired on the M300, but the owner
+pointed out he has never heard crackling from that device at all — so a clean run there would prove
+nothing, because *transport and device change together*. A silent M300 is equally consistent with
+"the wire fixed it" and "that device never had the problem". The A33 supports `usb_headset`
+(confirmed in `dumpsys audio`), so wired playback on the phone that actually crackles isolates the
+transport as the only variable.
+
+The M300 is still worth a run afterwards, but as a second data point, not the discriminator.
 
 What each outcome means:
 
@@ -73,8 +77,15 @@ Note the M300 runs API 33, so the cu-103 Doze/FGS fix is inert there — a stall
 
 ## Approach (to be validated by measurement first)
 
-1. **Measure before changing.** Fixed playback window with the mock server; record allocation rate,
-   GC count and A2DP underruns. Without a baseline the change cannot be judged.
+1. **Measure before changing.** `./measure-audio-glitches.sh [seconds] [idle|stress] [serial]`
+   counts A2DP and AudioFlinger underruns over a fixed window and reports the audio route, so two
+   runs are comparable. Start playback first — the script deliberately does not drive the player,
+   since doing so over adb would change the scheduling under test.
+
+   It has a `stress` mode (one busy loop per core) because **the crackle cannot be reproduced on
+   demand otherwise**: the 629-underrun spike happened when the system started 51 processes by
+   coincidence. Waiting for that again is not a test. `monkey` was rejected as the load source —
+   it also injects input events, which change playback.
 2. **Cache the per-book reads.** The track list and book change only on a track transition, not
    every second. Read once, invalidate on transition.
 3. **Decouple the tick from the write.** The player's position is needed once a second for the UI,
@@ -86,6 +97,7 @@ Note the M300 runs API 33, so the cu-103 Doze/FGS fix is inert there — a stall
 
 ## Acceptance Criteria
 
+- [ ] Wired-vs-Bluetooth run on the **A33**, both under `stress`, recorded here
 - [ ] Baseline recorded: allocation rate, GC frequency, underruns over a fixed window
 - [ ] Per-tick DB reads reduced; track list not re-read every second
 - [ ] Position still survives a process kill (this is the property the loop exists for — cu-9)
