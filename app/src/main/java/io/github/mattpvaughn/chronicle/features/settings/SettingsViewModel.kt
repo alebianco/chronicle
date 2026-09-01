@@ -148,6 +148,21 @@ class SettingsViewModel(
     prefsRepo.unregisterPrefsListener(prefsListener)
   }
 
+  /**
+   * Renders [refreshRateLabel]'s answer with the app's resources.
+   *
+   * The decision lives in `RefreshRate.kt` and is unit-tested; only the string lookup is here,
+   * because that is the part needing a `Context`. Keeping them apart is what took this out of the
+   * service locator's reach (cu-101).
+   */
+  private fun formatRefreshRate(minutes: Long): String {
+    val resources = Injector.get().applicationContext().resources
+    return when (val label = refreshRateLabel(minutes)) {
+      is RefreshRateLabel.Named -> resources.getString(label.stringRes)
+      is RefreshRateLabel.Quantity -> "${label.count} ${resources.getString(label.unitRes)}"
+    }
+  }
+
   private fun makePreferences(): List<PreferenceModel> {
     val list =
       mutableListOf(
@@ -217,40 +232,7 @@ class SettingsViewModel(
           title =
             FormattableString.ResourceString(
               stringRes = R.string.settings_refresh_rate_value,
-              // feels gross
-              placeHolderStrings =
-                listOf(
-                  when {
-                    prefsRepo.refreshRateMinutes == 0L -> {
-                      Injector.get()
-                        .applicationContext().resources.getString(
-                          R.string.settings_refresh_rate_always,
-                        )
-                    }
-                    prefsRepo.refreshRateMinutes < 60 -> {
-                      "${prefsRepo.refreshRateMinutes} " +
-                        Injector.get()
-                          .applicationContext().resources.getString(R.string.minutes)
-                    }
-                    prefsRepo.refreshRateMinutes < 60 * 24 -> {
-                      "${prefsRepo.refreshRateMinutes / 60} " +
-                        Injector.get()
-                          .applicationContext().resources.getString(R.string.hours)
-                    }
-                    prefsRepo.refreshRateMinutes <= 60 * 24 * 7 -> {
-                      "${prefsRepo.refreshRateMinutes / (60 * 24)} " +
-                        Injector.get()
-                          .applicationContext().resources.getString(R.string.days)
-                    }
-                    prefsRepo.refreshRateMinutes > 60 * 24 * 7 -> {
-                      Injector.get()
-                        .applicationContext().resources.getString(
-                          R.string.settings_refresh_rate_manual,
-                        )
-                    }
-                    else -> throw NoWhenBranchMatchedException()
-                  },
-                ),
+              placeHolderStrings = listOf(formatRefreshRate(prefsRepo.refreshRateMinutes)),
             ),
           explanation =
             FormattableString.from(
@@ -260,36 +242,7 @@ class SettingsViewModel(
             object : PreferenceClick {
               override fun onClick() {
                 showOptionsMenu(
-                  options =
-                    listOf(
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_always,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_15_minutes,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_1_hour,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_3_hours,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_6_hours,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_1_day,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_3_days,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_1_week,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_refresh_rate_manual,
-                      ),
-                    ),
+                  options = RefreshRate.choices.map { FormattableString.from(it.choiceRes) },
                   title =
                     FormattableString.from(
                       R.string.settings_refresh_rate_title,
@@ -300,38 +253,12 @@ class SettingsViewModel(
                         check(
                           formattableString is FormattableString.ResourceString,
                         )
-                        when (formattableString.stringRes) {
-                          R.string.settings_refresh_rate_always ->
-                            prefsRepo.refreshRateMinutes =
-                              0
-                          R.string.settings_refresh_rate_15_minutes ->
-                            prefsRepo.refreshRateMinutes =
-                              15
-                          R.string.settings_refresh_rate_1_hour ->
-                            prefsRepo.refreshRateMinutes =
-                              60
-                          R.string.settings_refresh_rate_3_hours ->
-                            prefsRepo.refreshRateMinutes =
-                              180
-                          R.string.settings_refresh_rate_6_hours ->
-                            prefsRepo.refreshRateMinutes =
-                              360
-                          R.string.settings_refresh_rate_1_day ->
-                            prefsRepo.refreshRateMinutes =
-                              60 * 24
-                          R.string.settings_refresh_rate_3_days ->
-                            prefsRepo.refreshRateMinutes =
-                              60 * 24 * 3
-                          R.string.settings_refresh_rate_1_week ->
-                            prefsRepo.refreshRateMinutes =
-                              60 * 24 * 7
-                          R.string.settings_refresh_rate_manual ->
-                            prefsRepo.refreshRateMinutes =
-                              Long.MAX_VALUE
-                          else -> throw NoWhenBranchMatchedException(
-                            "Unknown item: ${formattableString.stringRes}",
-                          )
-                        }
+                        val rate =
+                          RefreshRate.ofChoice(formattableString.stringRes)
+                            ?: throw NoWhenBranchMatchedException(
+                              "Unknown item: ${formattableString.stringRes}",
+                            )
+                        prefsRepo.refreshRateMinutes = rate.minutes
                         setBottomSheetVisibility(false)
                       }
                     },
