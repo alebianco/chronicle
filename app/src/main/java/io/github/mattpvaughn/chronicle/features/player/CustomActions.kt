@@ -21,6 +21,15 @@ fun buildCustomActions(prefsRepo: PrefsRepo): List<PlaybackStateCompat.CustomAct
 /** Threshold to decide whether to jump to the beginning of the current chapter or to the previous chapter. */
 const val SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS = 30L
 
+/**
+ * Nudge past a chapter's exact start when seeking forward to it.
+ *
+ * `getChapterAt` resolves a boundary timestamp to the chapter that *starts* there, but only once
+ * the player reports the position — landing exactly on the boundary leaves a window in which the
+ * previous chapter is still the answer. Was an unexplained `+ 300` inline (cu-96).
+ */
+const val CHAPTER_SEEK_NUDGE_MILLIS = 300L
+
 const val SKIP_TO_NEXT_STRING = "Skip to next"
 val SKIP_TO_NEXT: PlaybackStateCompat.CustomAction =
   PlaybackStateCompat.CustomAction.Builder(

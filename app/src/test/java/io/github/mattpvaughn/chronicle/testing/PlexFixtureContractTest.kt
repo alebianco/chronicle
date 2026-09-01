@@ -99,8 +99,8 @@ class PlexFixtureContractTest {
 
     assertEquals(3, chapters.size)
     assertEquals("Chapter 1: An Unexpected Party", chapters[0].title)
-    assertEquals(0L, chapters[0].startTimeOffset)
-    assertEquals(1600L, chapters[0].endTimeOffset)
+    assertEquals(0L, chapters[0].bookStartTimeOffset)
+    assertEquals(1600L, chapters[0].bookEndTimeOffset)
     // The third chapter has an empty tag on purpose: it exercises the
     // "Chapter $index" fallback in PlexChapter.toChapter.
     assertEquals("Chapter 3", chapters[2].title)

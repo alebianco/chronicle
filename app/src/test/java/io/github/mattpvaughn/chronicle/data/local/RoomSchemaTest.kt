@@ -185,14 +185,14 @@ class RoomSchemaTest {
     index: Long = 1L,
     discNumber: Int = 1,
     title: String = "Chapter $index",
-    endTimeOffset: Long = 60_000L,
+    bookEndTimeOffset: Long = 60_000L,
   ) = Chapter(
     title = title,
     id = id,
     index = index,
     discNumber = discNumber,
-    startTimeOffset = 0L,
-    endTimeOffset = endTimeOffset,
+    bookStartTimeOffset = 0L,
+    bookEndTimeOffset = bookEndTimeOffset,
     trackId = trackId,
     bookId = bookId,
   )
@@ -291,7 +291,7 @@ class RoomSchemaTest {
 
     val shared = "4001"
     val fromBookA = chapter(id = shared, bookId = "1001", trackId = "2001")
-    val fromBookB = chapter(id = shared, bookId = "1002", trackId = "3001", endTimeOffset = 90_000L)
+    val fromBookB = chapter(id = shared, bookId = "1002", trackId = "3001", bookEndTimeOffset = 90_000L)
 
     db.chapterDao.insertAll(listOf(fromBookA, fromBookB))
 

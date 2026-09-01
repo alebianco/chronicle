@@ -36,7 +36,7 @@ class AssembleChaptersTest {
   fun `fallback chapters get cumulative offsets, not zero`() {
     val chapters = assembleChapters(tracks) { emptyList() }
 
-    assertEquals(listOf(0L, 1_000L, 3_000L), chapters.map { it.startTimeOffset })
+    assertEquals(listOf(0L, 1_000L, 3_000L), chapters.map { it.bookStartTimeOffset })
   }
 
   @Test
@@ -55,8 +55,8 @@ class AssembleChaptersTest {
             index = track.index.toLong(),
             trackId = track.id,
             bookId = "1001",
-            startTimeOffset = 0L,
-            endTimeOffset = track.duration,
+            bookStartTimeOffset = 0L,
+            bookEndTimeOffset = track.duration,
           ),
         )
       }
@@ -81,8 +81,8 @@ class AssembleChaptersTest {
               index = 1L,
               trackId = track.id,
               bookId = "1001",
-              startTimeOffset = 0L,
-              endTimeOffset = 1_000L,
+              bookStartTimeOffset = 0L,
+              bookEndTimeOffset = 1_000L,
             ),
           )
         } else {
@@ -94,7 +94,7 @@ class AssembleChaptersTest {
     assertEquals(
       "a fallback must start after the tracks preceding it, server-answered or not",
       listOf(1_000L, 3_000L),
-      fallbacks.map { it.startTimeOffset },
+      fallbacks.map { it.bookStartTimeOffset },
     )
   }
 

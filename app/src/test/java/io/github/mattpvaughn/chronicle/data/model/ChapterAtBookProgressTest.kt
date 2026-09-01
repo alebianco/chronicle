@@ -26,8 +26,8 @@ class ChapterAtBookProgressTest {
     id = "4$index",
     index = index,
     discNumber = 1,
-    startTimeOffset = start,
-    endTimeOffset = end,
+    bookStartTimeOffset = start,
+    bookEndTimeOffset = end,
     trackId = trackId,
     bookId = "1001",
   )
@@ -91,7 +91,7 @@ class ChapterAtBookProgressTest {
    * The exact case that reached the owner's device (cu-73).
    *
    * A hand-rolled walk in two ViewModels subtracted each chapter's *duration* from a running offset
-   * while comparing against the **absolute** `endTimeOffset`. At 28,359,976ms in a real 40-chapter
+   * while comparing against the **absolute** `bookEndTimeOffset`. At 28,359,976ms in a real 40-chapter
    * book it resolved Chapter 12 (ending 15,803,900) instead of Chapter 20 — a cold start showed the
    * wrong chapter until playback corrected it.
    *

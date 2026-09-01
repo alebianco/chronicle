@@ -33,13 +33,13 @@
             "notNull": true
           },
           {
-            "fieldPath": "startTimeOffset",
+            "fieldPath": "bookStartTimeOffset",
             "columnName": "startTimeOffset",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "endTimeOffset",
+            "fieldPath": "bookEndTimeOffset",
             "columnName": "endTimeOffset",
             "affinity": "INTEGER",
             "notNull": true

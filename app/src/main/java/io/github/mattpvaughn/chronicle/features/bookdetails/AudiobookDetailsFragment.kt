@@ -193,7 +193,7 @@ class AudiobookDetailsFragment : Fragment() {
           override fun onClick(chapter: Chapter) {
             Timber.i("Starting chapter with name: ${chapter.title}")
             viewModel.jumpToChapter(
-              offset = chapter.startTimeOffset,
+              offset = chapter.bookStartTimeOffset,
               trackId = chapter.trackId,
             )
           }

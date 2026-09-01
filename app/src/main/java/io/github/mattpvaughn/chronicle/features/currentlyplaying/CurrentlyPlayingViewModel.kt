@@ -198,7 +198,7 @@ class CurrentlyPlayingViewModel(
 
       // `chapterAtBookProgress`, not a hand-rolled walk. The loop this replaces subtracted each
       // chapter's *duration* from a running offset while comparing against the **absolute**
-      // `endTimeOffset` — mixing relative and absolute coordinates, the same defect as cu-13 and
+      // `bookEndTimeOffset` — mixing relative and absolute coordinates, the same defect as cu-13 and
       // cu-49. At 28,359,976ms in a real book it picked Chapter 12 (ending 15,803,900) instead of
       // Chapter 20, so a cold start showed the wrong chapter until playback corrected it (cu-73).
       //
@@ -238,7 +238,7 @@ class CurrentlyPlayingViewModel(
     currentlyPlaying.chapter.combine(
       currentlyPlaying.track,
     ) { chapter: Chapter, track: MediaItemTrack ->
-      track.progress - chapter.startTimeOffset
+      track.progress - chapter.bookStartTimeOffset
     }.asLiveData(viewModelScope.coroutineContext)
 
   val chapterProgressString =
@@ -253,7 +253,7 @@ class CurrentlyPlayingViewModel(
     currentlyPlaying.chapter.combine(
       currentlyPlaying.track,
     ) { chapter: Chapter, track: MediaItemTrack ->
-      track.progress - chapter.startTimeOffset
+      track.progress - chapter.bookStartTimeOffset
     }.filter { !isSliding }
       // distinctUntilChanged, because `currentlyPlaying` publishes book, track *and* chapter on
       // every progress tick and each fans out through this combine. The device logged 228
@@ -272,7 +272,7 @@ class CurrentlyPlayingViewModel(
 
   val chapterDuration =
     currentChapter.map {
-      return@map it.endTimeOffset - it.startTimeOffset
+      return@map it.bookEndTimeOffset - it.bookStartTimeOffset
     }
 
   val chapterDurationString =
@@ -529,7 +529,7 @@ class CurrentlyPlayingViewModel(
       pausePlay(
         bookId = audiobook.value!!.id,
         // Neither a track id nor an offset is supplied: resume where the book left off.
-        // This used to pass ACTIVE_TRACK — a *track id* sentinel — as startTimeOffset,
+        // This used to pass ACTIVE_TRACK — a *track id* sentinel — as bookStartTimeOffset,
         // which is not a time at all.
         forcePlay = false,
       )
@@ -538,7 +538,7 @@ class CurrentlyPlayingViewModel(
 
   private fun pausePlay(
     bookId: String,
-    startTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
+    bookStartTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
     forcePlay: Boolean = false,
     trackId: String? = null,
   ) {
@@ -546,7 +546,7 @@ class CurrentlyPlayingViewModel(
 
     val extras =
       Bundle().apply {
-        putLong(KEY_START_TIME_TRACK_OFFSET, startTimeOffset)
+        putLong(KEY_START_TIME_TRACK_OFFSET, bookStartTimeOffset)
         // Only written when a specific track was asked for; absence means "resume active".
         trackId?.let { putString(KEY_SEEK_TO_TRACK_WITH_ID, it) }
       }
@@ -587,15 +587,15 @@ class CurrentlyPlayingViewModel(
         val here = chapters.indexOf(currentlyPlaying.chapter.value)
         val target =
           if (forward) {
-            chapters.getOrNull(here + 1)?.startTimeOffset
+            chapters.getOrNull(here + 1)?.bookStartTimeOffset
           } else {
             // Matches the service's rule: past the threshold, restart the current chapter.
             val current = currentlyPlaying.chapter.value
-            val intoChapter = currentlyPlaying.track.value.progress - current.startTimeOffset
+            val intoChapter = currentlyPlaying.track.value.progress - current.bookStartTimeOffset
             if (intoChapter < SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS) {
-              chapters.getOrNull(here - 1)?.startTimeOffset
+              chapters.getOrNull(here - 1)?.bookStartTimeOffset
             } else {
-              current.startTimeOffset
+              current.bookStartTimeOffset
             }
           }
         transportControls?.sendCustomAction(action, null)
@@ -611,7 +611,7 @@ class CurrentlyPlayingViewModel(
           if (skipToChapterIndex < currentlyPlaying.book.value.chapters.size) {
             val skipToChapter = currentlyPlaying.book.value.chapters[skipToChapterIndex]
             jumpToChapter(
-              skipToChapter.startTimeOffset,
+              skipToChapter.bookStartTimeOffset,
               currentlyPlaying.track.value.id,
               hasUserConfirmation = true,
             )
@@ -630,7 +630,7 @@ class CurrentlyPlayingViewModel(
           if (skipToChapterIndex < 0) skipToChapterIndex = 0
           val skipToChapter = currentlyPlaying.book.value.chapters[skipToChapterIndex]
           jumpToChapter(
-            skipToChapter.startTimeOffset,
+            skipToChapter.bookStartTimeOffset,
             currentlyPlaying.track.value.id,
             hasUserConfirmation = true,
           )
@@ -711,7 +711,7 @@ class CurrentlyPlayingViewModel(
 
   /** Jumps to a given track with [MediaItemTrack.id] == [trackId] */
   fun jumpToChapter(
-    startTimeOffset: Long = 0,
+    bookStartTimeOffset: Long = 0,
     trackId: String = TRACK_NOT_FOUND,
     hasUserConfirmation: Boolean = false,
   ) {
@@ -728,7 +728,7 @@ class CurrentlyPlayingViewModel(
               when (formattableString) {
                 FormattableString.yes ->
                   jumpToChapter(
-                    startTimeOffset,
+                    bookStartTimeOffset,
                     trackId,
                     true,
                   )
@@ -744,9 +744,18 @@ class CurrentlyPlayingViewModel(
 
     val jumpToChapterAction = {
       audiobook.value?.let { book ->
+        // `pausePlay` forwards this as KEY_START_TIME_TRACK_OFFSET, which the service applies as an
+        // offset *within* the starting track — but a chapter's offset is book-absolute (cu-96).
+        // They coincide on a single-file book, so this only misbehaves on a multi-track one.
+        val inTrackOffset =
+          tracks.value?.let { loaded ->
+            val trackStart =
+              loaded.sorted().takeWhile { it.id != trackId }.sumOf { it.duration }
+            (bookStartTimeOffset - trackStart).coerceAtLeast(0L)
+          } ?: bookStartTimeOffset
         pausePlay(
           book.id,
-          startTimeOffset = startTimeOffset,
+          bookStartTimeOffset = inTrackOffset,
           trackId = trackId,
           forcePlay = true,
         )
@@ -965,8 +974,8 @@ class CurrentlyPlayingViewModel(
       // Seeking by chapter length
       currentChapter.value?.let { chapter ->
         // seek relative to start of current track
-        val chapterDuration = chapter.endTimeOffset - chapter.startTimeOffset
-        val offset = chapter.startTimeOffset + (percentProgress * chapterDuration).toLong()
+        val chapterDuration = chapter.bookEndTimeOffset - chapter.bookStartTimeOffset
+        val offset = chapter.bookStartTimeOffset + (percentProgress * chapterDuration).toLong()
         mediaServiceConnection.transportControls?.seekTo(offset)
         // Keep the slider on the requested position until playback reports it. Without this the
         // next progress tick overwrites the thumb with the pre-seek position (cu-93).

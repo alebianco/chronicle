@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.model
 
 import android.text.format.DateUtils
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.TypeConverter
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
@@ -27,10 +28,27 @@ data class Chapter(
   val id: String = "0",
   val index: Long = 0L,
   val discNumber: Int = 1,
-  // The number of milliseconds from the start of the containing track and the start of the chapter
-  val startTimeOffset: Long = 0L,
-  // The number of milliseconds between the start of the containing track and the end of the chapter
-  val endTimeOffset: Long = 0L,
+  /**
+   * Milliseconds from the start of the **book** — not the containing track (cu-96).
+   *
+   * The old name, `bookStartTimeOffset`, reads as "offset from the start of *something*", and the
+   * something has now been guessed wrong four separate times: cu-13, cu-49, cu-93's display half,
+   * and `PlayerExt.skipToPrevious`/`skipToNext`, which subtracted it from an in-track position and
+   * handed it to `seekTo` as an in-track offset. The comment here used to say "from the start of
+   * the containing track", which was simply wrong and is presumably where the confusion started.
+   *
+   * On a single-file book the two frames coincide, which is why the arithmetic worked by accident
+   * on the owner's library and only misbehaves on a genuinely multi-track book.
+   *
+   * The **column** keeps its old name via [ColumnInfo]: renaming it would need a `ChapterDatabase`
+   * migration and a change to the `Audiobook.chapters` serialization format, for no behavioural
+   * gain, while cu-82 is already scheduled to retire that dual write.
+   */
+  @ColumnInfo(name = "startTimeOffset")
+  val bookStartTimeOffset: Long = 0L,
+  /** Milliseconds from the start of the **book** to the end of the chapter. See [bookStartTimeOffset]. */
+  @ColumnInfo(name = "endTimeOffset")
+  val bookEndTimeOffset: Long = 0L,
   val downloaded: Boolean = false,
   val trackId: String = TRACK_NOT_FOUND,
   val bookId: String = NO_AUDIOBOOK_FOUND_ID,
@@ -39,7 +57,7 @@ data class Chapter(
     get() =
       DateUtils.formatElapsedTime(
         StringBuilder(),
-        (endTimeOffset - startTimeOffset) / 1000,
+        (bookEndTimeOffset - bookStartTimeOffset) / 1000,
       )
 
   /** A string representing the index but padded to [length] characters with zeroes */
@@ -75,13 +93,13 @@ fun List<Chapter>.getChapterAt(
     //
     // This now agrees with [chapterAtBookProgress], which was already half-open. Two lookups over
     // the same data disagreeing at a boundary is the actual defect; the inclusive end was it.
-    if (chapter.trackId == trackId && timeStamp >= chapter.startTimeOffset && timeStamp < chapter.endTimeOffset) {
+    if (chapter.trackId == trackId && timeStamp >= chapter.bookStartTimeOffset && timeStamp < chapter.bookEndTimeOffset) {
       return chapter
     }
   }
   // The final chapter's own end is a real position — a book paused at its very last millisecond is
   // in the last chapter, not nowhere. Half-open excludes it, so accept it explicitly.
-  return lastOrNull { it.trackId == trackId && timeStamp == it.endTimeOffset } ?: EMPTY_CHAPTER
+  return lastOrNull { it.trackId == trackId && timeStamp == it.bookEndTimeOffset } ?: EMPTY_CHAPTER
 }
 
 /**
@@ -102,7 +120,7 @@ fun List<Chapter>.chapterAtBookProgress(bookProgress: Long): Chapter {
     return EMPTY_CHAPTER
   }
   val ordered = sorted()
-  return ordered.firstOrNull { bookProgress < it.endTimeOffset } ?: ordered.last()
+  return ordered.firstOrNull { bookProgress < it.bookEndTimeOffset } ?: ordered.last()
 }
 
 /**
@@ -147,8 +165,8 @@ class ChapterListConverter {
       title = split[0].unescapeSeparators(),
       id = split[1],
       index = split[2].toLong(),
-      startTimeOffset = split[3].toLong(),
-      endTimeOffset = split[4].toLong(),
+      bookStartTimeOffset = split[3].toLong(),
+      bookEndTimeOffset = split[4].toLong(),
       discNumber = discNumber,
       downloaded = downloaded,
       trackId = trackId,
@@ -163,8 +181,8 @@ class ChapterListConverter {
         it.title.escapeSeparators(),
         it.id,
         it.index,
-        it.startTimeOffset,
-        it.endTimeOffset,
+        it.bookStartTimeOffset,
+        it.bookEndTimeOffset,
         it.discNumber,
         it.downloaded,
         it.trackId,

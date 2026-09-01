@@ -16,7 +16,7 @@ import org.junit.Test
  * showed no chapters at all, in the player and in book details, rather than one per file.
  *
  * The offsets are the other half. Chapter positions are cumulative across the whole book, so
- * `endTimeOffset` has to be the running total — a per-track duration means every chapter after
+ * `bookEndTimeOffset` has to be the running total — a per-track duration means every chapter after
  * the first reports an end before its own start, and `getChapterAt` then matches nothing.
  */
 class AsChapterListTest {
@@ -47,13 +47,13 @@ class AsChapterListTest {
         track("3", 3, 3_000L),
       ).asChapterList()
 
-    assertEquals(listOf(0L, 1_000L, 3_000L), chapters.map { it.startTimeOffset })
-    assertEquals(listOf(1_000L, 3_000L, 6_000L), chapters.map { it.endTimeOffset })
+    assertEquals(listOf(0L, 1_000L, 3_000L), chapters.map { it.bookStartTimeOffset })
+    assertEquals(listOf(1_000L, 3_000L, 6_000L), chapters.map { it.bookEndTimeOffset })
   }
 
   /**
    * Each chapter must span its own track: end minus start is that file's duration. This is what
-   * breaks if `endTimeOffset` is set to the raw duration instead of the running total.
+   * breaks if `bookEndTimeOffset` is set to the raw duration instead of the running total.
    */
   @Test
   fun `each chapter spans exactly its own track duration`() {
@@ -64,7 +64,7 @@ class AsChapterListTest {
         track("3", 3, 3_000L),
       )
 
-    val spans = tracks.asChapterList().map { it.endTimeOffset - it.startTimeOffset }
+    val spans = tracks.asChapterList().map { it.bookEndTimeOffset - it.bookStartTimeOffset }
 
     assertEquals(tracks.map { it.duration }, spans)
   }
@@ -119,7 +119,7 @@ class AsChapterListTest {
     val chapters = listOf(track("1", 1, 5_000L)).asChapterList()
 
     assertEquals(1, chapters.size)
-    assertEquals(0L, chapters[0].startTimeOffset)
-    assertEquals(5_000L, chapters[0].endTimeOffset)
+    assertEquals(0L, chapters[0].bookStartTimeOffset)
+    assertEquals(5_000L, chapters[0].bookEndTimeOffset)
   }
 }

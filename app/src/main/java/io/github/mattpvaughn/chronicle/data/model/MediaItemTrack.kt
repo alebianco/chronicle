@@ -325,7 +325,7 @@ fun List<MediaItemTrack>.asChapterList(): List<Chapter> {
 /**
  * Represents this track as a single chapter starting at [startOffset].
  *
- * [Chapter.endTimeOffset] is `startOffset + duration`, not `duration`: offsets are absolute
+ * [Chapter.bookEndTimeOffset] is `startOffset + duration`, not `duration`: offsets are absolute
  * within the book, so using the raw duration made every chapter after the first report an end
  * earlier than its own start, and [getChapterAt] then matched nothing.
  */
@@ -335,8 +335,8 @@ fun MediaItemTrack.asChapter(startOffset: Long): Chapter {
     id = id,
     index = index.toLong(),
     discNumber = discNumber,
-    startTimeOffset = startOffset,
-    endTimeOffset = startOffset + duration,
+    bookStartTimeOffset = startOffset,
+    bookEndTimeOffset = startOffset + duration,
     downloaded = cached,
     trackId = id,
     // parentKey is this track's book. Required because chapters share one table keyed partly

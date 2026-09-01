@@ -7,7 +7,7 @@ package io.github.mattpvaughn.chronicle.data.model
  * did this inline, and both had the same defect: the per-track fallback was
  * `listOf(track.asChapter(0L))`, a literal zero for *every* track. Chapter offsets are absolute
  * within the book, so in a multi-file book where Plex returns no chapters, every chapter claimed to
- * start at 0 — and `getChapterAt` matches on a timestamp inside `startTimeOffset..endTimeOffset`,
+ * start at 0 — and `getChapterAt` matches on a timestamp inside `bookStartTimeOffset..bookEndTimeOffset`,
  * so the wrong chapter (or none) resolves. Same class of bug as the one cu-13 fixed in
  * [asChapterList], in the path that runs when the server *does* answer for some tracks.
  *

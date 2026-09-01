@@ -52,15 +52,17 @@ fun Player.skipToNext(
   if (nextChapterIndex < currentlyPlaying.book.value.chapters.size) {
     val nextChapter = currentlyPlaying.book.value.chapters[nextChapterIndex]
     Timber.d(
-      "NEXT CHAPTER: index=$nextChapterIndex id=${nextChapter.id} trackId=${nextChapter.trackId} offset=${nextChapter.startTimeOffset} title=${nextChapter.title}",
+      "NEXT CHAPTER: index=$nextChapterIndex id=${nextChapter.id} trackId=${nextChapter.trackId} offset=${nextChapter.bookStartTimeOffset} title=${nextChapter.title}",
     )
-    val containingTrack =
-      trackListStateManager.trackList
-        .firstOrNull {
-          it.id == nextChapter.trackId
-        }
-    val containingTrackIndex = trackListStateManager.trackList.indexOf(containingTrack)
-    seekTo(containingTrackIndex, nextChapter.startTimeOffset + 300)
+    // `seekTo` takes an in-track offset; the chapter's is book-absolute (cu-96).
+    val target = chapterSeekTarget(nextChapter, trackListStateManager.trackList)
+    if (target == null) {
+      Timber.e("Chapter ${nextChapter.id} names track ${nextChapter.trackId}, which is not loaded")
+      return
+    }
+    // The 300ms nudge keeps the seek inside the new chapter rather than on its boundary, where
+    // `getChapterAt` could still resolve the previous one.
+    seekTo(target.trackIndex, target.inTrackOffsetMillis + CHAPTER_SEEK_NUDGE_MILLIS)
     progressUpdater.updateProgressWithoutParameters()
   } else {
     val toast =
@@ -85,8 +87,16 @@ fun Player.skipToPrevious(
     currentlyPlaying.book.value.chapters.indexOf(
       currentlyPlaying.chapter.value,
     )
+  // Both operands must be book-absolute. This used to subtract a book-absolute chapter start from
+  // `currentPosition`, which is *in-track* — on a multi-track book that yields a large negative,
+  // so the branch always chose "previous chapter" and never "restart this one" (cu-96).
+  val bookPosition =
+    trackListStateManager.trackList.take(currentMediaItemIndex).sumOf { it.duration } +
+      currentPosition
   var previousChapterIndex: Int =
-    if ((currentPosition - currentlyPlaying.chapter.value.startTimeOffset) < (SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS * MILLIS_PER_SECOND)) {
+    if (millisIntoChapter(currentlyPlaying.chapter.value, bookPosition) <
+      (SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS * MILLIS_PER_SECOND)
+    ) {
       Timber.d("skipToPrevious → skip to previous chapter")
       currentChapterIndex - 1
     } else {
@@ -96,14 +106,13 @@ fun Player.skipToPrevious(
   if (previousChapterIndex < 0) previousChapterIndex = 0
   val previousChapter = currentlyPlaying.book.value.chapters[previousChapterIndex]
   Timber.d(
-    "PREVIOUS CHAPTER: index=$previousChapterIndex id=${previousChapter.id} trackId=${previousChapter.trackId} offset=${previousChapter.startTimeOffset} title=${previousChapter.title}",
+    "PREVIOUS CHAPTER: index=$previousChapterIndex id=${previousChapter.id} trackId=${previousChapter.trackId} offset=${previousChapter.bookStartTimeOffset} title=${previousChapter.title}",
   )
-  val containingTrack =
-    trackListStateManager.trackList
-      .firstOrNull {
-        it.id == previousChapter.trackId
-      }
-  val containingTrackIndex = trackListStateManager.trackList.indexOf(containingTrack)
-  seekTo(containingTrackIndex, previousChapter.startTimeOffset)
+  val target = chapterSeekTarget(previousChapter, trackListStateManager.trackList)
+  if (target == null) {
+    Timber.e("Chapter ${previousChapter.id} names track ${previousChapter.trackId}, not loaded")
+    return
+  }
+  seekTo(target.trackIndex, target.inTrackOffsetMillis)
   progressUpdater.updateProgressWithoutParameters()
 }

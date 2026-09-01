@@ -378,7 +378,7 @@ class AudiobookDetailsViewModel(
     val pausePlayAction = {
       pausePlay(
         bookId = inputAudiobook.id,
-        startTimeOffset = USE_SAVED_TRACK_PROGRESS,
+        bookStartTimeOffset = USE_SAVED_TRACK_PROGRESS,
         forcePlayFromMediaId = false,
       )
     }
@@ -395,17 +395,17 @@ class AudiobookDetailsViewModel(
    *
    * Assume that [mediaServiceConnection] has connected
    *
-   * Play behavior: start/resume playback from [startTimeOffset] milliseconds from the start of
+   * Play behavior: start/resume playback from [bookStartTimeOffset] milliseconds from the start of
    * the book. A null [trackId] indicates that playback should be resumed from the most recent
    * playback location
    *
    * [forcePlayFromMediaId] == true indicates to ignore playback state and play the book from the
-   * given [trackId] and [startTimeOffset] provided, otherwise pause/play/resume depending on
+   * given [trackId] and [bookStartTimeOffset] provided, otherwise pause/play/resume depending on
    * playback state
    */
   private fun pausePlay(
     bookId: String,
-    startTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
+    bookStartTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
     trackId: String? = null,
     forcePlayFromMediaId: Boolean = false,
   ) {
@@ -417,7 +417,7 @@ class AudiobookDetailsViewModel(
 
     val extras =
       Bundle().apply {
-        putLong(KEY_START_TIME_TRACK_OFFSET, startTimeOffset)
+        putLong(KEY_START_TIME_TRACK_OFFSET, bookStartTimeOffset)
         // Only written when a specific track was asked for; absence means "resume active".
         trackId?.let { putString(KEY_SEEK_TO_TRACK_WITH_ID, it) }
       }
@@ -461,7 +461,15 @@ class AudiobookDetailsViewModel(
 
     val jumpToChapterAction = {
       audiobook.value?.let { book ->
-        pausePlay(book.id, offset, trackId, forcePlayFromMediaId = true)
+        // The offset arrives book-absolute from the chapter list, but is applied as an in-track
+        // offset by the service. Same conversion as CurrentlyPlayingViewModel (cu-96).
+        val inTrackOffset =
+          tracks.value?.let { loaded ->
+            val trackStart =
+              loaded.sorted().takeWhile { it.id != trackId }.sumOf { it.duration }
+            (offset - trackStart).coerceAtLeast(0L)
+          } ?: offset
+        pausePlay(book.id, inTrackOffset, trackId, forcePlayFromMediaId = true)
       }
     }
     if (mediaServiceConnection.isConnected.value != true) {
