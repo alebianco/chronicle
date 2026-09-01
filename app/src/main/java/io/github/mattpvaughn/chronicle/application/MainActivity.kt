@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -290,11 +291,23 @@ class MainActivity : AppCompatActivity() {
    * top padding via [applyTopInsetToToolbar] as they are created.
    */
   private fun applyWindowInsets(binding: ActivityMainBinding) {
+    val navBarContentHeight = resources.getDimensionPixelSize(R.dimen.bottom_nav_bar_height)
     ViewCompat.setOnApplyWindowInsetsListener(binding.mainRoot) { view, windowInsets ->
       val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
       // Left/right matter in landscape and on devices with a cutout; the bottom
       // nav takes the bottom inset so it sits above the gesture bar.
       view.updatePadding(left = bars.left, right = bars.right)
+      // The bar has a *fixed* height (`@dimen/bottom_nav_bar_height`), so padding alone does not
+      // move it clear of the system bar — it eats into the 64dp of content instead, squeezing the
+      // icons while the bar still ends at the screen edge. Grow the view by the inset and pad by
+      // the same amount, so the content keeps its 64dp and the extra sits under the system bar.
+      //
+      // Found on the owner's phone in 3-button navigation mode, where the bar is 48dp rather than
+      // a gesture pill: the bottom nav rendered under it and looked absent (cu-73). Gesture mode
+      // hides this — the inset is small enough that the icons still land on screen.
+      binding.bottomNav.updateLayoutParams {
+        height = navBarContentHeight + bars.bottom
+      }
       binding.bottomNav.updatePadding(bottom = bars.bottom)
       // Consume nothing: fragments still need the top inset for their toolbars.
       windowInsets
