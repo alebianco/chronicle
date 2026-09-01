@@ -118,13 +118,27 @@ class SimpleProgressUpdater
     override fun startRegularProgressUpdates() {
       requireNotNull(mediaController).let { controller ->
         if (controller.playbackState?.isPlaying != false) {
-          serviceScope.launch(context = serviceScope.coroutineContext + dispatchers.io) {
-            updateProgress(
-              controller.metadata?.id ?: TRACK_NOT_FOUND,
-              MediaPlayerService.PLEX_STATE_PLAYING,
-              controller.playbackState?.currentPlayBackPosition ?: 0L,
-              false,
-            )
+          val position = controller.playbackState?.currentPlayBackPosition
+          // A position of 0 at the very start of playback is almost always "the player has not
+          // seeked to the saved offset yet", not "the listener is at the beginning". This loop
+          // starts the moment playback is requested, so the first tick used to report time=0 to
+          // Plex — the owner watched a book at 70% flash 0% and jump back, and the zero *was*
+          // written to the server. Had the app been closed in that window, 0 would have become the
+          // saved position.
+          //
+          // Skipping the tick costs nothing: the next one is a second later and carries the real
+          // offset. Genuinely starting a book at 0 is covered by the same next tick.
+          if (position != null && position > 0L) {
+            serviceScope.launch(context = serviceScope.coroutineContext + dispatchers.io) {
+              updateProgress(
+                controller.metadata?.id ?: TRACK_NOT_FOUND,
+                MediaPlayerService.PLEX_STATE_PLAYING,
+                position,
+                false,
+              )
+            }
+          } else {
+            Timber.i("Skipping progress report at position 0: player has not seeked yet")
           }
         }
       }

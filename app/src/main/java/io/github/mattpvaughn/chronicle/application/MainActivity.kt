@@ -292,6 +292,8 @@ class MainActivity : AppCompatActivity() {
    */
   private fun applyWindowInsets(binding: ActivityMainBinding) {
     val navBarContentHeight = resources.getDimensionPixelSize(R.dimen.bottom_nav_bar_height)
+    val collapsedPlayerGuideline =
+      resources.getDimensionPixelSize(R.dimen.bottom_nav_bar_height_plus_handle_height)
     ViewCompat.setOnApplyWindowInsetsListener(binding.mainRoot) { view, windowInsets ->
       val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
       // Left/right matter in landscape and on devices with a cutout; the bottom
@@ -309,6 +311,13 @@ class MainActivity : AppCompatActivity() {
         height = navBarContentHeight + bars.bottom
       }
       binding.bottomNav.updatePadding(bottom = bars.bottom)
+      // The collapsed mini-player sits on this guideline, which was a hardcoded 136dp from the
+      // bottom — `bottom_nav_bar_height_plus_handle_height`, i.e. 64 + 72. That arithmetic assumed
+      // the nav bar was exactly its declared 64dp, so growing it by the inset above squeezed the
+      // handle from 72dp to 24dp and the mini player looked swallowed by the bar. Move the
+      // guideline by the same inset, computed rather than hardcoded: the inset differs between
+      // gesture and 3-button navigation and between devices (cu-73).
+      binding.currentlyPlayingCollapsedTop.setGuidelineEnd(collapsedPlayerGuideline + bars.bottom)
       // Consume nothing: fragments still need the top inset for their toolbars.
       windowInsets
     }
