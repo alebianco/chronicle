@@ -242,6 +242,54 @@ class MainActivityViewModelTest {
     assertEquals("No track playing", viewModel.currentChapterTitle.value)
   }
 
+  /**
+   * The sheet state must be readable **immediately** after it is written (cu-73).
+   *
+   * Every writer used `postValue`, which defers to the next main-loop pass. Three methods here read
+   * the state back to decide what to do, and so does the activity's back handler — so a deferred
+   * write meant the next reader saw the *previous* state. Back concluded the player was not
+   * expanded and fell through to leaving the app.
+   *
+   * `InstantTaskExecutorRule` runs LiveData work inline, so this test would pass under `postValue`
+   * on the *observed* value; what it actually pins is the read-after-write that the production
+   * paths depend on.
+   */
+  @Test
+  fun `the sheet state is readable immediately after being set`() {
+    val viewModel = viewModel()
+
+    viewModel.setBottomSheetState(EXPANDED)
+
+    assertEquals(
+      "a deferred write makes the next reader — including the back handler — see stale state",
+      EXPANDED,
+      viewModel.currentlyPlayingLayoutState.value,
+    )
+  }
+
+  /** Two writes in one pass must both take effect; postValue coalesces and keeps only the last. */
+  @Test
+  fun `consecutive state changes are not coalesced`() {
+    val viewModel = viewModel()
+
+    viewModel.setBottomSheetState(EXPANDED)
+    assertEquals(EXPANDED, viewModel.currentlyPlayingLayoutState.value)
+
+    viewModel.setBottomSheetState(COLLAPSED)
+    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+  }
+
+  /** The read-then-write helpers must act on what was just written, not a stale value. */
+  @Test
+  fun `minimize acts on the state just set`() {
+    val viewModel = viewModel()
+
+    viewModel.setBottomSheetState(EXPANDED)
+    viewModel.minimizeCurrentlyPlaying()
+
+    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+  }
+
   private fun viewModel() =
     MainActivityViewModel(
       loginRepo = loginRepo,

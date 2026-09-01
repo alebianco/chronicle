@@ -69,6 +69,19 @@ class MainActivityViewModel(
       it.peekContent() == LOGGED_IN_FULLY
     }
 
+  /**
+   * The player sheet's state. Written with `value =`, **never** `postValue`.
+   *
+   * Every writer here runs on the main thread — click handlers and LiveData observers — and
+   * `postValue` defers the write to the next main-loop pass. Three things read this state back to
+   * decide what to do ([minimizeCurrentlyPlaying], [maximizeCurrentlyPlaying],
+   * [onCurrentlyPlayingHandleDragged]) and so does the activity's back handler, so a deferred write
+   * means the next reader sees the *previous* state. Back then decided the sheet was not expanded
+   * and fell through to leaving the app (cu-73).
+   *
+   * `postValue` also coalesces: several posts in one loop keep only the last, so a
+   * collapse-then-expand pair could lose the collapse entirely.
+   */
   private var _currentlyPlayingLayoutState = MutableLiveData(HIDDEN)
   val currentlyPlayingLayoutState: LiveData<BottomSheetState>
     get() = _currentlyPlayingLayoutState
@@ -152,7 +165,7 @@ class MainActivityViewModel(
             setAudiobook(trackId)
           }
         }
-      } ?: _currentlyPlayingLayoutState.postValue(HIDDEN)
+      } ?: run { _currentlyPlayingLayoutState.value = HIDDEN }
     }
 
   private val playbackObserver =
@@ -181,6 +194,9 @@ class MainActivityViewModel(
       if (previousAudiobookId != bookId && bookId != NO_AUDIOBOOK_FOUND_ID) {
         audiobookId.postValue(bookId)
         if (_currentlyPlayingLayoutState.value == HIDDEN) {
+          // The one legitimate postValue: this runs in a coroutine after a suspending DB read, so
+          // it may not be on the main thread. Every other writer of this field uses `value =` —
+          // see the field's own note for why that matters.
           _currentlyPlayingLayoutState.postValue(COLLAPSED)
         }
       }
@@ -193,8 +209,8 @@ class MainActivityViewModel(
    */
   fun onCurrentlyPlayingClicked() {
     when (currentlyPlayingLayoutState.value) {
-      COLLAPSED -> _currentlyPlayingLayoutState.postValue(EXPANDED)
-      EXPANDED -> _currentlyPlayingLayoutState.postValue(COLLAPSED)
+      COLLAPSED -> _currentlyPlayingLayoutState.value = EXPANDED
+      EXPANDED -> _currentlyPlayingLayoutState.value = COLLAPSED
       HIDDEN -> throw IllegalStateException("Cannot click on hidden sheet!")
       else -> {}
     }
@@ -230,7 +246,7 @@ class MainActivityViewModel(
   }
 
   override fun setBottomSheetState(state: BottomSheetState) {
-    _currentlyPlayingLayoutState.postValue(state)
+    _currentlyPlayingLayoutState.value = state
   }
 
   fun showUserMessage(errorMessage: String) {
@@ -241,20 +257,20 @@ class MainActivityViewModel(
   /** Minimize the currently playing modal/overlay if it is expanded */
   fun minimizeCurrentlyPlaying() {
     if (currentlyPlayingLayoutState.value == EXPANDED) {
-      _currentlyPlayingLayoutState.postValue(COLLAPSED)
+      _currentlyPlayingLayoutState.value = COLLAPSED
     }
   }
 
   /** Maximize the currently playing modal/overlay if it is visible, but not expanded yet */
   fun maximizeCurrentlyPlaying() {
     if (currentlyPlayingLayoutState.value != EXPANDED) {
-      _currentlyPlayingLayoutState.postValue(EXPANDED)
+      _currentlyPlayingLayoutState.value = EXPANDED
     }
   }
 
   fun onCurrentlyPlayingHandleDragged() {
     if (currentlyPlayingLayoutState.value == COLLAPSED) {
-      _currentlyPlayingLayoutState.postValue(EXPANDED)
+      _currentlyPlayingLayoutState.value = EXPANDED
     }
   }
 }
