@@ -692,11 +692,15 @@ class MediaPlayerService :
   private val playerEventListener =
     object : Player.Listener {
       override fun onPlayerError(error: PlaybackException) {
-        Timber.e(error, "Exoplayer playback error")
+        // `error.message` is only ever the generic "Source error"; the useful part is the cause
+        // chain, which names the HTTP status or IO failure that actually stopped playback. Logging
+        // the message alone is what made a mid-listen stall undiagnosable from a log dump (cu-103).
+        val diagnosis = describePlaybackError(error)
+        Timber.e(error, "Exoplayer playback error: $diagnosis")
         val errorIntent = Intent(ACTION_PLAYBACK_ERROR)
-        errorIntent.putExtra(PLAYBACK_ERROR_MESSAGE, error.message)
+        errorIntent.putExtra(PLAYBACK_ERROR_MESSAGE, diagnosis)
         localBroadcastManager.sendBroadcast(errorIntent)
-        setSessionCustomErrorMessage(error.message)
+        setSessionCustomErrorMessage(diagnosis)
         updateSessionPlaybackState()
       }
 

@@ -8,6 +8,7 @@ import android.view.*
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
@@ -226,6 +227,7 @@ class AudiobookDetailsFragment : Fragment() {
 //            }
 //        }
 
+    detailsToolbar = binding.detailsToolbar
     (activity as AppCompatActivity).setSupportActionBar(binding.detailsToolbar)
     binding.detailsToolbar.title = null
 
@@ -248,17 +250,19 @@ class AudiobookDetailsFragment : Fragment() {
       )
     }
 
+    // Both observers below reach into the toolbar's menu, which is **not always populated when they
+    // fire** (cu-102). `setSupportActionBar` hands the toolbar's menu to the activity's MenuHost,
+    // and the provider registered in `onViewCreated` repopulates it only at RESUMED. A LiveData
+    // observer, by contrast, becomes active at STARTED and immediately replays its cached value —
+    // so on every unlock `findItem` returned null and `.setIcon` threw, killing the process and
+    // with it playback. `menuItemOrNull` is the guard; the observers also re-apply in
+    // `onPrepareMenu`, which is what makes the state correct rather than merely non-fatal.
     viewModel.forceSyncInProgress.observe(viewLifecycleOwner) { isSyncing ->
-      val syncMenuItem = binding.detailsToolbar.menu.findItem(R.id.force_sync)
-      val syncIcon = syncMenuItem.icon
-      if (syncIcon is AnimatedVectorDrawable) {
-        if (isSyncing) syncIcon.start() else syncIcon.stop()
-      }
+      applySyncIconState(isSyncing)
     }
 
     viewModel.isWatchedIcon.observe(viewLifecycleOwner) { icon ->
-      Timber.d("isWatchedIcon.observe called")
-      binding.detailsToolbar.menu.findItem(R.id.toggle_watched).setIcon(icon)
+      applyWatchedIcon(icon)
     }
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
@@ -266,6 +270,29 @@ class AudiobookDetailsFragment : Fragment() {
     binding.appBarLayout.applyTopSystemBarInset()
 
     return binding.root
+  }
+
+  /**
+   * The details toolbar while the view exists, cleared in [onDestroyView].
+   *
+   * Held because the menu observers outlive the local `binding` in [onCreateView] and must not
+   * capture a destroyed view.
+   */
+  private var detailsToolbar: Toolbar? = null
+
+  /** The menu item, or null when the menu has not been populated yet. See cu-102. */
+  private fun menuItemOrNull(itemId: Int): MenuItem? = detailsToolbar?.menu?.findItem(itemId)
+
+  private fun applyWatchedIcon(icon: Int?) {
+    if (icon == null) return
+    menuItemOrNull(R.id.toggle_watched)?.setIcon(icon)
+  }
+
+  private fun applySyncIconState(isSyncing: Boolean?) {
+    val syncIcon = menuItemOrNull(R.id.force_sync)?.icon
+    if (syncIcon is AnimatedVectorDrawable) {
+      if (isSyncing == true) syncIcon.start() else syncIcon.stop()
+    }
   }
 
   override fun onViewCreated(
@@ -282,6 +309,17 @@ class AudiobookDetailsFragment : Fragment() {
           menuInflater: MenuInflater,
         ) {
           menuInflater.inflate(R.menu.audiobook_details_menu, menu)
+        }
+
+        /**
+         * Re-applies the icon state once the menu exists.
+         *
+         * Without this the guard alone would leave the icons stale: the observers fire while the
+         * menu is empty, so their values are dropped and nothing re-delivers them.
+         */
+        override fun onPrepareMenu(menu: Menu) {
+          applyWatchedIcon(viewModel.isWatchedIcon.value)
+          applySyncIconState(viewModel.forceSyncInProgress.value)
         }
 
         override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
@@ -303,6 +341,12 @@ class AudiobookDetailsFragment : Fragment() {
       viewLifecycleOwner,
       Lifecycle.State.RESUMED,
     )
+  }
+
+  override fun onDestroyView() {
+    // The field outlives the view otherwise, which is a leak of the whole view hierarchy.
+    detailsToolbar = null
+    super.onDestroyView()
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {

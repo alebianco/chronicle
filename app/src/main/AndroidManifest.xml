@@ -8,6 +8,14 @@
     <!-- Required to post notifications on Android 13+ (runtime permission still required at runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!--
+      Required since Android 14 (API 34) for a service declaring
+      foregroundServiceType="mediaPlayback". Its absence was not a build error and not a runtime
+      crash — the service still started, but it never received the media-playback exemption, so
+      Doze blocked its network. On a phone sitting still in a car, playback died ~12 minutes into
+      each idle window with `DNS ... isBlocked=true` followed by an ExoPlayer "Source error" (cu-103).
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
         android:name="io.github.mattpvaughn.chronicle.application.ChronicleApplication"
