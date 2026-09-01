@@ -575,65 +575,41 @@ class MediaPlayerService :
     result.detach()
     serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
       withContext(Dispatchers.IO) {
-        when (parentId) {
-          CHRONICLE_MEDIA_ROOT_ID -> {
+        // Categories are matched by their stable id, never by the localized label (cu-99).
+        when (AutoBrowseCategory.fromId(parentId)) {
+          null ->
+            if (parentId == CHRONICLE_MEDIA_ROOT_ID) {
+              result.sendResult(
+                AutoBrowseCategory.entries
+                  .map { makeBrowsable(it.id, getString(it.labelRes), it.iconRes) }
+                  .toMutableList(),
+              )
+            } else {
+              // An unknown parent is a bug or a stale id held across an app update. An empty list
+              // is the honest answer; sendResult must still be called, since result was detached.
+              Timber.w("Unknown Android Auto browse parent: $parentId")
+              result.sendResult(mutableListOf())
+            }
+          AutoBrowseCategory.RecentlyListened ->
             result.sendResult(
-              (
-                listOf(
-                  makeBrowsable(
-                    getString(R.string.auto_category_recently_listened),
-                    R.drawable.ic_recent,
-                  ),
-                ) +
-                  listOf(
-                    makeBrowsable(
-                      getString(R.string.auto_category_offline),
-                      R.drawable.ic_cloud_download_white,
-                    ),
-                  ) +
-                  listOf(
-                    makeBrowsable(
-                      getString(R.string.auto_category_recently_added),
-                      R.drawable.ic_add,
-                    ),
-                  ) +
-                  listOf(
-                    makeBrowsable(
-                      getString(R.string.auto_category_library),
-                      R.drawable.nav_library,
-                    ),
-                  )
-              ).toMutableList(),
-            )
-          }
-          getString(R.string.auto_category_recently_listened) -> {
-            val recentlyListened = bookRepository.getRecentlyListenedAsync()
-            result.sendResult(
-              recentlyListened.map { it.toMediaItem(plexConfig) }
+              bookRepository.getRecentlyListenedAsync().map { it.toMediaItem(plexConfig) }
                 .toMutableList(),
             )
-          }
-          getString(R.string.auto_category_recently_added) -> {
-            val recentlyAdded = bookRepository.getRecentlyAddedAsync()
+          AutoBrowseCategory.RecentlyAdded ->
             result.sendResult(
-              recentlyAdded.map { it.toMediaItem(plexConfig) }
+              bookRepository.getRecentlyAddedAsync().map { it.toMediaItem(plexConfig) }
                 .toMutableList(),
             )
-          }
-          getString(R.string.auto_category_library) -> {
-            val books = bookRepository.getAllBooksAsync()
+          AutoBrowseCategory.Library ->
             result.sendResult(
-              books.map { it.toMediaItem(plexConfig) }
+              bookRepository.getAllBooksAsync().map { it.toMediaItem(plexConfig) }
                 .toMutableList(),
             )
-          }
-          getString(R.string.auto_category_offline) -> {
-            val offline = bookRepository.getCachedAudiobooksAsync()
+          AutoBrowseCategory.Offline ->
             result.sendResult(
-              offline.map { it.toMediaItem(plexConfig) }
+              bookRepository.getCachedAudiobooksAsync().map { it.toMediaItem(plexConfig) }
                 .toMutableList(),
             )
-          }
         }
       }
     }

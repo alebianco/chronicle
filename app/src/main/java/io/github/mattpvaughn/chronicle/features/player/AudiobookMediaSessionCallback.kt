@@ -10,11 +10,14 @@ import android.view.KeyEvent
 import android.view.KeyEvent.*
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.Observer
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import com.github.michaelbull.result.getError
 import io.github.mattpvaughn.chronicle.BuildConfig
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -26,8 +29,10 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.getMediaItemUri
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
+import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
+import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
@@ -320,6 +325,7 @@ class AudiobookMediaSessionCallback
       bookId: String,
       extras: Bundle,
       playWhenReady: Boolean,
+      trackFetchAttempts: Int = 0,
     ) {
       // The [MediaItemTrack.id] of the track to be played, or null to resume the most recently
       // listened track in [bookId]. Absence of the key replaces the old ACTIVE_TRACK sentinel:
@@ -354,7 +360,7 @@ class AudiobookMediaSessionCallback
             trackRepository.getTracksForAudiobookAsync(bookId)
           }
         if (tracks.isEmpty()) {
-          handlePlayBookWithNoTracks(bookId, tracks, extras, playWhenReady)
+          handlePlayBookWithNoTracks(bookId, tracks, extras, playWhenReady, trackFetchAttempts)
           return@launch
         }
 
@@ -474,7 +480,15 @@ class AudiobookMediaSessionCallback
       tracks: List<MediaItemTrack>,
       extras: Bundle,
       playWhenReady: Boolean,
+      trackFetchAttempts: Int,
     ) {
+      // The budget exists because this method calls [playBook] again, which comes straight back
+      // here when the fetch yields nothing — one network request per pass, unbounded (cu-97).
+      if (!mayFetchTracksAgain(trackFetchAttempts)) {
+        Timber.w("Book $bookId still has no tracks after a fetch; giving up rather than retrying")
+        broadcastPlaybackError(appContext.getString(R.string.playback_error_no_tracks))
+        return
+      }
       Timber.i("No known tracks for book: $bookId, attempting to fetch them")
       // Tracks haven't been loaded by UI for this track, so load it here
       val networkTracks =
@@ -492,8 +506,25 @@ class AudiobookMediaSessionCallback
         if (audiobook != null) {
           bookRepository.syncAudiobook(audiobook, tracks)
         }
-        playBook(bookId, extras, playWhenReady)
+        playBook(bookId, extras, playWhenReady, trackFetchAttempts + 1)
+      } else {
+        // Was silent: a failed fetch left the user looking at a player that never started.
+        Timber.e(
+          networkTracks.getError(),
+          "Failed to fetch tracks for book $bookId",
+        )
+        broadcastPlaybackError(appContext.getString(R.string.playback_error_no_tracks))
       }
+    }
+
+    /**
+     * Sends a playback failure to [MainActivity] over the channel it already listens on, so the
+     * user is told instead of watching a player that never starts.
+     */
+    private fun broadcastPlaybackError(message: String) {
+      LocalBroadcastManager.getInstance(appContext).sendBroadcast(
+        Intent(ACTION_PLAYBACK_ERROR).putExtra(PLAYBACK_ERROR_MESSAGE, message),
+      )
     }
 
     private fun calculateRewindDuration(book: Audiobook?): Long {
