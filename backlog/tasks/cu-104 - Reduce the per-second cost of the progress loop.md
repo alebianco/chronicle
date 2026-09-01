@@ -1,7 +1,7 @@
 ---
 id: cu-104
 title: Reduce the per-second cost of the progress loop
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-09-01'
 labels: [R2, performance, trust]

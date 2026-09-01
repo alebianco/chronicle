@@ -27,3 +27,12 @@ the Google-IAP dependency, its ProGuard rules and the Play Billing manifest decl
 `billing` across `app/src/main` and the version catalog now returns zero hits.
 
 There is no library left to update. Closed rather than left as a draft that reads like pending work.
+
+## Filing note (2026-09-01)
+
+Moved out of `backlog/drafts/` because drafts are *ideas awaiting owner triage* and this is already
+triaged — the answer is no, permanently, and the reasoning is recorded above.
+
+Filed under `tasks/` as a closed record rather than as a new file in `backlog/decisions/`: the
+decision that settles it ([[decision-15]]) already exists and is the owner's, and billing is on the
+never-touch list. Nothing here needed a new decision record — only somewhere honest to rest.

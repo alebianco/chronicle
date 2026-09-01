@@ -1,7 +1,7 @@
 ---
 id: cu-80
 title: Extract repository interfaces and SourceManager ingestion API
-status: Draft
+status: To Do
 labels: [R2, architecture, debt]
 dependencies: [cu-71]
 priority: medium

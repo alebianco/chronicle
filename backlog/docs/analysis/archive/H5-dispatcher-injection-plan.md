@@ -1,3 +1,10 @@
+---
+id: H5-dispatcher-injection-plan
+title: "Task H5: Hardcoded Dispatcher Usage Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task H5: Hardcoded Dispatcher Usage Resolution Plan
 
 > **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the

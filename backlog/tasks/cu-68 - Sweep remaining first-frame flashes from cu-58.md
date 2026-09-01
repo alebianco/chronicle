@@ -1,7 +1,7 @@
 ---
 id: cu-68
 title: Sweep the remaining first-frame flashes from cu-58
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-08-31'
 labels: [R2, ui]

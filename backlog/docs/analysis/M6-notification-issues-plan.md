@@ -1,3 +1,10 @@
+---
+id: M6-notification-issues-plan
+title: "Task M6: Notification Issues Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task M6: Notification Issues Resolution Plan
 *Difficulty: Medium*
 *Estimated Completion: 2-3 days*  

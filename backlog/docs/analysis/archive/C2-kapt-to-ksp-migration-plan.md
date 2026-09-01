@@ -1,3 +1,10 @@
+---
+id: C2-kapt-to-ksp-migration-plan
+title: "Task C2: KAPT to KSP Migration Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task C2: KAPT to KSP Migration Plan
 
 > **Archived.** Its task [[cu-8]] is Done; kept as historical context, not part of the

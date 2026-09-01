@@ -1,3 +1,10 @@
+---
+id: H1-H8-high-priority-plans
+title: High Priority Tasks (H1-H8) - Resolution Plans
+type: analysis
+created_date: '2026-09-01'
+---
+
 # High Priority Tasks (H1-H8) - Resolution Plans
 
 > **Archived 2026-08-31.** A redundant aggregate: every H-item has its own file (H2–H6 archived

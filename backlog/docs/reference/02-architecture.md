@@ -1,3 +1,10 @@
+---
+id: 02-architecture
+title: Architecture
+type: reference
+created_date: '2026-09-01'
+---
+
 # Architecture
 
 ## Overview

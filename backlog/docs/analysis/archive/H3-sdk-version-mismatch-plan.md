@@ -1,3 +1,10 @@
+---
+id: H3-sdk-version-mismatch-plan
+title: "Task H3: SDK Version Mismatch Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task H3: SDK Version Mismatch Resolution Plan
 
 > **Archived.** Kept as historical context, not part of the active reference set.

@@ -1,3 +1,10 @@
+---
+id: C1-cleartext-traffic-resolution-plan
+title: "Task C1: Security - Cleartext Traffic Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task C1: Security - Cleartext Traffic Resolution Plan
 
 > **Archived.** Its task [[cu-42]] is Done; kept as historical context, not part of the

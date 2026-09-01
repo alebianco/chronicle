@@ -1,3 +1,10 @@
+---
+id: reference-README
+title: Chronicle App Documentation
+type: reference
+created_date: '2026-09-01'
+---
+
 # Chronicle App Documentation
 
 Welcome to the Chronicle Audiobook Player documentation. This guide will help you understand the project structure and architecture.

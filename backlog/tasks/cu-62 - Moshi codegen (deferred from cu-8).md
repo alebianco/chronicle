@@ -1,7 +1,7 @@
 ---
 id: cu-62
 title: Moshi reflection to codegen
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-08-30'
 labels: [R1, performance]

@@ -1,3 +1,10 @@
+---
+id: RESEARCH_FINDINGS
+title: Chronicle Audiobook Player — Ownership, Modernization & Feature-Gap Study
+type: research
+created_date: '2026-09-01'
+---
+
 # Chronicle Audiobook Player — Ownership, Modernization & Feature-Gap Study
 
 *Research date: 2026-07-05. Method: multi-agent research (repo audit, live GitHub API fork/issue mining, web research on competitors and the Plex/Audiobookshelf/Jellyfin APIs), synthesized by the lead orchestrator. Every claim is tagged **[V]** verified (seen in code/diff/API/docs by an agent) or **[I]** inferred. Nothing below rests on the stale `other-forks.txt` — all fork data was re-pulled live from GitHub.*

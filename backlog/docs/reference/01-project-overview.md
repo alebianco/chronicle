@@ -1,3 +1,10 @@
+---
+id: 01-project-overview
+title: Project Overview
+type: reference
+created_date: '2026-09-01'
+---
+
 # Project Overview
 
 ## What is Chronicle?

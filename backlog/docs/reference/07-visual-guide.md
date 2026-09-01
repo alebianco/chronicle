@@ -1,3 +1,10 @@
+---
+id: 07-visual-guide
+title: Visual Architecture Guide
+type: reference
+created_date: '2026-09-01'
+---
+
 # Visual Architecture Guide
 
 This document provides visual representations of Chronicle's architecture for quick reference.

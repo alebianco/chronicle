@@ -1,3 +1,10 @@
+---
+id: M3-billing-library-update-plan
+title: M3 billing library update plan
+type: analysis
+created_date: '2026-09-01'
+---
+
 ─────┬──────────────────────────────────────────────────────────────────────────
 
 > **Archived.** Its task [[cu-53]] is Won't Do; kept as historical context, not part of the

@@ -1,3 +1,10 @@
+---
+id: H4-ci-test-execution-plan
+title: "Task H4: No CI Test Execution Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task H4: No CI Test Execution Resolution Plan
 
 > **Archived.** Kept as historical context, not part of the active reference set.

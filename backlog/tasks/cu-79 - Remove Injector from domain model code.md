@@ -1,7 +1,7 @@
 ---
 id: cu-79
 title: Remove Injector from domain/model code
-status: Draft
+status: To Do
 labels: [R2, architecture, debt]
 dependencies: [cu-71]
 priority: medium

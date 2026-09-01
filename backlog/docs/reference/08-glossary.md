@@ -1,3 +1,10 @@
+---
+id: 08-glossary
+title: Glossary
+type: reference
+created_date: '2026-09-01'
+---
+
 # Glossary
 
 This glossary explains common Android, Kotlin, and architecture terms used throughout Chronicle.

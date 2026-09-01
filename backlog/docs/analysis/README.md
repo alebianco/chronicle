@@ -1,3 +1,10 @@
+---
+id: analysis-README
+title: Debt Analysis (reference)
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Debt Analysis (reference)
 
 *Optional* deep-reference for the 26 technical-debt items originally catalogued in the (now dissolved) `docs/09-project-analysis-and-tasks.md` — problem statement, current-state code audit, risk. **These are background reference, not the tracker.** A task's own plan and notes live *inside the task file* (Backlog.md `plan`/`notes`); the execution plan is drafted with `superpowers:writing-plans` as gitignored scratch and summarized into the task (see `/CLAUDE.md` §Workflow). Read the analysis file for a task when one is linked; many tasks need none. Files here are from 2025-11 (pre-consolidation) — treat the code snippets as informative, not prescriptive, and move a file to `archive/` once its task is Done and the content no longer matches the code.

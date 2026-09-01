@@ -1,3 +1,10 @@
+---
+id: H6-delicate-api-usage-plan
+title: "Task H6: Delicate API Usage Without Suppression Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task H6: Delicate API Usage Without Suppression Resolution Plan
 
 > **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the

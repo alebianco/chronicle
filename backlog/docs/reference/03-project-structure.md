@@ -1,3 +1,10 @@
+---
+id: 03-project-structure
+title: Project Structure
+type: reference
+created_date: '2026-09-01'
+---
+
 # Project Structure
 
 ## Directory Layout

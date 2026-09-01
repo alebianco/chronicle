@@ -1,3 +1,10 @@
+---
+id: C4-globalscope-removal-plan
+title: "Task C4: GlobalScope Usage Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task C4: GlobalScope Usage Resolution Plan
 
 > **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the

@@ -1,3 +1,10 @@
+---
+id: M2-stateflow-migration-plan
+title: "Task M2: Migrate to StateFlow from LiveData Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task M2: Migrate to StateFlow from LiveData Resolution Plan
 
 **Task ID**: M2  

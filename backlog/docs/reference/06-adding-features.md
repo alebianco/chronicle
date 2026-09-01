@@ -1,3 +1,10 @@
+---
+id: 06-adding-features
+title: Adding New Features
+type: reference
+created_date: '2026-09-01'
+---
+
 # Adding New Features
 
 This guide walks you through implementing new features in Chronicle following the established patterns.

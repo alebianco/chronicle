@@ -1,3 +1,10 @@
+---
+id: C5-internal-coroutines-api-removal-plan
+title: "Task C5: InternalCoroutinesApi Usage Removal Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task C5: InternalCoroutinesApi Usage Removal Plan
 
 > **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the

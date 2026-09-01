@@ -1,3 +1,10 @@
+---
+id: C6-localmediasource-decision-plan
+title: "Task C6: LocalMediaSource Implementation Decision Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task C6: LocalMediaSource Implementation Decision Plan
 
 > **Archived.** Its task [[cu-15]] is Done; kept as historical context, not part of the

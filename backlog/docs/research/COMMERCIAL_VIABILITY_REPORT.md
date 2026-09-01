@@ -1,3 +1,10 @@
+---
+id: COMMERCIAL_VIABILITY_REPORT
+title: Chronicle — Market Research & Commercial-Viability Report
+type: research
+created_date: '2026-09-01'
+---
+
 # Chronicle — Market Research & Commercial-Viability Report
 
 *Research date: 2026-07-12. Method: deep-research workflow (5 search angles, 24 sources fetched, 112 claims extracted, 25 top claims put through 3-vote adversarial verification — 14 confirmed 3-0, 1 refuted 0-3, 10 unverified due to infrastructure limits and flagged as such) + full read of the three prior artifacts, `RESEARCH_FINDINGS.md`, `PRODUCT_BACKLOG.md`, `docs/`, and a live repo audit. Claim tags: **[V]** = verified against a primary source this session (3-0 adversarial vote or direct repo inspection); **[S]** = single-source or secondary-source web finding, not adversarially verified; **[I]** = inference/estimate.*

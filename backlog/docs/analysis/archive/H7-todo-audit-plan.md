@@ -1,3 +1,10 @@
+---
+id: H7-todo-audit-plan
+title: "Task H7: TODO Items in Critical Paths Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task H7: TODO Items in Critical Paths Resolution Plan
 
 > **Archived 2026-08-31.** [[cu-46]] is Done and the `todo.md` this analyses no longer exists, so

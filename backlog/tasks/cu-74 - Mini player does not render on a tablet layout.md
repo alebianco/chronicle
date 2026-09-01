@@ -1,7 +1,7 @@
 ---
 id: cu-74
 title: Mini player does not render on a tablet layout
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-08-31'
 labels: [R2, ui]

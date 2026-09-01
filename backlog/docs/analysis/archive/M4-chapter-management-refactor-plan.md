@@ -1,3 +1,10 @@
+---
+id: M4-chapter-management-refactor-plan
+title: "Task M4: Chapter Management Refactoring Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task M4: Chapter Management Refactoring Resolution Plan
 
 > **Archived 2026-08-31.** Superseded by [[cu-49]]'s Implementation Plan. Not usable as written:

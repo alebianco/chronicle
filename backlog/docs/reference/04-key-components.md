@@ -1,3 +1,10 @@
+---
+id: 04-key-components
+title: Key Components
+type: reference
+created_date: '2026-09-01'
+---
+
 # Key Components
 
 This document explains the most important classes in Chronicle and what they do.

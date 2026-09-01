@@ -1,3 +1,10 @@
+---
+id: H1-test-coverage-plan
+title: "Task H1: Inadequate Test Coverage Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task H1: Inadequate Test Coverage Resolution Plan
 
 > **Archived 2026-08-31.** [[cu-44]] is Done. Its own reasoning against DAO tests on in-memory

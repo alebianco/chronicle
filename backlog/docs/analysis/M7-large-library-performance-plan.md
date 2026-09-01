@@ -1,3 +1,10 @@
+---
+id: M7-large-library-performance-plan
+title: "Task M7: Large Library Performance Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task M7: Large Library Performance Resolution Plan
 
 **Task ID**: M7  

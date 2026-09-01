@@ -1,3 +1,10 @@
+---
+id: H2-proguard-rules-plan
+title: "Task H2: Missing ProGuard Rules Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task H2: Missing ProGuard Rules Resolution Plan
 
 > **Archived.** Its task [[cu-45]] is Done; kept as historical context, not part of the

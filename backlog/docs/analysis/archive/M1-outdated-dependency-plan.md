@@ -1,3 +1,10 @@
+---
+id: M1-outdated-dependency-plan
+title: "Task M1: Outdated Dependency (kotlin-result) Resolution Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task M1: Outdated Dependency (kotlin-result) Resolution Plan
 
 > **Archived.** Its task [[cu-48]] is Done; kept as historical context, not part of the

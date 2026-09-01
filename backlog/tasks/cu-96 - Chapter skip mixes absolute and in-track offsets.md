@@ -1,7 +1,7 @@
 ---
 id: cu-96
 title: Chapter skip mixes absolute and in-track offsets
-status: Draft
+status: To Do
 labels: [R1, trust, bug]
 dependencies: [cu-73]
 priority: high

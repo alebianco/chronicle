@@ -1,3 +1,10 @@
+---
+id: C3-fresco-to-coil-migration-plan
+title: "Task C3: Deprecated Fresco API Migration Plan"
+type: analysis
+created_date: '2026-09-01'
+---
+
 # Task C3: Deprecated Fresco API Migration Plan
 
 > **Archived.** Its task [[cu-43]] is Done; kept as historical context, not part of the

@@ -1,3 +1,10 @@
+---
+id: 05-data-flow
+title: Data Flow
+type: reference
+created_date: '2026-09-01'
+---
+
 # Data Flow
 
 Understanding how data moves through Chronicle will help you implement features correctly.
