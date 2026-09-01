@@ -202,6 +202,13 @@ into "the symptom is gone".
 
 ### Unofficial endpoints
 
+- [ ] **A book switch flushes the outgoing position** ([[cu-91]]). On device A, play book X for a
+      minute, then start book Y *without* pausing X first. On device B, open book X: it must show
+      where A stopped, not an older position. Then check the inverse — pressing play, pause and
+      resume on a single book must **not** emit a `STOPPED` report for it (watch `/:/timeline` in
+      the server log). The flush now happens in `AudiobookMediaSessionCallback.playBook`, so it
+      covers the mini player, Android Auto and media buttons too, not just the details screen —
+      worth trying from at least two of those entry points.
 - [ ] **`/:/timeline`, scrobble, websockets.** Community-documented, not guaranteed
       (CLAUDE.md, Gotchas). Confirm the current Plex version still accepts the shapes the
       app sends — this is the item most likely to have silently drifted.

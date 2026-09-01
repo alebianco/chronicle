@@ -24,7 +24,6 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayin
 import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
@@ -422,8 +421,6 @@ class AudiobookDetailsViewModel(
       Timber.e("MediaServiceConnection not connected")
       return
     }
-    updateProgressIfChangingBook()
-
     val transportControls = mediaServiceConnection.transportControls ?: return
 
     val extras =
@@ -443,37 +440,6 @@ class AudiobookDetailsViewModel(
     }
   }
 
-  /**
-   * Check if there is an active audiobook which are about to be replaced by a different
-   * audiobook and if so, make a network request to inform the server that playback has ended
-   */
-  private fun updateProgressIfChangingBook() {
-    val currentlyPlayingTrackId = mediaServiceConnection.nowPlaying.value?.id
-    val isChangingBooks =
-      if (currentlyPlayingTrackId.isNullOrEmpty()) {
-        false
-      } else {
-        Timber.i("Currently playing is $currentlyPlayingTrackId")
-        tracks.value?.let { trackList ->
-          trackList.any { it.id == currentlyPlayingTrackId }
-        } ?: false
-      }
-
-    if (isChangingBooks) {
-      if (!currentlyPlayingTrackId.isNullOrEmpty()) {
-        mediaServiceConnection.playbackState.value?.let { state ->
-          progressUpdater.updateProgress(
-            currentlyPlayingTrackId,
-            PLEX_STATE_STOPPED,
-            state.currentPlayBackPosition,
-            true,
-          )
-        }
-      }
-    }
-  }
-
-  /** Jumps to a chapter starting [offset] milliseconds into the audiobook */
   fun jumpToChapter(
     offset: Long = 0,
     trackId: String = TRACK_NOT_FOUND,

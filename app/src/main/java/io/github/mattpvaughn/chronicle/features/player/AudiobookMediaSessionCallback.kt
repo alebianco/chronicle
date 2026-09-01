@@ -28,6 +28,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
+import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import kotlinx.coroutines.*
@@ -264,6 +265,39 @@ class AudiobookMediaSessionCallback
       playBook(bookId, extras ?: Bundle(), false)
     }
 
+    /**
+     * Writes the outgoing book's position before a *different* book replaces it.
+     *
+     * Every way to start a book — the details screen, the mini player, Android Auto, a media
+     * button, the debug `play_book` intent — arrives at [playBook], so this is the one place that
+     * sees both the outgoing and the incoming book. `AudiobookDetailsViewModel` used to attempt
+     * this alone, and its condition was inverted: it tested whether the playing track belonged to
+     * the book *being viewed*, which is true exactly when the user is **not** switching books. So
+     * it emitted a spurious STOPPED report for the current book and stayed silent for the case it
+     * existed to handle, leaving the outgoing position unsent (cu-91).
+     *
+     * [ProgressUpdater.updateProgressBlocking] rather than `updateProgress`: the latter launches
+     * into the service scope, and the state this reads is overwritten a few lines later. The
+     * blocking variant exists for exactly this shape of problem — see its KDoc on service teardown.
+     */
+    private suspend fun flushOutgoingBookProgress(incomingBookId: String) {
+      val outgoingTrack = currentlyPlaying.track.value
+      if (!shouldFlushOutgoingBook(outgoingTrack, incomingBookId)) {
+        return
+      }
+      Timber.i("Switching from book ${outgoingTrack.parentKey} to $incomingBookId; flushing position")
+      runCatching {
+        progressUpdater.updateProgressBlocking(
+          trackId = outgoingTrack.id,
+          playbackState = PLEX_STATE_STOPPED,
+          progress = currentPlayer.currentPosition,
+        )
+      }.onFailure {
+        // The new book must still start. A lost report is recoverable; a playback failure is not.
+        Timber.e(it, "Failed to flush progress for outgoing book ${outgoingTrack.parentKey}")
+      }
+    }
+
     private fun playBook(
       bookId: String,
       extras: Bundle,
@@ -295,6 +329,8 @@ class AudiobookMediaSessionCallback
         )
       }
       serviceScope.launch {
+        flushOutgoingBookProgress(bookId)
+
         val tracks =
           withContext(Dispatchers.IO) {
             trackRepository.getTracksForAudiobookAsync(bookId)
