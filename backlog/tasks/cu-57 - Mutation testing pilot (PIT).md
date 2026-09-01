@@ -1,7 +1,7 @@
 ---
 id: cu-57
 title: Mutation testing pilot (PIT) after cu-44
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-08-30'
 labels: [R1, agentic]
@@ -264,3 +264,31 @@ Apache-2.0 sample code over `PackageManager`/`XmlResourceParser`/`MediaMetadataC
 them would mostly re-test the framework. The populated branches of the mini-player's chapter readout
 need real media metadata; better done with cu-89.
 
+
+
+## Closing note (2026-09-02)
+
+Closed after re-running the tooling rather than trusting the recorded numbers — and it did not run.
+`./gradlew pitestDebug` failed with *"7 tests did not pass without mutation"*, because cu-100's
+`PackageValidatorTest` is Robolectric-based and had not been added to `excludedTestClasses`. That is
+precisely the failure the list's own comment predicts ("a new Robolectric test that forgets this
+list produces a confusing result rather than a silent lie"), and `./verify.sh` stayed green
+throughout — PIT is deliberately outside the gate, so nothing else would have caught it.
+
+Added the exclusion. Current run, with the allowlist as it now stands (larger than the pilot's):
+
+**426 mutations, 144 killed (34%), test strength 59%, 180 with no coverage.**
+
+Those are not comparable to the pilot's 217/94/60% — the target list grew as later tasks added
+covered classes, and the new entries include ones with real gaps. The *test strength* figure (59%
+vs 60%) is the comparable one, since it discounts uncovered code.
+
+### Verdict on the pilot's question
+
+It paid for itself once, decisively: `ProgressReporter` at 96% line coverage and 7% mutation score
+was a real defect the ratchet could never have seen, and fixing it is what cu-73 later confirmed on
+the device. The tooling is worth keeping.
+
+**Staying out of `verify.sh` and CI**, as the original scope boundary said. The 180 no-coverage
+mutations are a coverage problem, not a mutation-testing one — cu-33's carve is the thing that
+unblocks them. Revisit a score gate only once that lands, as a separate decision.

@@ -373,6 +373,9 @@ pitest {
       "io.github.mattpvaughn.chronicle.views.ColorContrastTest",
       "io.github.mattpvaughn.chronicle.data.sources.plex.ReauthenticationTest*",
       "io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsPlaybackTest",
+      // Added cu-100. Forgetting it did exactly what the note above predicts: PIT refused to
+      // start with "7 tests did not pass without mutation", while ./verify.sh stayed green.
+      "io.github.mattpvaughn.chronicle.util.PackageValidatorTest",
     ),
   )
 }
