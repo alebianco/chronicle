@@ -4,10 +4,15 @@ title: Websocket real-time sync + playing-elsewhere handoff
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R4, differentiator]
-dependencies: [cu-9, cu-14]
-priority: low
+labels:
+  - R4
+  - differentiator
 milestone: m-4
+dependencies:
+  - cu-9
+  - cu-14
+priority: low
+ordinal: 22000
 ---
 
 ## Description

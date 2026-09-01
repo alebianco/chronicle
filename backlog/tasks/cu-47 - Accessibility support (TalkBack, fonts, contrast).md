@@ -1,13 +1,16 @@
 ---
 id: cu-47
-title: Accessibility support (TalkBack, fonts, contrast)
+title: 'Accessibility support (TalkBack, fonts, contrast)'
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R2, accessibility]
+labels:
+  - R2
+  - accessibility
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 60000
 ---
 
 ## Description

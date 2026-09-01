@@ -4,10 +4,14 @@ title: Metadata enrichment + faceted search
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R4, differentiator]
-dependencies: [cu-15]
-priority: medium
+labels:
+  - R4
+  - differentiator
 milestone: m-4
+dependencies:
+  - cu-15
+priority: medium
+ordinal: 57000
 ---
 
 ## Description

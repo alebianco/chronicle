@@ -4,10 +4,14 @@ title: Listening stats and streaks
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R3, delight]
-dependencies: [cu-9]
-priority: medium
+labels:
+  - R3
+  - delight
 milestone: m-3
+dependencies:
+  - cu-9
+priority: medium
+ordinal: 50000
 ---
 
 ## Description

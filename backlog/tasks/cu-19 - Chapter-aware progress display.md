@@ -4,10 +4,14 @@ title: Chapter-aware progress display
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R2, comfort]
-dependencies: [cu-13]
-priority: medium
+labels:
+  - R2
+  - comfort
 milestone: m-2
+dependencies:
+  - cu-13
+priority: medium
+ordinal: 23000
 ---
 
 ## Description

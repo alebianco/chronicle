@@ -5,14 +5,15 @@ status: In Progress
 assignee:
   - claude
 created_date: ''
+updated_date: '2026-09-01 08:37'
 labels:
   - R2
   - comfort
   - bug
+milestone: m-2
 dependencies:
   - cu-73
 priority: medium
-milestone: m-2
 ordinal: 1000
 ---
 

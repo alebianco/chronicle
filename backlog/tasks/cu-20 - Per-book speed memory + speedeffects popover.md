@@ -4,10 +4,13 @@ title: Per-book speed memory + speed/effects popover
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R2, comfort]
+labels:
+  - R2
+  - comfort
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 43000
 ---
 
 ## Description

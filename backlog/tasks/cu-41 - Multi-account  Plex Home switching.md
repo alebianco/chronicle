@@ -4,10 +4,13 @@ title: Multi-account / Plex Home switching
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R4, backend]
+labels:
+  - R4
+  - backend
+milestone: m-4
 dependencies: []
 priority: low
-milestone: m-4
+ordinal: 42000
 ---
 
 ## Description

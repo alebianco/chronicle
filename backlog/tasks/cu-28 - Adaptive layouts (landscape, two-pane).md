@@ -1,13 +1,18 @@
 ---
 id: cu-28
-title: Adaptive layouts (landscape, two-pane)
+title: 'Adaptive layouts (landscape, two-pane)'
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R3, delight]
-dependencies: [cu-26, cu-27]
-priority: medium
+labels:
+  - R3
+  - delight
 milestone: m-3
+dependencies:
+  - cu-26
+  - cu-27
+priority: medium
+ordinal: 49000
 ---
 
 ## Description

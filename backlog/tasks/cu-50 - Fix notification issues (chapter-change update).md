@@ -4,10 +4,13 @@ title: Fix notification issues (chapter-change update)
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R2, playback]
+labels:
+  - R2
+  - playback
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 61000
 ---
 
 ## Description

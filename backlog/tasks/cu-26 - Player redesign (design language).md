@@ -4,10 +4,14 @@ title: Player redesign (design language)
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R3, delight]
-dependencies: [cu-19]
-priority: medium
+labels:
+  - R3
+  - delight
 milestone: m-3
+dependencies:
+  - cu-19
+priority: medium
+ordinal: 47000
 ---
 
 ## Description

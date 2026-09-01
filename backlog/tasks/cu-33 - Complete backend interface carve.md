@@ -4,10 +4,14 @@ title: Complete backend interface carve
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R4, architecture]
-dependencies: [cu-15]
-priority: medium
+labels:
+  - R4
+  - architecture
 milestone: m-4
+dependencies:
+  - cu-15
+priority: medium
+ordinal: 53000
 ---
 
 ## Description

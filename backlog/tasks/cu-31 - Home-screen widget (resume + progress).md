@@ -4,10 +4,13 @@ title: Home-screen widget (resume + progress)
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R3, delight]
+labels:
+  - R3
+  - delight
+milestone: m-3
 dependencies: []
 priority: low
-milestone: m-3
+ordinal: 52000
 ---
 
 ## Description

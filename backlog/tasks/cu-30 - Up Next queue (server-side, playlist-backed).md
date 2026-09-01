@@ -1,13 +1,16 @@
 ---
 id: cu-30
-title: Up Next queue (server-side, playlist-backed)
+title: 'Up Next queue (server-side, playlist-backed)'
 status: To Do
 assignee: []
 created_date: '2026-07-13'
-labels: [R3, delight]
+labels:
+  - R3
+  - delight
+milestone: m-3
 dependencies: []
 priority: medium
-milestone: m-3
+ordinal: 51000
 ---
 
 ## Description
