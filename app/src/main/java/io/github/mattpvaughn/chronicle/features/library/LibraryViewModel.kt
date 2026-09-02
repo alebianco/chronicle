@@ -76,6 +76,10 @@ class LibraryViewModel(
 
   val isRefreshing = librarySyncRepository.isRefreshing
 
+  /** A refresh failure, surfaced by the fragment. Raised off the main thread, so it is an
+   *  event carrying a string resource rather than a `Toast` (which would throw there). */
+  val syncError = librarySyncRepository.errorMessage
+
   private var _isSearchActive = MutableLiveData<Boolean>()
   val isSearchActive: LiveData<Boolean>
     get() = _isSearchActive
@@ -111,7 +115,11 @@ class LibraryViewModel(
 
   private var prevBooks = emptyList<Audiobook>()
 
-  private val allBooks = bookRepository.getAllBooks()
+  // Deduped at the source: this is the *whole library*, and Room re-emits it on every write to
+  // the Audiobook table — once a second during playback. Without this the sort and filter below
+  // ran per tick over every book, scaling with library size rather than with what changed
+  // (cu-110, and the mechanism behind cu-51).
+  private val allBooks = bookRepository.getAllBooks().distinctBy { it.booksKey() }
   val books =
     QuintLiveDataAsync(
       viewModelScope,
@@ -159,8 +167,15 @@ class LibraryViewModel(
             },
           )
 
-      // If nothing has changed, return prevBooks
-      if (prevBooks.map { it.id } == results.map { it.id }) {
+      // If nothing the UI draws has changed, return the previous list so the RecyclerView diff
+      // is skipped.
+      //
+      // Keyed on `booksKey()` — id, cached and progress — not on ids alone. Ids alone made this
+      // return the *stale* list for any change that kept the same books, so a book's progress bar
+      // in the library never moved: listen for an hour, come back, see the old value. The set of
+      // ids is unchanged in the overwhelmingly common case, which is exactly when progress *does*
+      // change (cu-110).
+      if (prevBooks.booksKey() == results.booksKey()) {
         return@QuintLiveDataAsync prevBooks
       }
 

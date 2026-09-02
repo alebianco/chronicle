@@ -353,7 +353,6 @@ class TrackRepository
     override suspend fun getBookIdForTrack(trackId: String): String {
       return withContext(dispatchers.io) {
         val track = trackDao.getTrackAsync(trackId)
-        Timber.i("Track is $track")
         val parentKey = track?.parentKey
         parentKey ?: NO_AUDIOBOOK_FOUND_ID
       }

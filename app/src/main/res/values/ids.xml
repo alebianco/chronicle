@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Marks which image source an ImageView was last bound to, so `bindImageRounded` can skip a
+      redundant Coil load. A view tag needs a stable, unique id; an XML-declared one avoids the
+      key collisions a hardcoded Int invites (cu-110).
+    -->
+    <item name="tag_bound_image_src" type="id" />
+
+    <!-- The aspect ratio a row's thumb container was last constrained to, so
+         `setSquareAspectRatio` can skip rebuilding the constraint graph on every rebind. -->
+    <item name="tag_thumb_aspect_ratio" type="id" />
+</resources>

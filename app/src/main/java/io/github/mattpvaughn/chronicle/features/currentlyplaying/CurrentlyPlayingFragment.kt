@@ -154,6 +154,21 @@ class CurrentlyPlayingFragment : Fragment() {
       if (viewModel.isSliding) {
         return
       }
+
+      // Nothing to refresh while the sheet is not on screen (DRAFT-117). All four observers fire
+      // on every 1 Hz progress tick whether or not the player is visible, and each write to
+      // `valueTo`/`value` invalidates the Slider — so a *collapsed* sheet was driving four full
+      // measure/layout passes a second over the whole activity. Measured: 89 observer firings and
+      // 33 refreshes in 18 s, against 1312 `View.measure` calls, at 87% janky frames.
+      //
+      // `isShown` rather than a visibility check: it accounts for every ancestor, so a collapsed
+      // bottom sheet, a backgrounded fragment and a hidden container all read false. The sheet
+      // re-reads current values from the ViewModel when it is expanded, so nothing is stale —
+      // this only skips work whose result cannot be seen.
+      if (!binding.chapterProgressSeekbar.isShown) {
+        return
+      }
+
       val chapterDuration = viewModel.chapterDuration.value ?: 0L
       val trackDuration = viewModel.currentTrack.value?.duration ?: 0L
       val max = (if (chapterDuration == 0L) trackDuration else chapterDuration).toFloat()
@@ -161,9 +176,18 @@ class CurrentlyPlayingFragment : Fragment() {
       val trackProgress = viewModel.trackProgressForSlider.value ?: 0L
       val current = if (chapterProgress == -1L) trackProgress else chapterProgress
 
-      binding.chapterProgressSeekbar.valueTo = if (max > 0f) max else 1f
-      binding.chapterProgressSeekbar.value =
-        current.toFloat().coerceIn(0f, binding.chapterProgressSeekbar.valueTo)
+      val newMax = if (max > 0f) max else 1f
+      val newValue = current.toFloat().coerceIn(0f, newMax)
+
+      // Only write when the value actually changed. Material's Slider invalidates on every
+      // assignment, even an identical one, and four observers assigning the same number per tick
+      // is four redundant invalidations.
+      if (binding.chapterProgressSeekbar.valueTo != newMax) {
+        binding.chapterProgressSeekbar.valueTo = newMax
+      }
+      if (binding.chapterProgressSeekbar.value != newValue) {
+        binding.chapterProgressSeekbar.value = newValue
+      }
     }
     viewModel.chapterDuration.observe(viewLifecycleOwner) { refreshSlider() }
     viewModel.currentTrack.observe(viewLifecycleOwner) { refreshSlider() }
