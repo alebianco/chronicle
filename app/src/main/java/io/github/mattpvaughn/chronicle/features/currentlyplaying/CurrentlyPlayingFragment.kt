@@ -25,7 +25,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentCurrentlyPlayingBindi
 import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter
 import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
-import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetWithMinHeight
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
@@ -287,7 +287,9 @@ class CurrentlyPlayingFragment : Fragment() {
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
 
-    binding.appBarLayout.applyTopSystemBarInset()
+    // The CollapsingToolbarLayout carries minHeight, so the inset has to grow that too or the
+    // bar collapses into the status-bar strip and the list shows through it (DRAFT-105).
+    binding.collapsingToolbar.applyTopSystemBarInsetWithMinHeight()
 
     return binding.root
   }

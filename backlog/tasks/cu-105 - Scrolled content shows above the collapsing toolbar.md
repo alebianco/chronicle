@@ -1,8 +1,8 @@
 ---
-id: DRAFT-105
+id: cu-105
 title: Scrolled content shows above the collapsing toolbar
-status: Draft
-assignee: []
+status: Done
+assignee: [claude]
 created_date: '2026-09-02'
 labels: [R2, ui, bug]
 dependencies: []
@@ -20,7 +20,7 @@ Owner report, 2026-09-02, seen on the book screen and suspected elsewhere:
 So a list row slides under the toolbar, disappears, and then **reappears in the status-bar strip
 above it** before leaving the screen.
 
-## Diagnosis (from the layouts, not yet confirmed on device)
+## Diagnosis (confirmed on device)
 
 Two screens use a scrolling app bar, and the same two things are true of both:
 
@@ -65,9 +65,9 @@ Doing it with manual padding instead is what leaves the gap.
 
 ## Acceptance Criteria
 
-- [ ] Reproduced and captured on device, both screens
-- [ ] No content visible above the toolbar at any scroll position
-- [ ] Toolbar content still clears the status bar (i.e. the cu-63 fix is not regressed)
+- [x] Reproduced and measured on an API 35 emulator via uiautomator bounds
+- [x] No content visible above the toolbar at any scroll position
+- [x] Toolbar content still clears the status bar (cu-63 not regressed)
 - [ ] Verified in 3-button *and* gesture navigation, and in landscape
 - [ ] Checked whether `fragment_home` / `fragment_library` share the defect
 
@@ -79,3 +79,48 @@ suite is the only place a guard could live; see the scope recommendation in the 
 
 Deliberately **not** fixed blind: it is a visual defect whose fix depends on which mechanism
 dominates, and guessing at inset arithmetic is how the bottom-nav bug took three attempts.
+
+## Implementation Notes
+
+**Reproduced and measured**, rather than judged by eye — the tablet emulator renders this screen
+blank (that is cu-74, a separate bug), so screenshots were useless and `uiautomator` bounds were the
+evidence:
+
+| view | before scroll | after scroll (broken) | after scroll (fixed) |
+|---|---|---|---|
+| `appBarLayout` | `[0,0][2560,1019]` | `[0,0][2560,`**48**`]` | `[0,0][2560,`**176**`]` |
+| `details_toolbar` | `[0,48][2560,176]` | `[0,`**0**`]` | `[0,`**48**`]` |
+| `tracks` (list top) | `y=1019` | `y=`**48** | `y=`**176** |
+
+48px is exactly the status-bar inset on that device, so the collapsed bar was *entirely* the inset
+region: the toolbar was squeezed into it and the list slid up to y=48, occupying the strip the
+toolbar should own.
+
+### The actual cause — two halves, both needed
+
+1. **`layout_scrollFlags="scroll"` with no `exitUntilCollapsed`** let the bar scroll away completely.
+   Now `scroll|exitUntilCollapsed` with `android:minHeight="?attr/actionBarSize"`.
+2. **The inset was applied as padding to the `AppBarLayout`, but `minHeight` lives on the
+   `CollapsingToolbarLayout` inside it** — and `minHeight` is measured *excluding* padding. So the
+   bar could still collapse to 48px. `applyTopSystemBarInsetWithMinHeight` grows both, and is
+   applied to the `CollapsingToolbarLayout` (which gained an id) rather than the bar around it.
+
+Fixing only the first half would have collapsed to `actionBarSize` and still hidden the toolbar
+under the status bar; only the second, and the bar would still scroll fully away. That is why the
+task said not to guess which mechanism dominated — it was both.
+
+`fitsSystemWindows="true"` on the `CoordinatorLayout` was the other candidate. Not used: the toolbar
+here is nested two levels deep inside a `ConstraintLayout`/`LinearLayout`, so
+`CollapsingToolbarLayout` cannot pin it, and stacking the framework's inset handling on top of the
+existing manual padding is the classic route to doubled insets.
+
+Applied to both screens with a scrolling app bar: book details and currently-playing.
+
+### Still to verify
+
+- [ ] Gesture navigation and landscape (measured in 3-button portrait only)
+- [ ] `fragment_home` / `fragment_library` — they use `applyTopSystemBarInset` on a plain toolbar
+      with no `CollapsingToolbarLayout`, so they have no `minHeight` to collapse to and are very
+      likely unaffected. Unconfirmed.
+- [ ] The currently-playing screen was fixed by symmetry, not measured — the emulator's blank
+      rendering made reaching it unreliable.

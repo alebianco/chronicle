@@ -30,7 +30,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionSt
 import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
-import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetWithMinHeight
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
@@ -267,7 +267,9 @@ class AudiobookDetailsFragment : Fragment() {
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
 
-    binding.appBarLayout.applyTopSystemBarInset()
+    // The CollapsingToolbarLayout carries minHeight, so the inset has to grow that too or the
+    // bar collapses into the status-bar strip and the list shows through it (DRAFT-105).
+    binding.collapsingToolbar.applyTopSystemBarInsetWithMinHeight()
 
     return binding.root
   }
