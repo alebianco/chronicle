@@ -1,9 +1,10 @@
 ---
 id: cu-109
 title: Downloads OOM in debug via the BODY logging interceptor
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-02'
+updated_date: '2026-09-02 10:45'
 labels:
   - R1
   - trust
@@ -74,14 +75,16 @@ first principle is that an agent must be able to close the loop, that is a real 
 
 ## Acceptance Criteria
 
-- [ ] A debug build downloads a 293 MB book to completion without an OOM, with bytes landing on disk
-- [ ] Downloads still go through OkHttp, keeping cu-10 re-auth and cu-11 tiering ([[cu-76]]'s gain
+- [x] A debug build downloads a 293 MB book to completion without an OOM, with bytes landing on disk
+- [x] Downloads still go through OkHttp, keeping cu-10 re-auth and cu-11 tiering ([[cu-76]]'s gain
       must not be reverted to fix this)
-- [ ] Request/response **headers** for downloads remain loggable in debug — the diagnostic value of
+- [x] Request/response **headers** for downloads remain loggable in debug — the diagnostic value of
       seeing a download's 206 and its `Content-Range` is the whole reason the interceptor is there
-- [ ] A test pins the property, so a future `Level.BODY` cannot silently reintroduce it. Asserting
+- [x] A test pins the property, so a future `Level.BODY` cannot silently reintroduce it. Asserting
       on the interceptor's configured level is enough; do not try to assert on memory
-- [ ] Memory watched across a large download and recorded in [[cu-73]], since that was #83's
+      — went further: the tests build the **real** client from the real module and inspect what it
+      actually carries, so they also catch a fix that drops the inherited interceptors
+- [x] Memory watched across a large download and recorded in [[cu-73]], since that was #83's
       original question
 
 ## Notes on likely shape
@@ -101,3 +104,107 @@ factory at :441), which is Media3's own HTTP stack and never touches the OkHttp 
 matches the observation: 4.5 minutes of continuous streaming of the same 293 MB file caused no
 memory growth, while merely *downloading* it died in 50 s. So the fix is confined to the download
 client.
+
+## Implementation Notes
+
+Fixed 2026-09-02, on the tablet that found it.
+
+### The change
+
+A third OkHttp client, `OKHTTP_CLIENT_DOWNLOADER`, **derived from the media client** with
+`newBuilder()` rather than built in parallel:
+
+```kotlin
+mediaClient.newBuilder()
+  .apply {
+    val survivors = interceptors().filterNot { it is HttpLoggingInterceptor }
+    interceptors().clear()
+    interceptors().addAll(survivors)
+    addInterceptor(HttpLoggingInterceptor().setLevel(downloadLogLevel()))
+  }
+  .build()
+```
+
+`newBuilder()` is the load-bearing choice. A second `OkHttpClient.Builder()` would have been a copy
+to keep in sync forever, and would silently drop `plexMediaInterceptor`, cu-10's
+`PlexTokenAuthenticator` and the cu-11 timeouts — which is exactly cu-76's gain. Deriving means
+downloads inherit everything by construction and only the logger is replaced.
+
+Filtering by **type** rather than removing a known instance, because the media client could grow a
+second logger later; `interceptors()` on the builder is a mutable view with no "replace", hence the
+clear-and-refill.
+
+`downloadLogLevel()` is capped at `HEADERS` in debug (`NONE` in release), not `NONE` throughout: a
+download's status line and `Content-Range` are how you tell a resume from a restart, which is a live
+[[cu-73]] item. Body logging stays on the **media** client, where bodies are small and where it is
+genuinely valuable — it is how cu-9's `time=0` and the `/:/scrobble` storm were both caught. Keeping
+both was the point; `Level.HEADERS` on the shared client would have been one line but would have
+cost those diagnostics.
+
+### Verification
+
+**Device, same 293 MB book that OOM'd:**
+
+| | before | after |
+|---|---|---|
+| bytes on disk | **0** | **293,768,919** (complete) |
+| peak PSS | 350 MB, then dead | **162 MB** |
+| outcome | `OutOfMemoryError` ~50 s in | `CachedFileManager: COMPLETED` |
+
+162 MB is *below* the 248 MB baseline before the download started, which is the signature of
+streaming rather than buffering. Zero `OutOfMemory` entries in the crash buffer.
+
+**Integrity checked, not assumed:** the downloaded file is byte-identical to the server's copy —
+`cmp` exit 0, both `md5 db0e9818e35331444f27679f45a8eb21`. (A first comparison appeared to mismatch;
+that was my own error, hashing on-device while the file was still being written. Worth noting because
+"same size, different hash" is alarming enough to act on, and the fix is to let the write settle.)
+
+**Then the items it unblocked**, both immediately: the book is marked `cached=true` /
+`isCached=true`, and with **aeroplane mode on** it plays from
+`file:///storage/.../151313.m4b` — scheme intact, confirming cu-83 — with `AudioFlinger` actively
+mixing and no `ExoPlaybackException`.
+
+### Tests
+
+`DownloadLogLevelTest`, 7 tests, Robolectric (the module needs an `Application`). Unlike
+`ConnectionTimeoutTest`, which can only pin constants and says so, these construct the real client
+and inspect it.
+
+**Sabotage-verified three ways**, each caught by a different subset:
+
+1. level back to `BODY` -> 3 fail, including `the download client never logs bodies`
+2. forget to strip the inherited logger -> 3 fail, including `the media client's body logger is not
+   carried over` (the actual real-world mechanism)
+3. `OkHttpClient.Builder()` instead of `newBuilder()` -> 2 fail: `every non-logging interceptor
+   survives` and `the authenticator and timeouts are inherited`
+
+Sabotage 3 matters most: it is the *tempting* fix, and it silently reverts cu-76.
+
+Coverage 28.39% -> 28.44%; 562 unit tests, 0 failures.
+
+### The `HEADERS` choice paid off within the hour
+
+Keeping the level at `HEADERS` rather than dropping to `NONE` was argued on diagnosability grounds
+before there was a concrete use for it. The very next [[cu-73]] item needed exactly that output: to
+tell a *resume* from a *restart* after killing the app mid-download, the evidence is
+
+```
+Range: bytes=966369280-
+Content-Range: bytes 966369280-1639241763/1639241764
+```
+
+which `NONE` would have hidden entirely. Recorded because it is a concrete argument against the
+one-line alternative, not just a preference.
+
+Also verified on a **1.64 GB** book, not only the 293 MB one: memory stayed flat at 141–144 MB
+across a climbing byte count and finished at 135 MB. Flat memory against rising bytes is the actual
+streaming proof; a completion check alone cannot distinguish streaming from a lucky buffer.
+
+**One measurement trap:** Fetch2 preallocates, so `stat` reports the file at full size within a
+second of starting. Progress lives in `_written_bytes` in `databases/LibGlobalFetchLib.db`.
+
+### Follow-up
+
+The **playback** path was checked and is not exposed: Media3 uses `DefaultHttpDataSource`, its own
+HTTP stack, never this client. Consistent with 4.5 min of clean streaming of the same file while a
+mere download died in 50 s.

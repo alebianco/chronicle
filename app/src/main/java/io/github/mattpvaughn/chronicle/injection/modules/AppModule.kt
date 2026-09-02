@@ -42,6 +42,14 @@ class AppModule(private val app: Application) {
     const val OKHTTP_CLIENT_MEDIA = "Media"
     const val OKHTTP_CLIENT_LOGIN = "Login"
 
+    /**
+     * Qualifier for the client Fetch2 downloads through; see [downloaderOkHttpClient].
+     *
+     * Deliberately *not* the media client, even though it is derived from it: a media body is a
+     * whole audiobook, and body-level logging buffers it in memory (cu-109).
+     */
+    const val OKHTTP_CLIENT_DOWNLOADER = "Downloader"
+
     /** Qualifier for the credentials preferences file; see [provideAuthPrefs]. */
     const val AUTH_PREFS = "AuthPrefs"
 
@@ -184,7 +192,7 @@ class AppModule(private val app: Application) {
   @Singleton
   fun fetchConfig(
     appContext: Context,
-    @Named(OKHTTP_CLIENT_MEDIA) okHttpClient: OkHttpClient,
+    @Named(OKHTTP_CLIENT_DOWNLOADER) okHttpClient: OkHttpClient,
   ): FetchConfiguration =
     FetchConfiguration.Builder(appContext)
       .setDownloadConcurrentLimit(3)
@@ -198,6 +206,10 @@ class AppModule(private val app: Application) {
       // interceptor's headers, cu-10's 401 re-auth and cu-11's connection tiering. This was
       // commented out with a "broken when I set up Fetch" TODO; the cause was simply that
       // the fetch2okhttp artifact was never declared, so OkHttpDownloader did not exist.
+      //
+      // Note this is the *downloader* client, not the media one: same interceptors and
+      // authenticator, but never body-level logging, which would buffer a whole audiobook in
+      // memory and OOM the process (cu-109).
       .setHttpDownloader(OkHttpDownloader(okHttpClient))
       .enableLogging(true)
       .build()
@@ -205,6 +217,24 @@ class AppModule(private val app: Application) {
   @Provides
   @Singleton
   fun fetch(fetchConfig: FetchConfiguration): Fetch = Fetch.Impl.getInstance(fetchConfig)
+
+  /**
+   * The logging level for **download** traffic.
+   *
+   * Capped at [HttpLoggingInterceptor.Level.HEADERS] even in debug: `BODY` would buffer a whole
+   * audiobook in memory (cu-109 / #83). Headers are the useful part for a download anyway — the
+   * `206`, the `Content-Range`, and whether a retry resumed or restarted.
+   *
+   * Named rather than inlined so [io.github.mattpvaughn.chronicle.injection.DownloadLogLevelTest]
+   * can pin it: a future edit raising this to `BODY` reintroduces an OOM that no unit test could
+   * otherwise catch.
+   */
+  fun downloadLogLevel(): HttpLoggingInterceptor.Level =
+    if (LOG_NETWORK_REQUESTS) {
+      HttpLoggingInterceptor.Level.HEADERS
+    } else {
+      HttpLoggingInterceptor.Level.NONE
+    }
 
   @Provides
   @Singleton
@@ -250,6 +280,46 @@ class AppModule(private val app: Application) {
             .firstOrNull { it.serverId == cached.serverId }
         },
       )
+      .build()
+
+  /**
+   * The client Fetch2 downloads through: the media client with body logging turned down.
+   *
+   * Downloads must keep everything the media client provides — [PlexConfig.plexMediaInterceptor]
+   * for the token and base URL, cu-10's [PlexTokenAuthenticator] for a rotated server token,
+   * and cu-11's chosen connection — which is why this is [OkHttpClient.newBuilder] off that
+   * client rather than a second builder. A parallel builder would be a copy to keep in sync, and
+   * the whole point of cu-76 was that downloads share playback's HTTP stack.
+   *
+   * The one thing it must **not** share is [HttpLoggingInterceptor.Level.BODY]. That level
+   * buffers an entire response body in memory in order to log it, and a download's body is the
+   * whole audiobook: a 293 MB m4b took the process from 248 MB to 350 MB PSS and then killed it
+   * with `OutOfMemoryError` on Fetch2's own thread, with zero bytes written to disk. That is
+   * issue #83, which cu-12 could not locate by reading app code or Fetch2 — the defect was in
+   * neither, but in the client Fetch2 was handed (cu-109).
+   *
+   * `HEADERS` rather than `NONE` on purpose: a download's status line and `Content-Range` are
+   * exactly what you need to tell a resume from a restart, and they cost nothing to log. Body
+   * logging stays on the media client, where it is genuinely useful and where bodies are small —
+   * it is how cu-9's `time=0` and the `/:/scrobble` storm were both caught.
+   */
+  @Provides
+  @Singleton
+  @Named(OKHTTP_CLIENT_DOWNLOADER)
+  fun downloaderOkHttpClient(
+    @Named(OKHTTP_CLIENT_MEDIA) mediaClient: OkHttpClient,
+  ): OkHttpClient =
+    mediaClient.newBuilder()
+      .apply {
+        // Drop every logging interceptor the media client carries, then re-add one capped at
+        // HEADERS. Filtering by type rather than by identity so an added second logger cannot
+        // slip through, and rebuilding the list because `interceptors()` on the builder is a
+        // mutable view — there is no "replace" on OkHttp's builder.
+        val survivors = interceptors().filterNot { it is HttpLoggingInterceptor }
+        interceptors().clear()
+        interceptors().addAll(survivors)
+        addInterceptor(HttpLoggingInterceptor().setLevel(downloadLogLevel()))
+      }
       .build()
 
   @Provides

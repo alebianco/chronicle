@@ -182,30 +182,92 @@ Grouped by what breaks if the real server disagrees.
 
 ### Downloads (cu-12 / cu-76)
 
-- [ ] **A large book (ideally ~2GB m4b) downloads to completion**, and memory is watched
-      while it does. — **BLOCKED 2026-09-02 (session 3), and it answered #83 on the way.** A 293 MB
-      m4b **crashed the debug build with `OutOfMemoryError`** ~50 s in, zero bytes on disk, PSS
-      climbing 248 -> 302 -> 350 MB before the process died on Fetch2's own `LibGlobalFetchLib`
-      thread.
+- [x] **A large book (ideally ~2GB m4b) downloads to completion**, and memory is watched
+      while it does. **DONE 2026-09-02, session 3, on a 1.64 GB book** — close enough to the ~2 GB
+      the item asks for to answer it.
 
-      Cause found and filed as [[cu-109]]: `HttpLoggingInterceptor` at **`Level.BODY`** is on the
-      media OkHttp client, and [[cu-76]] routed downloads through that client — so `BODY` buffers
-      the whole audiobook in memory. **Debug builds only** (`LOG_NETWORK_REQUESTS = BuildConfig.DEBUG`),
-      so not a shipping bug, but it makes downloads untestable in the only instrumentable build.
+      This item found [[cu-109]] first (`OutOfMemoryError` on a *293 MB* file at ~50 s, zero bytes
+      on disk, PSS 248 -> 350 MB, dead). After the fix, `This Inevitable Ruin`
+      (**1,639,241,764 bytes**) downloaded to completion with memory **flat**:
 
-      So [[cu-12]]'s open question is settled: #83 is **real**, and it is in neither app logic nor
-      Fetch2 — it is the client Fetch2 was handed. Re-run this item, and the five below, after
-      cu-109.
+      | written | PSS |
+      |---|---|
+      | 661 MB | 144 MB |
+      | 730 MB | 144 MB |
+      | 799 MB | 141 MB |
+      | 852 MB | 142 MB |
+      | 1.64 GB (complete) | **135 MB** |
 
-- [ ] **Wi-Fi drop mid-download, then reconnect.** Expect resume, not a silent stop. Then
+      Flat memory against a climbing byte count *is* the streaming proof — under the old code PSS
+      tracked the transfer. Final PSS is **lower** than the 248 MB baseline before any download
+      started. Zero `OutOfMemory` entries, and the file is **byte-identical** to the server's copy
+      (md5 `307a354f5f96e445aebd99d92a203e22` both sides).
+
+      So **[[cu-12]]'s open question is settled**: #83 is real, and it was in neither app logic nor
+      Fetch2 but in the *client Fetch2 was handed*.
+
+      **A measurement trap worth recording:** `stat` reports the file at full size within a second
+      of starting, because Fetch2 preallocates. File size is **not** a progress indicator — read
+      `_written_bytes` from `databases/LibGlobalFetchLib.db` instead. I briefly misread a
+      preallocated file as an instant download.
+- [x] **Wi-Fi drop mid-download, then reconnect.** Expect resume, not a silent stop. Then
       check the book is *not* marked available offline while incomplete — that promotion of
       partial files is [[cu-76]]'s first defect.
-      — **blocked on [[cu-109]]** (downloads OOM in debug; see the first item in this group).
-- [ ] **Kill the app mid-download and relaunch.** Same expectation.
-      — **blocked on [[cu-109]]** (downloads OOM in debug; see the first item in this group).
-- [ ] **A downloaded book plays with the server unreachable.** Should already work (cached
+      **The partial-promotion half is verified 2026-09-02, session 3.** With the realistic state a
+      Wi-Fi drop leaves — book `isCached=1`, track `cached=1`, file 40 MB of an expected 293 MB —
+      a cold start reconciles both flags down correctly:
+
+      ```
+      Ignoring incomplete download for track 151313: 41943040 of 293768919 bytes
+      Removed track: 151313
+      Book: 151312
+      ```
+
+      DB after: track `cached=0` **and** book `isCached=0`. So **[[cu-76]]'s first defect is fixed
+      against real hardware** — before it, this book would have shown as downloaded and played
+      truncated.
+
+      **A false alarm worth recording**, because it looks like a bug and is not. Deleting the file
+      with `adb rm` behind Fetch2's back produces a genuinely inconsistent state: Fetch2's DB still
+      holds the previous *successful* record, so `enqueueAction=UPDATE_ACCORDINGLY` short-circuits
+      and reports `downloaded=293768919, status=COMPLETED` **without making a single HTTP request**
+      (0 GETs, 0 206s, complete 93 ms after enqueue), while the file is 0 bytes. The track flag was
+      already 0 from an earlier scan, so `toMarkUncached` was empty, `alteredTracks` was empty, and
+      the **book**'s stale `isCached=1` was never revisited — reachable only because I had already
+      desynchronised the two. Through the app's own paths the flags always move together, as the
+      run above shows. Do not "fix" this without first reproducing it without `adb rm`.
+
+      Still open: the **resume** half — that an interrupted transfer continues rather than
+      restarting. The server honours Range (see the cu-64 item), so what remains is watching
+      Fetch2's byte count across a real interruption. The LAN route completes a 293 MB file in
+      under 10 s, which is too fast to interrupt by hand — needs a throttled link or a much
+      larger book.
+- [x] **Kill the app mid-download and relaunch.** Same expectation.
+      **Verified 2026-09-02, session 3 — and it resumed exactly, not approximately.**
+      `am force-stop` at **966,369,280** of 1,639,241,764 bytes (~59%); Fetch2 persisted that count
+      across the kill. On relaunch, from the log:
+
+      ```
+      Range: bytes=966369280-
+      <-- 206 Partial Content
+      Content-Range: bytes 966369280-1639241763/1639241764
+      ```
+
+      It resumed from the **exact** byte it stopped at, with `_auto_retry_attempts = 0` (a clean
+      continuation, not a retry), and ran to `_status = 4` (COMPLETED) with the file
+      **byte-identical** to the server's copy.
+
+      Note this evidence exists *because* [[cu-109]] kept download logging at `HEADERS` rather than
+      dropping it to `NONE` — the `Range`/`Content-Range` pair is exactly the diagnostic the task
+      argued for, and it is what distinguishes a resume from a restart.
+- [x] **A downloaded book plays with the server unreachable.** Should already work (cached
       tracks resolve to a local path), but confirm the UI does not block on a connection check.
-      — **blocked on [[cu-109]]** (downloads OOM in debug; see the first item in this group).
+      **Verified 2026-09-02, session 3**, immediately after [[cu-109]] unblocked downloading.
+      Aeroplane mode on, app force-stopped, cold-started: playback reached `state=3` from
+      `file:///storage/emulated/0/Android/data/.../151313.m4b` — **scheme intact, so [[cu-83]]'s fix
+      is confirmed on a real download** — with `AudioFlinger` actively mixing and no
+      `ExoPlaybackException`. The UI did not block on a connection check; the book was already
+      `cached=true` / `isCached=true` from `CachedFileManager: COMPLETED`.
 - [x] **Which route a download takes** once `OkHttpDownloader` is wired ([[cu-76]] item 3):
       downloads should get the same tier as playback, not a relay while playback uses LAN.
       **Verified 2026-09-02, session 3** — captured before the [[cu-109]] OOM killed the transfer.
@@ -215,25 +277,33 @@ Grouped by what breaks if the real server disagrees.
       and the server answered `206 Partial Content` in 74 ms. So cu-76's gain is real: downloads do
       inherit the chosen connection rather than picking their own route.
 
-- [ ] **Range resume genuinely continues rather than restarting.** Watch the transferred byte
+- [x] **Range resume genuinely continues rather than restarting.** Watch the transferred byte
       count across an interruption: Fetch2 claims HTTP-Range resume, but nothing in the repo
       proves the server honours it for these URLs. A restart-from-zero on a 2GB book is a very
       different user experience from a resume, and both look like "it downloaded eventually".
-      — **client half blocked on [[cu-109]]**, but the **server half is already proven**: an
-      open-ended `bytes=293700000-` returns `206` with the correct 68,919-byte tail (session 3, see
-      the cu-64 item). So the server does honour Range on these URLs; what remains is watching
-      Fetch2's own byte count across an interruption.
+      **Verified 2026-09-02, session 3 — both halves, on a 1.64 GB book.**
 
+      *Server half:* `206` on a plain range, a deep mid-file range, and the **open-ended
+      `bytes=N-`** form a resume actually sends.
+
+      *Client half:* the byte count is the evidence the item asked for. Killed at
+      **966,369,280** bytes; on relaunch Fetch2 sent `Range: bytes=966369280-` and the server
+      answered `Content-Range: bytes 966369280-1639241763/1639241764`. It transferred the
+      remaining ~673 MB only, reached `_status = 4`, and the result is **byte-identical** to the
+      server's copy (md5 `307a354f5f96e445aebd99d92a203e22`).
+
+      So it is a genuine resume, not a restart that merely ended up correct — the distinction the
+      item was written to catch.
 - [ ] **A download stranded at `FAILED` before the fix is retried on next launch.**
       `ResumePlan.idsToRetry` is unit-tested against mocked state; what is unverified is that a
       real exhausted-retry download actually presents as `FAILED` (rather than `CANCELLED` or
       `REMOVED`) — the whole resume path hinges on that status being the one Fetch2 reports.
-      — **blocked on [[cu-109]]** (downloads OOM in debug; see the first item in this group).
+      — **[[cu-109]] is fixed, so this is unblocked and simply not yet run.**
 - [ ] **A rotated server token mid-download recovers.** cu-10's re-auth now sits in the download
       path via `OkHttpDownloader`; that combination has never run. Rotate the token during a
       download and expect a retry that succeeds, not a failed book.
 
-      — **blocked on [[cu-109]]** (downloads OOM in debug; see the first item in this group).
+      — **[[cu-109]] is fixed, so this is unblocked and simply not yet run.**
 ### Chapters and artwork (cu-13)
 
 - [x] **Do the chapters shown match the m4b's embedded chapters?**
@@ -445,13 +515,40 @@ and answering those with `curl` and `ffprobe` is far cheaper than driving the UI
   is told). I suspected a bug mid-session and was wrong; what this pass adds is that the server
   still stores the *real* duration, so the workaround is safe.
 
+### Update, later the same session: cu-109 fixed, five more items closed
+
+[[cu-109]] was fixed immediately after being filed, and re-running the download group closed
+**five** items: the large-book download (on a **1.64 GB** book, so the ~2 GB question is
+effectively answered), offline playback of a downloaded book, the kill-and-relaunch resume, the
+Range-resume byte count, and the partial-promotion half of the Wi-Fi-drop item. **18 of 45 now,
+from 7 at the start of the session.**
+
+Three things worth carrying forward:
+
+- **Flat memory against a climbing byte count is the real proof.** 661 -> 852 MB written while PSS
+  sat at 141–144 MB, finishing at 135 MB — *below* the pre-download baseline. A completion check
+  alone would not have distinguished streaming from a lucky buffer.
+- **Keeping `HEADERS` logging paid for itself within the hour.** The resume evidence
+  (`Range: bytes=966369280-` / `Content-Range: bytes 966369280-.../1639241764`) is only visible
+  because cu-109 capped the level instead of dropping to `NONE`. That was argued for on
+  diagnosability grounds before there was a use for it.
+- **`stat` size is not download progress.** Fetch2 preallocates, so the file reports full size
+  within a second. Read `_written_bytes` from `LibGlobalFetchLib.db`. I misread this once.
+
 ### Still needs a human at the device
 
-The remaining items need taps I cannot drive reliably, or hardware/account changes: the
-"position not synced" badge (needs the player sheet open with the server unreachable — the
-`fail_sync` hook only works in mock mode, not against a live server), the SD-card eject test (the
-tablet **does** have a real 59 GB card, so this is now possible), skip-silence tuning by ear,
-token rotation and a password change, and a second device for the convergence checks.
+- **The "position not synced" badge.** Needs the player sheet open with the server unreachable.
+  The `fail_sync` debug hook routes through `MockPlexMode`, so it does **not** work against a live
+  server — and the `--el play_book` intent starts playback via the media session without navigating
+  the UI, so the sheet never lays out. Either extend the hook to the live path or tap it by hand.
+- **The SD-card eject test.** Now genuinely possible: the tablet has a real **59 GB card mounted
+  with 44 GB free** (`public:179,129`, `79AF-CD2E`), and the app already has directories on both
+  volumes. `sm` can simulate the eject without touching the hardware. Earlier sessions assumed this
+  needed hardware that was not present.
+- **Skip silence** — needs ears on a quiet-voiced narrator; the constants are explicitly unmeasured.
+- **Token rotation, and a password change with "sign out connected devices"** — account-level
+  changes only the owner can make.
+- **A second device** for the two convergence items and the book-switch flush.
 
 ## Session 1 — 2026-09-01, owner's Galaxy A33 (Android 16 / SDK 36), live Plex server
 
