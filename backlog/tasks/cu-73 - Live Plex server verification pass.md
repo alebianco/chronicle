@@ -186,6 +186,30 @@ Grouped by what breaks if the real server disagrees.
       are a community convention, not a guarantee. Confirm a real library populates them
       as expected — several R2/R3 features depend on it.
 
+### Performance (cu-110)
+
+The mechanism is fixed and unit-proven; these are the *numbers*, which need a device. Reproduce
+with the player sheet open over Home and a 100+ chapter book playing — the state that measured 88%
+janky frames and a 4950 ms 90th-percentile frame.
+
+- [ ] **Back and the nav bar respond reliably** in that state. This is the symptom the owner
+      originally reported ("the back button and the nav button sometimes don't work when the
+      playback screen is open"), and it is the one that actually matters.
+- [ ] **Janky frames well under 88%**, from `dumpsys gfxinfo`, with the figure recorded here.
+      Record the allocation rate and GC frequency too, so the before/after is comparable —
+      the baseline was a GC every ~4 s freeing ~165,000 objects.
+- [x] **`uiautomator dump` succeeds** while the player is open.
+      **Verified 2026-09-02** on a Phh-Treble GSI (API 32) — succeeded on every attempt, including
+      after a BACK press. Already ticked in [[cu-110]]; this copy was stale. It currently fails with
+      `ERROR: could not get idle state`, which is the same saturation seen from outside; a pass
+      also unblocks automated UI checks for the rest of this task.
+- [ ] **The library's progress bars actually move.** A latent bug fixed alongside cu-110: the
+      id-only short-circuit in `LibraryViewModel` returned a stale list, so a book's bar never
+      updated. Listen for a few minutes, return to Library, confirm the bar advanced.
+- [ ] **A large library still feels right.** The `MediaItemTrack` index (v5→v6) is the first index
+      in the schema; confirm the migration runs cleanly on the real database and that library load
+      and playback start are no worse. Relevant to [[cu-51]].
+
 ### Playback
 
 - [~] **cu-64 — seek over a real range request.** — **server side proven, ExoPlayer side still
@@ -489,6 +513,24 @@ Grouped by what breaks if the real server disagrees.
 
 - [ ] **Chapter highlight tracks playback** across a track boundary, and jumping to a chapter
       in a later file seeks to the right place.
+
+### Multi-track books (cu-115)
+
+The unit half is covered by the `MultiTrackBook` fixture; these need a real multi-track book, which
+the mock fixture pack does not have. They also close cu-93's and cu-96's remaining criteria.
+
+- [ ] **Chapter title tracks playback across a track boundary.** Play a multi-track book into its
+      second file and confirm the mini player and the full player both name the right chapter —
+      this was blank on any track but the first before cu-115.
+- [ ] **The chapter slider seeks where it points.** Drag it mid-chapter on a multi-track book. It
+      used to send a book-absolute offset to a track-relative API, so the thumb jumped to the end
+      of the current track.
+- [ ] **Chapter elapsed time is not negative or nonsense** on a later track.
+- [ ] **Previous-chapter honours the threshold** on a later track: just after a chapter start it
+      goes to the previous chapter, well into one it restarts the current chapter.
+- [ ] **Book position survives a full sync** on a multi-track book. `getTrackStartTime` summed an
+      unordered list, so the whole-library re-derive could report the position a whole track ahead
+      of where it was; confirm the position is unchanged after a refresh.
 
 ### Sync drift (cu-14)
 
@@ -969,3 +1011,84 @@ Session 1 concluded "on a device, instrument first". This session's finding came
 from reading `ConnectionChooser` (which is correct) but from reading **one log line that disagreed
 with the model** — two connections classified into one tier when the server's own JSON said
 otherwise. The fixture, the parse and the chooser were each individually right.
+
+### Fourth sweep (2026-09-02): tooling repaired, and the real blocker named
+
+A fresh audit of the 27 remaining items, on an attached **Phh-Treble vanilla GSI, Android 12 /
+API 32, 1200x1920** (`sw800dp xlrg`, i.e. tablet-class). No Plex account, no SIM, no second device.
+
+**Two script defects fixed — `capture-screens.sh` could not have worked on any device.**
+
+1. Its shebang was corrupted to `#!/usr/b#!/usr/bin/env bash`. It parses as a comment, so
+   `bash capture-screens.sh` worked and `./capture-screens.sh` failed with a bad interpreter —
+   which is why it went unnoticed.
+2. `PKG=io.github.mattpvaughn.chronicle`, the **release** id, while mock mode only exists in the
+   debug variant (`...chronicle.debug`). `am start` therefore targeted a package that is not
+   installed. Worse, the run's own foreground assertion still passed, because
+   `grep -q "$PKG"` matches `...chronicle.debug` as a *substring* of the release name. It now
+   derives the debug package (overridable via `CHRONICLE_PKG`) and the foreground check is
+   word-boundary anchored.
+3. Tab taps were hardcoded for "a 2560x1600 tablet". On this 1200x1920 device the settings tap
+   landed off-screen, and the run reported `captured settings` having re-captured the library. The
+   script's duplicate check caught it after the fact. **Now resolved from the live view hierarchy**
+   via a new `tap_id` helper — which is only possible because [[cu-110]] fixed
+   `uiautomator dump`.
+
+Verified end to end: four **distinct** screens captured (home / book-details / library / settings),
+no duplicates, settings visibly the settings screen with its tab highlighted. This is the first run
+of this script that has actually navigated on this hardware.
+
+**The real blocker for every player-open item is the fixture audio, not the hooks.** Sessions 1-3
+diagnosed these as debug-hook gaps and fixed the hooks; `show_player` and `play_book` both work.
+But the generated tone is **~5 seconds**, so playback reaches `state=3` and ends within about a
+second — `dumpsys gfxinfo` accumulates only 14-16 frames, which is statistically meaningless, and
+the sheet collapses before it can be measured. This is the *inverse* of the bias recorded in the
+second sweep: an item written as needing a device actually needs a **fixture**.
+
+The single highest-leverage fixture change on the list is therefore: **regenerate the tone at ~10
+minutes and add a genuine multi-track mock book with chapters crossing track boundaries.** It is
+generated, so there is no licence question, and `PlexFixtureContractTest` / `AudioFixtureTest`
+already catch a duration/offset mismatch (they did once, per cu-64). That one change unblocks the
+cu-110 jank measurement, the back/nav check, and the device halves of the multi-track items.
+
+**Corrections to earlier framing**, both verified:
+
+- The fixture is **not** chapter-less: `track-with-chapters.json` carries 3 chapters on track 2001,
+  and `MockPlexServer.fixtureFor` serves it for any `/library/metadata` path. The gap is a
+  multi-**track** book whose chapters *cross* boundaries — the unit fixture
+  (`testing/MultiTrackBook`) has that shape, the mock pack does not.
+- The cu-64 ExoPlayer-client range check needs **no proxy and no `EventLogger`**:
+  `MockPlexServer.kt:50` already logs `range=${request.headers["Range"]}` on every request. Play,
+  seek, grep for `range=bytes=`.
+- The v5->v6 index item is **already better covered than a device check would be**:
+  `RoomSchemaTest` opens a genuinely migrated file, asserts the index exists in `sqlite_master`,
+  and asserts `EXPLAIN QUERY PLAN` reports `USING INDEX` with no `TEMP B-TREE`.
+- Items "local progress is not clobbered by a stale server value" and "a deliberate seek backwards
+  survives a sync" are effectively **already done** by `TrackProgressConflictTest` — the second
+  matches a test name verbatim.
+
+**The second unit-test tier nobody noticed.** cu-115 landed `MultiTrackBook` plus 24 cases, but
+they pin the **helpers**; the *ViewModel consumers* are still untested. Specifically
+`CurrentlyPlayingViewModel.chapterProgress`/`chapterProgressForSlider` have **no test at any track
+count**, and their `coerceAtLeast(0L)` masks a frame regression as a stuck `0:00` rather than a
+negative — invisible to both a test and a human watching the screen. The two hand-inlined seek
+conversions (`:753`, `:1000`) and both `skipToPrevious` copies (`PlayerExt.kt:82`,
+`CurrentlyPlayingViewModel.kt:592`) are also uncovered. That is real work available *before* any
+device or fixture change.
+
+**`FakePlexServer` cannot simulate token rotation**, which blocks two cu-10 items from being unit
+tests: `stub()` is a prefix->single-response map, so a second stub *replaces* the first rather than
+queueing. `ReauthWiringTest:81` has a comment claiming "401 once, then accept whatever comes next"
+that the harness cannot honour — it passes only because it asserts on refresh *count*, never on a
+200, and nothing inspects the retry's `X-Plex-Token`. A response queue (~30 lines) fixes both.
+
+**The irreducible minimum is five areas**, unchanged in size but not in membership:
+
+- **Skip silence** — real ears on real narration; a sine tone has no speech pauses.
+- **Wi-Fi -> cellular** — no SIM in this GSI.
+- **Two-device convergence** (x2) — a second physical device, or server-side state the fixture does
+  not model.
+- **Account-level changes** — token rotation and a password change with "sign out connected
+  devices" are the owner's alone.
+- **Android Auto card ownership** — needs a head unit or DHU, *and* the flag change matters only on
+  API 27, which this API 32 device cannot test regardless.

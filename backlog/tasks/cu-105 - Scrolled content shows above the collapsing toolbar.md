@@ -69,7 +69,13 @@ Doing it with manual padding instead is what leaves the gap.
 - [x] No content visible above the toolbar at any scroll position
 - [x] Toolbar content still clears the status bar (cu-63 not regressed)
 - [ ] Verified in 3-button *and* gesture navigation, and in landscape
-- [ ] Checked whether `fragment_home` / `fragment_library` share the defect
+- [x] Checked whether `fragment_home` / `fragment_library` share the defect — **they cannot.**
+      Verified by inspection 2026-09-02: `layout_scrollFlags` appears in exactly **two** layouts in
+      the project, `fragment_audiobook_details.xml` and `fragment_currently_playing.xml`, and
+      `CollapsingToolbarLayout` in the same two. `fragment_home`, `fragment_library`,
+      `fragment_collections` and `fragment_collection_details` each have an `AppBarLayout` with
+      **no scroll flags and no collapsing toolbar**, so nothing scrolls up past the status bar and
+      the mechanism has nothing to act on. No device check needed for this item.
 
 ## Notes
 
