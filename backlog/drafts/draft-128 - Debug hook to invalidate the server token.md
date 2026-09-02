@@ -35,8 +35,23 @@ Three attempts, each defeated by correct behaviour:
    not validate tokens and returns `200`. plex.tv stayed reachable on other IPs and the token was
    repaired anyway.
 
-Rotating the token for real means re-claiming the server, which the household account cannot do
-(`server_owned=false`, a shared user). So the live path is unreachable without app support.
+**A real rotation was then performed and it still did not produce a 401** — which is the strongest
+argument for this hook.
+
+The owner owns ANTARES, so the library was unshared from the app's (managed) user and reshared,
+minting a fresh server token. Measured: the old token kept returning `200` for 110 requests while
+the app ran, and on the next cold start `setupNetwork`'s `/api/v2/resources` refresh adopted the
+new token (`Server refresh applied (fetched = true)`) **before any authenticated request**. Zero
+401s at any point.
+
+So the proactive path always wins in practice, for two compounding reasons: Plex does not
+immediately reject a superseded token, and the app re-fetches on every launch. That is *good*
+behaviour — but it means **`PlexTokenAuthenticator`'s live 401 path cannot be reached by any
+server-side action**, only by making the app hold a token the server rejects.
+
+(An earlier note here said a rotation needs re-claiming the server and that the account could not
+do it. Both were wrong: `server_owned=false` describes the signed-in managed user, not who
+administers the hardware, and unshare/reshare rotates the token without a re-claim.)
 
 ### What is already covered, so the hook is not covering nothing
 

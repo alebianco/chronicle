@@ -303,8 +303,45 @@ janky frames and a 4950 ms 90th-percentile frame.
       26:11, position 06:40, chapter list matching the real file exactly.
 ### Authentication
 
-- [~] **cu-10 — a rotated server token recovers silently.** — **Attempted 2026-09-03, session 4.
-      Could not be induced from outside the app; needs a debug hook ([[DRAFT-128]]).**
+- [x] **cu-10 — a rotated server token recovers silently.** — **Verified 2026-09-03, session 4,
+      by a real server-side rotation. It recovers *proactively*, so the 401 path never runs —
+      which is a better outcome than the item assumed.**
+
+      The owner owns ANTARES (the Plex admin is a different account, and the app signs in as a
+      **managed user** — `server_owned=false` reflects the signed-in account, not the hardware).
+      Rotation was induced the least-disruptive way: **unshare the Audiobooks library from that
+      user on the server, then reshare it**, which mints a fresh server access token without
+      re-claiming the server or disturbing other clients.
+
+      Measured, token values masked:
+
+      | step | result |
+      |---|---|
+      | before | `FxCCQs…_6S` |
+      | after reshare, app still running (stale token in memory) | **110 requests, all `200`** — Plex kept honouring the old token |
+      | after a cold start | token became **`gtvBeo…wsv`**, `Server refresh applied (fetched = true)` |
+      | after rotation | **110 requests `200`** on the new token, 196 books intact |
+      | **401s at any point** | **zero** |
+
+      **The important correction to the item's premise.** It assumed a rotation is discovered
+      *reactively* — "the 401 should be invisible: refreshed and retried". In practice
+      `ChronicleApplication.setupNetwork` re-fetches `/api/v2/resources` on every launch and
+      adopts the new token **before any authenticated request is made**, so no 401 ever occurs.
+      The recovery is real and completely invisible, just via the proactive path rather than the
+      authenticator. That is exactly what the cu-10 comment on `mergeServerRefresh` was for
+      ("dropping it meant a rotated server token was re-fetched and discarded on every launch").
+
+      Also learned: **Plex does not immediately reject the superseded token.** The old one kept
+      returning `200` for 110 requests after the reshare, so a running app notices nothing until
+      it restarts. That is why the earlier tampering attempts (below) could never produce a 401.
+
+      **So the authenticator's live 401 path remains unexercised end-to-end** — it is covered by
+      12 unit tests plus `ReauthWiringTest`, but no live rotation reaches it, because the startup
+      refresh always wins. [[DRAFT-128]]'s debug hook is still the way to exercise it, and is the
+      only route to the mid-download variant.
+
+      *Earlier in the session, before the owner clarified they control the server:* three
+      tampering routes were tried and all failed, each defeated by correct behaviour —
 
       Three routes tried, each defeated by something working correctly:
 
@@ -321,9 +358,14 @@ janky frames and a 4950 ms 90th-percentile frame.
          addresses and the token was repaired regardless.
 
       So the negative result is itself informative: **a stale server token is not reachable by
-      tampering, because the startup refresh repairs it first.** Truly rotating it requires
-      re-claiming the server — impossible here, the account is a *shared* user
-      (`server_owned=false`).
+      tampering, because the startup refresh repairs it first.**
+
+      ~~Truly rotating it requires re-claiming the server — impossible here, the account is a
+      *shared* user (`server_owned=false`).~~ **Wrong on both counts, corrected above.** The owner
+      owns the server; `server_owned=false` describes the *signed-in account* (a managed user),
+      not who administers the hardware — and the field is stored but never used to gate anything
+      in the app. And a rotation does not need a re-claim: unshare/reshare of the library mints a
+      new token for that user alone.
 
       The `PlexTokenAuthenticator` decision logic is unit-covered and its wiring is covered by
       `ReauthWiringTest` (7 tests, real OkHttp against a real 401). What remains unproven is only
