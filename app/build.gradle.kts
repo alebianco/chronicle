@@ -378,6 +378,8 @@ pitest {
       // Added cu-100. Forgetting it did exactly what the note above predicts: PIT refused to
       // start with "7 tests did not pass without mutation", while ./verify.sh stayed green.
       "io.github.mattpvaughn.chronicle.util.PackageValidatorTest",
+      // Robolectric because MediaControllerCompat.Callback's constructor needs Binder (DRAFT-72).
+      "io.github.mattpvaughn.chronicle.features.player.NotificationStateMachineTest",
     ),
   )
 }

@@ -14,6 +14,7 @@ import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.OnChapterChangeListener
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import timber.log.Timber
 import javax.inject.Inject
@@ -34,6 +35,7 @@ class OnMediaChangedCallback
     private val currentlyPlaying: CurrentlyPlaying,
     private val trackRepo: ITrackRepository,
     private val bookRepo: IBookRepository,
+    private val dispatchers: DispatcherProvider,
   ) : MediaControllerCompat.Callback(), OnChapterChangeListener {
     init {
       currentlyPlaying.setOnChapterChangeListener(this)
@@ -45,7 +47,7 @@ class OnMediaChangedCallback
       Timber.i("METADATA CHANGE")
       mediaController.playbackState?.let { state ->
         serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
-          withContext(Dispatchers.IO) {
+          withContext(dispatchers.io) {
             val trackId = metadata?.id ?: TRACK_NOT_FOUND
             if (trackId == TRACK_NOT_FOUND) {
               return@withContext
