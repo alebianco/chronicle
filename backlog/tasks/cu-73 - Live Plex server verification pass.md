@@ -59,7 +59,11 @@ Grouped by what breaks if the real server disagrees.
 
 ### Connection tiering (cu-11)
 
-- [x] **A LAN-only server connects, and over LAN.** — **FAILED 2026-09-02, filed as [[cu-107]].**
+- [ ] **A LAN-only server connects, and over LAN.** — **FAILED 2026-09-02, filed as [[cu-107]];
+      cu-107 is now fixed and the LAN tier is back (`Trying 1 LAN connection(s)` confirmed on
+      device), but the item stays open**: this network's resolver does not answer for
+      `192-168-1-54.<hash>.plex.direct`, so the LAN *probe* still cannot succeed here and "connects
+      over LAN" remains unproven. Needs a network whose resolver returns private answers.
       The log showed `Trying 2 DIRECT connection(s)` and `Chose DIRECT connection: <WAN address>`
       on a server whose `/resources` reports `local: true` for its LAN address. Cause: connections
       are persisted to `SharedPreferences` as bare URI strings and rebuilt with `Connection(uri)`,
@@ -336,6 +340,13 @@ addressing). It does mean **the LAN tier could not be exercised end-to-end here*
 why no LAN tier was offered, but even with cu-107 fixed this network would still fail the LAN probe
 and fall back to WAN. Re-checking the LAN half of cu-11 needs a network whose resolver returns
 private answers for `plex.direct`.
+
+**Fixed the same day ([[cu-107]] is Done).** The LAN tier is back and observable on device —
+`Trying 1 LAN connection(s)` and `Trying 1 DIRECT connection(s)`, matching the server's two
+connections. Fixing it also surfaced a second defect in `mergeServerRefresh`, which deduped
+connections by whole-object equality and so kept a flagless cached copy alongside its freshly
+flagged twin, putting one address in two tiers. The checklist item above stays **open** even so:
+the LAN *probe* cannot succeed on this network's DNS, so "connects over LAN" is still unproven.
 
 ### A second bug, found by testing cu-77 on the same device
 

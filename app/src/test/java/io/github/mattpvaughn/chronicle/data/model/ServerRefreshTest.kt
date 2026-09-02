@@ -86,6 +86,34 @@ class ServerRefreshTest {
     )
   }
 
+  @Test
+  fun `the same address cached with different flags is not duplicated`() {
+    // The case that appears right after the cu-107 migration: the cached copy carries no
+    // flags, because the pre-cu-107 keys stored bare URIs, while the refresh reports the
+    // real ones. Whole-object equality kept both, which put one address in two tiers and
+    // made `ConnectionChooser` probe it twice per selection round.
+    val flagless = Connection(LOCAL.uri)
+    val cachedFlagless = cached.copy(connections = listOf(flagless))
+    val fetched = cached.copy(connections = listOf(LOCAL))
+
+    assertEquals(
+      "one address must appear once, with the freshly reported flags",
+      listOf(LOCAL),
+      mergeServerRefresh(cachedFlagless, fetched).connections,
+    )
+  }
+
+  @Test
+  fun `the fetched flags win over the cached ones`() {
+    // Ordering does double duty: fetched-first plus dedupe-by-URI means the refresh is
+    // authoritative about a connection's tier, which is what makes cu-107's re-derivation work.
+    val staleFlags = Connection(LOCAL.uri, local = false, relay = true)
+    val cachedStale = cached.copy(connections = listOf(staleFlags))
+    val fetched = cached.copy(connections = listOf(LOCAL))
+
+    assertEquals(LOCAL, mergeServerRefresh(cachedStale, fetched).connections.single())
+  }
+
   private companion object {
     val LOCAL = Connection("https://10-0-0-42.hash.plex.direct:32400", local = true)
     val REMOTE = Connection("https://remote.hash.plex.direct:32400", local = false)

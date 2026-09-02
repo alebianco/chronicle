@@ -29,11 +29,18 @@ fun mergeServerRefresh(
 ): ServerModel {
   if (fetched == null) return cached
   return cached.copy(
-    // Freshest first, deduped. Connections are raced in order by
+    // Freshest first, deduped **by URI**. Connections are raced in order by
     // PlexConfig.chooseViableConnections, so a just-reported address is likelier to
     // answer; cached ones are kept because /resources can omit a LAN address the device
     // can still reach.
-    connections = (fetched.connections + cached.connections).distinct(),
+    //
+    // `distinctBy { uri }` rather than `distinct()`: the same address can be cached with
+    // different flags from the one just fetched — most obviously right after the cu-107
+    // migration, where cached entries carry no `local`/`relay` at all — and whole-object
+    // equality then keeps both. That put one address in two tiers and probed it twice per
+    // selection round. Keeping the *fetched* copy is what makes the flags authoritative,
+    // which is the ordering above doing double duty.
+    connections = (fetched.connections + cached.connections).distinctBy { it.uri },
     // A shared server may legitimately report no token, so an empty value must never
     // overwrite one that works.
     accessToken = fetched.accessToken.ifEmpty { cached.accessToken },
