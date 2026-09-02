@@ -338,4 +338,70 @@ class MainActivityViewModelTest {
       mediaServiceConnection = mediaServiceConnection,
       collectionsRepository = collectionsRepository,
     )
+
+  /**
+   * The player sheet must survive a book ending.
+   *
+   * `STATE_STOPPED` fires when the last track runs out, and hiding on it was a **one-way door**:
+   * nothing could bring the sheet back, because the routes off `HIDDEN` need either a later
+   * non-stopped state (there is none — playback has ended) or a *different* book id. The collapsed
+   * player is the only handle that expands the sheet, so the player became unreachable, and for an
+   * already-finished book it was never reachable at all (cu-119).
+   */
+  @Test
+  fun `a book reaching its end does not hide the player`() {
+    val playbackState =
+      MutableLiveData(
+        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build(),
+      )
+    every { mediaServiceConnection.playbackState } returns playbackState
+    val viewModel = viewModel()
+
+    // Playing: the sheet is revealed.
+    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+
+    // The book runs out.
+    playbackState.value =
+      PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_STOPPED, 0L, 1.0f).build()
+
+    assertEquals(
+      "a finished book must stay reachable; hiding here is a one-way door",
+      COLLAPSED,
+      viewModel.currentlyPlayingLayoutState.value,
+    )
+  }
+
+  /** `STATE_NONE` still hides it: that means there is genuinely nothing to play. */
+  @Test
+  fun `no playback at all hides the player`() {
+    val playbackState =
+      MutableLiveData(
+        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build(),
+      )
+    every { mediaServiceConnection.playbackState } returns playbackState
+    val viewModel = viewModel()
+    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+
+    playbackState.value =
+      PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0L, 1.0f).build()
+
+    assertEquals(HIDDEN, viewModel.currentlyPlayingLayoutState.value)
+  }
+
+  /** Recovery from the hidden state, which is the half that made it a trap. */
+  @Test
+  fun `playback resuming after nothing was playing reveals the player again`() {
+    val playbackState =
+      MutableLiveData(
+        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0L, 1.0f).build(),
+      )
+    every { mediaServiceConnection.playbackState } returns playbackState
+    val viewModel = viewModel()
+    assertEquals(HIDDEN, viewModel.currentlyPlayingLayoutState.value)
+
+    playbackState.value =
+      PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build()
+
+    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+  }
 }

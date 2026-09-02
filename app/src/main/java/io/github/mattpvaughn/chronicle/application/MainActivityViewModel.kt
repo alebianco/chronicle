@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.application
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.STATE_NONE
-import android.support.v4.media.session.PlaybackStateCompat.STATE_STOPPED
 import androidx.lifecycle.*
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.*
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
@@ -178,7 +177,17 @@ class MainActivityViewModel(
     Observer<PlaybackStateCompat> { state ->
       Timber.i("Observing playback: $state")
       when (state.state) {
-        STATE_STOPPED, STATE_NONE -> setBottomSheetState(HIDDEN)
+        // Only STATE_NONE hides the player. It means "there is no longer anything to play" —
+        // the service tore down, or nothing was ever loaded.
+        //
+        // STATE_STOPPED deliberately does **not**: it fires when a book reaches the end of its
+        // last track, and the book is still the current one, merely not advancing. Hiding on it
+        // was a one-way door — nothing could bring the sheet back, because the only routes off
+        // HIDDEN need either a later non-stopped state (there is none; playback has ended) or
+        // `setAudiobook` seeing a *different* book id, which re-selecting the same book fails.
+        // Since the collapsed player is the only handle that expands the sheet, the player became
+        // unreachable, and for an already-finished book it was never reachable at all (cu-119).
+        STATE_NONE -> setBottomSheetState(HIDDEN)
         else -> {
           if (currentlyPlayingLayoutState.value == HIDDEN) {
             setBottomSheetState(COLLAPSED)
@@ -210,15 +219,22 @@ class MainActivityViewModel(
     val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
     viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
       val bookId = trackRepository.getBookIdForTrack(trackId)
+      if (bookId == NO_AUDIOBOOK_FOUND_ID) {
+        return@launch
+      }
       // Only change the active audiobook if it differs from the one currently in metadata
-      if (previousAudiobookId != bookId && bookId != NO_AUDIOBOOK_FOUND_ID) {
+      if (previousAudiobookId != bookId) {
         audiobookId.postValue(bookId)
-        if (_currentlyPlayingLayoutState.value == HIDDEN) {
-          // The one legitimate postValue: this runs in a coroutine after a suspending DB read, so
-          // it may not be on the main thread. Every other writer of this field uses `value =` —
-          // see the field's own note for why that matters.
-          _currentlyPlayingLayoutState.postValue(COLLAPSED)
-        }
+      }
+      // Revealing the sheet is *not* conditional on the book having changed. It used to be, which
+      // stranded the player: re-selecting the same book after it had been hidden was rejected by
+      // the guard above, so nothing could bring the collapsed handle back (cu-119). Whether there
+      // is something playing and whether it is a *new* something are different questions.
+      if (_currentlyPlayingLayoutState.value == HIDDEN) {
+        // The one legitimate postValue: this runs in a coroutine after a suspending DB read, so
+        // it may not be on the main thread. Every other writer of this field uses `value =` —
+        // see the field's own note for why that matters.
+        _currentlyPlayingLayoutState.postValue(COLLAPSED)
       }
     }
   }

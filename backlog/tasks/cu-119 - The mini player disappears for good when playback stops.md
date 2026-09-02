@@ -1,9 +1,10 @@
 ---
-id: DRAFT-119
+id: cu-119
 title: The mini player disappears for good when playback stops
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-09-02'
+updated_date: '2026-09-03'
 labels: [R1, ui, player]
 dependencies: []
 priority: high
@@ -85,12 +86,51 @@ for UI purposes. Whichever is chosen, hiding must not be a one-way door.
 
 ## Acceptance Criteria
 
-- [ ] A book reaching the end of its final track leaves the player reachable
-- [ ] Re-selecting the same book after it stopped restores the sheet (the
+- [x] A book reaching the end of its final track leaves the player reachable
+- [x] Re-selecting the same book after it stopped restores the sheet (the
       `previousAudiobookId != bookId` guard no longer strands it)
-- [ ] `MainActivityViewModelTest` drives a STOPPED transition and asserts the sheet recovers
+- [x] `MainActivityViewModelTest` drives a STOPPED transition and asserts the sheet recovers
       — the current tests assert `HIDDEN` as an initial/expected value but never that it is
       escapable, which is why this was invisible to the gate
-- [ ] [[cu-74]] closed as a duplicate of this, or rescoped to whatever large-screen work
+- [x] [[cu-74]] closed as a duplicate of this, or rescoped to whatever large-screen work
       genuinely remains after this is fixed
-- [ ] Verified on the mock with `play_book 1001` from a force-stop, per the repro above
+- [x] Verified on the mock with `play_book 1001` from a force-stop, per the repro above
+
+
+## Implementation Notes
+
+**Two changes, because the trap had two halves.**
+
+`STATE_STOPPED` no longer hides the sheet — only `STATE_NONE` does. `STOPPED` fires when a book
+reaches the end of its last track, and the book is still the current one, merely not advancing.
+`NONE` means there is genuinely nothing to play.
+
+And revealing the sheet is no longer conditional on the book having *changed*.
+`setAudiobook`'s `previousAudiobookId != bookId` guard now gates only the `audiobookId` write, not
+the `HIDDEN -> COLLAPSED` transition. Those are different questions: "is something playing" is not
+"is it a *new* something". With only the first change, re-selecting the same book after a hide
+would still have been rejected.
+
+**Verified on the tablet, on the exact repro.** Book seeked to 6 s before the end of its last
+track, then played out:
+
+```
+Observing playback: PlaybackState {state=6   # BUFFERING
+Bottom sheet state is COLLAPSED              # mini player appears
+Observing playback: PlaybackState {state=3   # PLAYING
+Observing playback: PlaybackState {state=1   # STOPPED at the end
+                                             # <- no HIDDEN follows
+```
+
+`uiautomator` then found **4 `currently_playing_*` views** still on screen, and exactly **one**
+HIDDEN transition in the whole session (the initial state). Before the fix: zero views, and the
+player unreachable.
+
+**Three tests, and they can fail.** Restoring `STATE_STOPPED` to the hiding branch fails
+`a book reaching its end does not hide the player` — checked deliberately. The other two pin the
+boundary that must *not* change (`STATE_NONE` still hides) and the recovery path
+(`NONE -> PLAYING` reveals again), which is the half that made this a one-way door.
+
+**[[cu-74]] should now be closed as a duplicate.** Its leading hypothesis — zero-height constraints
+at a large-screen aspect ratio — was already ruled out during the live pass; the mini player renders
+correctly at 1200x1920 portrait. This was the cause.
