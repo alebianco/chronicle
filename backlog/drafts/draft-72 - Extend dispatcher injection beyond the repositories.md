@@ -65,7 +65,47 @@ contract.
 
 ## Acceptance Criteria
 
-- [ ] Player classes take `DispatcherProvider`; cu-9's tests drive them on a test scheduler
+- [~] Player classes take `DispatcherProvider` — **1 of 3 done**. `OnMediaChangedCallback` converted
+      behind `NotificationStateMachineTest` (06165f3). `MediaPlayerService` (5 sites) and
+      `AudiobookMediaSessionCallback` (3 sites) remain.
 - [ ] Worker threading reviewed against WorkManager's executor contract before converting
 - [ ] `RepositoryDispatcherTest`'s source scan widened to whichever layers get converted
 - [ ] No behaviour change: existing suite passes untouched
+
+
+## Progress (2026-09-02)
+
+Unblocked and started, in the order this task insisted on: **tests first, injection second.**
+
+**`OnMediaChangedCallback` — done.** `NotificationStateMachineTest` (7 tests) pins what each
+playback state does to the notification, foreground service and becoming-noisy receiver; the
+dispatcher is now injected. Sabotage-verified.
+
+### What it cost to make the player testable at all
+
+Recorded because the remaining two classes will hit the same walls:
+
+- **`MediaControllerCompat.Callback`'s constructor reaches `android.os.Binder`**, so any test that
+  constructs one of these callbacks needs Robolectric — regardless of whether the logic under test
+  touches Android.
+- **mockk cannot mock final support-library classes under Robolectric.** `MediaControllerCompat`,
+  `PlaybackStateCompat` and `Notification` all fail with *"class redefinition failed: attempted to
+  change the class modifiers"* — mockk's inline instrumentation collides with Robolectric's. The way
+  through is to build real objects (a real `MediaSessionCompat`, a real `NotificationCompat` build),
+  which is closer to production anyway.
+- **A relaxed mock cannot satisfy a generic `StateFlow<Chapter>`** — it returns a bare `Object` that
+  fails to cast at the first read.
+- Every such test must go in PIT's `excludedTestClasses` (cu-57), or `pitestDebug` refuses to start.
+
+### Remaining, in recommended order
+
+1. **`AudiobookMediaSessionCallback`** (3 sites) — 16 constructor deps but they are nearly all
+   interfaces. `OutgoingBookFlush` and `TrackFetchAttempt` already extracted the two decisions worth
+   testing, so what remains is mostly wiring.
+2. **`MediaPlayerService`** (5 sites, one of which is `serviceScope = CoroutineScope(Dispatchers.Main
+   + serviceJob)`) — the hardest, and the one where a wrong scope actually leaks. Worth splitting
+   the browse-tree and PlaybackState-mapping halves out first (see the pre-R2 review's god-class
+   finding) so the pieces are testable without the Service.
+
+The worker group is still untouched and still needs its own review against WorkManager's executor
+contract before conversion — that criterion stands unchanged.
