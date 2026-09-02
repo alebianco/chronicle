@@ -116,11 +116,21 @@ existing manual padding is the classic route to doubled insets.
 
 Applied to both screens with a scrolling app bar: book details and currently-playing.
 
+### Re-verified with the final build (2026-09-02 07:52)
+
+The first emulator install predated the `minHeight` half of the fix — the installed dex did not
+contain `applyTopSystemBarInsetWithMinHeight` at all, so the earlier "fixed" measurement was taken
+against an incomplete build. Rebuilt, reinstalled, and confirmed the helper is present in
+`classes5.dex` before re-measuring. The numbers above are from that run and hold.
+
 ### Still to verify
 
 - [ ] Gesture navigation and landscape (measured in 3-button portrait only)
 - [ ] `fragment_home` / `fragment_library` — they use `applyTopSystemBarInset` on a plain toolbar
       with no `CollapsingToolbarLayout`, so they have no `minHeight` to collapse to and are very
       likely unaffected. Unconfirmed.
-- [ ] The currently-playing screen was fixed by symmetry, not measured — the emulator's blank
-      rendering made reaching it unreliable.
+- [ ] **The currently-playing screen is fixed by symmetry only, and cannot be measured on a
+      tablet.** Reaching it needs the mini player, which does not render on a tablet layout —
+      [[cu-74]], whose own notes say "on a tablet there appears to be no way to reach the
+      currently-playing screen". Both changes to `fragment_currently_playing.xml` are identical to
+      the details screen's, so the risk is low, but it is unmeasured. Verify on the owner's phone.
