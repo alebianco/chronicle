@@ -17,6 +17,18 @@ interface CurrentlyPlaying {
   val track: StateFlow<MediaItemTrack>
   val chapter: StateFlow<Chapter>
 
+  /**
+   * The listening position **as an offset from the start of the book**, in millis.
+   *
+   * Published here rather than left to each consumer to derive, because deriving it needs the
+   * track list — which is not exposed — and every consumer that tried got it wrong. A
+   * `MediaItemTrack.progress` is an offset within *its own track*; subtracting a
+   * `Chapter.bookStartTimeOffset` from it mixes the two frames and, on a multi-track book, yields
+   * a large negative number (cu-115). On a single-track book the two are the same value, which is
+   * why it went unnoticed for so long.
+   */
+  val bookPosition: StateFlow<Long>
+
   fun setOnChapterChangeListener(listener: OnChapterChangeListener)
 
   fun update(
@@ -40,6 +52,7 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
   override val book = MutableStateFlow(EMPTY_AUDIOBOOK)
   override val track = MutableStateFlow(EMPTY_TRACK)
   override val chapter = MutableStateFlow(EMPTY_CHAPTER)
+  override val bookPosition = MutableStateFlow(0L)
 
   private var tracks: List<MediaItemTrack> = emptyList()
   private var chapters: List<Chapter> = emptyList()
@@ -66,6 +79,9 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
       } else {
         tracks.asChapterList()
       }
+
+    // Set before the chapter lookup below, which uses the same derivation.
+    this.bookPosition.value = tracks.getProgress()
 
     if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
       // Falls back to the position derived from saved progress when the exact lookup misses.

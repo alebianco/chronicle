@@ -233,6 +233,36 @@ class RoomSchemaTest {
       assertEquals("a track that loses its parentKey is orphaned from its book", "1001", cursor.getString(1))
       assertEquals("an upgrade that loses progress loses the user's place", 4_242L, cursor.getLong(2))
     }
+
+    // The cu-110 index must exist on an *upgraded* database, not just a freshly created one.
+    // Room validates that the schema matches the entity on open, so a missing index would throw
+    // above — but only if the entity declares it, and a silently-dropped `@Index` would then make
+    // both sides agree on the wrong thing. Asserting against `sqlite_master` is independent of
+    // that agreement, and the query plan below is what actually pays for it.
+    db.query(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'MediaItemTrack'",
+      emptyArray(),
+    ).use { cursor ->
+      val indexNames = mutableListOf<String>()
+      while (cursor.moveToNext()) indexNames.add(cursor.getString(0))
+      assertTrue(
+        "the parentKey index must survive a migration, not only a fresh create; found $indexNames",
+        indexNames.contains("index_MediaItemTrack_parentKey_discNumber_index"),
+      )
+    }
+
+    // The point of the index: the per-book track query must not scan the table or sort. This is
+    // the assertion that would fail if someone removed the index or reordered its columns —
+    // SQLite reports "SCAN" and "USE TEMP B-TREE FOR ORDER BY" when it cannot use one.
+    db.query(
+      "EXPLAIN QUERY PLAN SELECT * FROM MediaItemTrack WHERE parentKey = '1001' " +
+        "AND cached >= 0 ORDER BY `discNumber` ASC, `index` ASC",
+      emptyArray(),
+    ).use { cursor ->
+      val plan = buildString { while (cursor.moveToNext()) append(cursor.getString(3)).append(' ') }
+      assertTrue("the per-book query must use the index, not scan: $plan", plan.contains("USING INDEX"))
+      assertTrue("the index must satisfy the ORDER BY too: $plan", !plan.contains("TEMP B-TREE"))
+    }
     db.close()
   }
 

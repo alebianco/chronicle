@@ -9,6 +9,7 @@ import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomS
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
+import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_FULLY
@@ -132,11 +133,16 @@ class MainActivityViewModel(
       if (_chapters.isNullOrEmpty() || _tracks.isNullOrEmpty()) {
         return@DoubleLiveData "No track playing"
       }
-      val activeTrack = _tracks.getActiveTrack()
-      val currentTrackProgress: Long = activeTrack.progress
-      return@DoubleLiveData _chapters.filter {
-        it.trackId == activeTrack.id
-      }.getChapterAt(_tracks.getActiveTrack().id, currentTrackProgress).title
+      // Book-absolute, because `Chapter.bookStartTimeOffset` is (cu-115). This used to pass
+      // `activeTrack.progress` — an **in-track** offset — into a lookup that compares against
+      // book offsets, and to filter the chapters to the active track first. On a single-track
+      // book the two frames are the same number, so it worked; on any later track the offset is
+      // below every one of that track's chapter starts, so nothing matched and the mini player
+      // showed an empty chapter title.
+      //
+      // `chapterAtBookProgress` is the book-frame lookup, and it clamps past the end rather than
+      // returning EMPTY_CHAPTER — which is what `CurrentlyPlayingSingleton` already falls back to.
+      return@DoubleLiveData _chapters.chapterAtBookProgress(_tracks.getProgress()).title
     }
 
   val isPlaying =
@@ -186,7 +192,21 @@ class MainActivityViewModel(
     mediaServiceConnection.playbackState.observeForever(playbackObserver)
   }
 
+  /** The track [setAudiobook] last resolved, so an unchanged tick costs nothing. */
+  private var lastResolvedTrackId: String = TRACK_NOT_FOUND
+
   private fun setAudiobook(trackId: String) {
+    // Cheapest guard first (DRAFT-117). `nowPlaying` re-emits on every 1 Hz progress tick with
+    // the *same* track, and this method used to do a suspending DB read on each one before the
+    // "has the book changed?" check below could reject it. Measured: 48 `mapAsync` resumptions
+    // and 50 `bindImageRounded` calls in 20 s of playback, each rebinding the cover with a fresh
+    // `crossfade(true)` — an animation that invalidates continuously, producing ~14 full
+    // ConstraintLayout measure/layout passes a second.
+    if (trackId == lastResolvedTrackId) {
+      return
+    }
+    lastResolvedTrackId = trackId
+
     val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
     viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
       val bookId = trackRepository.getBookIdForTrack(trackId)

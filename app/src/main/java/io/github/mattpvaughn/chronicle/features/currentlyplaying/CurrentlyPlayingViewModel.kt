@@ -234,11 +234,15 @@ class CurrentlyPlayingViewModel(
    */
   val currentChapter: LiveData<Chapter> get() = activeChapter
 
+  // Both operands in the **book** frame. This was `track.progress - chapter.bookStartTimeOffset`,
+  // which subtracts a book-absolute offset from an in-track one: on any track after the first the
+  // result is a large negative, so the chapter elapsed time and the slider were nonsense. It
+  // happened to work on a single-track book, where the two frames are the same number (cu-115).
   val chapterProgress =
     currentlyPlaying.chapter.combine(
-      currentlyPlaying.track,
-    ) { chapter: Chapter, track: MediaItemTrack ->
-      track.progress - chapter.bookStartTimeOffset
+      currentlyPlaying.bookPosition,
+    ) { chapter: Chapter, bookPosition: Long ->
+      (bookPosition - chapter.bookStartTimeOffset).coerceAtLeast(0L)
     }.asLiveData(viewModelScope.coroutineContext)
 
   val chapterProgressString =
@@ -251,9 +255,9 @@ class CurrentlyPlayingViewModel(
 
   val chapterProgressForSlider =
     currentlyPlaying.chapter.combine(
-      currentlyPlaying.track,
-    ) { chapter: Chapter, track: MediaItemTrack ->
-      track.progress - chapter.bookStartTimeOffset
+      currentlyPlaying.bookPosition,
+    ) { chapter: Chapter, bookPosition: Long ->
+      (bookPosition - chapter.bookStartTimeOffset).coerceAtLeast(0L)
     }.filter { !isSliding }
       // distinctUntilChanged, because `currentlyPlaying` publishes book, track *and* chapter on
       // every progress tick and each fans out through this combine. The device logged 228
@@ -591,7 +595,11 @@ class CurrentlyPlayingViewModel(
           } else {
             // Matches the service's rule: past the threshold, restart the current chapter.
             val current = currentlyPlaying.chapter.value
-            val intoChapter = currentlyPlaying.track.value.progress - current.bookStartTimeOffset
+            // Book frame on both sides (cu-115). `track.value.progress` is an in-track offset,
+            // so on a later track this went negative and the threshold test always took the
+            // restart-current-chapter branch — the same mix-up cu-96 fixed in the service, left
+            // unfixed in this mirror copy.
+            val intoChapter = currentlyPlaying.bookPosition.value - current.bookStartTimeOffset
             if (intoChapter < SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS) {
               chapters.getOrNull(here - 1)?.bookStartTimeOffset
             } else {
@@ -971,15 +979,33 @@ class CurrentlyPlayingViewModel(
         awaitSeek(curr.progress)
       }
     } else {
-      // Seeking by chapter length
+      // Seeking within the current chapter.
       currentChapter.value?.let { chapter ->
-        // seek relative to start of current track
         val chapterDuration = chapter.bookEndTimeOffset - chapter.bookStartTimeOffset
-        val offset = chapter.bookStartTimeOffset + (percentProgress * chapterDuration).toLong()
-        mediaServiceConnection.transportControls?.seekTo(offset)
+        // Book-absolute: where in the *book* the user asked to be.
+        val bookOffset =
+          chapter.bookStartTimeOffset + (percentProgress * chapterDuration).toLong()
+
+        // `MediaControllerCompat.TransportControls.seekTo` is a position **within the current
+        // media item**, not within the book — so handing it a book offset overshoots on any
+        // multi-track book, and Media3 clamps rather than throwing, which presents as the thumb
+        // jumping to the end of the current track (cu-115). Convert, exactly as the
+        // jump-to-chapter path above already does.
+        val inTrackOffset =
+          tracks.value?.let { loaded ->
+            val ordered = loaded.sorted()
+            val trackStart =
+              ordered.takeWhile { it.id != chapter.trackId }.sumOf { it.duration }
+            (bookOffset - trackStart).coerceAtLeast(0L)
+          } ?: bookOffset
+
+        mediaServiceConnection.transportControls?.seekTo(inTrackOffset)
         // Keep the slider on the requested position until playback reports it. Without this the
         // next progress tick overwrites the thumb with the pre-seek position (cu-93).
-        awaitSeek(offset)
+        //
+        // `awaitSeek` compares against the *track* progress the player reports, so it takes the
+        // in-track value, not the book one.
+        awaitSeek(inTrackOffset)
       }
     }
   }

@@ -50,7 +50,7 @@ val MIGRATION_4_5 =
     }
   }
 
-@Database(entities = [MediaItemTrack::class], version = 5, exportSchema = true)
+@Database(entities = [MediaItemTrack::class], version = 6, exportSchema = true)
 abstract class TrackDatabase : RoomDatabase() {
   abstract val trackDao: TrackDao
 }
@@ -87,7 +87,11 @@ interface TrackDao {
   @Query("SELECT * FROM MediaItemTrack")
   fun getAllTracks(): LiveData<List<MediaItemTrack>>
 
-  @Query("SELECT * FROM MediaItemTrack")
+  // Ordered, because callers derive book position from the result and `getTrackStartTime` sums
+  // the tracks *before* the active one. It sorts defensively now (cu-115), but an unordered
+  // whole-library read is a trap for anything else that groups or slices this list, and the
+  // `parentKey, discNumber, index` index makes the ordering free.
+  @Query("SELECT * FROM MediaItemTrack ORDER BY `parentKey`, `discNumber` ASC, `index` ASC")
   suspend fun getAllTracksAsync(): List<MediaItemTrack>
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -152,5 +156,23 @@ interface TrackDao {
   suspend fun findTrackByTitle(title: String): MediaItemTrack?
 }
 
+/**
+ * Adds the `parentKey, discNumber, index` index (cu-110).
+ *
+ * Pure addition — no data moves, so a `CREATE INDEX` is enough and there is no rebuild to get
+ * wrong. The name must match what Room generates for the entity's `@Index`
+ * (`index_<table>_<cols joined by _>`), or Room's on-open validation rejects the schema.
+ */
+val MIGRATION_5_6 =
+  object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL(
+        "CREATE INDEX IF NOT EXISTS `index_MediaItemTrack_parentKey_discNumber_index` " +
+          "ON `MediaItemTrack` (`parentKey`, `discNumber`, `index`)",
+      )
+    }
+  }
+
 /** Every migration, in order. Named so `RoomSchemaTest` runs exactly what production runs. */
-val TRACK_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+val TRACK_MIGRATIONS =
+  arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)

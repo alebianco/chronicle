@@ -3,7 +3,9 @@ package io.github.mattpvaughn.chronicle.features.currentlyplaying
 import android.content.SharedPreferences
 import android.text.format.DateUtils
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -17,15 +19,21 @@ import io.github.mattpvaughn.chronicle.data.model.EMPTY_TRACK
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -74,7 +82,27 @@ class CurrentlyPlayingViewModelTest {
       every { this@mockk.book } returns MutableStateFlow(EMPTY_AUDIOBOOK)
       every { track } returns MutableStateFlow(EMPTY_TRACK)
       every { chapter } returns MutableStateFlow(EMPTY_CHAPTER)
+      every { bookPosition } returns MutableStateFlow(0L)
     }
+
+  /**
+   * The same collaborator, positioned mid-book on a **multi-track** book.
+   *
+   * `MID_BOOK_POSITION` (750_000) is 2m30s into track 2 and inside chapter 3, so the in-track
+   * offset (150_000) and the book offset differ by a whole track. That difference is the point:
+   * on a single-track book the two frames are the same number and a mix-up is invisible.
+   */
+  private fun midBookCurrentlyPlaying(): CurrentlyPlaying {
+    val tracks = MultiTrackBook.midBookTracks()
+    val activeTrack = tracks.single { it.id == MultiTrackBook.MID_TRACK_ID }
+    val chapterThree = MultiTrackBook.chapters().single { it.id == MultiTrackBook.MID_CHAPTER_ID }
+    return mockk(relaxed = true) {
+      every { this@mockk.book } returns MutableStateFlow(MultiTrackBook.book())
+      every { track } returns MutableStateFlow(activeTrack)
+      every { chapter } returns MutableStateFlow(chapterThree)
+      every { bookPosition } returns MutableStateFlow(MultiTrackBook.MID_BOOK_POSITION)
+    }
+  }
 
   private val bookRepository =
     mockk<IBookRepository>(relaxed = true) {
@@ -131,7 +159,89 @@ class CurrentlyPlayingViewModelTest {
     assertNotNull("a null here is the cu-87 launch crash", viewModel().currentChapter)
   }
 
-  private fun viewModel() =
+  /**
+   * Reads a `LiveData` produced by `asLiveData(...)`, after letting the flow actually run.
+   *
+   * Two things are needed and each fails silently on its own. `asLiveData` does not collect its
+   * flow until something observes it, so `.value` is `null` before `observeForever`. And
+   * `MainDispatcherRule` installs a `StandardTestDispatcher`, which *queues* work rather than
+   * running it — so the `combine` never produces a value until the scheduler is advanced.
+   *
+   * Getting either wrong yields `null`, which is indistinguishable from "the arithmetic is broken"
+   * unless you look. Worth the helper.
+   */
+  private fun <T> TestScope.observedValue(live: LiveData<T>): T? {
+    var seen: T? = null
+    val observer = Observer<T> { seen = it }
+    live.observeForever(observer)
+    advanceUntilIdle()
+    live.removeObserver(observer)
+    return seen
+  }
+
+  /**
+   * Chapter-relative progress, on a multi-track book (cu-115 / cu-73 fourth sweep).
+   *
+   * This was `track.progress - chapter.bookStartTimeOffset` — an in-track offset minus a
+   * book-absolute one. At this position that is `150_000 - 600_000 = -450_000`. It reached
+   * `DateUtils.formatElapsedTime` and the chapter slider, and it was correct only on a
+   * single-track book where the two frames coincide.
+   *
+   * **There was no test at any track count**, and the `coerceAtLeast(0L)` guard added with the fix
+   * means a future regression presents as a stuck `0:00` rather than a negative number — invisible
+   * to a human watching the screen as well as to the suite. Hence this test.
+   */
+  @Test
+  fun `chapter progress is measured from the chapter start in the book frame`() =
+    runTest(mainDispatcherRule.testDispatcher) {
+      val viewModel = viewModel(midBookCurrentlyPlaying())
+
+      assertEquals(
+        "750000 into the book, in a chapter starting at 600000, is 150000 into the chapter",
+        150_000L,
+        observedValue(viewModel.chapterProgress),
+      )
+    }
+
+  /** The slider reads the same value, or the thumb and the label disagree. */
+  @Test
+  fun `the chapter slider agrees with the chapter progress readout`() =
+    runTest(mainDispatcherRule.testDispatcher) {
+      val viewModel = viewModel(midBookCurrentlyPlaying())
+
+      assertEquals(
+        observedValue(viewModel.chapterProgress),
+        observedValue(viewModel.chapterProgressForSlider),
+      )
+    }
+
+  /**
+   * Never negative, whatever the frames do. This is the property `coerceAtLeast(0L)` guarantees;
+   * asserted directly so the guard cannot be dropped silently.
+   */
+  @Test
+  fun `chapter progress is never negative`() =
+    runTest(mainDispatcherRule.testDispatcher) {
+      val activeTrack =
+        MultiTrackBook.midBookTracks().single { it.id == MultiTrackBook.MID_TRACK_ID }
+      // A chapter that starts *after* the reported position: the frames disagree, which is the
+      // condition that used to produce a large negative.
+      val laterChapter = MultiTrackBook.chapters().last()
+      val positioned =
+        mockk<CurrentlyPlaying>(relaxed = true) {
+          every { this@mockk.book } returns MutableStateFlow(MultiTrackBook.book())
+          every { track } returns MutableStateFlow(activeTrack)
+          every { chapter } returns MutableStateFlow(laterChapter)
+          every { bookPosition } returns MutableStateFlow(MultiTrackBook.MID_BOOK_POSITION)
+        }
+
+      val progress = observedValue(viewModel(positioned).chapterProgress)
+
+      assertNotNull("the flow must have produced a value", progress)
+      assertTrue("a negative chapter progress reaches the slider and the clock", progress!! >= 0L)
+    }
+
+  private fun viewModel(playing: CurrentlyPlaying = currentlyPlaying) =
     CurrentlyPlayingViewModel(
       bookRepository = bookRepository,
       trackRepository = trackRepository,
@@ -139,7 +249,7 @@ class CurrentlyPlayingViewModelTest {
       mediaServiceConnection = mockk<MediaServiceConnection>(relaxed = true),
       prefsRepo = mockk<PrefsRepo>(relaxed = true),
       plexConfig = mockk<PlexConfig>(relaxed = true),
-      currentlyPlaying = currentlyPlaying,
+      currentlyPlaying = playing,
       workManager = workManager,
       sharedPrefs = sharedPrefs,
     )
