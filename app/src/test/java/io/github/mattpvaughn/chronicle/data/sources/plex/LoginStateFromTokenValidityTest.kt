@@ -11,6 +11,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -67,18 +68,36 @@ class LoginStateFromTokenValidityTest {
     assertEquals(LOGGED_IN_FULLY, repo.loginEvent.value?.peekContent())
   }
 
-  /** The regression: presence is not validity. */
+  /**
+   * The regression: presence is not validity — but the *remedy* changed in decision-17.
+   *
+   * This originally asserted `NOT_LOGGED_IN`, whose stated purpose was that the app must not
+   * "show stale data in silence". That goal is right and still enforced; the mechanism was wrong.
+   * `NOT_LOGGED_IN` routes through `Navigator.showLogin()`, which calls `plexConfig.clear()` and
+   * wipes server, library and connections — so an expired token cost the user their entire
+   * configuration and sent them back through server and library pickers. The owner hit exactly
+   * that in the cu-73 live pass after a password change.
+   *
+   * So a revoked account now stays `LOGGED_IN_FULLY` — keeping config, cached library and
+   * downloads — and the *silence* is fixed where it belongs, by surfacing `account_signed_out`.
+   * `isRevoked` is what the UI observes; that it is set is pinned below and in
+   * `AccountAuthStateTest`.
+   */
   @Test
-  fun `a token the server has rejected is not logged in`() {
+  fun `a rejected token keeps the configuration but is flagged as revoked`() {
     val authState = AccountAuthState().apply { onAccountRejected() }
     val repo = repo(fullySetUpPrefs(), authState)
 
     repo.determineLoginState()
 
     assertEquals(
-      "a rejected token must not report as logged in, or the app shows stale data in silence",
-      NOT_LOGGED_IN,
+      "a revoked account must keep its server and library, not be dumped back to a login wall",
+      LOGGED_IN_FULLY,
       repo.loginEvent.value?.peekContent(),
+    )
+    assertTrue(
+      "the revocation must still be visible to the UI, or the app is silent again",
+      authState.isRevoked,
     )
   }
 
@@ -158,6 +177,6 @@ class LoginStateFromTokenValidityTest {
 
     repo.beginReauthentication()
 
-    assertEquals(false, authState.isSignedOut.value)
+    assertEquals(false, authState.isRevoked)
   }
 }

@@ -33,6 +33,21 @@ interface PlexLoginService {
     @Query("includeHttps") shouldIncludeHttps: Int = 1,
     @Query("includeRelay") shouldIncludeRelay: Int = 1,
   ): List<PlexServer>
+
+  /**
+   * Every client registered against the account — this app included, keyed by its
+   * `X-Plex-Client-Identifier`.
+   *
+   * Used to notice that the user removed this device at plex.tv, which is otherwise **invisible**:
+   * Plex invalidates no token when a device is revoked, so the app keeps working with credentials
+   * the user believes they withdrew (decision-17). `resources` cannot answer this — it lists
+   * *servers*, and the `clientIdentifier` there is the server's, not the caller's.
+   *
+   * Note the account accumulates one entry per login, since a fresh identifier is minted each
+   * time; matching must therefore be on this install's own uuid, never on the device name.
+   */
+  @GET("https://plex.tv/api/v2/devices")
+  suspend fun devices(): List<PlexDevice>
 }
 
 interface PlexMediaService {

@@ -18,9 +18,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.google.android.material.snackbar.Snackbar
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.EXPANDED
@@ -28,6 +31,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
+import io.github.mattpvaughn.chronicle.data.sources.plex.AccountAuthState
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_FULLY
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -69,6 +73,9 @@ class MainActivity : AppCompatActivity() {
 
   @Inject
   lateinit var navigator: Navigator
+
+  /** Held so the standing revocation notice can be dismissed when the account recovers. */
+  private var signedOutSnackbar: Snackbar? = null
 
   @Inject
   lateinit var plexPrefsRepo: PlexPrefsRepo
@@ -177,6 +184,32 @@ class MainActivity : AppCompatActivity() {
 
     viewModel.errorMessage.observeEvent(this) { errorMessage ->
       Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+    }
+
+    // A revoked account is a standing condition the user has to act on, not a passing error, so
+    // it gets an indefinite Snackbar rather than the Toast above — which would vanish before it
+    // was read and leave the app looking merely broken. Before decision-17 nothing was shown at
+    // all: `account_signed_out` existed as a string and was referenced nowhere (cu-73).
+    //
+    // The action routes to Settings, where "Sign in again" already restores sync without losing
+    // the server, library or downloads; this adds discovery, not a new recovery path.
+    lifecycleScope.launch {
+      repeatOnLifecycle(Lifecycle.State.STARTED) {
+        Injector.get().accountAuthState().state.collect { state ->
+          if (state == AccountAuthState.State.Revoked) {
+            if (signedOutSnackbar?.isShown != true) {
+              signedOutSnackbar =
+                Snackbar
+                  .make(binding.root, R.string.account_signed_out, Snackbar.LENGTH_INDEFINITE)
+                  .setAction(R.string.settings_reauthenticate) { navigator.showSettings() }
+                  .also { it.show() }
+            }
+          } else {
+            signedOutSnackbar?.dismiss()
+            signedOutSnackbar = null
+          }
+        }
+      }
     }
 
     // TODO: show/hide this item on launch more performantly

@@ -203,9 +203,14 @@ class PlexLoginRepo
           // timer, so presence proves nothing — and reporting LOGGED_IN_FULLY here is what made the
           // app show stale data with no way back (cu-84). Only a request that actually came back
           // 401 sets this, so being offline does not land here.
-          accountAuthState.isSignedOut.value -> {
+          // Deliberately *not* NOT_LOGGED_IN: that routes through `Navigator.showLogin()`, which
+          // calls `plexConfig.clear()` and wipes server, library and connections — so an expired
+          // token cost the user their whole configuration (decision-17, cu-73). A revoked account
+          // keeps its config and its downloads; the UI surfaces `account_signed_out` and points at
+          // Settings -> ACCOUNT -> "Sign in again", which already restores sync in place.
+          accountAuthState.isRevoked -> {
             Timber.w("Stored token was rejected by the server; account needs re-authentication")
-            NOT_LOGGED_IN
+            LOGGED_IN_FULLY
           }
           server != null && library != null -> LOGGED_IN_FULLY // Migrating from v0.41, impossible otherwise
           user == null -> LOGGED_IN_NO_USER_CHOSEN

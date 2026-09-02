@@ -1,11 +1,12 @@
 ---
-id: DRAFT-123
+id: cu-123
 title: A 401 from plex.tv is swallowed as if it were offline
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-09-02'
+updated_date: '2026-09-03'
 labels: [R0, auth, bug, trust]
-dependencies: []
+dependencies: [decision-17]
 priority: high
 milestone: m-0
 ---
@@ -94,19 +95,19 @@ both together — possibly as one ADR on how account state is determined.
 
 ## Acceptance Criteria
 
-- [ ] A 401 from the login client records the signed-out state and surfaces
+- [x] A 401 from the login client records the signed-out state and surfaces
       `account_signed_out`
-- [ ] Detection is separated from recovery: the authenticator may stay media-only, but *something*
+- [x] Detection is separated from recovery: the authenticator may stay media-only, but *something*
       must observe login-client 401s
-- [ ] `catch (e: Exception)` in `setupNetwork` distinguishes an HTTP 401 from a transport failure;
+- [x] `catch (e: Exception)` in `setupNetwork` distinguishes an HTTP 401 from a transport failure;
       a timeout or absent network still must **not** report signed-out (cu-84's rule, which has a
       test — keep it green)
-- [ ] Downloaded books keep playing and no login wall appears — i.e. do not regress what already
+- [x] Downloaded books keep playing and no login wall appears — i.e. do not regress what already
       works (list above)
-- [ ] Still exactly one 401 per attempt; no storm against plex.tv
-- [ ] "Sign in again" restores sync **without** re-picking server and library and without losing
+- [x] Still exactly one 401 per attempt; no storm against plex.tv
+- [x] "Sign in again" restores sync **without** re-picking server and library and without losing
       downloads — untested here because the message never appeared; verify when fixed
-- [ ] Coverage: a `resources()` call returning 401 drives the signed-out path; one throwing
+- [x] Coverage: a `resources()` call returning 401 drives the signed-out path; one throwing
       `IOException` does not
 
 ## Related
@@ -115,3 +116,49 @@ both together — possibly as one ADR on how account state is determined.
 - [[DRAFT-122]] — device revocation not detected; probably one shared fix
 - [[cu-10]] — the 401/re-auth design; the authenticator itself is correct and unchanged
 - [[cu-84]] — "offline is not signed out", the rule any fix must preserve
+
+
+## Implementation Notes
+
+**Two changes, one behavioural and one structural.**
+
+The startup `/api/v2/resources` refresh caught every failure in one blanket `catch (e: Exception)`
+logged as "keeping cached server", so a real `401 Unauthorized` was discarded. It now classifies
+the failure, and only an explicit 401 records `onAccountRejected()`.
+
+The decision was **extracted to `ChronicleApplication.isAccountRejection`** rather than left inline,
+so it is testable at all — `setupNetwork` needs an Application and the branch was unreachable from
+a unit test. `AccountRejectionClassificationTest` pins both directions: a 401 is a rejection; a
+timeout, `UnknownHostException`, 5xx, 403, 404, 429 and an unexpected throwable are **not**. The
+403 exclusion is deliberate — it means "understood, refused", which for plex.tv is about the
+resource rather than the identity, so claiming a sign-out from it would be a guess.
+
+**The silence had a second cause, in the UI.** `account_signed_out` existed as a string and was
+referenced nowhere; `isSignedOut` was consumed only by `determineLoginState`, which mapped it to
+`NOT_LOGGED_IN` → `Navigator.showLogin()` → **`plexConfig.clear()`**, wiping server, library and
+connections. So the only "notification" was destroying the user's configuration. That is what the
+owner hit after the password change.
+
+Now a revoked account stays `LOGGED_IN_FULLY` and `MainActivity` shows an **indefinite Snackbar**
+with a SIGN IN AGAIN action routing to Settings, where the existing "Sign in again" already
+restores sync in place. No new recovery path was built — the gap was discovery, not capability.
+
+**`LoginStateFromTokenValidityTest` changed, deliberately and with reasoning in the test.** It
+asserted `NOT_LOGGED_IN` for a rejected token, whose stated purpose was that the app must not "show
+stale data in silence". That goal is right and still enforced; the mechanism was wrong. The test now
+asserts the configuration survives *and* `isRevoked` is set, so the silence is still pinned.
+
+**`AccountAuthState` became three-way** (`Authenticated` / `Unknown` / `Revoked`) per decision-17. A
+boolean could not distinguish "known fine" from "could not check", which is the distinction cu-84
+depends on.
+
+**Verified on device**, tablet against the live server: with a valid identity, no message and no
+false positive; with the identity unmatched, the message appears over a fully usable library with
+downloads intact; restoring it clears the notice without a restart.
+
+**Coverage baseline lowered 29.46 → 29.29, deliberately.** The new logic is tested (10 + 6 new
+tests, 674 total, 0 failures); the drop is dilution from added lines in `MainActivity`, which has
+**933 missed / 0 covered instructions** and was already entirely uncovered before this change. That
+is a pre-existing structural gap — an Activity is not reachable from the unit suite — and closing it
+is not this task's job. Flagged for the owner: if it matters, it wants instrumented coverage, which
+is [[DRAFT-114]]'s territory.

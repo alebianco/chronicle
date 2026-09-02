@@ -107,7 +107,7 @@ class PlexTokenAuthenticatorTest {
 
     assertTrue(
       "a surviving 401 is the only reliable signal that the account is signed out",
-      accountAuthState.isSignedOut.value,
+      accountAuthState.isRevoked,
     )
   }
 
@@ -124,7 +124,7 @@ class PlexTokenAuthenticatorTest {
 
     assertFalse(
       "offline must not be reported as signed out",
-      accountAuthState.isSignedOut.value,
+      accountAuthState.isRevoked,
     )
   }
 
@@ -134,7 +134,7 @@ class PlexTokenAuthenticatorTest {
 
     authenticator.authenticate(null, response401())
 
-    assertFalse(accountAuthState.isSignedOut.value)
+    assertFalse(accountAuthState.isRevoked)
   }
 
   /** A successful refresh means the account is fine, so an earlier signal must be cleared. */
@@ -145,7 +145,7 @@ class PlexTokenAuthenticatorTest {
 
     authenticator.authenticate(null, response401())
 
-    assertFalse(accountAuthState.isSignedOut.value)
+    assertFalse(accountAuthState.isRevoked)
   }
 
   /** Giving up after a prior retry says nothing new; it must not manufacture a signal. */
@@ -155,7 +155,7 @@ class PlexTokenAuthenticatorTest {
 
     authenticator.authenticate(null, response401(hasPriorResponse = true))
 
-    assertFalse(accountAuthState.isSignedOut.value)
+    assertFalse(accountAuthState.isRevoked)
   }
 
   private val accountAuthState = AccountAuthState()

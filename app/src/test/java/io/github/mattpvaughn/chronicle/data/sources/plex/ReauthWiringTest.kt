@@ -208,7 +208,7 @@ class ReauthWiringTest {
     assertEquals(1, refreshes.get())
     assertTrue(
       "an unrecoverable 401 must surface as a signed-out account",
-      authState.isSignedOut.value == true,
+      authState.isRevoked == true,
     )
   }
 }

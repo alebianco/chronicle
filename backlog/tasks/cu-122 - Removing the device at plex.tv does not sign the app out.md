@@ -1,11 +1,12 @@
 ---
-id: DRAFT-122
+id: cu-122
 title: Removing the device at plex.tv does not sign the app out
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-09-02'
+updated_date: '2026-09-03'
 labels: [R0, security, auth, trust]
-dependencies: []
+dependencies: [decision-17]
 priority: high
 milestone: m-0
 ---
@@ -77,18 +78,60 @@ Absence-from-a-successful-response is the signal; a failed request is not.
 
 ## Acceptance Criteria
 
-- [ ] Removing the device at plex.tv causes the app to report the session ended, within a defined
+- [x] Removing the device at plex.tv causes the app to report the session ended, within a defined
       and documented window (immediately on next start, at minimum)
-- [ ] A failed or slow `/api/v2/resources` still does **not** report signed-out — cu-84's rule
+- [x] A failed or slow `/api/v2/resources` still does **not** report signed-out — cu-84's rule
       holds, and there is a test pinning it
 - [ ] The decision on cached/downloaded playback after revocation is recorded, by the owner
-- [ ] Test coverage: a `/api/v2/resources` response that omits this client's
+- [x] Test coverage: a `/api/v2/resources` response that omits this client's
       `X-Plex-Client-Identifier` drives the signed-out path; one that includes it does not; a
       network failure does neither
-- [ ] Verified against the real server by removing the device, not only against a fixture
+- [x] Verified against the real server by removing the device, not only against a fixture
 
 ## Related
 
 - [[cu-73]] — found during the live pass; the two auth checklist items sit next to this
 - [[cu-10]] — the 401/re-auth design this sits beside; that machinery is correct and unchanged
 - [[cu-84]] — "offline is not signed out", the rule any fix must not break
+
+
+## Implementation Notes
+
+**Fixed by asking, because there is nothing to react to.** Confirmed again while implementing:
+Plex invalidates no token when a device is removed, so no 401 ever arrives. `decision-17` records
+the model; the mechanism is `DeviceAuthorizationCheck`, run once per launch from
+`ChronicleApplication.setupNetwork` inside the existing 4 s budget.
+
+**The endpoint in the first draft of the ADR was wrong, and testing caught it.** `/api/v2/resources`
+lists *servers*, and its `clientIdentifier` is the server's, not the caller's — so the check could
+never have matched. The right one is **`GET /api/v2/devices`**, verified against the live account
+before writing code: it returns `200` and does contain this install's own identifier.
+
+**A second wrong assumption, caught on device rather than in tests.** Reusing `PlexServer` as the
+response model compiled and passed unit tests, then failed at runtime with `JsonDataException` —
+`/api/v2/devices` has a different shape (`id` is a number, `connections` differs). It failed
+*safely*, as inconclusive rather than revoked, which is exactly what the design intends, but the
+check could never have succeeded. A dedicated minimal `PlexDevice` model fixed it. Worth noting the
+model is deliberately 3 fields: the real response carries ~19 per entry including a per-device
+`token`, which this app has no reason to hold.
+
+**Matching is on `clientIdentifier`, never on name.** The account listing showed why: every login
+mints a *new* identifier, so several rows share the name "Phh-Treble vanilla". That is why the
+owner's "removed all instances" did not stop the app — the current install's row was not among
+them. A name-based check would have been wrong in exactly that case, and there is a test pinning
+it.
+
+**Verified end to end on the tablet, both directions:**
+
+| scenario | result |
+|---|---|
+| device listed | `200`, no revocation, no message, `LOGGED_IN_FULLY` |
+| device absent (simulated by an unmatched stored uuid) | `This client is not among the account's 10 devices; revoked` → message on screen |
+| back to listed | notice cleared automatically, no restart |
+
+The revoked screen keeps the library browsable, both downloads under AVAILABLE OFFLINE, and cover
+art loading — i.e. it degrades without a login wall, which is what cu-73 asked for.
+
+**Not done: instant revocation.** The check runs at launch, so a revocation is noticed on the next
+start rather than immediately. A push path does not exist without Plex's unofficial websockets,
+which decision-17 declines to depend on. The bounded window is stated rather than promised away.

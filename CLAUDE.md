@@ -129,6 +129,18 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   that class's tests assert it gives up, because looping would hammer plex.tv. Plex tokens never
   expire on a timer; they are invalidated by an event (password change with "sign out connected
   devices", server re-claim).
+- **Account state is three-way, and revocation is checked proactively** (decision-17, cu-122/cu-123).
+  `AccountAuthState` is `Authenticated` / `Unknown` / `Revoked` — a boolean could not tell "known
+  fine" from "could not check", and that distinction *is* cu-84's rule. **Only a successful,
+  parseable negative answer may set `Revoked`**: a timeout, 5xx, offline or malformed body is
+  `Unknown`, or the app nags users on trains again. Two traps found the hard way: Plex invalidates
+  **no token** when a device is removed at plex.tv, so nothing reactive can ever notice it — the
+  check is `GET /api/v2/devices` matched on this install's own `X-Plex-Client-Identifier`
+  (`/api/v2/resources` cannot answer, its `clientIdentifier` is the *server's*); and **every login
+  mints a new identifier**, so several rows share a device name and matching on name is wrong.
+  A revoked account stays `LOGGED_IN_FULLY` on purpose — `NOT_LOGGED_IN` routes through
+  `Navigator.showLogin()`, which calls `plexConfig.clear()` and wipes server, library and
+  connections, so an expired token used to cost the user their whole configuration.
 - **Credentials live in their own `SharedPreferences` file** (`ChronicleAuth.xml`), split out of
   `Chronicle.xml` in cu-108. All three secrets — the Plex account token, the server access token
   and the serialized user — go through `credentialString`/`putCredential`/`removeCredential`,

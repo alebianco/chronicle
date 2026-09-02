@@ -17,7 +17,7 @@ class AccountAuthStateTest {
   fun `a fresh state is not signed out`() {
     assertFalse(
       "the default must be optimistic, or a first launch reports a problem it has not seen",
-      AccountAuthState().isSignedOut.value,
+      AccountAuthState().isRevoked,
     )
   }
 
@@ -27,7 +27,7 @@ class AccountAuthStateTest {
 
     state.onAccountRejected()
 
-    assertTrue(state.isSignedOut.value)
+    assertTrue(state.isRevoked)
   }
 
   @Test
@@ -37,7 +37,7 @@ class AccountAuthStateTest {
 
     state.onAuthenticated()
 
-    assertFalse(state.isSignedOut.value)
+    assertFalse(state.isRevoked)
   }
 
   /** A repeated rejection must not toggle it back off. */
@@ -48,7 +48,7 @@ class AccountAuthStateTest {
     state.onAccountRejected()
     state.onAccountRejected()
 
-    assertTrue(state.isSignedOut.value)
+    assertTrue(state.isRevoked)
   }
 
   @Test
@@ -57,7 +57,7 @@ class AccountAuthStateTest {
 
     state.onAuthenticated()
 
-    assertFalse(state.isSignedOut.value)
+    assertFalse(state.isRevoked)
   }
 
   /**
@@ -69,10 +69,10 @@ class AccountAuthStateTest {
     val state = AccountAuthState()
 
     state.onAccountRejected()
-    assertTrue(state.isSignedOut.value)
+    assertTrue(state.isRevoked)
     state.onAuthenticated()
-    assertFalse(state.isSignedOut.value)
+    assertFalse(state.isRevoked)
     state.onAccountRejected()
-    assertTrue("a second invalidation must be noticed too", state.isSignedOut.value)
+    assertTrue("a second invalidation must be noticed too", state.isRevoked)
   }
 }

@@ -74,6 +74,8 @@ interface AppComponent {
 
   fun plexConfig(): PlexConfig
 
+  fun accountAuthState(): AccountAuthState
+
   fun plexLoginService(): PlexLoginService
 
   fun plexMediaService(): PlexMediaService

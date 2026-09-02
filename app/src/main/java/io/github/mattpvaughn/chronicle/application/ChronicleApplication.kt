@@ -25,7 +25,9 @@ import io.github.mattpvaughn.chronicle.injection.components.AppComponent
 import io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
 import kotlinx.coroutines.*
+import retrofit2.HttpException
 import timber.log.Timber
+import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -68,6 +70,12 @@ open class ChronicleApplication :
 
   @Inject
   lateinit var plexLoginService: PlexLoginService
+
+  @Inject
+  lateinit var accountAuthState: AccountAuthState
+
+  @Inject
+  lateinit var deviceAuthorizationCheck: DeviceAuthorizationCheck
 
   /**
    * Coil's image loader, built on the media OkHttp client so image requests carry
@@ -148,6 +156,21 @@ open class ChronicleApplication :
      */
     private const val RESOURCE_REFRESH_TIMEOUT_MS = 4000L
 
+    /**
+     * Whether a failed `/api/v2/resources` refresh means the **account token was refused**, as
+     * opposed to the network being unavailable.
+     *
+     * Split out of [setupNetwork] so it can be tested: the branch used to be a blanket
+     * `catch (e: Exception)` that logged every failure as "keeping cached server", so a real
+     * `401 Unauthorized` — the one unambiguous signal that the account is dead — was discarded and
+     * the user was never told (decision-17, cu-73).
+     *
+     * Only an explicit 401 qualifies. A timeout, a connection error and a 5xx are all *not* this:
+     * being offline is not being signed out (cu-84), and treating it as such would nag every user
+     * on a train.
+     */
+    fun isAccountRejection(e: Throwable): Boolean = e is HttpException && e.code() == HTTP_UNAUTHORIZED
+
     private var INSTANCE: ChronicleApplication? = null
 
     @JvmStatic
@@ -206,13 +229,23 @@ open class ChronicleApplication :
                 .map { it.asServer() }
                 .firstOrNull { it.serverId == server.serverId }
             } catch (e: Exception) {
-              // Launching offline is ordinary; keep the cached credentials.
-              Timber.w(e, "Could not refresh server resources; keeping cached server")
+              if (isAccountRejection(e)) {
+                Timber.w("plex.tv refused the account token (401); marking the account revoked")
+                accountAuthState.onAccountRejected()
+              } else {
+                // Launching offline is ordinary; keep the cached credentials.
+                Timber.w(e, "Could not refresh server resources; keeping cached server")
+              }
               null
             }
           }
         plexPrefs.server = mergeServerRefresh(server, fetched)
         Timber.i("Server refresh applied (fetched = ${fetched != null})")
+        // Ask whether this install is still a registered device. Removing one at plex.tv
+        // invalidates no token, so without this the app keeps working on credentials the user
+        // believes they withdrew (decision-17). Shares the refresh's timeout budget; any failure
+        // is inconclusive, never a revocation.
+        withTimeoutOrNull(RESOURCE_REFRESH_TIMEOUT_MS) { deviceAuthorizationCheck.run() }
         try {
           plexConfig.connectToServer(plexMediaService)
         } catch (t: Throwable) {

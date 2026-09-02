@@ -7,47 +7,112 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Whether the Plex account is still signed in, as observed from actual request failures.
+ * Whether the Plex account still accepts this app, as observed from actual server answers.
  *
  * `PlexLoginRepo.determineLoginState` decides from **presence** — a non-empty stored token means
  * `LOGGED_IN_FULLY`. Plex tokens never expire on a timer; they are invalidated by an event (a
- * password change with "sign out connected devices", a server re-claim), so a stored token can be
- * dead while looking perfectly valid. The app then showed stale data or an empty library and said
- * nothing, and the only recovery was a full logout and the whole OAuth flow again (cu-84).
+ * password change with "sign out connected devices", a server re-claim, the device being removed
+ * from plex.tv), so a stored token can be dead while looking perfectly valid.
  *
- * [PlexTokenAuthenticator] already knows: a 401 that survives its single server-token refresh means
- * the *account* token is bad. It logged that and gave up silently. This is where it records it, so
- * the UI can say so and offer re-authentication.
+ * ### Why three states and not a boolean (decision-17)
  *
- * **A network failure must never land here.** Being offline is not being signed out, and treating it
- * as such would nag every user on a train. Only an authenticated request that came back 401 counts.
+ * A boolean forces "not known to be signed out" and "known to be fine" into one value, and the
+ * app then has to guess which it meant. The live pass showed both failure directions:
+ *
+ * - a real 401 from plex.tv was **swallowed** as though it were an offline launch, so the user was
+ *   never told (DRAFT-123);
+ * - a device removed at plex.tv kept working entirely, because Plex invalidates no token and there
+ *   is nothing to react to (DRAFT-122).
+ *
+ * [Unknown] is therefore a first-class answer: it is what "the network did not tell us" means, and
+ * it must behave exactly like [Authenticated] as far as the user is concerned. Only a *successful*
+ * negative answer moves the state to [Revoked].
+ *
+ * **A network failure must never land in [Revoked].** Being offline is not being signed out, and
+ * treating it as such would nag every user on a train (cu-84). A timeout, a connection error, a
+ * 5xx or an unparseable body all mean [Unknown].
  */
 @Singleton
 class AccountAuthState
   @Inject
   constructor() {
-    private val _isSignedOut = MutableStateFlow(false)
+    /** What the server last told us about this app's authorization. */
+    enum class State {
+      /** A request was accepted. */
+      Authenticated,
 
-    /** True once a 401 has survived re-auth. Cleared by [onAuthenticated]. */
-    val isSignedOut: StateFlow<Boolean> = _isSignedOut
+      /** Nothing recent to go on — offline, not yet tried, or the check failed. Treat as fine. */
+      Unknown,
 
-    /**
-     * Records that the account token is no longer accepted.
-     *
-     * Called only from the authenticator's give-up path, never on a connection error.
-     */
-    fun onAccountRejected() {
-      if (!_isSignedOut.value) {
-        Timber.w("Account token rejected; signalling signed-out state")
-      }
-      _isSignedOut.value = true
+      /** The server explicitly refused, or explicitly no longer lists this client. */
+      Revoked,
     }
 
-    /** Records a successful authenticated exchange, clearing any signed-out state. */
-    fun onAuthenticated() {
-      if (_isSignedOut.value) {
-        Timber.i("Account accepted again; clearing signed-out state")
+    private val _state = MutableStateFlow(State.Unknown)
+
+    /** The current account state. */
+    val state: StateFlow<State> = _state
+
+    /**
+     * True only when the account is definitively [State.Revoked].
+     *
+     * Deliberately *not* true for [State.Unknown]: callers asking this question are deciding
+     * whether to tell the user something is wrong, and "we could not check" is not grounds.
+     *
+     * A plain value rather than a flow — the one caller (`PlexLoginRepo.determineLoginState`)
+     * reads it synchronously while deciding a login state. Observers should collect [state].
+     */
+    val isRevoked: Boolean
+      get() = _state.value == State.Revoked
+
+    /**
+     * Records that the account token is no longer accepted — a 401 that survived the
+     * authenticator's single server-token refresh.
+     */
+    fun onAccountRejected() {
+      if (_state.value != State.Revoked) {
+        Timber.w("Account token rejected; signalling revoked state")
       }
-      _isSignedOut.value = false
+      _state.value = State.Revoked
+    }
+
+    /**
+     * Records that plex.tv answered successfully and did **not** list this client any more, i.e.
+     * the user removed the device.
+     *
+     * Separate entry point from [onAccountRejected] so the *reason* is visible in logs; both land
+     * in the same state, because both mean "the user must sign in again".
+     */
+    fun onDeviceRevoked() {
+      if (_state.value != State.Revoked) {
+        Timber.w("This device is no longer listed on the account; signalling revoked state")
+      }
+      _state.value = State.Revoked
+    }
+
+    /** Records a successful authenticated exchange, clearing any revoked state. */
+    fun onAuthenticated() {
+      if (_state.value == State.Revoked) {
+        Timber.i("Account accepted again; clearing revoked state")
+      }
+      _state.value = State.Authenticated
+    }
+
+    /**
+     * Records that the check could not be made — offline, timed out, or the answer was unusable.
+     *
+     * Never downgrades a known-good [State.Authenticated]: failing to reach the server tells us
+     * nothing new, and flapping the state on every lost connection would make it useless.
+     */
+    fun onCheckInconclusive(reason: String) {
+      if (_state.value == State.Unknown) {
+        return
+      }
+      if (_state.value == State.Revoked) {
+        // A failed check is not evidence the revocation was lifted.
+        Timber.i("Account check inconclusive ($reason); staying revoked")
+        return
+      }
+      Timber.i("Account check inconclusive ($reason); state unchanged")
     }
   }
