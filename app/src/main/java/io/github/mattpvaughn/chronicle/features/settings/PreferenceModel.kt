@@ -13,7 +13,15 @@ data class PreferenceModel(
         // Do nothing by default
       }
     },
-  val defaultValue: Any? = null,
+  /**
+   * The switch's current value, for [PreferenceType.SWITCH] rows.
+   *
+   * Typed `Boolean?` rather than `Any?`: it is only ever a boolean, the sole reader cast it to
+   * one, and `DiffUtil.areContentsTheSame` compares it — an `Any?` there compares by identity
+   * for any type without `equals()`, so a row would silently stop repainting. Narrowing makes
+   * the compiler enforce what lint could only warn about.
+   */
+  val defaultValue: Boolean? = null,
 ) {
   fun hasExplanation(): Boolean {
     return explanation != FormattableString.EMPTY_STRING

@@ -113,7 +113,7 @@ class SettingsList : FrameLayout {
           if (prefsRepo.containsKey(preferenceModel.key)) {
             prefsRepo.getBoolean(preferenceModel.key)
           } else {
-            preferenceModel.defaultValue as Boolean
+            preferenceModel.defaultValue == true
           }
         binding.preferenceSwitch.setOnCheckedChangeListener { _: CompoundButton, isChecked: Boolean ->
           prefsRepo.setBoolean(preferenceModel.key, isChecked)

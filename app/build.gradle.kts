@@ -13,7 +13,11 @@ android {
   compileSdk = 36
 
   lint {
-    abortOnError = false
+    // Fatal, so `verify.sh`'s lint stage means what it claims. With `abortOnError = false` the
+    // stage could not fail: 18 Error-severity issues were passing through it, and neither id was
+    // in the baseline, so they were unreviewed rather than knowingly accepted. Anything genuinely
+    // accepted belongs in lint-baseline.xml, where it shows up in a diff.
+    abortOnError = true
     baseline = file("lint-baseline.xml")
     checkReleaseBuilds = true
     checkAllWarnings = true
