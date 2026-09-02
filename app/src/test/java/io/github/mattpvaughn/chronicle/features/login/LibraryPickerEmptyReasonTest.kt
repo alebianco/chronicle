@@ -47,7 +47,16 @@ class LibraryPickerEmptyReasonTest {
       every { url } returns "https://example.plex.direct:32400"
     }
 
-  private fun viewModel(mediaService: PlexMediaService) = ChooseLibraryViewModel(mediaService, plexConfig, mockk(relaxed = true))
+  private fun viewModel(mediaService: PlexMediaService) =
+    ChooseLibraryViewModel(
+      mediaService,
+      plexConfig,
+      mockk(relaxed = true),
+      mockk(relaxed = true),
+      mockk(relaxed = true),
+      mockk(relaxed = true),
+      mockk(relaxed = true),
+    )
 
   private fun serviceReturning(directories: List<Any>) =
     mockk<PlexMediaService>(relaxed = true) {

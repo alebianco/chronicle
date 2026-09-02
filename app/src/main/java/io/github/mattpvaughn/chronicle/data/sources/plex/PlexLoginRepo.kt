@@ -36,8 +36,13 @@ interface IPlexLoginRepo {
    */
   fun chooseServer(serverModel: ServerModel)
 
-  /** Chooses a library, sets it in the [PlexPrefsRepo], changes state to [LOGGED_IN_FULLY] */
-  fun chooseLibrary(plexLibrary: PlexLibrary)
+  /**
+   * Chooses a library, sets it in the [PlexPrefsRepo], changes state to [LOGGED_IN_FULLY].
+   *
+   * Returns true when this **replaced a different** library, so the caller can drop the previous
+   * library's cached catalogue. A first-ever choice returns false: there is nothing to invalidate.
+   */
+  fun chooseLibrary(plexLibrary: PlexLibrary): Boolean
 
   /**
    * Determines the current [LoginState] based on information stored in [PlexPrefsRepo] and
@@ -172,10 +177,29 @@ class PlexLoginRepo
       _loginState.postEvent(LOGGED_IN_NO_LIBRARY_CHOSEN)
     }
 
-    override fun chooseLibrary(plexLibrary: PlexLibrary) {
-      Timber.i("User chose library: $plexLibrary")
+    /**
+     * Records the chosen library, and reports whether it **replaced a different one**.
+     *
+     * The caller needs that answer: switching libraries invalidates every cached book and track,
+     * and leaves downloads belonging to a library that is no longer selected. Settings already
+     * handles this — it clears the databases and asks whether to keep downloaded files — but this
+     * path did not, so choosing a different library here left the app showing a *union* of two
+     * libraries until the next refresh pruned it, and a multi-gigabyte download could be reclaimed
+     * later as a silent side effect of a choice nobody was warned about (cu-126).
+     *
+     * Returning the fact rather than acting on it keeps this repository free of database and
+     * download dependencies; the decision about *what* to clear belongs with the code that already
+     * owns it.
+     */
+    override fun chooseLibrary(plexLibrary: PlexLibrary): Boolean {
+      val previous = plexPrefsRepo.library
+      // A first-ever choice is not a *change*: there is nothing cached to invalidate, and
+      // prompting there would ask about downloads that cannot exist yet.
+      val replacedDifferentLibrary = previous != null && previous.id != plexLibrary.id
+      Timber.i("User chose library: $plexLibrary (replaces different library: $replacedDifferentLibrary)")
       plexPrefsRepo.library = plexLibrary
       _loginState.postEvent(LOGGED_IN_FULLY)
+      return replacedDifferentLibrary
     }
 
     init {

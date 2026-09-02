@@ -66,7 +66,9 @@ class ChooseLibraryFragment : Fragment() {
       LibraryListAdapter(
         LibraryClickListener { library ->
           Timber.i("Library name: $library")
-          plexLoginRepo.chooseLibrary(library)
+          // Through the ViewModel, not the repo directly: switching to a *different* library has
+          // to drop the previous one's cached catalogue, or the app shows a union of two (cu-126).
+          viewModel.chooseLibrary(library)
         },
       )
 

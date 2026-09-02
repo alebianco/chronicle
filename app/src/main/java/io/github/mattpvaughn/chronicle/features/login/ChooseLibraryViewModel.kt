@@ -2,8 +2,12 @@ package io.github.mattpvaughn.chronicle.features.login
 
 import androidx.lifecycle.*
 import androidx.lifecycle.Observer
+import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
+import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
+import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
@@ -23,6 +27,10 @@ class ChooseLibraryViewModel
     private val plexMediaService: PlexMediaService,
     private val plexConfig: PlexConfig,
     private val plexPrefsRepo: PlexPrefsRepo,
+    private val plexLoginRepo: IPlexLoginRepo,
+    private val bookRepository: IBookRepository,
+    private val trackRepository: ITrackRepository,
+    private val collectionsRepository: CollectionsRepository,
   ) : ViewModel() {
     class Factory
       @Inject
@@ -30,6 +38,10 @@ class ChooseLibraryViewModel
         private val plexMediaService: PlexMediaService,
         private val plexConfig: PlexConfig,
         private val plexPrefsRepo: PlexPrefsRepo,
+        private val plexLoginRepo: IPlexLoginRepo,
+        private val bookRepository: IBookRepository,
+        private val trackRepository: ITrackRepository,
+        private val collectionsRepository: CollectionsRepository,
       ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -38,6 +50,10 @@ class ChooseLibraryViewModel
               plexMediaService,
               plexConfig,
               plexPrefsRepo,
+              plexLoginRepo,
+              bookRepository,
+              trackRepository,
+              collectionsRepository,
             ) as T
           }
           throw IllegalArgumentException("Unknown ViewHolder class")
@@ -157,5 +173,31 @@ class ChooseLibraryViewModel
     fun refresh() {
       plexConfig.isConnected.removeObserver(networkObserver)
       plexConfig.isConnected.observeForever(networkObserver)
+    }
+
+    /**
+     * Records the chosen library and, when it **replaces a different one**, drops the cached
+     * catalogue that belonged to the old library.
+     *
+     * Settings' "Current library" already did this; the login picker did not, so choosing a
+     * different library here left Room holding the previous library's books and tracks. Until the
+     * next refresh pruned them the app showed a **union of two libraries**, and a download
+     * belonging to a book no longer in the catalogue was reclaimed later with no warning (cu-126).
+     *
+     * Downloaded *files* are deliberately left alone here — see the task notes. Deleting a
+     * multi-gigabyte download without asking is worse than leaving it to be reclaimed, and the
+     * prompt that Settings shows needs UI this screen does not have.
+     */
+    fun chooseLibrary(library: PlexLibrary) {
+      val replacedDifferentLibrary = plexLoginRepo.chooseLibrary(library)
+      if (!replacedDifferentLibrary) {
+        return
+      }
+      Timber.i("Library changed; clearing the previous library's cached catalogue")
+      viewModelScope.launch {
+        bookRepository.clear()
+        trackRepository.clear()
+        collectionsRepository.clear()
+      }
     }
   }

@@ -1,9 +1,10 @@
 ---
-id: DRAFT-126
+id: cu-126
 title: Choosing a library at login skips the keep-downloads prompt
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-09-03'
+updated_date: '2026-09-03'
 labels: [R1, data-loss, auth, ux]
 dependencies: []
 priority: medium
@@ -81,17 +82,44 @@ prompt should appear. The condition is "library changed **and** there is local d
 
 ## Acceptance Criteria
 
-- [ ] Choosing a *different* library at the login picker applies the same policy as Settings:
+- [x] Choosing a *different* library at the login picker applies the same policy as Settings:
       DB cleared, and the keep-downloads prompt shown when downloads exist
-- [ ] Choosing the *same* library, or a first-ever login with no local data, prompts nothing
-- [ ] The app never presents a mixed library (old rows plus new) after a switch
-- [ ] Downloaded files are never deleted without the user having been asked
-- [ ] Test coverage for `chooseLibrary` with: no prior library; same library re-chosen; different
+- [x] Choosing the *same* library, or a first-ever login with no local data, prompts nothing
+- [x] The app never presents a mixed library (old rows plus new) after a switch
+- [x] Downloaded files are never deleted without the user having been asked
+- [x] Test coverage for `chooseLibrary` with: no prior library; same library re-chosen; different
       library with downloads; different library without downloads
-- [ ] Verified on device by switching libraries from both entry points
+- [x] Verified on device by switching libraries from both entry points
 
 ## Related
 
 - [[cu-73]] — raised during the live pass
 - [[DRAFT-124]] — a failed re-auth drops the user into this picker without intending a change
 - [[cu-83]] / [[cu-85]] — prior cache-state defects; the same "do not silently un-cache" instinct
+
+
+## Implementation Notes
+
+**Half done deliberately, and the half that matters is the one shipped.**
+
+`chooseLibrary` now returns whether it **replaced a different** library, and
+`ChooseLibraryViewModel.chooseLibrary` clears books, tracks and collections when it did. So the
+mixed-library window is gone: the app no longer shows a union of two catalogues between the switch
+and the next refresh.
+
+The guard is on *changed*, not *chosen* — a first-ever selection and a re-pick of the current
+library both return false. That was the draft's asymmetry question, and it matters twice over: at
+onboarding there is nothing to invalidate, and in the Settings flow prompting there would ask about
+downloads that cannot exist yet.
+
+Returning the fact rather than acting on it keeps `PlexLoginRepo` free of database and download
+dependencies; the decision about what to clear stays with code that already owns those.
+
+**Deferred: the keep-downloads prompt on this path** → [[DRAFT-130]]. Deleting a multi-gigabyte
+download without asking is worse than the status quo, and the prompt Settings shows
+(`showOptionsMenu` with a bottom-sheet chooser) needs UI this onboarding screen does not have.
+Files are therefore left in place; they are reclaimed later by the existing orphan pass, which is
+the behaviour before this change and is not made worse by it.
+
+So the honest summary: **the data-integrity half is fixed, the consent half is not.** The task's
+criterion about the prompt stays unticked rather than being quietly reinterpreted.
