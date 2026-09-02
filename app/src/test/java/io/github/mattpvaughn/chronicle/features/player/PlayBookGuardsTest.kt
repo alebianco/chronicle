@@ -105,6 +105,40 @@ class PlayBookGuardsTest {
   }
 
   /**
+   * The recovery path must sync with the tracks it just **fetched**, not the empty list it was
+   * called with.
+   *
+   * `syncAudiobook` writes `progress = tracks.getProgress()` and `duration = tracks.getDuration()`,
+   * so handing it the empty list zeroes both — the book restarts from the beginning and the library
+   * shows 0%. It reproduces whenever the local track table has no rows for a book that plays: a
+   * fresh install restore, after a `clear()`, or a play from Android Auto before any sync. The
+   * fetch *succeeds*, which is what makes it silent.
+   *
+   * Asserting on the tracks passed rather than on a resulting `progress` value keeps this pinned to
+   * the actual defect — a real `BookRepository` would then derive the position from them
+   * ([decision-16]).
+   */
+  @Test
+  fun `the fetched tracks are synced, not the empty list that triggered the fetch`() {
+    val fetched =
+      listOf(
+        MediaItemTrack(id = "2001", parentKey = bookId, index = 1, duration = 600_000L, progress = 90_000L),
+        MediaItemTrack(id = "2002", parentKey = bookId, index = 2, duration = 600_000L),
+      )
+    val syncedTracks = mutableListOf<List<MediaItemTrack>>()
+    val trackRepo = FakeEmptyTrackRepository(onFetch = { Ok(fetched) })
+
+    callback(trackRepo, onSyncAudiobook = { syncedTracks.add(it) })
+      .onPlayFromMediaId(bookId, Bundle())
+
+    assertEquals(
+      "syncAudiobook must receive the fetched tracks; the empty list zeroes the saved position",
+      listOf(fetched.map { it.id }),
+      syncedTracks.map { tracks -> tracks.map { it.id } },
+    )
+  }
+
+  /**
    * A hand-written fake rather than a mock.
    *
    * `loadTracksForAudiobook` returns `Result`, a **value class**, and mockk mangles the method name
@@ -123,12 +157,21 @@ class PlayBookGuardsTest {
     ): Result<List<MediaItemTrack>, Throwable> = onFetch()
   }
 
-  private fun callback(trackRepo: ITrackRepository): AudiobookMediaSessionCallback {
+  private fun callback(
+    trackRepo: ITrackRepository,
+    onSyncAudiobook: (List<MediaItemTrack>) -> Unit = {},
+  ): AudiobookMediaSessionCallback {
     val session =
       MediaSessionCompat(ApplicationProvider.getApplicationContext(), "PlayBookGuardsTest")
     val bookRepo =
       mockk<IBookRepository>(relaxed = true) {
         coEvery { getAudiobookAsync(any()) } returns Audiobook(id = bookId, source = 1L, title = "Book")
+        coEvery { syncAudiobook(any(), any(), any()) } answers
+          {
+            @Suppress("UNCHECKED_CAST")
+            onSyncAudiobook(secondArg<List<MediaItemTrack>>())
+            true
+          }
       }
 
     return AudiobookMediaSessionCallback(

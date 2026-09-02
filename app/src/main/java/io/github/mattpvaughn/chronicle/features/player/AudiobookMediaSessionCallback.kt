@@ -369,7 +369,7 @@ class AudiobookMediaSessionCallback
           return@launch
         }
 
-        Timber.i("Tracks: $tracks")
+        Timber.i("Playing book $bookId with ${tracks.size} tracks")
 
         trackListStateManager.trackList = tracks
         val metadataList = buildPlaylist(tracks, plexConfig)
@@ -509,7 +509,11 @@ class AudiobookMediaSessionCallback
         )
         val audiobook = bookRepository.getAudiobookAsync(bookId)
         if (audiobook != null) {
-          bookRepository.syncAudiobook(audiobook, tracks)
+          // The tracks just fetched, never the empty `tracks` this method was called with.
+          // `syncAudiobook` writes `progress`/`duration` derived from what it is handed, so the
+          // empty list zeroes the book's saved position — it restarts from the beginning and
+          // reads 0% in the library ([decision-16]).
+          bookRepository.syncAudiobook(audiobook, networkTracks.value)
         }
         playBook(bookId, extras, playWhenReady, trackFetchAttempts + 1)
       } else {
