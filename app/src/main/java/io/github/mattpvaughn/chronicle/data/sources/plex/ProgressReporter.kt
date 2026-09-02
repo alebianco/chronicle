@@ -130,6 +130,13 @@ class ProgressReporter(
     if (lookupBookViewCount(bookId) > 0L) return
 
     val bookDuration = lookupBookDuration(bookId)
+    // A book whose duration is not loaded yet has duration 0, which makes the window check
+    // trivially true for any progress — so a book at 3% gets scrobbled as finished, its
+    // `viewCount` incremented and its `viewOffset` cleared server-side (the cu-73/cu-98 damage).
+    // It is reachable: `lookupBookDuration` derives from `getTracksForAudiobookAsync`, which
+    // filters on `cached >= offlineMode`, so an uncached book in offline mode has no tracks and
+    // therefore no duration. `Audiobook.isCompleted()` has carried this guard all along.
+    if (bookDuration <= 0L) return
     if (bookDuration - request.bookProgress < BOOK_FINISHED_END_OFFSET_MILLIS) {
       runCatching { api.markWatched(bookId) }
         .onFailure { Timber.e(it, "Failed to mark book $bookId watched") }

@@ -243,4 +243,46 @@ class MarkFinishedBoundaryTest {
 
       assertTrue(api.watchedKeys.none { it == "1001" })
     }
+
+  /**
+   * A duration of zero means "the tracks are not loaded", not "the book is over".
+   *
+   * Without a guard the window check is trivially true — `0 - 3000 < 120000` — so a book barely
+   * started gets scrobbled finished on the server: `viewCount` incremented and `viewOffset`
+   * cleared, which is precisely the damage cu-73 observed and cu-98 had to repair.
+   *
+   * It is reachable, not hypothetical. `lookupBookDuration` derives from
+   * `getTracksForAudiobookAsync`, whose query filters `cached >= :offlineMode` — so an *uncached*
+   * book in offline mode returns no tracks and therefore no duration. `Audiobook.isCompleted()`
+   * has carried this guard all along; the two paths that write to the server did not.
+   */
+  @Test
+  fun `a book whose duration is not loaded is never marked watched`() =
+    runTest {
+      val api =
+        reportAt(
+          trackProgress = 100L,
+          bookProgress = 3_000L,
+          bookDuration = 0L,
+        )
+
+      assertTrue(
+        "duration 0 means tracks are unloaded, not that the book is finished",
+        api.watchedKeys.none { it == "1001" },
+      )
+    }
+
+  /** The same at the very start, which is the state a fresh play is in. */
+  @Test
+  fun `an unstarted book with no duration is never marked watched`() =
+    runTest {
+      val api =
+        reportAt(
+          trackProgress = 0L,
+          bookProgress = 0L,
+          bookDuration = 0L,
+        )
+
+      assertTrue(api.watchedKeys.none { it == "1001" })
+    }
 }

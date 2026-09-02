@@ -204,13 +204,26 @@ class SimpleProgressUpdater
       progress: Long,
       forceNetworkUpdate: Boolean,
     ) {
-      Timber.i("Updating progress")
       val currentTime = System.currentTimeMillis()
-      val bookId: String = trackRepository.getBookIdForTrack(trackId)
-      val track: MediaItemTrack = trackRepository.getTrackAsync(trackId) ?: EMPTY_TRACK
+
+      // Cheapest guard first: this runs once a second, so a known-bad id must cost nothing.
+      // It used to sit *after* the two reads below, which it exists to avoid.
+      if (trackId == TRACK_NOT_FOUND) {
+        return
+      }
+
+      // One read, not two. `getBookIdForTrack` fetches this very row and throws everything but
+      // `parentKey` away, so asking for the track separately queried the same row twice per tick
+      // (cu-110/cu-104).
+      //
+      // A missing row must still stop here. `getBookIdForTrack` signalled that by returning
+      // `NO_AUDIOBOOK_FOUND_ID`, which is *not* what `EMPTY_TRACK.parentKey` holds ("-1"), so the
+      // null check has to happen on the row itself rather than on the id it yields.
+      val track: MediaItemTrack = trackRepository.getTrackAsync(trackId) ?: return
+      val bookId: String = track.parentKey
 
       // No reason to update if the track or book doesn't exist in the DB
-      if (trackId == TRACK_NOT_FOUND || bookId == NO_AUDIOBOOK_FOUND_ID) {
+      if (bookId == NO_AUDIOBOOK_FOUND_ID || bookId == EMPTY_TRACK.parentKey) {
         return
       }
 
@@ -313,7 +326,14 @@ class SimpleProgressUpdater
       val hasUserEndedPlayback =
         playbackState == MediaPlayerService.PLEX_STATE_PAUSED ||
           playbackState == MediaPlayerService.PLEX_STATE_STOPPED
-      if (hasUserEndedPlayback && bookDuration - bookProgress <= BOOK_FINISHED_END_OFFSET_MILLIS) {
+      // A duration of 0 means the tracks are not loaded, not that the book is over: the window
+      // check would be trivially true and mark an unstarted book finished. Same guard as
+      // `Audiobook.isCompleted()` and the server-side path in `ProgressReporter`.
+      if (
+        hasUserEndedPlayback &&
+        bookDuration > 0L &&
+        bookDuration - bookProgress <= BOOK_FINISHED_END_OFFSET_MILLIS
+      ) {
         Timber.i("Marking $bookId as finished")
         // `setWatched` propagates a server failure since cu-98. Caught here rather than left to
         // escape: this runs on the progress-reporting path, and failing to mark a finished book
