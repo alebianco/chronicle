@@ -83,9 +83,31 @@ Grouped by what breaks if the real server disagrees.
       network, and worth knowing generally — a resolver that filters rebind-style private answers
       breaks Plex LAN addressing for every client, not just this app.
 
-- [ ] **Network switch mid-playback recovers in under 5 seconds.** Wi-Fi to cellular and
+- [~] **Network switch mid-playback recovers in under 5 seconds.** Wi-Fi to cellular and
       back while a book plays. The arithmetic supports it (1.5s tier budget + 5s connect
       timeout) but elapsed time cannot be measured in a unit test.
+      **Measured 2026-09-02, session 3, for a Wi-Fi drop-and-restore** (this tablet has no SIM —
+      `mDataRegState = OUT_OF_SERVICE` — so the cellular half is still untested):
+
+      | event | time |
+      |---|---|
+      | Wi-Fi disabled | 11:04:05.6 |
+      | Wi-Fi re-enabled | 11:04:11.9 |
+      | app re-chose LAN | **11:04:16.5** |
+      | Android marked network validated | 11:04:19.0 |
+
+      **~4.6 s** from the link returning to a working connection — inside the 5 s target, and
+      notably *before* the platform considered the network validated, so the app is not waiting on
+      `onAvailable` validation to retry.
+
+      Crucially **playback never stopped**: `state=3` throughout, position advanced normally, and
+      **zero** `ExoPlaybackException` / source errors. The stream survived a 6 s outage, which is
+      ExoPlayer's buffer doing its job.
+
+      Left partial rather than done for two honest gaps: no **cellular** transport (no SIM), and
+      the tablet has a configured hotspot from the owner's phone so a true *Wi-Fi-to-Wi-Fi
+      handover* is possible but was not run — a same-SSID reconnect is an easier case than
+      switching to a different network with a different route to the server.
 - [x] **The real `/resources` response shape.**
       **Verified 2026-09-02.** `relay` is present and spelled as the model expects (`"relay":false`
       on both connections; this server exposes no relay route). `IPv6` **is** present as a boolean
@@ -325,9 +347,26 @@ Grouped by what breaks if the real server disagrees.
       the absolute-vs-per-track offset trap actually bites) and on a book with **no** embedded
       chapters.
 
-- [ ] **A book with no embedded chapters falls back to one chapter per file.** Fixed in cu-13
+- [x] **A book with no embedded chapters falls back to one chapter per file.** Fixed in cu-13
       (`asChapterList` built its chapters and discarded them, so such books showed none at
       all); unit-tested, but never seen against a real library.
+      **Verified 2026-09-02, session 3 — and this library is full of the case.** An API sweep found
+      the split cleanly: **every multi-track book reports 0 embedded chapters per track** (they are
+      already one file per chapter), while single-m4b books carry real chapter data. So the fallback
+      is not an edge case here, it is how most of the library renders.
+
+      Tested on `Ender's Game` (book 151444, **107 tracks**). The detail screen lists
+      "Ender's Game - Chapter 96", 97, 98 … each with its own duration, grouped by disc. In
+      `chapter_db`:
+
+      - **107 chapters** for 107 tracks — exactly one per file
+      - offsets **absolute and contiguous**: `0 -> 407275 -> 823536 -> 1129821 -> …`, each `end`
+        equal to the next `start`
+      - `MAX(endTimeOffset)` = **40,307,356** = the book's stored `duration`, exactly
+      - **exactly one** chapter with `startTimeOffset = 0`
+
+      Those last two are the [[cu-13]]/[[cu-49]] per-track-`0L` trap checked directly: were it
+      present, every chapter would start at 0 and the chapters would not tile the book. They do.
 - [x] **Which artwork the player shows for each track** (#119).
       **Verified 2026-09-02, session 3 — the bug cannot manifest on this library.** Swept **all
       1376 tracks across all 196 books** via `?type=10`, including books of 240, 159, 113 and 107
@@ -378,15 +417,53 @@ mechanism in the code and fixed, but **every fix is unit-tested only** — none 
 library, a real upgrade, or a second device. These are the checks that turn "the mechanism is right"
 into "the symptom is gone".
 
-- [ ] **A downloaded book plays after a force-quit and relaunch, offline** ([[cu-83]]). The cached
+- [x] **A downloaded book plays after a force-quit and relaunch, offline** ([[cu-83]]). The cached
       track URI now carries a `file://` scheme; the symptom was an unsupported-format error on
       downloaded books only. Try a book whose sync directory path contains a **space or a non-ASCII
       character**, since that is what the percent-encoding half of the fix is for.
-- [ ] **Cached status survives repeated relaunches** ([[cu-85]]), and — the case that matters — with
+      **Verified 2026-09-02, session 3 — including the awkward-path case the item asks for.** The
+      1.64 GB download was moved to
+      `.../files/Chronicle Downloads àéî/` (spaces *and* accents), the sync location repointed
+      there, aeroplane mode enabled, the app force-stopped, then cold-started. It played:
+
+      ```
+      file:///storage/79AF-CD2E/Android/data/.../files/Chronicle%20Downloads%20%C3%A0%C3%A9%C3%AE/155607.m4b
+      ```
+
+      Spaces as `%20` and `àéî` as correct UTF-8 escapes (`%C3%A0%C3%A9%C3%AE`) — which is what
+      `Uri.fromFile` produces and precisely what the old `"file://" + path` concatenation got wrong.
+      `state=3`, **zero** `ExoPlaybackException` / `ERROR_CODE_IO`, `AudioFlinger` actively mixing,
+      and the progress loop advancing (26669 -> 27673 ms). Off an SD card, with no network at all.
+
+      So both halves of cu-83 are confirmed on real hardware: the scheme *and* the encoding.
+- [x] **Cached status survives repeated relaunches** ([[cu-85]]), and — the case that matters — with
       downloads on an **SD card, eject it**: the books must read as unavailable, *not* as
-      never-downloaded, and must come back when it is reinserted. Also confirm
-      `MoveSyncLocationWorker` does not leave a stale path in prefs after moving storage; that
-      interaction was not audited.
+      never-downloaded, and must come back when it is reinserted.
+      **Verified 2026-09-02, session 3, on a real 59 GB SD card.** Earlier sessions assumed this
+      needed absent hardware; the tablet has one mounted (`public:179,129`, `79AF-CD2E`), and `sm
+      unmount` / `sm mount` drive a genuine eject without touching it.
+
+      Setup was made real rather than simulated: sync location repointed to the card, the 1.64 GB
+      download moved there, and the internal copy deleted, so the card held the *only* copy.
+
+      | state | track `cached` | book `isCached` |
+      |---|---|---|
+      | card present (baseline) | 1 | 1 |
+      | **card unmounted, path gone** | **1** | **1** |
+      | card remounted | 1 | 1 |
+      | + 3 further relaunches | 1, 1, 1 | 1, 1, 1 |
+
+      With the volume genuinely absent (`ls /storage/79AF-CD2E` -> `No such file or directory`) the
+      flags **stayed at 1** — "downloaded but unavailable", which is the correct and recoverable
+      answer — and the 1.64 GB file was intact on reinsertion. Before cu-85, `cachedMediaDir` fell
+      back to a different *readable* directory, the scan found none of the expected files there,
+      and it un-cached the whole library.
+
+      Repeated-relaunch stability confirmed separately: three cold starts, no drift.
+
+      **Still not covered:** `MoveSyncLocationWorker` leaving a stale path in prefs after moving
+      storage. I set the pref directly rather than driving the settings UI, so the worker itself
+      never ran — that interaction remains unaudited, as the original item noted.
 - [ ] **Two devices converge on one position** ([[cu-90]]). Listen on A into a *later* track, then
       open the book on B which last touched an *earlier* track. B must not drag the position
       backwards. Then reload book info repeatedly on one device: the position must not move.
