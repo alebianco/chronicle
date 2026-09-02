@@ -49,19 +49,33 @@ Grouped by what breaks if the real server disagrees.
       *Disabled* will no longer connect on its LAN address. Verify the default
       (*Preferred*) works, and note what the failure looks like if someone has disabled
       it, so the error is diagnosable.
-- [ ] **cu-42 — `resources.json` fidelity.** The fixture now models local connections as
-      hyphenated-IP HTTPS. Capture a real `/api/resources` response and confirm the shape
+- [x] **cu-42 — `resources.json` fidelity.**
+      **Verified 2026-09-02.** The fixture is faithful: `local`, `relay`, `protocol` and
+      hyphenated-IP HTTPS all match a real response. Two harmless differences, no fixture change
+      needed — the real payload also carries `address`, `port` and `IPv6` (all ignored by the
+      model), and the real server reports **no relay connection** while the fixture has one, which
+      is correct since the fixture must exercise that tier. Capture a real `/api/resources` response and confirm the shape
       matches; correct the fixture if not.
 
 ### Connection tiering (cu-11)
 
-- [ ] **A LAN-only server connects, and over LAN.** Confirm from the log which tier was
+- [x] **A LAN-only server connects, and over LAN.** — **FAILED 2026-09-02, filed as [[cu-107]].**
+      The log showed `Trying 2 DIRECT connection(s)` and `Chose DIRECT connection: <WAN address>`
+      on a server whose `/resources` reports `local: true` for its LAN address. Cause: connections
+      are persisted to `SharedPreferences` as bare URI strings and rebuilt with `Connection(uri)`,
+      so `local` and `relay` both revert to `false` — **cu-11's tiering is inert on every launch
+      after the first**, and the two "local"/"remote" pref keys are written identical contents.
+      Checking this from the log rather than assuming is exactly what caught it. Confirm from the log which tier was
       chosen (`Chose LAN connection: ...`) rather than assuming — the whole point is that
       relay no longer wins races it should not be in.
 - [ ] **Network switch mid-playback recovers in under 5 seconds.** Wi-Fi to cellular and
       back while a book plays. The arithmetic supports it (1.5s tier budget + 5s connect
       timeout) but elapsed time cannot be measured in a unit test.
-- [ ] **The real `/resources` response shape.** Capture it and confirm `relay` is present
+- [x] **The real `/resources` response shape.**
+      **Verified 2026-09-02.** `relay` is present and spelled as the model expects (`"relay":false`
+      on both connections; this server exposes no relay route). `IPv6` **is** present as a boolean
+      and is `false` on every connection — so [[draft-75]] has its answer: the flag exists and is
+      parseable, but nothing on this server needs it. Full captured payload is quoted in [[cu-107]]. Capture it and confirm `relay` is present
       and spelled as the model expects, and note whether `IPv6` connections appear at all —
       that decides whether [[cu-75]] is worth opening.
 - [ ] **End-to-end connection selection via `FakePlexServer`.** The chooser's tests inject
@@ -286,3 +300,58 @@ Three fixes were attempted on the seek before the right one, all reasoned from r
 actually solved it was **measuring**: a log showing 228 UI recomputations per minute. On a device,
 instrument first.
 
+
+## Session 2 — 2026-09-02, tablet (Phh-Treble GSI, Android 12 / SDK 32), live Plex server
+
+A second device, deliberately *unlike* session 1's Galaxy A33: **SDK 32, not 36**, and a
+1920×1200 **landscape tablet**. So it re-verifies none of session 1's platform findings
+(predictive back, bottom-nav insets and the mini-player squash are all SDK 35/36 behaviours) but
+it does cover a form factor nothing in this backlog had ever been run on.
+
+Installed side by side with the `.debug` suffix again; login, library population and the Home
+screen all render correctly at this size.
+
+### One bug, in the layer the unit tests cannot reach
+
+**[[cu-107]] — the connection tier is destroyed by its own persistence.** `local` and `relay` are
+dropped when the chosen server is written to `SharedPreferences` and rebuilt with the single-arg
+`Connection(uri)` constructor, so every connection reads back as `DIRECT` and cu-11's tiering does
+nothing from the second launch onwards. The app still connects, by whichever route answers first —
+here, the **WAN address**, while a LAN address was available.
+
+Worth dwelling on *why* every cu-11 unit test passes: they construct `Connection` objects directly
+and assert the chooser's decisions. The defect is entirely in the round trip, which no test crosses.
+The checklist item said "confirm from the log which tier was chosen **rather than assuming**" — that
+wording is the only reason this was caught, since the observable behaviour is simply "it works".
+
+### An environment fact that shaped the above
+
+`192-168-1-54.<hash>.plex.direct` **does not resolve on this network** — verified independently
+with `dig` from a second machine, which returns an empty answer, while the WAN name resolves fine.
+On the device it resolved to `127.0.0.1`, so the LAN probe failed against loopback.
+
+This is a DNS matter, not an app bug (Plex's wildcard `*.plex.direct` records are public DNS, so a
+resolver that filters rebind-style answers — many routers and most public resolvers do — breaks LAN
+addressing). It does mean **the LAN tier could not be exercised end-to-end here**: cu-107 explains
+why no LAN tier was offered, but even with cu-107 fixed this network would still fail the LAN probe
+and fall back to WAN. Re-checking the LAN half of cu-11 needs a network whose resolver returns
+private answers for `plex.direct`.
+
+### A second bug, found by testing cu-77 on the same device
+
+**The settings list never rebound a row whose value changed** (fixed in [[cu-77]]).
+`PreferenceItemDiffCallback.areContentsTheSame` compared only title and explanation, so importing a
+settings backup left every switch showing its old state while the preferences underneath were
+already correct.
+
+Same shape as the cu-107 finding above, and worth noting as a pattern: the code was correct
+*locally* (the view holder reads `prefsRepo` live and would have rendered the right value), and the
+defect was in a comparison deciding whether to run it at all. Both were invisible to unit tests and
+both needed a screen.
+
+### Method note, consistent with session 1
+
+Session 1 concluded "on a device, instrument first". This session's finding came the same way: not
+from reading `ConnectionChooser` (which is correct) but from reading **one log line that disagreed
+with the model** — two connections classified into one tier when the server's own JSON said
+otherwise. The fixture, the parse and the chooser were each individually right.
