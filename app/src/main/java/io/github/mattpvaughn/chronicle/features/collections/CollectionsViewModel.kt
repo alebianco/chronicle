@@ -57,6 +57,10 @@ class CollectionsViewModel(
 
   val isRefreshing = librarySyncRepository.isRefreshing
 
+  /** A refresh failure, surfaced by the fragment. Raised off the main thread, so it is an
+   *  event carrying a string resource rather than a `Toast` (which would throw there). */
+  val syncError = librarySyncRepository.errorMessage
+
   private var _isSearchActive = MutableLiveData<Boolean>()
   val isSearchActive: LiveData<Boolean>
     get() = _isSearchActive

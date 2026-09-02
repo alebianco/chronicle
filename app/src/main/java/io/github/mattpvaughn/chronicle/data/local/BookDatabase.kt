@@ -6,6 +6,7 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookTrackData
 
 private const val BOOK_DATABASE_NAME = "book_db"
 
@@ -221,6 +222,20 @@ interface BookDao {
     duration: Long,
     trackCount: Int,
   )
+
+  /**
+   * The same update for many books in one transaction.
+   *
+   * A full sync re-derives this for every book. Done one call at a time each write is its own
+   * implicit transaction — 2000 fsyncs for a 2000-book library — so the loop is the cost, not the
+   * statement. [androidx.room.Transaction] makes the batch one commit.
+   */
+  @Transaction
+  suspend fun updateTrackDataForAll(updates: List<BookTrackData>) {
+    updates.forEach {
+      updateTrackData(it.bookId, it.bookProgress, it.bookDuration, it.trackCount)
+    }
+  }
 
   @Query(
     "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive AND (title LIKE :query OR author LIKE :query)",

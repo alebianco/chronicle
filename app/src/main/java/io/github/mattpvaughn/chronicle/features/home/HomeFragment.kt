@@ -155,6 +155,14 @@ class HomeFragment : Fragment() {
       },
     )
 
+    // A refresh failure. It arrives as a string resource because it is raised on an IO
+    // dispatcher, where `Toast.show()` throws; the toast belongs here, on the main thread.
+    viewModel.syncError.observe(viewLifecycleOwner) {
+      it.getContentIfNotHandled()?.let { messageRes ->
+        Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
+      }
+    }
+
     (activity as MainActivity).setSupportActionBar(binding.toolbar)
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).

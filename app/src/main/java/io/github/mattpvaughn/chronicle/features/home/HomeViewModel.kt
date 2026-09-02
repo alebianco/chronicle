@@ -12,6 +12,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.library.LibraryViewModel
 import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.booksKey
+import io.github.mattpvaughn.chronicle.util.distinctBy
 import io.github.mattpvaughn.chronicle.util.observeOnce
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -52,31 +54,46 @@ class HomeViewModel(
   val offlineMode: LiveData<Boolean>
     get() = _offlineMode
 
+  /**
+   * The shelves are deduped at the source (cu-110).
+   *
+   * Each of these is a Room `LiveData` on the `Audiobook` table, and Room invalidates per table —
+   * so `ProgressUpdater`'s once-a-second write during playback re-emitted all three, and each
+   * emission rebuilt the list and deserialized `Audiobook.chapters` for every book in it. Measured
+   * with the player sheet open over Home: 88% janky frames, main thread at ~24% of a core
+   * continuously, a GC every ~4s freeing ~165,000 objects, and taps and back presses dropped.
+   *
+   * [distinctBy] with [booksKey] stops the emission when nothing the UI draws has changed, which
+   * is the common case at tick rate. It keys on progress as well as identity, so a genuine
+   * progress change still propagates — dropping that is what froze `LibraryViewModel`'s bars.
+   */
+  private val recentlyListenedSource =
+    bookRepository.getRecentlyListened().distinctBy { it.booksKey() }
+
   val recentlyListened =
-    DoubleLiveData(bookRepository.getRecentlyListened(), _offlineMode) { recents, offline ->
+    DoubleLiveData(recentlyListenedSource, _offlineMode) { recents, offline ->
       return@DoubleLiveData if (offline == true) {
         recents?.filter { it.isCached }
       } else {
-        // Titles only, deliberately. This used to interpolate the whole `List<Audiobook>`, and
-        // `Audiobook.toString()` includes the serialized `chapters` column — so a book with 108
-        // chapters produced a ~1 KB line, on the main thread, built and written on **every**
-        // emission. The source is a Room `LiveData`, which re-emits on every write to the
-        // Audiobook table, and `ProgressUpdater` writes once a second during playback: measured
-        // 3.4 MB of logging across 2920 lines in one short session, with the main thread at ~24%
-        // of a core and 84% janky frames (cu-110).
-        Timber.i("Recently listened: ${recents?.map { it.title }}")
         recents
       } ?: emptyList()
     }
 
   val isRefreshing = librarySyncRepository.isRefreshing
 
+  /** A refresh failure, surfaced by the fragment. Raised off the main thread, so it is an
+   *  event carrying a string resource rather than a `Toast` (which would throw there). */
+  val syncError = librarySyncRepository.errorMessage
+
   private var _messageForUser = MutableLiveData<Event<String>>()
   val messageForUser: LiveData<Event<String>>
     get() = _messageForUser
 
   var recentlyAdded: DoubleLiveData<List<Audiobook>, Boolean, List<Audiobook>> =
-    DoubleLiveData(bookRepository.getRecentlyAdded(), _offlineMode) { recents, offline ->
+    DoubleLiveData(
+      bookRepository.getRecentlyAdded().distinctBy { it.booksKey() },
+      _offlineMode,
+    ) { recents, offline ->
       /** We only want books which have actually been listened to! */
       if (offline == true) {
         return@DoubleLiveData recents?.filter { book -> book.isCached } ?: emptyList()
@@ -85,7 +102,8 @@ class HomeViewModel(
       }
     }
 
-  val downloaded: LiveData<List<Audiobook>> = bookRepository.getCachedAudiobooks()
+  val downloaded: LiveData<List<Audiobook>> =
+    bookRepository.getCachedAudiobooks().distinctBy { it.booksKey() }
 
   private var _isSearchActive = MutableLiveData<Boolean>()
   val isSearchActive: LiveData<Boolean>

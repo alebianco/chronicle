@@ -87,6 +87,7 @@
     <string name="cannot_play_media_no_server">Cannot play media- not connected to any server!</string>
     <string name="prompt_mark_as_unwatched">Mark as unwatched?</string>
     <string name="failed_to_sync_progress">Failed to sync progress</string>
+    <string name="failed_to_refresh_library">Couldn\'t refresh your library</string>
     <string name="unable_to_cache_audiobook">Unable to download audiobook- not connected to server</string>
     <string name="force_sync">Force Sync</string>
     <string name="prompt_force_sync">Force sync with network? Local progress will be lost</string>
