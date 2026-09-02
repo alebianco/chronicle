@@ -211,7 +211,17 @@ class AppModule(private val app: Application) {
       // authenticator, but never body-level logging, which would buffer a whole audiobook in
       // memory and OOM the process (cu-109).
       .setHttpDownloader(OkHttpDownloader(okHttpClient))
+      // Fetch2 logs whole `DownloadInfo` objects, and that `toString()` includes the headers
+      // map — so plain logging wrote the Plex token to logcat three times before a single byte
+      // transferred, in release builds too, since `enableLogging(true)` was unconditional.
+      // `TokenLoggingTest` could not catch it: it scans our own Timber calls, not a library's
+      // internal logging.
+      //
+      // Redacted rather than switched off. These lines are how the download path is diagnosed —
+      // cu-109's OOM inside Fetch2's own thread was found by reading them, and cu-73's remaining
+      // download items still need them.
       .enableLogging(true)
+      .setLogger(RedactingFetchLogger())
       .build()
 
   @Provides
