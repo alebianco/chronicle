@@ -12,6 +12,41 @@ milestone: m-1
 
 ## Description
 
+> **⚠️ RETRACTED IN PART, 2026-09-03 — the original measurement was flawed. Do not act on this
+> without re-testing.**
+>
+> The claim "the phone's stored position stayed at 189 ms" was read with
+> `sqlite3` against a **copy of the main database file only**, without its `-wal`. Room runs in WAL
+> mode, so recent writes live in the write-ahead log and are invisible to that read. Re-reading the
+> same device *with* the WAL showed **14768 ms**, with a `lastViewedAt` **newer** than the tablet's
+> — i.e. the phone's own playback, not a failed adoption.
+>
+> `MediaItemTrack.merge` was then unit-tested against the exact live numbers
+> (`viewOffset 236955` / `lastViewedAt 1788384988` vs local `189` / `1788384769136`) and **behaves
+> correctly**: it adopts the newer network value, refuses a stale one, honours `forceUseNetwork`,
+> and keeps the local `cached` flag. `plexTimestampToMillis` converts seconds to millis correctly,
+> so the comparison is sound. Five tests, in `PositionAdoptionTest`, all passing against unmodified
+> production code.
+>
+> `loadTracksForAudiobook`, `syncTracksInBook` and `mergeNetworkTracks` were also read line by line
+> and each merges and persists correctly.
+>
+> **A clean re-test could not be completed**, because the phone is no longer a valid test device:
+> the password change killed its account token, and it still holds the *pre-restart* `plex.direct`
+> certificate hash (`32080aae…` vs the server's current `d8f64ea2…`), so it shows
+> "Can't connect to server" — the same TLS mismatch as [[DRAFT-125]]. It must be re-logged-in before
+> any two-device test means anything.
+>
+> **What remains genuinely unknown:** whether adoption works end to end on a device that *has not*
+> played the book itself. The original run cannot answer it either way. The lesson worth keeping is
+> the method one, below.
+>
+> **Method rule for anyone re-testing:** always pull `track_db`, `track_db-wal` **and**
+> `track_db-shm` together, or use `run-as … sqlite3` on the device (which opens the WAL). A
+> main-file-only read silently reports stale data and will fabricate a bug.
+
+### Original report (kept for the network evidence, which stands)
+
 Found during the cu-73 live pass (session 4), with **two real devices against ANTARES**: a
 Phh-Treble tablet (API 32) and a Galaxy A33 (Android 16 / API 36), both on the LAN, both on the
 current debug build.
@@ -60,7 +95,11 @@ Ruled out during the session, each by measurement rather than reading:
   should have taken the network copy. (I initially suspected a seconds/ms mismatch here and was
   wrong — the conversion is right, which makes the behaviour stranger, not simpler.)
 
-### The one hard clue
+### The one hard clue — also explained by the retraction
+
+*(This was the strongest evidence for a bug. It is consistent with there being none: if the phone's
+local row was already newer, `merge` correctly takes the `else` branch and the "Integrating" line
+correctly never fires.)*
 
 **`Timber.i("Integrating network track: …")` never fires** — 0 occurrences in a full captured
 phone log across the whole details-screen load. That line sits in `MediaItemTrack.merge`'s
@@ -93,13 +132,13 @@ were not evidence of anything. **Tap the book in the UI** (or otherwise reach
 
 ## Acceptance Criteria
 
+- [ ] **Re-test first, on a device that has not played the book**, with both devices logged in and
+      the phone's stale certificate cleared. The original run does not establish a bug.
 - [ ] Device B adopts device A's position after opening the book, with both on the same server
-- [ ] Determine which of the two possibilities above is true — `merge` not called, or called and
-      losing — and say which in the fix
-- [ ] A test that would have caught this: a track whose *network* copy has a greater
-      `lastViewedAt` and a different `viewOffset` must end up with the network progress after
-      `loadTracksForAudiobook`. The existing `merge` unit tests pass while this is broken, so the
-      gap is above `merge`, in the repository path.
+- [x] A test that would have caught this: a track whose *network* copy has a greater
+      `lastViewedAt` and a different `viewOffset` must end up with the network progress.
+      **Added: `PositionAdoptionTest`, 5 tests, using the exact live numbers. They pass against
+      unmodified production code**, which is itself the evidence that `merge` is not the fault.
 - [ ] Re-check the converse afterwards — local progress must still not be clobbered by a *stale*
       server value ([[cu-73]]'s next item). Fixing adoption naively could break that.
 - [ ] Verified on two real devices, not one device plus a fixture

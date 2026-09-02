@@ -661,7 +661,18 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
 
 ### Sync drift (cu-14)
 
-- [!] **A second device's position is adopted.** — **FAILS. Filed as [[DRAFT-121]]
+- [ ] **A second device's position is adopted.** — **The session-4 "FAILS" verdict is RETRACTED
+      (2026-09-03): the measurement was flawed, and nothing is known to be broken.** The phone's
+      position was read from a copy of `track_db` **without its `-wal`**, and Room runs in WAL mode,
+      so the read reported stale data. With the WAL the same device held **14768 ms** and a
+      *newer* `lastViewedAt` than the tablet — its own playback, not a failed adoption.
+      `MediaItemTrack.merge` was then unit-tested against the exact live numbers and behaves
+      correctly (`PositionAdoptionTest`, 5 tests, passing against unmodified code). A clean re-test
+      is still owed: the phone's token died with the password change and it holds the pre-restart
+      certificate hash, so it cannot connect until it is logged in again. **Method rule: pull
+      `track_db`, `-wal` and `-shm` together, or run `sqlite3` on the device.** See [[DRAFT-121]].
+
+      *Superseded verdict, kept for the trail:* — **FAILS. Filed as [[DRAFT-121]]
       (2026-09-02, session 4, two real devices against ANTARES).**
 
       Tablet (API 32) played *Ender's Game* `151444` to **244973 ms** and reported it
