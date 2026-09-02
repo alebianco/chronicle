@@ -151,7 +151,23 @@ class MediaServiceConnection
      * call, so this guard is what keeps an Activity recreation from crashing the app.
      */
     private fun connectIfIdle() {
-      if (isConnecting || isConnected.value == true) {
+      // `mediaBrowser.isConnected` is the browser's *own* synchronous state, and it is the only
+      // reliable thing to test here.
+      //
+      // The guard used to be `isConnecting || isConnected.value == true`, and both halves can be
+      // false while the browser is already CONNECTED: `onConnected` clears `isConnecting`
+      // immediately but publishes `isConnected` with **postValue**, which defers to the next
+      // main-loop pass. Anything calling `connect()` inside that window — `onNewIntent`, an
+      // Activity recreation — reached `MediaBrowserCompat.connect()`, which throws rather than
+      // ignoring a redundant call:
+      //
+      //   IllegalStateException: connect() called while neither disconnecting nor disconnected
+      //   (state=CONNECT_STATE_CONNECTED)
+      //
+      // Reproduced on a device by delivering two intents in quick succession. Same
+      // postValue-defers-the-write hazard as `_currentlyPlayingLayoutState` in
+      // `MainActivityViewModel`.
+      if (isConnecting || mediaBrowser.isConnected) {
         Timber.i("Already connected or connecting; skipping redundant connect()")
         return
       }
