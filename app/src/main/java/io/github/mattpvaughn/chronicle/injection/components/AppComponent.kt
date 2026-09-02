@@ -34,6 +34,8 @@ interface AppComponent {
 
   fun sharedPrefs(): SharedPreferences
 
+  fun settingsBackupRepo(): SettingsBackupRepo
+
   fun trackDao(): TrackDao
 
   fun bookDao(): BookDao

@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.settings
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
+import android.net.Uri
 import android.text.format.Formatter
 import androidx.lifecycle.*
 import androidx.work.ExistingWorkPolicy
@@ -15,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.local.SettingsBackupRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -32,6 +34,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -55,6 +60,7 @@ class SettingsViewModel(
   private val workManager: WorkManager,
   private val plexPrefs: PlexPrefsRepo,
   private val collectionsRepository: CollectionsRepository,
+  private val settingsBackupRepo: SettingsBackupRepo,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -70,6 +76,7 @@ class SettingsViewModel(
       private val workManager: WorkManager,
       private val plexPrefs: PlexPrefsRepo,
       private val collectionsRepository: CollectionsRepository,
+      private val settingsBackupRepo: SettingsBackupRepo,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
@@ -84,6 +91,7 @@ class SettingsViewModel(
             workManager = workManager,
             plexPrefs = plexPrefs,
             collectionsRepository = collectionsRepository,
+            settingsBackupRepo = settingsBackupRepo,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -118,6 +126,23 @@ class SettingsViewModel(
   private var _showLicenseActivity = MutableLiveData(false)
   val showLicenseActivity: LiveData<Boolean>
     get() = _showLicenseActivity
+
+  /**
+   * Asks the fragment to open the system "create document" picker, carrying the default filename.
+   *
+   * An event rather than a state flag: the picker must open exactly once per tap, and a
+   * [MutableLiveData] the fragment re-reads on a configuration change would open it again.
+   * Launching it is the fragment's job because only a `Fragment` owns an
+   * `ActivityResultLauncher`.
+   */
+  private var _exportFileRequest = MutableLiveData<Event<String>>()
+  val exportFileRequest: LiveData<Event<String>>
+    get() = _exportFileRequest
+
+  /** Asks the fragment to open the system "open document" picker. */
+  private var _importFileRequest = MutableLiveData<Event<Unit>>()
+  val importFileRequest: LiveData<Event<Unit>>
+    get() = _importFileRequest
 
   private fun showOptionsMenu(
     options: List<FormattableString>,
@@ -364,6 +389,48 @@ class SettingsViewModel(
                           }
                           else -> {
                           } // do nothing
+                        }
+                        setBottomSheetVisibility(false)
+                      }
+                    },
+                )
+              }
+            },
+        ),
+        PreferenceModel(
+          PreferenceType.TITLE,
+          FormattableString.from(R.string.settings_category_backup),
+        ),
+        PreferenceModel(
+          type = PreferenceType.CLICKABLE,
+          title = FormattableString.from(R.string.settings_backup_export_title),
+          explanation = FormattableString.from(R.string.settings_backup_export_explanation),
+          click =
+            object : PreferenceClick {
+              override fun onClick() {
+                // Export needs no confirmation: it writes a new file the user names, and
+                // overwriting is the picker's own prompt to make.
+                _exportFileRequest.postEvent(defaultBackupFileName())
+              }
+            },
+        ),
+        PreferenceModel(
+          type = PreferenceType.CLICKABLE,
+          title = FormattableString.from(R.string.settings_backup_import_title),
+          explanation = FormattableString.from(R.string.settings_backup_import_explanation),
+          click =
+            object : PreferenceClick {
+              override fun onClick() {
+                // Import replaces settings, so it warns first — the same yes/no shape as
+                // deleting synced files above.
+                showOptionsMenu(
+                  options = listOf(FormattableString.yes, FormattableString.no),
+                  title = FormattableString.from(R.string.settings_backup_import_confirm),
+                  listener =
+                    object : BottomChooserItemListener() {
+                      override fun onItemClicked(formattableString: FormattableString) {
+                        if (formattableString == FormattableString.yes) {
+                          _importFileRequest.postEvent(Unit)
                         }
                         setBottomSheetVisibility(false)
                       }
@@ -944,5 +1011,88 @@ class SettingsViewModel(
 
   fun setShowLicenseActivity(showLicense: Boolean) {
     _showLicenseActivity.postValue(showLicense)
+  }
+
+  /**
+   * The filename offered in the picker, e.g. `chronicle-backup-2026-09-02.json`.
+   *
+   * ISO order so a folder of exports sorts chronologically, and `Locale.US` digits so the name is
+   * stable regardless of the device locale — a filename is not user-facing prose.
+   */
+  private fun defaultBackupFileName(): String {
+    val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    return Injector.get().applicationContext()
+      .getString(R.string.settings_backup_export_filename, today)
+  }
+
+  /** Writes the backup to the document the user just picked. */
+  fun onExportFileChosen(destination: Uri) {
+    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+      when (val result = settingsBackupRepo.exportTo(destination)) {
+        is SettingsBackupRepo.ExportResult.Written ->
+          showUserMessage(
+            FormattableString.ResourceString(
+              R.string.settings_backup_export_response,
+              placeHolderStrings = listOf(result.settingCount.toString()),
+            ),
+          )
+
+        is SettingsBackupRepo.ExportResult.Failed ->
+          showUserMessage(FormattableString.from(R.string.settings_backup_export_failed))
+      }
+    }
+  }
+
+  /**
+   * Applies the backup in the document the user just picked.
+   *
+   * Every outcome says something specific. A refused file that reported nothing would look
+   * identical to a successful restore that changed nothing, which is the silent failure cu-77 set
+   * out to avoid.
+   */
+  fun onImportFileChosen(source: Uri) {
+    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+      when (val result = settingsBackupRepo.importFrom(source)) {
+        is SettingsBackupRepo.ImportResult.Applied -> {
+          showUserMessage(
+            if (result.skipped > 0) {
+              FormattableString.ResourceString(
+                R.string.settings_backup_import_response_skipped,
+                placeHolderStrings =
+                  listOf(result.applied.toString(), result.skipped.toString()),
+              )
+            } else {
+              FormattableString.ResourceString(
+                R.string.settings_backup_import_response,
+                placeHolderStrings = listOf(result.applied.toString()),
+              )
+            },
+          )
+          // The prefs listener rebuilds the list on each individual write, but it is
+          // registered against the same file this just edited in one commit, so refresh
+          // explicitly rather than relying on the callback's timing.
+          _preferences.postValue(makePreferences())
+        }
+
+        is SettingsBackupRepo.ImportResult.WrongVersion ->
+          showUserMessage(
+            FormattableString.ResourceString(
+              R.string.settings_backup_import_wrong_version,
+              placeHolderStrings = listOf(result.fileVersion.toString()),
+            ),
+          )
+
+        is SettingsBackupRepo.ImportResult.Unreadable ->
+          showUserMessage(
+            FormattableString.from(R.string.settings_backup_import_unreadable),
+          )
+      }
+    }
+  }
+
+  /** No document picker on the device — rare, but a bare crash would be worse. */
+  fun onNoFilePickerAvailable() {
+    Timber.w("No activity could handle the document picker intent")
+    showUserMessage(FormattableString.from(R.string.settings_backup_no_picker))
   }
 }

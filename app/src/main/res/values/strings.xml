@@ -198,6 +198,23 @@
     <string name="settings_delete_synced_explanation">Remove all downloaded files from your device</string>
     <string name="settings_delete_synced_confirm">Delete all downloaded files?</string>
     <string name="settings_delete_synced_response">Deleted %1$s cached files</string>
+
+    <!-- Settings backup (cu-77). The user picks the file location themselves through the
+         system document picker, so no cloud account or SDK is involved. -->
+    <string name="settings_category_backup">Backup</string>
+    <string name="settings_backup_export_title">Export settings</string>
+    <string name="settings_backup_export_explanation">Save your settings to a file you choose. Downloads and sign-in details are not included.</string>
+    <string name="settings_backup_export_filename">chronicle-backup-%1$s.json</string>
+    <string name="settings_backup_export_response">Exported %1$s settings</string>
+    <string name="settings_backup_export_failed">Could not write the settings file</string>
+    <string name="settings_backup_import_title">Import settings</string>
+    <string name="settings_backup_import_explanation">Restore settings from a file you exported earlier</string>
+    <string name="settings_backup_import_confirm">Replace your current settings with the ones in the file?</string>
+    <string name="settings_backup_import_response">Restored %1$s settings</string>
+    <string name="settings_backup_import_response_skipped">Restored %1$s settings, skipped %2$s the app could not read</string>
+    <string name="settings_backup_import_wrong_version">That file was written by a newer version of Chronicle (format %1$s), so it was not applied</string>
+    <string name="settings_backup_import_unreadable">That file is not a Chronicle settings backup</string>
+    <string name="settings_backup_no_picker">No app on this device can pick files</string>
     <string name="settings_offline_mode_title">Offline Mode</string>
     <string name="settings_refresh_rate_always">Always refresh</string>
     <string name="settings_refresh_rate_value">Refresh frequency: %1$s</string>

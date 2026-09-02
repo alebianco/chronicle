@@ -110,3 +110,97 @@ fun importSettings(backup: SettingsBackup): Map<String, String> =
     }
     allowed
   }
+
+/**
+ * The type each allowlisted key is stored as, so a restore can parse strings back.
+ *
+ * Kept next to [BACKUP_SETTING_KEYS] deliberately: a key added to the allowlist without a type
+ * here would import as nothing, silently. [settingTypesCoverAllowlist] fails the build instead.
+ */
+internal enum class SettingType { BOOLEAN, LONG, FLOAT, STRING }
+
+internal val BACKUP_SETTING_TYPES: Map<String, SettingType> =
+  mapOf(
+    PrefsRepo.KEY_BOOK_COVER_STYLE to SettingType.STRING,
+    PrefsRepo.KEY_OFFLINE_MODE to SettingType.BOOLEAN,
+    PrefsRepo.KEY_REFRESH_RATE to SettingType.LONG,
+    PrefsRepo.KEY_JUMP_FORWARD_SECONDS to SettingType.LONG,
+    PrefsRepo.KEY_JUMP_BACKWARD_SECONDS to SettingType.LONG,
+    PrefsRepo.KEY_PLAYBACK_SPEED to SettingType.FLOAT,
+    PrefsRepo.KEY_SKIP_SILENCE to SettingType.BOOLEAN,
+    PrefsRepo.KEY_AUTO_REWIND_ENABLED to SettingType.BOOLEAN,
+    PrefsRepo.KEY_ALLOW_AUTO to SettingType.BOOLEAN,
+    PrefsRepo.KEY_SHAKE_TO_SNOOZE_ENABLED to SettingType.BOOLEAN,
+    PrefsRepo.KEY_PAUSE_ON_FOCUS_LOST to SettingType.BOOLEAN,
+    PrefsRepo.KEY_BOOK_SORT_BY to SettingType.STRING,
+    PrefsRepo.KEY_IS_LIBRARY_SORT_DESCENDING to SettingType.BOOLEAN,
+    PrefsRepo.KEY_HIDE_PLAYED_AUDIOBOOKS to SettingType.BOOLEAN,
+    PrefsRepo.KEY_LIBRARY_MEDIA_TYPE to SettingType.STRING,
+    PrefsRepo.KEY_LIBRARY_VIEW_STYLE to SettingType.STRING,
+  )
+
+/**
+ * One parsed setting, ready to write.
+ *
+ * A sealed type rather than `Any`: the writer has to handle every case, so a new setting type
+ * cannot be dropped on the floor by an `else` branch.
+ */
+internal sealed interface ParsedSetting {
+  data class BooleanSetting(val value: Boolean) : ParsedSetting
+
+  data class LongSetting(val value: Long) : ParsedSetting
+
+  data class FloatSetting(val value: Float) : ParsedSetting
+
+  data class StringSetting(val value: String) : ParsedSetting
+}
+
+/**
+ * Parses one exported string against its declared type, or null if it cannot be trusted.
+ *
+ * Null covers three separate cases, all of which mean "skip this key and keep the current value":
+ * a key with no declared type, a value that does not parse, and — for booleans — a value that is
+ * neither `true` nor `false`. `String.toBoolean()` is **not** used on purpose: it maps every
+ * unrecognised string to `false`, so a corrupted file would quietly turn settings off rather than
+ * leaving them alone.
+ */
+internal fun parseSettingOrNull(
+  key: String,
+  raw: String,
+): ParsedSetting? {
+  val type = BACKUP_SETTING_TYPES[key]
+  if (type == null) {
+    Timber.w("No declared type for backup key $key; skipping it")
+    return null
+  }
+  val parsed =
+    when (type) {
+      SettingType.BOOLEAN ->
+        when (raw.lowercase()) {
+          "true" -> ParsedSetting.BooleanSetting(true)
+          "false" -> ParsedSetting.BooleanSetting(false)
+          else -> null
+        }
+
+      SettingType.LONG -> raw.toLongOrNull()?.let { ParsedSetting.LongSetting(it) }
+      SettingType.FLOAT ->
+        raw.toFloatOrNull()
+          ?.takeIf { it.isFinite() }
+          ?.let { ParsedSetting.FloatSetting(it) }
+
+      SettingType.STRING -> ParsedSetting.StringSetting(raw)
+    }
+  if (parsed == null) {
+    Timber.w("Skipping backup key $key: '$raw' is not a valid $type")
+  }
+  return parsed
+}
+
+/**
+ * Parses a whole restore payload, dropping the entries that cannot be parsed.
+ *
+ * A malformed value must not abort the restore — one bad line in a hand-edited file would
+ * otherwise cost the user every other setting in it.
+ */
+internal fun parseSettings(settings: Map<String, String>): Map<String, ParsedSetting> =
+  settings.mapNotNull { (key, raw) -> parseSettingOrNull(key, raw)?.let { key to it } }.toMap()

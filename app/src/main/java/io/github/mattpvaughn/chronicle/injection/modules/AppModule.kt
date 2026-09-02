@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.injection.modules
 
 import android.app.Application
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
@@ -71,6 +72,10 @@ class AppModule(private val app: Application) {
   @Provides
   @Singleton
   fun provideSharedPrefs(): SharedPreferences = app.getSharedPreferences(APP_NAME, MODE_PRIVATE)
+
+  @Provides
+  @Singleton
+  fun provideContentResolver(): ContentResolver = app.contentResolver
 
   @Provides
   @Singleton
