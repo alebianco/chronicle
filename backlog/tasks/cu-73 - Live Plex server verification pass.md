@@ -550,6 +550,19 @@ Three things worth carrying forward:
   changes only the owner can make.
 - **A second device** for the two convergence items and the book-switch flush.
 
+### Device state left behind after session 3
+
+Deliberate, and worth knowing before the next session:
+
+- **Private DNS is set to `one.one.one.one`** (DNS-over-TLS). This is the LAN-tier workaround for
+  this router, not a test artifact — leaving it on keeps Plex traffic on the LAN instead of routing
+  out to the WAN and back. Remove it only to reproduce the DNS failure.
+- **`This Inevitable Ruin` (1.64 GB) is downloaded** and correctly flagged cached, left in place as
+  the fixture for the still-open download items (offline playback of a *multi-hour* book, the
+  `FAILED` retry, token rotation mid-download). 63 GB free, so it is not in the way.
+- Settings still carry **offline mode on and refresh rate 6h** from the cu-77 import test in
+  session 2.
+
 ## Session 1 — 2026-09-01, owner's Galaxy A33 (Android 16 / SDK 36), live Plex server
 
 5 of 45 checks done. The pass is **not** finished, but it has already justified itself: **fifteen
