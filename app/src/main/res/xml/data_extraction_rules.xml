@@ -2,39 +2,42 @@
 <!--
   What Android's Auto Backup and device-transfer may take.
 
-  Why this file exists: with `allowBackup="true"` and no rules, Auto Backup includes *all*
-  shared preferences by default — and this app keeps its Plex auth token, server access token
-  and user record in the **same** `SharedPreferences` file as its settings (both prefs repos
-  inject the one instance provided for `APP_NAME`). So the default behaviour uploaded working
-  credentials to the user's Drive. Backups are end-to-end encrypted with the device screen lock
-  on Android 9+, so this was not an open leak, but D8 is explicit that auth tokens stay on the
-  device and re-login is expected on restore.
+  `ChronicleAuth.xml` holds the Plex account token, the server access token and the serialized
+  user (cu-108). Those stay on the device: D8 is explicit that auth tokens are not backed up and
+  that re-login is expected on restore. Backups are end-to-end encrypted with the device screen
+  lock on Android 9+, so including them would not have been an open leak, but a token restored
+  onto hardware whose owner has not authenticated to Plex is exactly what D8 rules out.
 
-  `Chronicle.xml` is therefore excluded whole rather than by key, because Auto Backup cannot
-  exclude individual preference keys — only files. Splitting tokens into their own prefs file
-  would allow finer rules and is worth doing (see cu-17 notes), but excluding the file is
-  correct and complete today.
+  Auto Backup can exclude a preferences **file** but not individual keys, which is why the
+  credentials now live in a file of their own. Before cu-108 they shared `Chronicle.xml` with the
+  settings, so the only correct rule was to exclude the whole thing — and the harmless settings
+  were collateral. Now `Chronicle.xml` is **allowed**, so preferences the user has set survive a
+  device transfer while the credentials do not.
 
-  The Room databases are excluded too. They hold only what Plex can re-derive — books, tracks,
+  The Room databases are still excluded. They hold only what Plex can re-derive — books, tracks,
   chapters, collections — plus listening progress, which also lives server-side and is synced
-  (cu-9/cu-14). Restoring a stale copy of them onto a fresh install would fight that sync
-  rather than help it, and the export in cu-17 is the supported way to move local-only state.
+  (cu-9/cu-14). Restoring a stale copy onto a fresh install would fight that sync rather than help
+  it, and the export in cu-17/cu-77 is the supported way to move local-only state.
 
   Note `device-transfer` is deliberately as strict as `cloud-backup`: a direct device-to-device
   copy still moves a token onto hardware whose owner has not authenticated to Plex.
+
+  Keep this file and `backup_rules.xml` in agreement; `BackupRulesTest` fails the build otherwise,
+  because a rule that applies on only some API levels is the kind of gap that stays invisible
+  until it matters.
 -->
 <data-extraction-rules>
   <cloud-backup>
     <exclude
       domain="sharedpref"
-      path="Chronicle.xml" />
+      path="ChronicleAuth.xml" />
     <exclude domain="database" />
   </cloud-backup>
 
   <device-transfer>
     <exclude
       domain="sharedpref"
-      path="Chronicle.xml" />
+      path="ChronicleAuth.xml" />
     <exclude domain="database" />
   </device-transfer>
 </data-extraction-rules>

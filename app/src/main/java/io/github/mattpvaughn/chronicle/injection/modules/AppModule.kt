@@ -42,6 +42,9 @@ class AppModule(private val app: Application) {
     const val OKHTTP_CLIENT_MEDIA = "Media"
     const val OKHTTP_CLIENT_LOGIN = "Login"
 
+    /** Qualifier for the credentials preferences file; see [provideAuthPrefs]. */
+    const val AUTH_PREFS = "AuthPrefs"
+
     /**
      * Handshake budget. A reachability probe that takes 15s has already failed as far as
      * the listener is concerned, and the old value let a dead LAN address consume the whole
@@ -72,6 +75,19 @@ class AppModule(private val app: Application) {
   @Provides
   @Singleton
   fun provideSharedPrefs(): SharedPreferences = app.getSharedPreferences(APP_NAME, MODE_PRIVATE)
+
+  /**
+   * The credentials file, separate from settings (cu-108).
+   *
+   * Qualified rather than replacing the unqualified binding: settings, the sync path and the
+   * backup export all legitimately want `Chronicle.xml`, and only the three credential accessors
+   * in `SharedPreferencesPlexPrefsRepo` want this one. An unqualified second `SharedPreferences`
+   * would be ambiguous to Dagger and, worse, easy to inject by accident.
+   */
+  @Provides
+  @Singleton
+  @Named(AUTH_PREFS)
+  fun provideAuthPrefs(): SharedPreferences = app.getSharedPreferences(AUTH_PREFS_NAME, MODE_PRIVATE)
 
   @Provides
   @Singleton

@@ -33,6 +33,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class PlexPrefsConnectionRoundTripTest {
   private lateinit var prefs: SharedPreferences
+  private lateinit var authPrefs: SharedPreferences
   private lateinit var repo: SharedPreferencesPlexPrefsRepo
 
   /** Modelled on a real `/api/v2/resources` response, captured in cu-107. */
@@ -72,7 +73,9 @@ class PlexPrefsConnectionRoundTripTest {
     val context: Context = ApplicationProvider.getApplicationContext()
     prefs = context.getSharedPreferences("PlexPrefsConnectionRoundTripTest", Context.MODE_PRIVATE)
     prefs.edit().clear().commit()
-    repo = SharedPreferencesPlexPrefsRepo(prefs, Moshi.Builder().build())
+    authPrefs = context.getSharedPreferences("PlexPrefsConnectionRoundTripTestAuth", Context.MODE_PRIVATE)
+    authPrefs.edit().clear().commit()
+    repo = SharedPreferencesPlexPrefsRepo(prefs, authPrefs, Moshi.Builder().build())
   }
 
   @Test

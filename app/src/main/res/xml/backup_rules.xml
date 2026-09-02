@@ -3,8 +3,11 @@
   The pre-Android-12 equivalent of `data_extraction_rules.xml`.
 
   `android:dataExtractionRules` is only honoured on API 31+, and this app's minSdk is 27, so
-  without this file devices on API 27–30 would still fall back to Auto Backup's default of
-  backing up everything — including the shared preferences file holding the Plex auth token.
+  without this file devices on API 27-30 would fall back to Auto Backup's default of backing up
+  everything — including the credentials file.
+
+  Excludes `ChronicleAuth.xml` (the Plex tokens and user, separated out in cu-108) and the Room
+  databases, and deliberately **allows** `Chronicle.xml` so the user's settings survive a restore.
 
   Keep the two files in agreement. `BackupRulesTest` fails the build if one excludes something
   the other does not, because a rule that applies on only some API levels is the kind of gap
@@ -13,6 +16,6 @@
 <full-backup-content>
   <exclude
     domain="sharedpref"
-    path="Chronicle.xml" />
+    path="ChronicleAuth.xml" />
   <exclude domain="database" />
 </full-backup-content>

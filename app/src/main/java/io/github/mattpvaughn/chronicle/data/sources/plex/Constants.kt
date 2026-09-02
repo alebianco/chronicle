@@ -5,6 +5,16 @@ const val MEDIA_TYPE_TRACK = 10
 const val APP_NAME = "Chronicle"
 
 /**
+ * The `SharedPreferences` file holding credentials, kept apart from settings (cu-108).
+ *
+ * Auto Backup can exclude a preferences **file** but not individual keys, so while tokens shared
+ * `Chronicle.xml` with the settings the only correct rule was to exclude the whole thing — and any
+ * settings export depended on an allowlist staying correct to avoid writing a token into a
+ * plaintext file the user syncs to a cloud folder. Separating them makes that structural.
+ */
+const val AUTH_PREFS_NAME = "ChronicleAuth"
+
+/**
  * Declares that ContentStyle is supported
  */
 const val CONTENT_STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED"

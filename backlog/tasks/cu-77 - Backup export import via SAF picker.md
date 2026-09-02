@@ -76,12 +76,12 @@ stale Play purchase token from the device entirely, which is better than merely 
       before/after settings compared explicitly rather than eyeballed
 - [x] Screenshot of both settings entry points (a UI claim needs one — cu-63's lesson)
 - [x] Decide on the prefs-file split; if done, migration plus updated `BackupRulesTest`
-      — **decided: split out to [[draft-108]].** Not needed for correctness (the allowlist and the
+      — **decided: split out to [[cu-108]].** Not needed for correctness (the allowlist and the
       whole-file exclusion are each verified), and it touches credentials at rest, which is the
       owner's call. The migration also carries a real sign-out risk if interrupted, which deserves
       its own task rather than riding along with the picker work.
 - [x] Decide on the premium-key removal migration
-      — **decided: split out to [[draft-108]]**, same reasoning. Cheap and low-risk on its own, and
+      — **decided: split out to [[cu-108]]**, same reasoning. Cheap and low-risk on its own, and
       independent of the prefs-file split, so it can ship separately.
 
 ## Implementation Notes
@@ -164,7 +164,7 @@ setting had been written. That looked like an export bug for a while and was not
 ### Split out rather than left open
 
 Both remaining criteria were **decisions, not code**, and both touch credentials at rest — the
-owner's call per CLAUDE.md. They are now [[draft-108]] rather than an open checkbox on a closed
+owner's call per CLAUDE.md. They are now [[cu-108]] rather than an open checkbox on a closed
 task, so the SAF work can land without either being forgotten:
 
 - **The prefs-file split** (tokens into `ChronicleAuth.xml`). Would make the separation
