@@ -1,8 +1,8 @@
 ---
-id: DRAFT-72
+id: cu-72
 title: Extend dispatcher injection beyond the repositories
-status: Draft
-assignee: []
+status: Done
+assignee: [claude]
 created_date: '2026-08-31'
 labels: [R1, architecture]
 dependencies: [cu-15, cu-54]
@@ -65,12 +65,10 @@ contract.
 
 ## Acceptance Criteria
 
-- [~] Player classes take `DispatcherProvider` — **1 of 3 done**. `OnMediaChangedCallback` converted
-      behind `NotificationStateMachineTest` (06165f3). `MediaPlayerService` (5 sites) and
-      `AudiobookMediaSessionCallback` (3 sites) remain.
+- [x] Player classes take `DispatcherProvider` — **all 3 done**, each behind tests written first.
 - [ ] Worker threading reviewed against WorkManager's executor contract before converting
-- [ ] `RepositoryDispatcherTest`'s source scan widened to whichever layers get converted
-- [ ] No behaviour change: existing suite passes untouched
+- [x] `RepositoryDispatcherTest`'s source scan widened to the player layer
+- [x] No behaviour change: existing suite passes untouched
 
 
 ## Progress (2026-09-02)
@@ -109,3 +107,63 @@ Recorded because the remaining two classes will hit the same walls:
 
 The worker group is still untouched and still needs its own review against WorkManager's executor
 contract before conversion — that criterion stands unchanged.
+
+
+## Closing notes (2026-09-02)
+
+All three player classes converted, each with tests written **before** the conversion — the order
+this task's deferral demanded, since a wrong scope here drops or duplicates work rather than failing
+to compile.
+
+| class | sites | safety net |
+|---|---|---|
+| `OnMediaChangedCallback` | 1 | `NotificationStateMachineTest` (7) |
+| `AudiobookMediaSessionCallback` | 3 | `PlayBookGuardsTest` (3) |
+| `MediaPlayerService` | 4 of 5 | the two above, plus the widened guard |
+
+`RepositoryDispatcherTest` now scans the player sources too, and sabotage-verified: reinstating one
+hardcoded `Dispatchers.IO` fails it.
+
+### The one deliberate exception
+
+`MediaPlayerService.serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)` **keeps its
+hardcoded dispatcher.** `ServiceModule` provides that very scope to the Dagger graph
+(`fun serviceScope() = service.serviceScope`), so the field must exist before injection runs — a
+field initialiser reading an injected dispatcher is a circular dependency. `Main` is also simply
+correct for a scope that drives MediaSession and notification updates.
+
+A dedicated test pins this at **exactly one** occurrence (skipping comment lines, so the assertion
+does not depend on the prose explaining it), so the exception cannot quietly become a precedent.
+
+### Four traps, for whoever tests this layer next
+
+Each cost real time and none is obvious:
+
+1. **`MediaSessionCompat.Callback` / `MediaControllerCompat.Callback` constructors reach
+   `android.os.Binder`**, so any test constructing one needs Robolectric — regardless of whether
+   the logic under test touches Android at all.
+2. **mockk cannot mock final support-library classes under Robolectric.** `MediaControllerCompat`,
+   `PlaybackStateCompat`, `Notification` all fail with *"class redefinition failed: attempted to
+   change the class modifiers"*. Build real objects instead.
+3. **A relaxed mock cannot satisfy a generic `StateFlow<T>`** — it returns a bare `Object` that
+   fails to cast. Hit twice: `currentlyPlaying.chapter` and `currentlyPlaying.track`. Worse, the
+   failure happens *inside* a launched coroutine, so it vanishes and the test just sees nothing
+   happen.
+4. **mockk mangles methods returning a value class.** `loadTracksForAudiobook` returns `Result`, so
+   `coVerify` cannot match the call and reports "was not called" while it really was. A
+   hand-written counting fake is unambiguous.
+
+Every such test must also go in PIT's `excludedTestClasses` (cu-57), or `pitestDebug` refuses to
+start with a green suite.
+
+### Still out of scope
+
+The **worker** group (`PlexSyncScrobbleWorker`, `DownloadNotificationWorker`,
+`MoveSyncLocationWorker`) is untouched, and its acceptance criterion stands unchanged: WorkManager
+has its own executor contract and its own test harness, and an injected dispatcher fighting the
+worker's executor is a real risk. Worth its own task rather than being folded in here.
+
+The ViewModel and application groups remain cosmetic — they already have `viewModelScope`, so their
+dispatchers are redundant rather than wrong.
+
+Coverage across the three slices: 24.84% → 26.83%.

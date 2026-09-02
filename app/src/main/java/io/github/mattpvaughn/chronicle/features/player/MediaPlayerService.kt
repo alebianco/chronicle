@@ -50,6 +50,7 @@ import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
 import io.github.mattpvaughn.chronicle.injection.components.DaggerServiceComponent
 import io.github.mattpvaughn.chronicle.injection.modules.ServiceModule
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.PackageValidator
 import io.github.mattpvaughn.chronicle.util.ServiceUtils
 import kotlinx.coroutines.*
@@ -67,6 +68,13 @@ class MediaPlayerService :
   ServiceController,
   SleepTimer.SleepTimerBroadcaster {
   val serviceJob: CompletableJob = SupervisorJob()
+
+  // Keeps `Dispatchers.Main` rather than an injected provider (cu-72). `ServiceModule` provides this
+  // very scope to the Dagger graph (`fun serviceScope() = service.serviceScope`), so it must exist
+  // *before* injection runs — a field initialiser cannot read an injected dispatcher without a
+  // circular dependency. Main is also correct here regardless: this scope drives MediaSession and
+  // notification updates, which must be on the main thread. The work inside it that does not
+  // belong there hops via `withContext(dispatchers.io)`, and those sites *are* injected.
   val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
 
   @Inject
@@ -98,6 +106,9 @@ class MediaPlayerService :
 
   @Inject
   lateinit var trackRepository: ITrackRepository
+
+  @Inject
+  lateinit var dispatchers: DispatcherProvider
 
   @Inject
   lateinit var trackListManager: TrackListStateManager
@@ -306,7 +317,7 @@ class MediaPlayerService :
         PrefsRepo.KEY_JUMP_FORWARD_SECONDS, PrefsRepo.KEY_JUMP_BACKWARD_SECONDS -> {
           updateCustomActions()
           serviceScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(dispatchers.io) {
               sessionToken?.let {
                 val notification = notificationBuilder.buildNotification(it)
                 startForeground(NOW_PLAYING_NOTIFICATION, notification)
@@ -567,7 +578,7 @@ class MediaPlayerService :
 
     result.detach()
     serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         // Categories are matched by their stable id, never by the localized label (cu-99).
         when (AutoBrowseCategory.fromId(parentId)) {
           null ->
@@ -737,7 +748,7 @@ class MediaPlayerService :
             val trackId = mediaController.metadata.id
             if (trackId != null && trackId != TRACK_NOT_FOUND) {
               val plexState = PLEX_STATE_PLAYING
-              withContext(Dispatchers.IO) {
+              withContext(dispatchers.io) {
                 val bookId = trackRepository.getBookIdForTrack(trackId)
                 val track = trackRepository.getTrackAsync(trackId)
                 val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
@@ -768,7 +779,7 @@ class MediaPlayerService :
         }
         Timber.i("Player STATE ENDED")
         serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
-          withContext(Dispatchers.IO) {
+          withContext(dispatchers.io) {
             // get track through tracklistmanager b/c metadata will be empty
             val activeTrack = trackListManager.trackList.getActiveTrack()
             if (activeTrack.id != MediaItemTrack.EMPTY_TRACK.id) {

@@ -48,12 +48,51 @@ class RepositoryDispatcherTest {
   }
 
   /**
+   * The player layer, converted in cu-72. Scanned separately from the repositories because
+   * `MediaPlayerService` keeps exactly one legitimate `Dispatchers.Main`.
+   */
+  @Test
+  fun `player sources hold no hardcoded IO dispatcher`() {
+    val offenders =
+      PLAYER_SOURCES.filter { path ->
+        Regex("""Dispatchers[.](IO|Default)""").containsMatchIn(File(path).readText())
+      }.map { it.substringAfterLast('/') }
+
+    assertEquals(
+      "the player's disk and network hops must come from the injected provider",
+      emptyList<String>(),
+      offenders,
+    )
+  }
+
+  /**
+   * `MediaPlayerService.serviceScope` is the one exception, and it is deliberate: `ServiceModule`
+   * provides that very scope to the Dagger graph, so it must exist before injection runs — a field
+   * initialiser cannot read an injected dispatcher without a circular dependency. Main is also the
+   * right dispatcher for a scope driving MediaSession and notification updates.
+   *
+   * Pinned so the exception stays *one* line and stays explained, rather than becoming precedent.
+   */
+  @Test
+  fun `the service scope is the only hardcoded dispatcher in the player`() {
+    // Comment lines are skipped: the exception is *explained* in a comment that names the
+    // dispatcher, and counting that would make the assertion depend on the prose.
+    val mains =
+      File(PLAYER_SOURCES.single { it.endsWith("MediaPlayerService.kt") })
+        .readLines()
+        .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+        .count { Regex("""Dispatchers[.]Main""").containsMatchIn(it) }
+
+    assertEquals("only the serviceScope declaration may hardcode a dispatcher; see cu-72", 1, mains)
+  }
+
+  /**
    * Guards the guard: a wrong path would make the scan above pass while reading
    * nothing.
    */
   @Test
   fun `repository sources all resolve`() {
-    REPOSITORY_SOURCES.forEach { path ->
+    (REPOSITORY_SOURCES + PLAYER_SOURCES).forEach { path ->
       assertTrue("expected $path to exist", File(path).exists())
     }
   }
@@ -76,5 +115,13 @@ class RepositoryDispatcherTest {
         "CollectionsRepository",
         "LibrarySyncRepository",
       ).map { "src/main/java/io/github/mattpvaughn/chronicle/data/local/$it.kt" }
+
+    val PLAYER_SOURCES: List<String> =
+      listOf(
+        "MediaPlayerService",
+        "AudiobookMediaSessionCallback",
+        "OnMediaChangedCallback",
+        "ProgressUpdater",
+      ).map { "src/main/java/io/github/mattpvaughn/chronicle/features/player/$it.kt" }
   }
 }
