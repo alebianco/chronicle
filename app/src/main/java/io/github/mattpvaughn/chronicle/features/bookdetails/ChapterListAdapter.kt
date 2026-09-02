@@ -102,7 +102,11 @@ class ChapterListAdapter(val clickListener: TrackClickListener) :
     chapterIndex: Long,
   ) {
     activeChapter = Triple(trackId, discNumber, chapterIndex)
-    Timber.i("Updating current chapter: ($trackId, $discNumber, $chapterIndex), $chapters")
+    // Count, not contents: this fires on every chapter change and `$chapters` interpolated the
+    // whole list — 108 entries for a long book, built on the main thread (cu-110).
+    Timber.i(
+      "Updating current chapter: ($trackId, $discNumber, $chapterIndex), ${chapters.size} chapters",
+    )
     submitChapters(chapters)
   }
 

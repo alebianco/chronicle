@@ -792,6 +792,29 @@ nothing about adapter strictness. And an earlier sabotage appeared to pass only 
 regenerated the adapter; the generated file still had the old default in it. **Check the generated
 source, not just the test result.**
 
+### A bug the owner found while reading these screenshots
+
+**[[cu-110]] — back and the nav bar stop responding while the player is open.** Reported after
+looking at this session's screenshots, reproduced and measured immediately: it is not an input or
+navigation defect but **main-thread saturation**. 88% janky frames, a 4950 ms 90th-percentile
+frame, ~24% of a core burned continuously, and GC freeing ~165,000 objects every 4 seconds. Taps
+and back presses are simply dropped.
+
+Cause: `HomeViewModel.recentlyListened` is a Room `LiveData`, which re-emits on *any* write to the
+Audiobook table — and `ProgressUpdater` writes once a second during playback. So the home list is
+rebuilt every second **while the player covers it**, and each rebuild deserializes
+`Audiobook.chapters` (~108 chapters × 2 books) through `ChapterListConverter`.
+
+Three logging defects were fixed on the way, the worst producing **3.38 MB of log output across
+2920 lines** on the main thread in one session (`Audiobook.toString()` drags in the serialized
+chapters column). Worth recording that **fixing them changed nothing the owner reported** — jank
+went 88% -> 82% — which is what proved the recomputation is the real cause. Stopping at the logging
+would have looked like a fix and been one.
+
+This also explains an annoyance throughout this session: `uiautomator dump` kept failing with
+`ERROR: could not get idle state`, forcing screenshots instead of hierarchy dumps. Same root cause,
+so cu-110 unblocks automated UI assertions here too.
+
 ### Still needs a human at the device
 
 - ~~**The "position not synced" badge.**~~ **Done and automated** — see the item above. Both

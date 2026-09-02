@@ -52,7 +52,9 @@ class ChapterRepository
       isAudiobookCached: Boolean,
       tracks: List<MediaItemTrack>,
     ) = withContext(dispatchers.io) {
-      Timber.i("Loading chapter data for tracks: $tracks")
+      // Ids only: the full `MediaItemTrack` list is large and this adds nothing diagnostic
+      // over knowing which tracks were asked for (cu-110).
+      Timber.i("Loading chapter data for tracks: ${tracks.map { it.id }}")
       val chapters: List<Chapter> =
         try {
           // Shares assembleChapters with BookRepository, which is where the running offset

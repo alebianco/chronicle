@@ -57,7 +57,14 @@ class HomeViewModel(
       return@DoubleLiveData if (offline == true) {
         recents?.filter { it.isCached }
       } else {
-        Timber.i("Recently listened: $recents")
+        // Titles only, deliberately. This used to interpolate the whole `List<Audiobook>`, and
+        // `Audiobook.toString()` includes the serialized `chapters` column — so a book with 108
+        // chapters produced a ~1 KB line, on the main thread, built and written on **every**
+        // emission. The source is a Room `LiveData`, which re-emits on every write to the
+        // Audiobook table, and `ProgressUpdater` writes once a second during playback: measured
+        // 3.4 MB of logging across 2920 lines in one short session, with the main thread at ~24%
+        // of a core and 84% janky frames (cu-110).
+        Timber.i("Recently listened: ${recents?.map { it.title }}")
         recents
       } ?: emptyList()
     }
