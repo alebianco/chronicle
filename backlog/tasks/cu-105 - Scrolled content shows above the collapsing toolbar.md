@@ -1,7 +1,7 @@
 ---
 id: cu-105
 title: Scrolled content shows above the collapsing toolbar
-status: Done
+status: In Review
 assignee: [claude]
 created_date: '2026-09-02'
 labels: [R2, ui, bug]
@@ -134,3 +134,44 @@ against an incomplete build. Rebuilt, reinstalled, and confirmed the helper is p
       [[cu-74]], whose own notes say "on a tablet there appears to be no way to reach the
       currently-playing screen". Both changes to `fragment_currently_playing.xml` are identical to
       the details screen's, so the risk is low, but it is unmeasured. Verify on the owner's phone.
+
+
+## First fix was wrong (2026-09-02)
+
+The owner's screenshot showed the bug still present: a **purple block of cover art above the
+toolbar**, in the status-bar strip. My measurement said fixed; it was measuring the wrong view.
+
+**Why the bounds looked right.** I asserted on `tracks` (the RecyclerView) and the toolbar. Both
+were correct — the list did start below the bar. The view actually showing through was
+`details_artwork`, which lives *inside* the CollapsingToolbarLayout and scrolls with it. A
+`uiautomator` dump of the fixed-but-broken build proves it:
+
+```
+details_artwork  [1084,0][1476,205]     <- extends to y=0, into the status-bar strip
+pinned_bar       [0,48][2560,176]       <- started at 48, so it covered nothing above that
+```
+
+Padding the `CollapsingToolbarLayout` moved the *pinned bar* down to y=inset. The strip above it
+then belonged to the scrolling content, and the artwork slid up through it. Adding
+`exitUntilCollapsed` fixed how far the bar could collapse but did nothing about that strip.
+
+**The correct fix: inset the pinned view, not the container.** The pinned bar now starts at y=0 and
+carries the inset as its own top padding, so it occupies the strip and paints it with its own
+background. `applyTopSystemBarInsetWithMinHeight` is replaced by
+`applyTopSystemBarInsetAsPinnedBar`, whose KDoc records why the obvious approach measures as correct
+while being wrong.
+
+- Book details: the pinned wrapper gained an id (`pinned_bar`) and a background — it had none, so it
+  would have cleared the strip without painting it.
+- Currently playing: pins its `Toolbar` directly, which already has a background.
+
+After: `pinned_bar [0,0][2560,128]` — starts at y=0, covers the artwork.
+
+### Why this is In Review, not Done
+
+**Screenshots on this emulator are blank for this app** — `screencap` returns all-black pixels for
+every part of Chronicle's UI while `uiautomator` reports a fully populated hierarchy (the same
+rendering problem as cu-74). So the structural fix is verified by bounds, but **the visual result is
+not verified anywhere**, and bounds are exactly what misled me the first time.
+
+Needs one look on the owner's phone at a partial scroll — the state in the original screenshot.

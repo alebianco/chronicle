@@ -28,23 +28,29 @@ fun View.applyTopSystemBarInset() {
 }
 
 /**
- * Pads [this] by the top system-bar inset **and** grows its `minHeight` to match, so a collapsing
- * app bar still owns the status-bar strip once it has scrolled away (DRAFT-105).
+ * Insets a **pinned** app-bar child so it both clears and *paints* the status-bar strip
+ * (cu-105).
  *
- * [applyTopSystemBarInset] alone is not enough for a `CollapsingToolbarLayout`. Padding moves the
- * bar's *content* below the status bar but does not change how far the bar may collapse, so with
- * `exitUntilCollapsed` it shrinks to `minHeight` — measured *excluding* the padding. On a device
- * with a 48px status bar the bar collapsed to exactly 48px, the toolbar was squeezed into the inset
- * region, and the scrolling list slid up to y=48: list rows appeared in the status-bar strip above
- * the toolbar before leaving the screen, which is what the owner reported.
+ * The obvious approach — padding the `AppBarLayout` or the `CollapsingToolbarLayout` — is wrong for
+ * a `CollapsingToolbarLayout`, and wrong in a way that measures as correct. Padding the collapsing
+ * container pushes the pinned toolbar down to y=inset, so the strip above it belongs to the
+ * *scrolling* content: the cover art slides up through it and is visible above the toolbar before
+ * leaving the screen. `uiautomator` bounds look right (toolbar at y=48, list below the bar) because
+ * the offending view is the collapsing artwork, not the list.
  *
- * Growing `minHeight` by the same inset means the collapsed bar is `actionBarSize + inset` tall —
- * the toolbar keeps its full height and the strip above it stays covered.
+ * The pinned view instead starts at y=0 and carries the inset as its own top padding. It therefore
+ * occupies the strip, paints it with its own background, and its content still sits below the
+ * status bar. Nothing scrolling can appear above it.
  *
- * Apply this to the view carrying `minHeight` (the `CollapsingToolbarLayout`), not to the
- * `AppBarLayout` around it.
+ * Also grows `minHeight` by the same inset: `minHeight` is measured *excluding* padding, so a bar
+ * with `exitUntilCollapsed` would otherwise collapse to `actionBarSize` and hide its content under
+ * the status bar.
+ *
+ * @receiver the view carrying `app:layout_collapseMode="pin"` — the toolbar itself, or the wrapper
+ *   pinning it. It must have a non-transparent background, or it will clear the strip without
+ *   painting it.
  */
-fun View.applyTopSystemBarInsetWithMinHeight() {
+fun View.applyTopSystemBarInsetAsPinnedBar() {
   val initialTopPadding = paddingTop
   val initialMinHeight = minimumHeight
   ViewCompat.setOnApplyWindowInsetsListener(this) { view, windowInsets ->

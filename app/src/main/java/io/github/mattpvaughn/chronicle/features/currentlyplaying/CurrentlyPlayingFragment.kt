@@ -25,7 +25,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentCurrentlyPlayingBindi
 import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter
 import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
-import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetWithMinHeight
+import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
@@ -287,9 +287,10 @@ class CurrentlyPlayingFragment : Fragment() {
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
 
-    // The CollapsingToolbarLayout carries minHeight, so the inset has to grow that too or the
-    // bar collapses into the status-bar strip and the list shows through it (DRAFT-105).
-    binding.collapsingToolbar.applyTopSystemBarInsetWithMinHeight()
+    // The *pinned* bar takes the inset, so it paints the status-bar strip itself. Padding the
+    // collapsing container instead leaves that strip to the scrolling artwork, which then shows
+    // above the toolbar (cu-105).
+    binding.detailsToolbar.applyTopSystemBarInsetAsPinnedBar()
 
     return binding.root
   }
