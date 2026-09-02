@@ -185,13 +185,27 @@ class CachedFileManager
 
       val cachedFilesDir = prefsRepo.cachedMediaDir
       Timber.i("Caching tracks to: ${cachedFilesDir.path}")
-      Timber.i("Tracks to cache: $tracks")
+      Timber.i("Tracks to cache: ${tracks.map { it.id }}")
 
       val requests =
         tracks.mapNotNull { track ->
           // File exists but is not marked as cached in the database- more likely than not
           // this means that it has failed to fully download
           val destFile = File(cachedFilesDir, track.getCachedFileName())
+
+          // Defence in depth (cu-111). Ids are validated where a server response becomes a model
+          // (`asTrackList`), so nothing should reach here unsafe — but this is the line that
+          // actually writes to the filesystem, and `File(parent, child)` does not normalize. A
+          // path that escapes the cache directory is refused here rather than trusted to have
+          // been caught upstream, because the cost of being wrong is a write next to the Room
+          // databases and the credential file.
+          if (!destFile.canonicalPath.startsWith(cachedFilesDir.canonicalPath + File.separator)) {
+            Timber.e(
+              "Refusing to download track ${track.id}: '${destFile.path}' escapes the cache dir",
+            )
+            return@mapNotNull null
+          }
+
           val trackCached = track.cached
           val destFileExists = destFile.exists()
 

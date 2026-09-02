@@ -71,19 +71,31 @@ class CacheScanOutcomeTest {
     )
   }
 
+  /**
+   * The pattern's job is "is this filename shaped like one of ours?", and since cu-111 that
+   * includes non-numeric ids — so a stray `notes.txt` is shaped like a track whose id is `notes`
+   * and does match. That is deliberate and safe: the caller
+   * (`CachedFileManager.refreshTrackDownloadedStatus`) looks the id up in the database and
+   * requires the file's length to equal the stored size, so an unknown id is dropped a moment
+   * later. See `CachedFilePatternTest` for why narrowing this to digits was worse — it made an
+   * Audiobookshelf id invisible to the scan, so it was deleted and re-downloaded forever.
+   *
+   * What must still be excluded is anything that cannot be an id at all: a dotfile (no id before
+   * the dot) and a partial download (a second extension).
+   */
   @Test
-  fun `only files matching the cached-media pattern are returned`() {
+  fun `only files shaped like a cached track are returned`() {
     val dir = folder.newFolder("media")
     File(dir, "3001.mp3").writeText("audio")
     File(dir, "3002.m4b").writeText("audio")
-    File(dir, "notes.txt").writeText("not a track")
+    File(dir, "li_8x2h9fk3.m4b").writeText("audio")
     File(dir, ".hidden").writeText("not a track")
     File(dir, "3003.mp3.part").writeText("partial download")
 
     val outcome = scanCachedMediaDir(dir, cachedMedia) as CacheScanOutcome.Scanned
 
     assertEquals(
-      listOf("3001.mp3", "3002.m4b"),
+      listOf("3001.mp3", "3002.m4b", "li_8x2h9fk3.m4b"),
       outcome.files.map { it.name }.sorted(),
     )
   }

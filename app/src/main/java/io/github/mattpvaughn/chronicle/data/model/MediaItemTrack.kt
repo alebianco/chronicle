@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.data.model
 import android.net.Uri
 import android.support.v4.media.MediaMetadataCompat
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
@@ -18,7 +19,14 @@ import kotlin.math.roundToInt
 /**
  * A model for an audio track (i.e. a song)
  */
-@Entity
+@Entity(
+  // Every per-book track query filters on `parentKey` and orders by `discNumber, index`
+  // (see `TrackDao`). Unindexed that is a full table scan *plus* a sort, and `writeProgress`
+  // runs it once a second during playback — so the cost was paid per tick and grew with the
+  // whole library, not with the book (cu-110). Covering the order-by columns lets SQLite
+  // satisfy both the filter and the sort from the index.
+  indices = [Index(value = ["parentKey", "discNumber", "index"])],
+)
 data class MediaItemTrack(
   @PrimaryKey
   val id: String = TRACK_NOT_FOUND,
@@ -70,8 +78,18 @@ data class MediaItemTrack(
      * second dot, so `3001.mp3.part` read as a finished track. The scan runs over a
      * user-writable directory that MoveSyncLocationWorker shuffles files through, so stray
      * names are ordinary (cu-76).
+     *
+     * Then `\d+` was too *narrow*: cu-71 retyped ids to `String` so a non-numeric backend can be
+     * represented (decision-11, [[cu-33.1]]), and a digits-only pattern silently made this the
+     * arbiter of **id format** as well as of stray files. An Audiobookshelf id would download
+     * fine and then be invisible to the cache scan — file present, DB says uncached, so it is
+     * deleted and re-downloaded forever. The charset now matches what [MediaId] permits in an id,
+     * minus `.`, which is the field separator here.
+     *
+     * This pattern does exactly one job: **decide whether a filename is one of ours**. It is not
+     * a security check — that is [MediaId], applied where a server response becomes a model.
      */
-    val cachedFilePattern = Regex("""\d+\.[^.]+""")
+    val cachedFilePattern = Regex("""[A-Za-z0-9_~:@+-]+\.[^.]+""")
 
     fun getTrackIdFromFileName(fileName: String): String = fileName.substringBefore('.')
 
@@ -183,10 +201,24 @@ fun List<MediaItemTrack>.getTrackStartTime(track: MediaItemTrack): Long {
   if (isEmpty()) {
     return 0
   }
+  // Playback order, never the list's own order (cu-115). This used to sum
+  // `subList(0, indexOf(track))` over the receiver as it arrived, which is only correct if the
+  // caller happens to pass an ordered list. `LibrarySyncRepository` does not: it derives every
+  // book's position from `getAllTracksAsync()`, whose query is `SELECT * FROM MediaItemTrack`
+  // with no `ORDER BY`. On a three-track book that reported the listener 10 minutes ahead of
+  // where they were — and because every track is a similar length, the wrong answer is a
+  // plausible one, which is why it survived. The per-book DAO reads are ordered, so this only
+  // ever bit the whole-library path.
+  //
+  // `getActiveTrack` already sorts before deciding which track is current; these two must agree
+  // about what "before" means or the position is incoherent.
+  val inPlaybackOrder = sorted()
   // There's a possibility [track] has been edited and [this] has not, so find it again
-  val trackInList = find { it.id == track.id } ?: return 0
-  val previousTracks = this.subList(0, indexOf(trackInList))
-  return previousTracks.map { it.duration }.sum()
+  val index = inPlaybackOrder.indexOfFirst { it.id == track.id }
+  if (index < 0) {
+    return 0
+  }
+  return inPlaybackOrder.take(index).sumOf { it.duration }
 }
 
 /**
