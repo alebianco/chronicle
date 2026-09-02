@@ -56,6 +56,15 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   unit-tested only. `./capture-screens.sh <dir>` drives the app and screenshots the main
   screens; it asserts the app was actually foregrounded, because an earlier version silently captured
   the launcher.
+  **Getting back to a real server needs `adb shell pm clear <pkg>`, not `--ez mock_plex false`**
+  (cu-73). `MockPlexMode.enable` seeds `accountAuthToken`/`server`/`library` into prefs, and
+  `determineLoginState` reports `LOGGED_IN_FULLY` whenever all three are present — so merely
+  clearing the flag leaves the app "logged in" to a dead `127.0.0.1`, with no login screen.
+  `MockPlexMode.disable()` would clear those prefs but is **dead code, called from nowhere**, and
+  `onMockPlexIntent` exits the process before anything could call it. `pm clear` also drops the
+  `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
+  be interleaved within one verification pass — plan mock items and live-server items as separate
+  blocks.
 - Tests: **654 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 

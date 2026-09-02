@@ -4,7 +4,7 @@ title: Live Plex server verification pass
 status: In Progress
 assignee: []
 created_date: '2026-08-31'
-updated_date: '2026-09-02 10:20'
+updated_date: '2026-09-02 22:55'
 labels:
   - R1
   - agentic
@@ -306,7 +306,32 @@ janky frames and a 4950 ms 90th-percentile frame.
 - [ ] **cu-10 — a rotated server token recovers silently.** Rotate the server's token
       (reset `PlexOnlineToken`, or re-claim the server) while the app holds a stale one,
       then play something. The 401 should be invisible: refreshed and retried, no message.
-- [ ] **cu-10 — an invalidated account token degrades honestly.** Change the Plex password
+- [!] **cu-10 — an invalidated account token degrades honestly.** — **RUN 2026-09-02, session 4.
+      Four of five criteria pass; the message does not appear. Filed as [[DRAFT-123]].**
+
+      Password changed with "sign out connected devices", both devices watched from a cleared log.
+      `GET https://plex.tv/api/v2/resources` → **`401 Unauthorized`** (750 ms), so the token is
+      genuinely dead.
+
+      | criterion | result |
+      |---|---|
+      | sign-in-expired message | **✗ never shown** |
+      | no login wall | ✓ |
+      | library not empty (196 books from Room) | ✓ |
+      | downloaded books still play | ✓ `file:///…155607.m4b`, `state=3`, position 2h58m |
+      | no repeated 401 storm | ✓ **exactly one** 401 (tablet); 3 on the phone across retries |
+
+      The app also surfaced an **"AVAILABLE OFFLINE"** section listing the downloaded book, and
+      fell back to placeholder art — it degrades gracefully, just **silently**.
+
+      Cause: `AccountAuthState.onAccountRejected()` reached **0 times**. It is only ever called
+      from `PlexTokenAuthenticator`, which is attached to the **media client only** (deliberately —
+      re-fetching resources with a dead account token cannot help). So a 401 on the *login* client
+      has no path to recording the state, and `ChronicleApplication.setupNetwork`'s blanket
+      `catch (e: Exception)` logs it as "Could not refresh server resources; keeping cached
+      server" — treating 401 exactly like a timeout. Detection and recovery were conflated.
+
+      Original text: Change the Plex password
       with "sign out connected devices", then play. Expect the sign-in-expired message,
       **no login wall**, downloaded books still playing, and — importantly — *no repeated
       401 storm* against plex.tv. The retry-once guard is unit-tested but never seen against
@@ -511,30 +536,81 @@ janky frames and a 4950 ms 90th-percentile frame.
       item asked for (it wanted a spot check), and it retires #119 for this server rather than
       deferring it. Keep the caveat that a *differently tagged* library could still differ.
 
-- [ ] **Chapter highlight tracks playback** across a track boundary, and jumping to a chapter
+- [~] **Chapter highlight tracks playback** across a track boundary, and jumping to a chapter
       in a later file seeks to the right place.
+
+      **Highlight half verified 2026-09-02, session 4** (mock): crossing track 2 → 3 moved the cyan
+      highlight to entry `03` unprompted. **Jump-to-chapter is not verified** — and it cannot be on
+      the mock as currently routed, see the fixture-routing note in session 4 below: every track
+      receives the same 3 chapters, so there is no distinct later-file chapter to jump *to*.
 
 ### Multi-track books (cu-115)
 
-The unit half is covered by the `MultiTrackBook` fixture; these need a real multi-track book, which
-the mock fixture pack does not have. They also close cu-93's and cu-96's remaining criteria.
+The unit half is covered by the `MultiTrackBook` fixture. **Correction (session 4): the mock
+*does* serve a multi-track book** — The Hobbit, `1001`, three 180 s tracks (`2001`–`2003`) — so the
+position-arithmetic items are checkable without credentials. What the mock cannot do is give each
+track *distinct chapters* (see session 4's fixture-routing note), so the items needing a real
+per-track chapter layout still want a live server. They also close cu-93's and cu-96's remaining
+criteria.
 
-- [ ] **Chapter title tracks playback across a track boundary.** Play a multi-track book into its
+**Second correction, same session: prefer the real library for what is left.** ANTARES has
+multi-track books an order of magnitude bigger than the mock's — `151444` Ender's Game (107
+tracks), `150974` Stone Blind (77), `151180` Forward the Foundation (113), up to `150697` (240) —
+so the two remaining items below need neither mock mode nor a `pm clear`. Use them: an unordered
+`getTrackStartTime` sum is much likelier to show across 107 tracks than across 3.
+
+- [~] **Chapter title tracks playback across a track boundary.** — **Full player verified
+      2026-09-02, session 4, on the mock.** Playback crossed track 2 → track 3 automatically and
+      both the title ("A Short Rest") and the highlighted list entry (`03`, cyan) followed it;
+      blank on any track but the first before cu-115. **The mini player half is unverifiable until
+      [[DRAFT-119]] is fixed** — it is hidden on `STATE_STOPPED` and never returns, so there is no
+      mini player on screen to read a chapter name from. Play a multi-track book into its
       second file and confirm the mini player and the full player both name the right chapter —
       this was blank on any track but the first before cu-115.
 - [ ] **The chapter slider seeks where it points.** Drag it mid-chapter on a multi-track book. It
       used to send a book-absolute offset to a track-relative API, so the thumb jumped to the end
       of the current track.
-- [ ] **Chapter elapsed time is not negative or nonsense** on a later track.
-- [ ] **Previous-chapter honours the threshold** on a later track: just after a chapter start it
+- [x] **Chapter elapsed time is not negative or nonsense** on a later track.
+      **Verified 2026-09-02, session 4.** On track 3 the track slider read `00:10 / 03:00` and the
+      book readout `06:11/09:00 69%` — both positive and arithmetically right (180+180+10 = 370 s;
+      371/540 = 68.7%). The 1 s discrepancy is the sampling gap between the two reads, not drift.
+- [~] **Previous-chapter honours the threshold** on a later track: just after a chapter start it
       goes to the previous chapter, well into one it restarts the current chapter.
+
+      **Half verified 2026-09-02, session 4.** The *restart* half is confirmed: paused 31.8 s into
+      track 3 (well past the chapter start), previous-chapter logged
+      `PlayerExtKt: skipToPrevious → back to start of current chapter` — the correct branch, named
+      explicitly. The *go-back* half (pressing just after a chapter start) is **not** done: the app
+      backgrounded to the launcher right after the seek. Re-run it with the position set a second
+      or two into a chapter.
 - [ ] **Book position survives a full sync** on a multi-track book. `getTrackStartTime` summed an
       unordered list, so the whole-library re-derive could report the position a whole track ahead
       of where it was; confirm the position is unchanged after a refresh.
 
 ### Sync drift (cu-14)
 
-- [ ] **A second device's position is adopted.** Listen on device A, stop, then open the book
+- [!] **A second device's position is adopted.** — **FAILS. Filed as [[DRAFT-121]]
+      (2026-09-02, session 4, two real devices against ANTARES).**
+
+      Tablet (API 32) played *Ender's Game* `151444` to **244973 ms** and reported it
+      (`200 OK`). Phone (API 36) opened the book's details screen, fetched
+      `/library/metadata/151444/children` (`200 OK`), and the response carried the right track
+      with `"viewOffset":236955,"lastViewedAt":1788384988`. **The phone's stored position stayed
+      at 189 ms.** It was handed the correct value and did not apply it.
+
+      Ruled out by measurement: the write path (server echoed the offset back), LAN-vs-WAN
+      routing (same failure on both tiers — see the DNS note below), and a seconds/ms units bug
+      in `plexTimestampToMillis` (the conversion is correct, so `merge`'s comparison *should*
+      favour the network copy). The hard clue is that `"Integrating network track"` never logs,
+      so `merge` either is not called on this path or is losing with values that disagree with
+      the JSON. DRAFT-121 has the full trail and points at
+      `TrackRepository.loadTracksForAudiobook(…, forceUseNetwork = false)`.
+
+      **Method trap worth heeding:** `--el play_book <id>` does **not** exercise this — it never
+      opens the details screen, so no `/children` request happens at all. Tap the book in the UI.
+      Two runs were wasted before noticing.
+
+      Listen on device A, stop, then open the book
       on device B and refresh. B should jump to A's position. This is the round trip the
       timestamp fix enables and that no mock can prove — the fixture server accepts timeline
       writes without modelling server-side state.
@@ -626,11 +702,88 @@ into "the symptom is gone".
       book after force-quitting the app, *without* pressing play. Also check skip-to-next-chapter and
       skip-to-previous-chapter land correctly before any playback, since `PlayerExt` reads the same
       value.
-- [ ] **Skip silence is listenable** ([[cu-88]]). The retuned values (800 ms minimum, 0.55 retention)
+- [x] **Skip silence is listenable** ([[cu-88]]).
+      **Verified by the owner 2026-09-02, session 4 — the constants stand, no revision needed.**
+      Tested against **Malleus** (151312) and **Xenos** (151314), Dan Abnett / narrated by Toby
+      Longworth: quiet, measured Warhammer narration, and — the reason this is strong evidence —
+      **the exact books where the owner had trouble with skip silence before**. Verdict: "they
+      seem to sound good now." ~58 min of listening on Malleus, so a sustained judgement rather
+      than a spot check. `key_skip_silence = true` confirmed in prefs for the session.
+
+      So `MINIMUM_SILENCE_DURATION_US = 800_000` and `SILENCE_RETENTION_RATIO = 0.55f` are now
+      **measured-by-ear against the known failure case**, not merely reasoned starting points —
+      which is what `AudiobookRenderersFactory`'s KDoc asked this pass to settle. Update that
+      KDoc's "expected to be revised after the live pass" wording when convenient.
+
+      Original item text: The retuned values (800 ms minimum, 0.55 retention)
       are reasoned starting points, **not measured** — this check is what sets them. Use a
       quiet-voiced narrator and check chapter boundaries as well as mid-sentence pauses. Expect to
       revise the constants.
-- [ ] **An expired token is noticed and recoverable** ([[cu-84]]). Invalidate the token server-side
+- [!] **An expired token is noticed and recoverable** ([[cu-84]]). — **RUN 2026-09-02, session 4.
+      "Noticed" FAILS; "recoverable" untested as a consequence. Filed as [[DRAFT-123]].**
+
+      Same run as the cu-10 item above. The app does **not** say the login expired — it shows the
+      cached library with grey art and dead sync, leaving the user to infer the cause.
+
+      **Correction, found by looking rather than assuming:** the recovery path *is* built and is
+      exactly right. **Settings → ACCOUNT → "Sign in again"**, subtitled *"Refresh your Plex login
+      without losing your server, library or downloads"* — precisely this item's requirement. An
+      earlier note in this session said the affordance "never appeared"; that was wrong, it is
+      simply not on the Home screen where a signed-out user would look.
+
+      So the gap is narrower than first written: **discovery, not capability.** Nothing on the
+      degraded Home screen points at Settings, and no message names the problem. DRAFT-123 should
+      surface `account_signed_out` with a route to this existing action rather than build anything
+      new.
+
+      **The "without re-picking server and library" half FAILS, and re-login could not be
+      completed at all.** Taking "Sign in again" through OAuth:
+
+      - `server_name`/`server_id` **survived**, but `library_id`/`library_name` were **cleared** —
+        so the user *is* sent back through library selection, contrary to the item's requirement
+        and to the button's own subtitle.
+      - The picker then showed **"No libraries found"**. Cause is **not** an empty library: it is a
+        TLS hostname mismatch — plex.tv now advertises `*.d8f64ea2….plex.direct` while the server
+        still presents `CN=*.32080aae….plex.direct`. Both tiers failed,
+        `Failure(reason=No connection answered)`. Chronicle is **right** to refuse (cu-42); the
+        defect is reporting a connection/TLS failure as an empty library list. Filed as
+        [[DRAFT-125]].
+      - Backing out of the picker landed on a **working-looking Home** while the app's state was
+        `LOGGED_IN_NO_LIBRARY_CHOSEN` with no library in prefs — owner's words: *"super confusing
+        for a user"*. Filed as [[DRAFT-124]].
+
+      The stale certificate was a **server-side condition**, **confirmed**: the owner restarted
+      Plex Media Server and the cert immediately became `CN=*.d8f64ea2….plex.direct`, with strict
+      verification returning `200`. Owner's note — *"didn't know i had to restart it after changing
+      password"* — is the point of DRAFT-125: nothing said so, and the app's message pointed away
+      from the cause.
+
+      **After the failed re-login, the whole server configuration was gone**, not just the library:
+      `Chronicle.xml` retained only `id`, `uuid`, `key_last_refresh`, `key_sync_location` and two
+      playback settings. `ConnectionChooser` then reported `No connection answered out of **0**` —
+      zero candidates — and the state fell to `NOT_LOGGED_IN`, requiring a full fresh login rather
+      than the promised "without re-picking the server and library".
+
+      **What did survive is the important half**: the **1564 MB download intact** and all **196
+      books** still in Room. So the data-preservation promise holds even through a failed re-auth;
+      it is the *configuration* promise that breaks.
+
+      **Re-login after the server restart: clean, and nothing lost.** Fresh OAuth →
+      `Chose LAN connection: https://192-168-1-54.d8f64ea2….plex.direct:32400` (the **new** cert
+      accepted) → `LOGGED_IN_FULLY`. Verified afterwards: server **ANTARES**, library **14 /
+      Audiobooks**, **196 books**, **1 cached**, **1564 MB** download intact, and the downloaded
+      book plays from `file:///…155607.m4b` at `state=3`, position 2h59m.
+
+      So the end state is right; the journey is not. Summary of this item as run:
+      **downloads and library data are never at risk** — the failures are all in *notification*
+      (DRAFT-123), *configuration retention* (this item), and *error attribution*
+      (DRAFT-125/DRAFT-124).
+
+      What *is* confirmed good: no empty library, no login wall, cached book plays
+      (`state=3` from the local file), one 401 not a storm, and an "AVAILABLE OFFLINE" section
+      appears listing the download. The failure is precisely the notification, not the degradation.
+
+      Original text: Invalidate the token server-side
       (password change with "sign out connected devices"), then confirm: the app says the login
       expired rather than showing an empty library, cached books still play, and "Sign in again"
       restores sync **without** re-picking the server and library or losing downloads.
@@ -650,8 +803,35 @@ into "the symptom is gone".
       the tiering structure holds when nothing can answer. This is the failure that would nag every
       user on a train, and it does not happen.
 
-- [ ] **Which media session owns the card** ([[cu-89]]). Reproduce on the phone first — see that
+- [~] **Which media session owns the card** ([[cu-89]]). Reproduce on the phone first — see that
       task; Auto may not be needed. Note the session-flag change only affects API 27.
+
+      **Session 4: does not reproduce on the tablet (API 32), and the flag fix is ruled out as the
+      explanation.** Measured with Pocket Casts — *the very app that stole the card* — installed
+      and holding a session on the same device:
+
+      - `Media button session is io.github.mattpvaughn.chronicle.debug/Chronicle`
+      - Chronicle is **top of the Sessions Stack**; `PocketCastsMediaSession` sits below it,
+        `active=false`
+      - `flags=7` — media buttons + transport controls + queue commands, all three set
+      - `controllers: 8`, real metadata (`Xenos, Dan Abnett`), `queueTitle=Xenos`
+      - **exactly one** Chronicle session → cu-89 **lead 1** (two competing sessions, or one
+        recreated per service start) is **ruled out**
+      - `dumpsys audio`: Chronicle is the sole focus entry, `gain: GAIN`, `loss: none` → cu-89
+        **lead 2** (focus requested but not granted, or immediately lost) is **ruled out**
+
+      **The owner's phone is API 34+** (confirmed session 4), and the `setFlags` change only
+      affects **API 27** — media-button and transport-control flags are auto-enabled from API 28.
+      So that change *cannot* be what fixed the reported symptom, and cu-89's progress note
+      already said as much ("not a confirmed fix ... if it is 28+ this changes nothing"). It is now
+      confirmed to be 28+.
+
+      **What that leaves.** Either the symptom has a cause not yet identified, or something else in
+      the intervening work fixed it incidentally. Two sessions' worth of platform checks have found
+      nothing wrong with Chronicle's session on API 32. The remaining honest step is to reproduce
+      on the API 34+ phone itself — and if it no longer happens there either, close cu-89 as
+      "no longer reproducible, cause unidentified" rather than claiming the flag change fixed it.
+      Do **not** tick this off the flag change.
 
 ### Unofficial endpoints
 
@@ -703,6 +883,275 @@ into "the symptom is gone".
 - [ ] Any failure filed as its own task rather than fixed inline, so this pass stays a
       verification step and not an open-ended debugging session
 - [ ] Items added by later tasks appended to the checklist as they arise
+
+## Session 4 — 2026-09-02, same tablet (Phh-Treble GSI, Android 12 / SDK 32), **mock server**
+
+Ran as a guided pass over the remaining manual items. Deliberately started on the mock, because
+five cu-115 items and one cu-13 item looked mock-coverable. Three closed, three partially — and
+the session turned up one real bug and one harness limitation that changes how the rest is planned.
+
+### First: the device was not in the state session 3 left it
+
+Session 3's notes describe a 1.64 GB download left in place as the fixture for the open download
+items. **It is gone.** App data was wiped and the debug APK reinstalled at 22:15–22:25, so all four
+databases are fresh, no cached files remain, and the app came back up pointed at the *mock* server
+(`server_name=Mock Plex Server`, `http://127.0.0.1:51585`) rather than the live one.
+
+Survived the wipe, because they are device settings rather than app data: the SD card
+(`public:179,129`, 44 GB free) and the Private DNS strict-mode workaround. So the SD-eject item is
+still viable.
+
+**Lesson for the next session:** device state that a checklist item depends on has to be treated as
+perishable. A note saying "left in place as the fixture" is not a guarantee; re-check before
+planning around it.
+
+### The bug: the mini player disappears for good when playback stops → [[DRAFT-119]]
+
+**This is the actual cause of [[cu-74]]**, which had guessed at a large-screen layout problem and
+asked whether it reproduced on a phone. It is not a layout bug at all. The mini player renders
+correctly; it is *hidden on purpose* and then stranded.
+
+`MainActivityViewModel.playbackObserver` maps `STATE_STOPPED`/`STATE_NONE` to
+`setBottomSheetState(HIDDEN)`, and neither path off `HIDDEN` can fire afterwards: there is no
+further non-stopped playback state, and `setAudiobook`'s `previousAudiobookId != bookId` guard
+rejects re-selecting the same book. The collapsed player is the only handle that expands the sheet,
+so the player becomes unreachable — cu-74's reported consequence, now traced to a cause.
+
+Clean repro from a force-stop, with the log in order:
+
+```
+Bottom sheet state is HIDDEN                      # initial value
+Observing playback: PlaybackState {state=6 ...}   # BUFFERING
+Bottom sheet state is COLLAPSED                   # mini player appears, correctly
+Observing playback: PlaybackState {state=3 ...}   # PLAYING
+Observing playback: PlaybackState {state=1, position=180002 ...}  # STOPPED at track end
+Bottom sheet state is HIDDEN                      # gone, permanently
+```
+
+A `uiautomator dump` then holds **zero** `currently_playing_*` views while `dumpsys media_session`
+still reports the app's session `active=true`. That mismatch is the signature to look for.
+
+**Why it hid for so long:** every previous observation was made after playback had already run out,
+so it looked like the mini player never rendered. Two things made it visible now — cu-115's 180 s
+tone (it was 5 s) widens the COLLAPSED window, and this book had all three tracks at full progress,
+so every resume stopped within seconds. Note the corollary: for a *finished* book the mini player is
+effectively never reachable.
+
+The existing `MainActivityViewModelTest` asserts `HIDDEN` as an initial/expected value but never
+that it is *escapable*, which is why the gate was green. That gap is in DRAFT-119's criteria.
+
+### The harness limitation: the mock cannot serve per-track chapters
+
+Worth recording, because it silently invalidates part of the plan. `MockPlexServer.fixtureFor`
+routes on the path *shape* and ignores the requested id:
+
+```kotlin
+path.contains("/children")        -> "tracks.json"
+path.startsWith("/library/metadata") -> "track-with-chapters.json"
+```
+
+So **every** book's `/children` returns The Hobbit's 3 tracks, and **every** track's metadata
+returns all 3 entries of `track-with-chapters.json`. Measured consequence: `chapter_db` holds **18
+rows** — the same 3 chapters written once per track — instead of the fixture's intended 8 distinct
+chapters. The book's own `chapters` column is empty (`length(chapters) = 0`), so the player falls
+back to `tracksAsChapters` and the CHAPTERS list shows the 3 *track* names, grouped "DISC 1 / DISC 2".
+
+Two corrections follow:
+
+- The CHAPTERS list showing track names, and `duration=360000` appearing in a `/:/timeline` report
+  for a 540 s book, are both **fixture artifacts, not app bugs.** I nearly filed the duration one
+  before checking; `albums.json` declares 1002 at 360000 while `/children` hands it 1001's tracks.
+- **My own earlier claim in this session — that the five cu-115 items were fully mock-coverable —
+  was too optimistic.** The three that depend only on *position arithmetic across a boundary* are;
+  the two that need distinct per-track chapter data (jump-to-chapter, slider seek target) are not.
+  Fixing this is a real improvement to the harness: route `fixtureFor` on the id so each track gets
+  its own chapters. Filed as part of DRAFT-119's context rather than a separate task for now.
+
+### What the mock did verify
+
+The useful trick was resetting progress directly in the DB to place playback mid-book, since
+`play_book` always resumes the saved position (`USE_SAVED_TRACK_PROGRESS`, no offset extra):
+
+```
+run-as ... sqlite3 .../track_db "UPDATE MediaItemTrack SET progress=175000 WHERE id='2002';"
+```
+
+With track 2 at 175/180 s, playback crossed into track 3 on its own and gave:
+
+- **Track title follows the boundary in the full player** — "Roast Mutton" → "A Short Rest", and
+  the highlight moved to entry `03`. Blank on later tracks before cu-115. The *mini* player could
+  not be checked at all: DRAFT-119 keeps it off screen.
+- **Position arithmetic is right, and ordered.** Track 2 at `00:49` → book `03:50/09:00 42%`
+  (180+49 = 229 s; 229/540 = 42.4%). Track 3 at `00:10` → book `06:11/09:00 69%`
+  (370 s; 68.7%). This is the specific thing cu-115 fixed: an unordered `getTrackStartTime` sum
+  would have reported a whole track ahead (06:49 rather than 03:50).
+- **Previous-chapter takes the restart branch** well into a chapter:
+  `PlayerExtKt: skipToPrevious → back to start of current chapter`.
+- **`uiautomator dump` succeeds with the player open** — confirms the already-ticked cu-110 item on
+  this device, 28 KB hierarchy, including while the sheet was EXPANDED.
+
+### Still needs a human or a live server
+
+Unchanged from session 3's list, minus nothing — no live-server item was closed here. Note the
+ordering constraint that came up: the app points at one server at a time, so the mock pass and the
+live pass cannot be interleaved. Do the mock items first, then log in.
+
+The two download items additionally need their fixture re-created (see the wipe above) before they
+can run at all.
+
+### Later the same session: back on the live server
+
+**The clean-slate route matters, and the obvious route does not work.** Flipping
+`--ez mock_plex false` is *not* enough to get back to a real server. `MockPlexMode.enable` seeds
+`accountAuthToken` / `server` / `library` into prefs, and `determineLoginState` returns
+`LOGGED_IN_FULLY` whenever all three are present — so the app boots believing it is logged into
+`http://127.0.0.1:51585`, with no login screen and no way forward.
+
+`MockPlexMode.disable()`, which would `plexPrefs.clear()`, is **dead code — nothing calls it**, and
+`onMockPlexIntent` kills the process with `Runtime.exit(0)` before anything could. So the working
+route is `adb shell pm clear <pkg>`, which also drops the `mock_plex` flag (it lives in
+`chronicle_debug.xml`). Worth fixing, or worth a note in the hook's KDoc; recorded here for now.
+
+Fresh login to **ANTARES**, library "Audiobooks" (id 14), `server_owned=false` — a *shared* user,
+not the owner, which constrains the token-rotation items below. **196 books** synced.
+
+Re-confirmed on a fresh login (both items were already ticked; this is independent evidence):
+
+- **cu-42 HTTPS** — all three stored connections are `https://…plex.direct`, LAN on `:32400`,
+  relay on `:8443`. No cleartext anywhere.
+- **cu-11 tiering** — all three tiers stored and correctly classified (`local:true` /
+  `local:false,relay:false` / `relay:true`), and on restart:
+  `Trying 1 LAN connection(s)` → `Chose LAN connection: https://192-168-1-54.….plex.direct:32400`
+  in **~1.4 s**. The Private DNS strict-mode workaround is holding; session 3's search-domain
+  hijack did not recur.
+- **cu-14, server → new device** — the book opened at `2:58:02/28:40:39 10%`, adopted from the
+  server after a full data wipe. Progress made on another device came back intact. (This is not
+  the same as the two-device convergence items, which still need a second device.)
+- **cu-83 `file://` scheme** — the enqueued download target is
+  `file:///storage/emulated/0/Android/data/…/155607.m4b`, scheme intact.
+
+### A security bug found on the first real download → [[DRAFT-120]]
+
+`AppModule` sets `.enableLogging(true)` on the Fetch2 config **unconditionally**, and Fetch2 logs
+`DownloadInfo.toString()` — which includes the headers map. Result: `X-Plex-Token=<working token>`
+written to logcat three times before a single byte transferred, in **release builds too**.
+
+`TokenLoggingTest` could not catch this: it scans our own `Timber` calls, not a third-party
+library's internal logging. The rule ("never log an auth token") was enforced only where we are the
+caller. Filed with a fix sketch and, importantly, a criterion for a guard that *can* catch the
+class.
+
+### The download fixture, re-created
+
+`This Inevitable Ruin` (155606, 28:40:39, single track) re-downloaded over the LAN to internal
+storage. **Completed: 1564 MB allocated, `stat` 1,639,241,764 bytes, `isCached=1`**, in ~4.5 min
+(~130 MB/min on this LAN).
+
+**The measurement trap from session 3 reproduced exactly:** `ls`/`stat` reported the full
+1,639,241,764 bytes within a second of starting, because Fetch2 preallocates. Session 3's advice —
+read `_written_bytes` from `databases/LibGlobalFetchLib.db` — remains the right measure. `du -m`
+also works (it reports allocated blocks: 308 → 607 → 887 → 1564 MB) and needs no SQL, but
+`_written_bytes` is the authoritative one; prefer it.
+
+**One thing I got wrong, recorded so the next session does not repeat it.** Mid-download the book
+row read `isCached=1` while its track read `cached=0`, and since `MediaItemTrack.getTrackSource()`
+branches on the *track* flag, I inferred playback would stream from the network despite a complete
+local file. **It does not.** Testing it directly gave
+`Media uri is: file:///storage/emulated/0/…/155607.m4b`, and a re-read showed `cached=1` — the
+cache scan reconciles the track flag shortly after the group completes. The book/track ordering is
+*eventual*, not inconsistent. The lesson is the repo's own: profile/observe, do not read and infer.
+
+### The router DNS hijack reproduces on a second device (session 4)
+
+Session 3 recorded the `homenet.telecomitalia.it` search-domain hijack as a tablet finding with a
+device-level workaround. **It is not device-specific.** The Galaxy A33 (API 36), fresh onto the
+LAN with no Private DNS set:
+
+```
+$ ping 192-168-1-54.<hash>.plex.direct
+PING …plex.direct.homenet.telecomitalia.it (127.0.0.1)   ← loopback
+```
+
+Consequence: Chronicle chose **`87-17-202-231…` — the WAN tier — while sitting on the same LAN as
+the server**, 17 ms away by IP. It works, so nothing looks broken; it just routes household audio
+out to the internet and back. Applying the same workaround
+(`settings put global private_dns_mode hostname` / `private_dns_specifier one.one.one.one`) fixed
+it immediately: `Chose LAN connection: https://192-168-1-54.….plex.direct:32400`.
+
+**So every device on this network needs the workaround, and a new device silently gets the WAN
+path.** That strengthens session 3's conclusion that the real fix is on the router (drop the DHCP
+search domain, or disable DNS rebind protection) — it is an owner decision, but it now affects two
+devices out of two tested, i.e. all of them. Chronicle cannot influence it: the platform resolver
+is not app-controllable.
+
+Worth noting for the checklist's own integrity: the WAN tier is **not** why sync failed
+(DRAFT-121 reproduces on the LAN tier too), but it was a confounder that had to be removed before
+the sync result meant anything.
+
+### Removing a device at plex.tv does NOT sign Chronicle out (session 4)
+
+Recorded because it is the obvious thing to reach for when you want to invalidate a token without
+touching the account password, and it **silently proves nothing**.
+
+The owner removed every `Chronicle / Phh-Treble vanilla` entry from plex.tv's Authorized Devices.
+Measured immediately after, tablet cold-started and then a book's details screen opened to force
+authenticated traffic:
+
+- **111 library requests, every one `200 OK`, zero 401s**
+- `GET https://plex.tv/api/v2/resources` → `200 OK`, still listing `ANTARES`
+- every request carried the **same single token**, the *server access token*
+
+**Why.** plex.tv's device list governs *account*-level client registrations. Chronicle's library
+traffic authenticates with the **server access token** — a separate credential minted by the
+server, per `PlexTokenAuthenticator`'s own two-token model. Revoking the device entry leaves that
+untouched, so no 401 ever occurs.
+
+The app's 401 handling was **correct** — no 401 arrived, and per the cu-84 rule ("only an
+authenticated request that came back 401 counts") it rightly claimed nothing. **But the outcome is
+still a defect**, and the owner has ruled on it: *"remove the device from the plex list should
+absolutely kick out chronicle, this needs to be fixed asap (after the cu-73 checklist is
+completed)."*
+
+Filed as **[[DRAFT-122]]**, R0/security. The measured cause is that Plex invalidates *neither*
+token on device removal — the account token (`FdX…`) still gets `200 OK` from
+`plex.tv/api/v2/resources`, and the server token (`FxC…_6S`) still gets `200 OK` from ANTARES — so
+there is no rejection for the app to react to. `refreshServer` is only ever called from the
+authenticator, i.e. reactively on a 401, and nothing proactively asks whether this client is still
+authorized. The likely fix is to check the app's own `X-Plex-Client-Identifier` against a
+*successful* `/api/v2/resources` response at startup; the trap to avoid is letting a failed or slow
+call read as signed-out, which would reintroduce cu-84.
+
+**What does work, for the record:** a password change with "sign out connected devices" (the blunt
+instrument the items name), or corrupting the *stored* server token locally to force a 401 — the
+latter tests the re-auth path but not an account-level sign-out, so the two items still need
+different treatment. See the items themselves.
+
+### Device state left behind after session 4
+
+- **Logged into the live server (ANTARES), mock mode off, app data cleared once** to get there —
+  so the mock fixture state from earlier in the session is gone. The mock/live switch is one-way
+  per pass; plan mock items and live items as separate blocks.
+- **`This Inevitable Ruin` (155606) downloading or downloaded** to internal storage
+  (`/storage/emulated/0/Android/data/…/files/155607.m4b`, ~1.6 GB). This is the fixture for the
+  three open download items. Check it with `du -m`, never `ls`.
+- SD card (`public:179,129`, 50 GB free) and Private DNS strict mode untouched, exactly as
+  session 3 left them.
+- The Hobbit multi-track mock state is **gone** with the data clear — but that no longer matters.
+  **The real library has far better multi-track fixtures**, so the remaining cu-115 items need no
+  mock mode and no `pm clear` (which would destroy the download fixture above):
+
+  | book | id | tracks | length |
+  |---|---|---|---|
+  | Forward the Foundation | 151180 | 113 | 968 min |
+  | Ender's Game | 151444 | 107 | 671 min |
+  | Stone Blind | 150974 | 77 | 521 min |
+  | Weyward | 150621 | 57 | 651 min |
+
+  (Two larger ones exist — 150697 with 240 tracks, 150361 with 159 — worth using for the
+  large-library item.) Prefer these over the 3-track mock fixture: the task's own rule is that a
+  fix verified against the easy fixture is not verified, and `getTrackStartTime`'s ordering bug
+  is far more likely to show across 107 tracks than 3. Place playback mid-book with
+  `UPDATE MediaItemTrack SET progress=… WHERE id='…'` as before.
 
 ## Session 3 — 2026-09-02, same tablet (Phh-Treble GSI, Android 12 / SDK 32), live Plex server
 
@@ -891,9 +1340,11 @@ Deliberate, and worth knowing before the next session:
   is on the **router** — drop the `homenet.telecomitalia.it` DHCP search domain, or disable its DNS
   rebind protection — which is an owner decision, not an app one. Chronicle cannot influence any of
   this; the platform resolver is not app-controllable.
-- **`This Inevitable Ruin` (1.64 GB) is downloaded** and correctly flagged cached, left in place as
-  the fixture for the still-open download items (offline playback of a *multi-hour* book, the
-  `FAILED` retry, token rotation mid-download). 63 GB free, so it is not in the way.
+- ~~**`This Inevitable Ruin` (1.64 GB) is downloaded**~~ — **gone as of session 4.** App data was
+  wiped and the debug APK reinstalled at 22:15 on 2026-09-02, taking the download, all four
+  databases and the live-server config with it. The still-open download items (offline playback of
+  a *multi-hour* book, the `FAILED` retry, token rotation mid-download) need this fixture
+  re-created before they can run. Treat any "left in place" note as perishable.
 - Settings still carry **offline mode on and refresh rate 6h** from the cu-77 import test in
   session 2.
 

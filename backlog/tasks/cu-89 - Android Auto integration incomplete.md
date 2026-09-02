@@ -146,6 +146,24 @@ All three are now set. Harmless on newer releases, so this closes off the theory
 it as a maybe. **It is not a confirmed fix** — the reported device's API level is unknown, and if it
 is 28+ this changes nothing.
 
+> **Settled 2026-09-02 (cu-73 session 4): the reported phone is API 34+, so this change is
+> irrelevant to the symptom.** The flags are auto-enabled from API 28. This theory is therefore
+> not merely unconfirmed but *excluded*; keep the flags (harmless, correct on API 27) and look
+> elsewhere.
+>
+> Also measured that session, on a tablet at **API 32 with Pocket Casts installed and holding its
+> own session** — i.e. the competing app from the report:
+>
+> - `Media button session is …chronicle.debug/Chronicle`, Chronicle top of the Sessions Stack,
+>   `PocketCastsMediaSession` below it and `active=false`
+> - one and only one Chronicle session → **lead 1 ruled out**
+> - `dumpsys audio`: Chronicle the sole focus entry, `gain: GAIN`, `loss: none` → **lead 2
+>   ruled out**
+>
+> So the symptom does not reproduce on API 32 and the two leading theories are dead. Next step is
+> a reproduction attempt on the API 34+ phone. If it does not reproduce there either, close this
+> as *no longer reproducible, cause unidentified* — do not attribute it to the `setFlags` change.
+
 ### Still the open question
 
 The owner's clarification reframed this: **Pocket Casts held the media card while Chronicle was
