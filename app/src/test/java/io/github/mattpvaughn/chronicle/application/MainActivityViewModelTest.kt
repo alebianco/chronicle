@@ -123,6 +123,46 @@ class MainActivityViewModelTest {
     assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
   }
 
+  // --- expandCurrentlyPlaying: the idempotent, non-throwing counterpart -------------------
+  //
+  // Added for the `show_player` debug hook (cu-73), which needs the player on screen without tap
+  // coordinates so the "position not synced" badge can be screenshotted. It cannot use
+  // `onCurrentlyPlayingClicked`, which toggles and throws on HIDDEN.
+
+  @Test
+  fun `expanding a collapsed sheet expands it`() {
+    val viewModel = viewModel()
+    viewModel.setBottomSheetState(COLLAPSED)
+
+    viewModel.expandCurrentlyPlaying()
+
+    assertEquals(EXPANDED, viewModel.currentlyPlayingLayoutState.value)
+  }
+
+  @Test
+  fun `expanding is idempotent`() {
+    // Unlike the click handler, calling this twice must not collapse the sheet again — the hook
+    // observes playback state and can fire more than once.
+    val viewModel = viewModel()
+    viewModel.setBottomSheetState(COLLAPSED)
+
+    viewModel.expandCurrentlyPlaying()
+    viewModel.expandCurrentlyPlaying()
+
+    assertEquals(EXPANDED, viewModel.currentlyPlayingLayoutState.value)
+  }
+
+  @Test
+  fun `expanding a hidden sheet is a no-op rather than a throw`() {
+    // The reason this method exists. Nothing is playing, so there is no player to show; the
+    // caller is a debug hook firing on a state change and must not crash the app.
+    val viewModel = viewModel()
+
+    viewModel.expandCurrentlyPlaying()
+
+    assertEquals(HIDDEN, viewModel.currentlyPlayingLayoutState.value)
+  }
+
   /**
    * Current behaviour, pinned rather than endorsed: clicking a hidden sheet throws. The sheet is
    * not on screen when hidden, so this should be unreachable — but it is an uncaught exception on

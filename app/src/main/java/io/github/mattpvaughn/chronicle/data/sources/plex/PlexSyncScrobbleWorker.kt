@@ -5,6 +5,7 @@ import androidx.work.*
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
+import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import timber.log.Timber
 
 /**
@@ -39,7 +40,10 @@ class PlexSyncScrobbleWorker(
 
     val reporter =
       ProgressReporter(
-        api = PlexProgressApi(plexMediaService),
+        // Through DebugHooks so a debug build can inject a terminal failure with
+        // `--ez fail_sync true` and make the "position not synced" badge reachable against a
+        // real server (cu-73). Release returns this unchanged.
+        api = DebugHooks.wrapProgressApi(PlexProgressApi(plexMediaService)),
         lookupTrack = { trackRepository.getTrackAsync(it) },
         lookupBookDuration = { bookId ->
           trackRepository.getTracksForAudiobookAsync(bookId).getDuration()

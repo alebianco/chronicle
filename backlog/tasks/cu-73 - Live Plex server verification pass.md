@@ -236,13 +236,47 @@ Grouped by what breaks if the real server disagrees.
       duration (`36805904`), so the doubling affects only the finish calculation and does not
       corrupt stored metadata.
 
-- [ ] **cu-9 — the "position not synced" badge on screen.** Its state is unit-tested and
+- [x] **cu-9 — the "position not synced" badge on screen.** Its state is unit-tested and
       the terminal-failure path is confirmed in logcat, but the badge has never been
       *seen*: the currently-playing sheet did not lay out during the emulator run. Pull
       the player up on a real phone with the server unreachable and confirm it appears —
       and that it does **not** appear during ordinary playback, which is the failure mode
       that would make it worthless.
+      **Verified 2026-09-02, session 3 — and automated, so it is repeatable rather than a
+      one-off.** Both halves, screenshotted on the tablet against the **live** server:
 
+      - `--ez fail_sync true` -> **"Position not synced" visible in red** on the expanded player
+      - `--ez fail_sync false`, otherwise identical -> **badge absent**, reports succeeding
+        (`Worker result SUCCESS`)
+
+      The second is the one that gives the first its meaning: a badge stuck on would have looked
+      correct in the first screenshot alone.
+
+      **Two debug-hook gaps had to be closed first, and both were real defects in the harness:**
+
+      1. `--ez fail_sync true` only set a flag on [MockPlexMode]'s fixture server, which is null
+         unless mock mode is running — so **against a live server it was a silent no-op**. Now
+         `DebugHooks.wrapProgressApi` substitutes a failing `ProgressApi`, and the flag is
+         *persisted*, because the report runs in a WorkManager process that may never have seen
+         the intent.
+      2. `--el play_book` drives playback through the **media session**, which never navigates the
+         UI, so the player sheet never laid out — the exact reason this item had gone unverified
+         since cu-9. Added `--ez show_player true`, which waits for playback and expands the sheet.
+
+      Which failure to inject is not arbitrary: a **4xx** is needed. An `IOException` or a 5xx maps
+      to `RETRY` -> `Result.retry()` -> ENQUEUED, which `hasFailedSync` deliberately ignores, so
+      the intuitive "simulate no network" injection would leave the badge hidden and look like the
+      badge was broken. `FailSyncInjectionTest` pins all three outcomes.
+
+      One command now reproduces the whole thing on any device, with no tap coordinates:
+
+      ```
+      adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \
+        --ez fail_sync true --ez show_player true --el play_book <id>
+      ```
+
+      The screenshot also incidentally re-confirmed [[cu-87]]: chapter highlight on Chapter 1 at
+      26:11, position 06:40, chapter list matching the real file exactly.
 ### Authentication
 
 - [ ] **cu-10 — a rotated server token recovers silently.** Rotate the server's token
@@ -760,10 +794,9 @@ source, not just the test result.**
 
 ### Still needs a human at the device
 
-- **The "position not synced" badge.** Needs the player sheet open with the server unreachable.
-  The `fail_sync` debug hook routes through `MockPlexMode`, so it does **not** work against a live
-  server — and the `--el play_book` intent starts playback via the media session without navigating
-  the UI, so the sheet never lays out. Either extend the hook to the live path or tap it by hand.
+- ~~**The "position not synced" badge.**~~ **Done and automated** — see the item above. Both
+  debug-hook gaps were fixed rather than worked around: `fail_sync` now applies to a live server,
+  and `show_player` expands the sheet, so no tap coordinates are involved.
 - **The SD-card eject test.** Now genuinely possible: the tablet has a real **59 GB card mounted
   with 44 GB free** (`public:179,129`, `79AF-CD2E`), and the app already has directories on both
   volumes. `sm` can simulate the eject without touching the hardware. Earlier sessions assumed this

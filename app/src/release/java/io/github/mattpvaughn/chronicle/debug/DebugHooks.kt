@@ -1,7 +1,10 @@
 package io.github.mattpvaughn.chronicle.debug
 
 import android.content.Intent
+import androidx.lifecycle.LifecycleOwner
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
+import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
+import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 
 /**
@@ -23,4 +26,13 @@ object DebugHooks : DebugHooksContract {
   ) = Unit
 
   override fun onFailSyncIntent(intent: Intent?) = Unit
+
+  /** Returns the api unchanged: no wrapper, and no failure injection, in a release build. */
+  override fun wrapProgressApi(api: ProgressApi): ProgressApi = api
+
+  override fun onShowPlayerIntent(
+    intent: Intent?,
+    lifecycleOwner: LifecycleOwner,
+    viewModel: MainActivityViewModel,
+  ) = Unit
 }

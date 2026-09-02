@@ -204,6 +204,20 @@ class MainActivityViewModel(
   }
 
   /**
+   * Expands the currently-playing sheet, if there is anything playing to expand.
+   *
+   * Separate from [onCurrentlyPlayingClicked] because that one *toggles* and throws on
+   * [BottomSheetState.HIDDEN]. This is idempotent and a no-op when hidden, which is what a
+   * caller that just wants the player on screen needs — used by the `show_player` debug hook
+   * so the "position not synced" badge can be screenshotted without tap coordinates (cu-73).
+   */
+  fun expandCurrentlyPlaying() {
+    if (currentlyPlayingLayoutState.value == COLLAPSED) {
+      _currentlyPlayingLayoutState.value = EXPANDED
+    }
+  }
+
+  /**
    * React to clicks on the "currently playing" modal, which is shown at the bottom of the
    * R.layout.activity_main view when media is active (can be playing or paused)
    */

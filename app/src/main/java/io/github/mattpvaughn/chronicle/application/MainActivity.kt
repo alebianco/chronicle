@@ -105,6 +105,7 @@ class MainActivity : AppCompatActivity() {
     // the mock-Plex machinery is not compiled into a release build at all.
     DebugHooks.onMainActivityIntent(intent)
     DebugHooks.onFailSyncIntent(intent)
+    DebugHooks.onShowPlayerIntent(intent, this, viewModel)
     // Debug-only: `--el play_book <id>` starts playback once the media service is
     // connected. connect{} is required — transportControls is null until then,
     // which is why driving playback from a bare intent alone does not work.
@@ -364,6 +365,7 @@ class MainActivity : AppCompatActivity() {
     // The activity is singleInstance, so a re-launch arrives here rather than in
     // onCreate — the debug hooks have to be handled in both places.
     DebugHooks.onFailSyncIntent(intent)
+    DebugHooks.onShowPlayerIntent(intent, this, viewModel)
     if (mediaServiceConnection.isConnected.value == true) {
       DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
     } else {
