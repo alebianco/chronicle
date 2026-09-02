@@ -75,8 +75,12 @@ class PlexFixtureContractTest {
     assertEquals("2001", first.id)
     assertEquals("1001", first.parentKey)
     assertEquals("An Unexpected Party", first.title)
-    assertEquals("listening progress survives deserialization", 1500L, first.progress)
-    assertEquals(5000L, first.duration)
+    assertEquals("listening progress survives deserialization", 54_000L, first.progress)
+    // 180_000 = the real length of the generated tone. The fixture durations are deliberately
+    // kept equal to the audio (cu-64), so progress percentages and chapter boundaries are
+    // computed against a length the audio actually has. Extended from 5s to 3min so playback
+    // sustains long enough to measure (cu-110).
+    assertEquals(180_000L, first.duration)
     assertTrue("media part key is present", first.media.isNotEmpty())
   }
 
@@ -90,20 +94,80 @@ class PlexFixtureContractTest {
 
   @Test
   fun `chapter fixture maps to chapters including the untitled fallback`() {
-    val directory = container("track-with-chapters.json").plexMediaContainer.metadata.single()
+    val track = trackWithChapters("2001")
     val chapters =
-      directory.plexChapters.map {
+      track.plexChapters.map {
         it.toChapter(trackId = "2001", trackDiscNumber = 1, downloaded = false, bookId = "1001")
       }
 
     assertEquals(3, chapters.size)
     assertEquals("Chapter 1: An Unexpected Party", chapters[0].title)
     assertEquals(0L, chapters[0].bookStartTimeOffset)
-    assertEquals(1600L, chapters[0].bookEndTimeOffset)
-    // The third chapter has an empty tag on purpose: it exercises the
-    // "Chapter $index" fallback in PlexChapter.toChapter.
-    assertEquals("Chapter 3", chapters[2].title)
+    assertEquals(75_000L, chapters[0].bookEndTimeOffset)
   }
+
+  /**
+   * The last chapter has an empty `tag` on purpose, exercising the "Chapter $index" fallback in
+   * `PlexChapter.toChapter`. It lives on the final track now that the fixture spans three.
+   */
+  @Test
+  fun `an untitled chapter falls back to its index`() {
+    val chapters =
+      trackWithChapters("2003").plexChapters.map {
+        it.toChapter(trackId = "2003", trackDiscNumber = 1, downloaded = false, bookId = "1001")
+      }
+
+    assertEquals("Chapter 8", chapters.last().title)
+  }
+
+  /**
+   * The property cu-115 needs from this fixture: chapters whose spans **cross a track boundary**.
+   *
+   * The book is 3 x 180 s and the chapters are 75 s, which does not divide evenly — so chapter 3
+   * straddles 180000 and chapter 5 straddles 360000. Plex reports such a chapter on *both* tracks
+   * it overlaps, with offsets absolute within the **book**, which is what makes the in-track vs
+   * book-absolute confusion reachable here. Every earlier version of this fixture had a single
+   * track, where the two frames are the same number and the bug class is invisible.
+   */
+  @Test
+  fun `chapters cross track boundaries with book-absolute offsets`() {
+    val trackDuration = 180_000L
+
+    val onFirst = trackWithChapters("2001").plexChapters
+    val onSecond = trackWithChapters("2002").plexChapters
+    val onThird = trackWithChapters("2003").plexChapters
+
+    // Chapter 3 spans 150000..225000, so it belongs to both track 1 and track 2.
+    val straddler = onFirst.single { it.index == 3L }
+    assertEquals(150_000L, straddler.startTimeOffset)
+    assertEquals(225_000L, straddler.endTimeOffset)
+    assertTrue(
+      "a chapter crossing the boundary must be reported on the following track too",
+      onSecond.any { it.index == 3L },
+    )
+    assertTrue(
+      "and it must actually cross it, or the fixture proves nothing",
+      straddler.startTimeOffset < trackDuration && straddler.endTimeOffset > trackDuration,
+    )
+
+    // The same at the second boundary, so the property is not an accident of the first.
+    val second = onSecond.single { it.index == 5L }
+    assertTrue(
+      second.startTimeOffset < trackDuration * 2 && second.endTimeOffset > trackDuration * 2,
+    )
+    assertTrue(onThird.any { it.index == 5L })
+
+    // Offsets are book-absolute: a later track's chapters start beyond its own duration.
+    assertTrue(
+      "track 3's chapters must be numbered from the start of the book, not of the track",
+      onThird.all { it.startTimeOffset >= trackDuration * 2 - 75_000 },
+    )
+  }
+
+  /** The fixture now carries all three tracks, so a lookup by ratingKey is needed. */
+  private fun trackWithChapters(ratingKey: String) =
+    container("track-with-chapters.json").plexMediaContainer.metadata
+      .single { it.ratingKey == ratingKey }
 
   @Test
   fun `collections fixture maps to collections`() {

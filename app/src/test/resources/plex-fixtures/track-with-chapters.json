@@ -1,6 +1,6 @@
 {
   "MediaContainer": {
-    "size": 1,
+    "size": 3,
     "Metadata": [
       {
         "ratingKey": "2001",
@@ -10,9 +10,16 @@
         "type": "track",
         "index": 1,
         "parentIndex": 1,
-        "duration": 5000,
+        "duration": 180000,
         "Media": [
-          { "Part": [{ "key": "/library/parts/3001/1600000000/file.wav", "size": 52428800 }] }
+          {
+            "Part": [
+              {
+                "key": "/library/parts/3001/1600000000/file.wav",
+                "size": 52428800
+              }
+            ]
+          }
         ],
         "Chapter": [
           {
@@ -20,21 +27,114 @@
             "tag": "Chapter 1: An Unexpected Party",
             "index": 1,
             "startTimeOffset": 0,
-            "endTimeOffset": 1600
+            "endTimeOffset": 75000
           },
           {
             "id": 4002,
             "tag": "Chapter 2: Roast Mutton",
             "index": 2,
-            "startTimeOffset": 1600,
-            "endTimeOffset": 3300
+            "startTimeOffset": 75000,
+            "endTimeOffset": 150000
           },
           {
             "id": 4003,
-            "tag": "",
+            "tag": "Chapter 3: A Short Rest",
             "index": 3,
-            "startTimeOffset": 3300,
-            "endTimeOffset": 5000
+            "startTimeOffset": 150000,
+            "endTimeOffset": 225000
+          }
+        ]
+      },
+      {
+        "ratingKey": "2002",
+        "parentRatingKey": 1001,
+        "title": "Roast Mutton",
+        "parentTitle": "The Hobbit",
+        "type": "track",
+        "index": 2,
+        "parentIndex": 1,
+        "duration": 180000,
+        "Media": [
+          {
+            "Part": [
+              {
+                "key": "/library/parts/3002/1600000000/file.wav",
+                "size": 52428800
+              }
+            ]
+          }
+        ],
+        "Chapter": [
+          {
+            "id": 4003,
+            "tag": "Chapter 3: A Short Rest",
+            "index": 3,
+            "startTimeOffset": 150000,
+            "endTimeOffset": 225000
+          },
+          {
+            "id": 4004,
+            "tag": "Chapter 4: Over Hill and Under Hill",
+            "index": 4,
+            "startTimeOffset": 225000,
+            "endTimeOffset": 300000
+          },
+          {
+            "id": 4005,
+            "tag": "Chapter 5: Riddles in the Dark",
+            "index": 5,
+            "startTimeOffset": 300000,
+            "endTimeOffset": 375000
+          }
+        ]
+      },
+      {
+        "ratingKey": "2003",
+        "parentRatingKey": 1001,
+        "title": "A Short Rest",
+        "parentTitle": "The Hobbit",
+        "type": "track",
+        "index": 3,
+        "parentIndex": 1,
+        "duration": 180000,
+        "Media": [
+          {
+            "Part": [
+              {
+                "key": "/library/parts/3003/1600000000/file.wav",
+                "size": 52428800
+              }
+            ]
+          }
+        ],
+        "Chapter": [
+          {
+            "id": 4005,
+            "tag": "Chapter 5: Riddles in the Dark",
+            "index": 5,
+            "startTimeOffset": 300000,
+            "endTimeOffset": 375000
+          },
+          {
+            "id": 4006,
+            "tag": "Chapter 6: Out of the Frying-Pan",
+            "index": 6,
+            "startTimeOffset": 375000,
+            "endTimeOffset": 450000
+          },
+          {
+            "id": 4007,
+            "tag": "Chapter 7: Queer Lodgings",
+            "index": 7,
+            "startTimeOffset": 450000,
+            "endTimeOffset": 525000
+          },
+          {
+            "id": 4008,
+            "tag": "",
+            "index": 8,
+            "startTimeOffset": 525000,
+            "endTimeOffset": 540000
           }
         ]
       }
