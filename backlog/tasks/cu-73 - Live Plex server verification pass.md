@@ -514,10 +514,38 @@ into "the symptom is gone".
       the server log). The flush now happens in `AudiobookMediaSessionCallback.playBook`, so it
       covers the mini player, Android Auto and media buttons too, not just the details screen —
       worth trying from at least two of those entry points.
-- [ ] **`/:/timeline`, scrobble, websockets.** Community-documented, not guaranteed
+- [x] **`/:/timeline`, scrobble, websockets.** Community-documented, not guaranteed
       (CLAUDE.md, Gotchas). Confirm the current Plex version still accepts the shapes the
       app sends — this is the item most likely to have silently drifted.
+      **Verified 2026-09-02, session 3, against Plex Media Server 1.43.3.10896 (Windows).** No
+      drift: `/:/timeline`, `/:/scrobble` and `/:/unscrobble` all accept the app's exact query
+      shapes and return `200`.
 
+      **One requirement worth pinning down, found by getting it wrong.** `/:/timeline` returns
+      **`400`** without an `X-Plex-Client-Identifier` header, and `200` with one. Isolated to that
+      single header — `X-Plex-Product` alone still 400s. The app is fine (`PlexInterceptor` sets it
+      from the persisted `uuid`), but it means **the endpoint requires a client identity, not just
+      a token**, which is not obvious from the community docs and would break any future code path
+      that built a timeline request outside the interceptor.
+
+      **The scrobble semantics, measured directly** — this is the mechanism behind session 1's
+      data loss, now confirmed rather than inferred:
+
+      | call | effect on a track |
+      |---|---|
+      | `/:/scrobble` | `viewCount` **1 -> 2** (it *increments*; it is not a flag) and `viewOffset` cleared |
+      | `/:/unscrobble` | `viewCount` cleared entirely |
+
+      So re-scrobbling an already-watched track both inflates the count *and* destroys the
+      listener's position — exactly why `ProgressReporter`'s `viewCount == 0L` one-shot guard is
+      load-bearing, and why the owner's library carried counts of 183/129/126.
+
+      Also learned: an **album-level** `unscrobble` **cascades down and clears its tracks**, while
+      an album's `viewCount` is *derived* from its tracks rather than stored independently —
+      consistent with decision-16 ("position is owned by the tracks"). Test data was restored to
+      its original `viewCount = 1`.
+
+      **Websockets remain untested** — the app's usage of them was not exercised here.
 ## Acceptance Criteria
 
 - [ ] Every checklist item above checked against a real server, with the result recorded
@@ -611,6 +639,28 @@ Three things worth carrying forward:
   diagnosability grounds before there was a use for it.
 - **`stat` size is not download progress.** Fetch2 preallocates, so the file reports full size
   within a second. Read `_written_bytes` from `LibGlobalFetchLib.db`. I misread this once.
+
+### Second sweep: what was automatable after all
+
+A deliberate audit of the 27 then-remaining items found **six more** that needed no human, and all
+six passed. Worth recording *why* they were missed, since the same bias will recur: each had been
+written as a physical-world action ("eject the SD card", "switch networks", "a book with a space in
+its path") when the actual requirement was a *state*, reachable with `sm unmount`,
+`cmd wifi set-wifi-enabled`, `mv`, or a pref edit.
+
+- **Network switch** — ~4.6 s recovery, playback never dropped (partial: no SIM for cellular)
+- **SD-card eject** — on a real 59 GB card, flags correctly stayed "downloaded but unavailable"
+- **cu-83 percent-encoding** — played from `Chronicle Downloads àéî/` as
+  `Chronicle%20Downloads%20%C3%A0%C3%A9%C3%AE`
+- **cu-13 chapter fallback** — 107 chapters for a 107-track book, offsets absolute and tiling the
+  book exactly
+- **cu-85 repeated relaunches** — three cold starts, no drift
+- **`/:/timeline` + scrobble shapes** — no drift on PMS 1.43.3, and the scrobble *increment*
+  semantics measured directly
+
+The two most valuable findings came from being wrong first: `/:/timeline` 400s without
+`X-Plex-Client-Identifier` (found by omitting it), and `opportunistic` Private DNS does **not** fix
+the LAN route (found by recommending it and testing).
 
 ### Still needs a human at the device
 
