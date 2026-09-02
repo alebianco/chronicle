@@ -1,9 +1,10 @@
 ---
-id: DRAFT-125
+id: cu-125
 title: A stale plex.direct certificate reports "No libraries found"
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-09-03'
+updated_date: '2026-09-03'
 labels: [R1, network, error-handling, trust]
 dependencies: []
 priority: high
@@ -120,18 +121,18 @@ app holds a fresh resource list.
 
 ## Acceptance Criteria
 
-- [ ] A connection failure during library selection is reported **as a connection failure**, not as
+- [x] A connection failure during library selection is reported **as a connection failure**, not as
       an empty library list
-- [ ] The distinct case of a **TLS hostname/certificate mismatch** is named in the user-facing
+- [x] The distinct case of a **TLS hostname/certificate mismatch** is named in the user-facing
       message, since the remedy differs entirely from "server offline" (restart Plex Media Server /
       wait for cert refresh, rather than check the network)
-- [ ] "No libraries found" is shown **only** when the server actually answered with zero eligible
+- [x] "No libraries found" is shown **only** when the server actually answered with zero eligible
       libraries
 - [ ] The same distinction is applied wherever else `connectToServer` failure is folded into an
       empty result — check the server picker and the initial post-login sync
-- [ ] Test coverage: a `FakePlexServer` that fails the TLS handshake, and one that returns an empty
+- [x] Test coverage: a `FakePlexServer` that fails the TLS handshake, and one that returns an empty
       `/library/sections`, must produce **different** user-facing outcomes
-- [ ] Do not weaken certificate verification anywhere as part of this (cu-42)
+- [x] Do not weaken certificate verification anywhere as part of this (cu-42)
 
 ## Related
 
@@ -139,3 +140,34 @@ app holds a fresh resource list.
 - [[cu-42]] — HTTPS enforcement; the refusal itself is correct and must stay
 - [[cu-11]] — `ConnectionChooser` tiering; both tiers failed here and the summary was accurate
 - [[DRAFT-124]] — the half-configured Home a user reaches by backing out of this picker
+
+
+## Implementation Notes
+
+**The empty state now has a reason.** `ChooseLibraryViewModel.EmptyReason` distinguishes
+`CANNOT_CONNECT` (nothing was reachable — the certificate-mismatch case), `REQUEST_FAILED`
+(connected, but `/library/sections` failed) and `NO_LIBRARIES` (the server answered and genuinely
+has none). `ChooseLibraryFragment` picks the string from it; the layout's hardcoded text is now
+only one of three.
+
+The `CANNOT_CONNECT` copy names the remedy, because it is not guessable: *"If it was just
+re-claimed or its password changed, restart Plex Media Server so it picks up its new certificate."*
+That is exactly what the owner had to be told — *"didn't know i had to restart it after changing
+password"* — and it was unfindable from "No libraries found".
+
+**One real behaviour change beyond the wording.** A successful call returning zero libraries now
+sets `LoadingStatus.ERROR` explicitly rather than `DONE`, so the empty state is reached honestly
+instead of via an empty list rendering as a blank success.
+
+**Certificate verification is untouched.** Chronicle refusing the mismatched host is correct
+(cu-42) and stays; only the *reporting* changed.
+
+**Three tests**, one per reason, driving `PlexConfig.ConnectionState` and the service. Two traps
+worth recording for anyone writing tests around this ViewModel: `loadLibraries` launches into
+`viewModelScope`, so an assertion needs `advanceUntilIdle()`; and `loadingStatus` is a
+`DoubleLiveData`, which computes **only while observed** — without an `observeForever` it stays
+`null` and the test fails for the wrong reason.
+
+**Left open deliberately:** applying the same distinction to the *server* picker and the initial
+post-login sync. Those share the failure shape but not the code path, and bundling them here would
+mean changing three screens on one commit's evidence. Worth a follow-up.

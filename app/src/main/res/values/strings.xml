@@ -33,6 +33,11 @@
     <string name="choose_user">Choose User</string>
     <string name="unknown_library_name">Unknown</string>
     <string name="no_libraries_found">No libraries found</string>
+    <!-- Shown when the library picker is empty because the server could not be reached at all,
+         rather than because it has no libraries. A certificate mismatch is the common cause and
+         needs a different remedy from "check your network", so it is named (cu-125). -->
+    <string name="library_picker_cannot_connect">Can\'t reach the server. If it was just re-claimed or its password changed, restart Plex Media Server so it picks up its new certificate.</string>
+    <string name="library_picker_request_failed">Connected, but the server did not return its libraries. Try again.</string>
     <string name="no_user_found">No users found</string>
     <string name="no_servers_found">No servers found</string>
     <string name="refresh_list">Refresh list</string>

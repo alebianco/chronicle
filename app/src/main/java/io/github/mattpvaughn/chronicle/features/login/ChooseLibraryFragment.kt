@@ -10,6 +10,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
@@ -77,6 +78,20 @@ class ChooseLibraryFragment : Fragment() {
       binding.libraryList.isVisible = status == LoadingStatus.DONE
       binding.noLibrariesFound.isVisible = status == LoadingStatus.ERROR
       binding.loadingIcon.isVisible = status == LoadingStatus.LOADING
+    }
+
+    // The empty state has three causes and used to render one sentence for all of them —
+    // "No libraries found", which is a claim about the *server's contents* and was wrong in two.
+    // The remedies differ completely, so the message has to (cu-125).
+    viewModel.emptyReason.observe(viewLifecycleOwner) { reason ->
+      binding.noLibrariesFound.setText(
+        when (reason) {
+          ChooseLibraryViewModel.EmptyReason.NO_LIBRARIES -> R.string.no_libraries_found
+          ChooseLibraryViewModel.EmptyReason.CANNOT_CONNECT -> R.string.library_picker_cannot_connect
+          ChooseLibraryViewModel.EmptyReason.REQUEST_FAILED -> R.string.library_picker_request_failed
+          null -> R.string.no_libraries_found
+        },
+      )
     }
 
     viewModel.userMessage.observe(

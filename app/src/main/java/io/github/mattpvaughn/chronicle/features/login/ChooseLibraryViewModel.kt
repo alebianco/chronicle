@@ -68,11 +68,45 @@ class ChooseLibraryViewModel
         }
       }
 
+    /**
+     * Why the picker is empty, so the screen can say something true.
+     *
+     * All three causes used to render as the layout's static "No libraries found", which is a
+     * statement about the *server's contents* and was wrong in two of them. The owner hit the
+     * worst case: a TLS hostname mismatch after a certificate rotation, reported as though the
+     * server had no audiobook libraries (cu-125).
+     *
+     * That reads as plausible rather than broken, because account and server selection both
+     * succeed first — they are answered by plex.tv, while libraries come from the server itself.
+     * So the user has no reason to suspect a connection problem.
+     */
+    enum class EmptyReason {
+      /** The server answered, and genuinely has no audiobook libraries. */
+      NO_LIBRARIES,
+
+      /** No connection could be established — including a certificate mismatch. */
+      CANNOT_CONNECT,
+
+      /** Connected, but the library request itself failed. */
+      REQUEST_FAILED,
+    }
+
+    private val _emptyReason = MutableLiveData(EmptyReason.NO_LIBRARIES)
+    val emptyReason: LiveData<EmptyReason> = _emptyReason
+
     private val networkObserver =
       Observer<Boolean> { isConnected ->
         if (isConnected) {
           Timber.i("Connected to server at ${plexConfig.url}, fetching libraries")
           loadLibraries()
+        }
+      }
+
+    private val connectionStateObserver =
+      Observer<PlexConfig.ConnectionState> { state ->
+        if (state == PlexConfig.ConnectionState.CONNECTION_FAILED) {
+          // Distinct from a failed *request*: nothing was reachable to ask.
+          _emptyReason.value = EmptyReason.CANNOT_CONNECT
         }
       }
 
@@ -87,10 +121,12 @@ class ChooseLibraryViewModel
         }
       }
       plexConfig.isConnected.observeForever(networkObserver)
+      plexConfig.connectionState.observeForever(connectionStateObserver)
     }
 
     override fun onCleared() {
       plexConfig.isConnected.removeObserver(networkObserver)
+      plexConfig.connectionState.removeObserver(connectionStateObserver)
       super.onCleared()
     }
 
@@ -105,10 +141,14 @@ class ChooseLibraryViewModel
               .map { it.asLibrary() }
           Timber.i("Libraries: $tempLibraries")
           _libraries.postValue(tempLibraries)
-          _loadingStatus.value = LoadingStatus.DONE
+          // An empty list here is the one case where "no libraries found" is *true*: the server
+          // answered and has none of the right type.
+          _emptyReason.value = EmptyReason.NO_LIBRARIES
+          _loadingStatus.value = if (tempLibraries.isEmpty()) LoadingStatus.ERROR else LoadingStatus.DONE
         } catch (e: Throwable) {
-          Timber.e("Error loading libraries: ${Arrays.toString(e.stackTrace)}")
+          Timber.e(e, "Error loading libraries")
           _userMessage.postEvent("Unable to load libraries: ${e.message}")
+          _emptyReason.value = EmptyReason.REQUEST_FAILED
           _loadingStatus.value = LoadingStatus.ERROR
         }
       }
