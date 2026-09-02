@@ -2,12 +2,17 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
+import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.ConnectionTier
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
+import timber.log.Timber
+import java.io.IOException
 import java.util.*
 import javax.inject.Inject
 import kotlin.collections.HashSet
@@ -65,6 +70,18 @@ class SharedPreferencesPlexPrefsRepo
     private val prefs: SharedPreferences,
     private val moshi: Moshi,
   ) : PlexPrefsRepo {
+    /** Guards the legacy-load log; see [legacyServerConnections]. */
+    private var hasLoggedLegacyConnections = false
+
+    /**
+     * Reused rather than rebuilt per call: `Moshi.adapter` walks its reflective factory list on
+     * every lookup, and this is on the launch path.
+     */
+    private val connectionsAdapter =
+      moshi.adapter<List<Connection>>(
+        Types.newParameterizedType(List::class.java, Connection::class.java),
+      )
+
     private companion object {
       const val PREFS_AUTH_TOKEN_KEY = "auth_token"
       const val PREFS_LIBRARY_NAME_KEY = "library_name"
@@ -73,9 +90,27 @@ class SharedPreferencesPlexPrefsRepo
       const val PREFS_SERVER_ACCESS_TOKEN = "server_token"
       const val PREFS_SERVER_IS_OWNED = "server_owned"
       const val PREFS_SERVER_ID_KEY = "server_id"
-      const val PREFS_REMOTE_SERVER_CONNECTIONS_KEY = "remote_server_connections"
       const val PREFS_USER = "user"
+
+      /**
+       * The chosen server's connections, as a serialized `List<Connection>`.
+       *
+       * Replaces the two keys below, which stored **bare URI strings** and so lost `local`,
+       * `relay` and `protocol` — every connection read back as [ConnectionTier.DIRECT] and
+       * cu-11's tiering did nothing from the second launch onwards (cu-107).
+       */
+      const val PREFS_SERVER_CONNECTIONS_KEY = "server_connections_v2"
+
+      /**
+       * Legacy connection keys, read for migration and then removed.
+       *
+       * Both were written the *same* complete list of URIs — the names implied a partition that
+       * the code never made — so the flags cannot be recovered from them. They are re-derived
+       * from the next `/api/v2/resources` refresh instead, which happens on every launch via
+       * `mergeServerRefresh`.
+       */
       const val PREFS_LOCAL_SERVER_CONNECTIONS_KEY = "local_server_connections"
+      const val PREFS_REMOTE_SERVER_CONNECTIONS_KEY = "remote_server_connections"
       const val PREFS_UUID_KEY = "uuid"
       const val PREFS_TEMP_ID = "id"
       const val NO_TEMP_ID_FOUND = -1L
@@ -166,6 +201,8 @@ class SharedPreferencesPlexPrefsRepo
             .remove(PREFS_SERVER_ID_KEY)
             .remove(PREFS_SERVER_ACCESS_TOKEN)
             .remove(PREFS_SERVER_IS_OWNED)
+            .remove(PREFS_SERVER_CONNECTIONS_KEY)
+            // The legacy keys go too, or a later read would resurrect the old flagless shape.
             .remove(PREFS_LOCAL_SERVER_CONNECTIONS_KEY)
             .remove(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
             .remove(PREFS_SERVER_NAME_KEY).commit()
@@ -179,12 +216,57 @@ class SharedPreferencesPlexPrefsRepo
         putConnections(value.connections)
       }
 
+    /**
+     * The stored connections, preferring the serialized form and falling back to the legacy one.
+     *
+     * The fallback must not fail loudly: returning an empty list here makes [server] read as null,
+     * which presents as "no server chosen" and sends the user back through the chooser. An
+     * upgrade must not do that, so a legacy install still loads — with `DIRECT` for everything,
+     * exactly as before, until the next `/resources` refresh restores the real flags.
+     */
     private fun getServerConnections(): List<Connection> {
-      val localServers = getStringSet(PREFS_LOCAL_SERVER_CONNECTIONS_KEY).toList()
-      val remoteServers = getStringSet(PREFS_REMOTE_SERVER_CONNECTIONS_KEY).toList()
+      val serialized = prefs.getString(PREFS_SERVER_CONNECTIONS_KEY, null)
+      if (!serialized.isNullOrEmpty()) {
+        val parsed =
+          try {
+            connectionsAdapter.fromJson(serialized)
+          } catch (e: JsonDataException) {
+            Timber.e(e, "Stored connections are unreadable; falling back to the legacy keys")
+            null
+          } catch (e: IOException) {
+            Timber.e(e, "Stored connections are unreadable; falling back to the legacy keys")
+            null
+          }
+        if (parsed != null) {
+          return parsed
+        }
+      }
+      return legacyServerConnections()
+    }
 
-      val combinedList = (localServers union remoteServers).toList()
-      return combinedList.map { Connection(it) }
+    /**
+     * Connections from the pre-cu-107 keys, as bare URIs.
+     *
+     * The flags are unrecoverable here — both keys were written the same full list, so the
+     * union below is a formality kept only in case a hand-edited install has them differing.
+     * `Connection(uri)` leaves `local` and `relay` false, which is the old behaviour; it is
+     * corrected on the next `/resources` refresh rather than guessed from the URI shape, since a
+     * wrong guess would re-introduce the mis-tiering this fix exists to remove.
+     */
+    private fun legacyServerConnections(): List<Connection> {
+      val local = getStringSet(PREFS_LOCAL_SERVER_CONNECTIONS_KEY)
+      val remote = getStringSet(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
+      val uris = (local union remote).filter { it.isNotEmpty() }
+      // Logged once per process, not once per read: `server` is a computed getter and the
+      // launch path reads it repeatedly, which turned one migration into seven identical lines.
+      if (uris.isNotEmpty() && !hasLoggedLegacyConnections) {
+        hasLoggedLegacyConnections = true
+        Timber.i(
+          "Loaded ${uris.size} connection(s) from the pre-cu-107 keys; tiers will be " +
+            "re-derived on the next /resources refresh",
+        )
+      }
+      return uris.map { Connection(uri = it) }
     }
 
     // TODO: ensure this is only usable for a certain amount of time
@@ -209,17 +291,21 @@ class SharedPreferencesPlexPrefsRepo
       user = user?.copy(authToken = "")
     }
 
+    /**
+     * Stores [connections] whole, flags included.
+     *
+     * Was two `putStringSet` calls holding bare URIs — and, both times, the *same* complete list
+     * despite the keys being named local and remote, so the partition they implied never
+     * happened (cu-107). The legacy keys are removed here rather than left behind, so a
+     * downgrade-then-upgrade cannot read a stale flagless copy.
+     */
     @SuppressLint("ApplySharedPref")
     private fun putConnections(connections: List<Connection>) {
       prefs.edit()
-        .putStringSet(
-          PREFS_LOCAL_SERVER_CONNECTIONS_KEY,
-          connections.map { connection -> connection.uri }.toSet(),
-        )
-        .putStringSet(
-          PREFS_REMOTE_SERVER_CONNECTIONS_KEY,
-          connections.map { connection -> connection.uri }.toSet(),
-        ).commit()
+        .putString(PREFS_SERVER_CONNECTIONS_KEY, connectionsAdapter.toJson(connections))
+        .remove(PREFS_LOCAL_SERVER_CONNECTIONS_KEY)
+        .remove(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
+        .commit()
     }
 
     private fun getStringSet(key: String): MutableSet<String> {
