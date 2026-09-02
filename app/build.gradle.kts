@@ -380,6 +380,7 @@ pitest {
       "io.github.mattpvaughn.chronicle.util.PackageValidatorTest",
       // Robolectric because MediaControllerCompat.Callback's constructor needs Binder (DRAFT-72).
       "io.github.mattpvaughn.chronicle.features.player.NotificationStateMachineTest",
+      "io.github.mattpvaughn.chronicle.features.player.PlayBookGuardsTest",
     ),
   )
 }

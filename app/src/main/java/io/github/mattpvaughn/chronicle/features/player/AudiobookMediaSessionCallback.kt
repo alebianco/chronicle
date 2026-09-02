@@ -36,6 +36,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import timber.log.Timber
 import javax.inject.Inject
@@ -61,6 +62,7 @@ class AudiobookMediaSessionCallback
     private val currentlyPlaying: CurrentlyPlaying,
     private val progressUpdater: ProgressUpdater,
     defaultPlayer: ExoPlayer,
+    private val dispatchers: DispatcherProvider,
   ) : MediaSessionCompat.Callback() {
     // Default to ExoPlayer to prevent having a nullable field
     var currentPlayer: Player = defaultPlayer
@@ -359,7 +361,7 @@ class AudiobookMediaSessionCallback
         flushOutgoingBookProgress(bookId)
 
         val tracks =
-          withContext(Dispatchers.IO) {
+          withContext(dispatchers.io) {
             trackRepository.getTracksForAudiobookAsync(bookId)
           }
         if (tracks.isEmpty()) {
@@ -405,7 +407,7 @@ class AudiobookMediaSessionCallback
         trackListStateManager.updatePosition(startingTrackIndex, trueStartTimeOffsetMillis)
 
         val book =
-          withContext(Dispatchers.IO) {
+          withContext(dispatchers.io) {
             return@withContext bookRepository.getAudiobookAsync(bookId)
           }
         if (book == null || book.id == NO_AUDIOBOOK_FOUND_ID) {
@@ -495,7 +497,7 @@ class AudiobookMediaSessionCallback
       Timber.i("No known tracks for book: $bookId, attempting to fetch them")
       // Tracks haven't been loaded by UI for this track, so load it here
       val networkTracks =
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
           trackRepository.loadTracksForAudiobook(bookId)
         }
       if (networkTracks.isOk) {
