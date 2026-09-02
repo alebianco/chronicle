@@ -1,0 +1,61 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "identifier": "com.plexapp.plugins.library",
+    "Metadata": [
+      {
+        "ratingKey": "151312",
+        "key": "/library/metadata/151312/children",
+        "parentRatingKey": "151299",
+        "guid": "plex://album/000000000000000000000000",
+        "parentGuid": "plex://album/000000000000000000000000",
+        "studio": "Black Library",
+        "type": "album",
+        "title": "Fixture Book",
+        "titleSort": "Fixture Series, Book 2",
+        "parentKey": "/library/metadata/151299",
+        "librarySectionTitle": "Audiobooks",
+        "librarySectionID": 14,
+        "librarySectionKey": "/library/sections/14",
+        "parentTitle": "Fixture Author",
+        "summary": "Invented summary.",
+        "index": 1,
+        "rating": 9.6,
+        "viewCount": 3,
+        "lastViewedAt": 1788340602,
+        "year": 2017,
+        "thumb": "/library/metadata/151312/thumb/1752360841",
+        "parentThumb": "/library/metadata/151299/thumb/1752360827",
+        "originallyAvailableAt": "2017-09-27",
+        "leafCount": 1,
+        "viewedLeafCount": 1,
+        "addedAt": 1752360765,
+        "updatedAt": 1752360841,
+        "loudnessAnalysisVersion": "2",
+        "Image": [
+          {
+            "alt": "Malleus",
+            "type": "coverPoster",
+            "url": "/library/metadata/151312/thumb/1752360841"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "4b1f07",
+          "topRight": "633312",
+          "bottomRight": "963516",
+          "bottomLeft": "602908"
+        },
+        "Style": [
+          {
+            "tag": "Fixture Narrator"
+          }
+        ],
+        "Mood": [
+          {
+            "tag": "Series: Fixture Series"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "MediaContainer": {
+    "size": 4,
+    "identifier": "com.plexapp.plugins.library",
+    "Metadata": [
+      {
+        "ratingKey": "151801",
+        "key": "/library/metadata/151801/children",
+        "parentRatingKey": "151796",
+        "guid": "plex://album/000000000000000000000000",
+        "parentGuid": "plex://album/000000000000000000000000",
+        "type": "album",
+        "title": "Fixture Book",
+        "titleSort": "Fixture Book, Sorted",
+        "parentKey": "/library/metadata/151796",
+        "parentTitle": "Fixture Author",
+        "summary": "Invented summary for a fixture.",
+        "index": 1,
+        "thumb": "/library/metadata/151801/thumb/1752395325",
+        "parentThumb": "/library/metadata/151796/thumb/1752395192",
+        "addedAt": 1752395320,
+        "updatedAt": 1752395325,
+        "loudnessAnalysisVersion": "2",
+        "Image": [
+          {
+            "alt": "The Winds of Darkover",
+            "type": "coverPoster",
+            "url": "/library/metadata/151801/thumb/1752395325"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "22171c",
+          "topRight": "4f3b85",
+          "bottomRight": "463a82",
+          "bottomLeft": "643d89"
+        },
+        "Collection": [
+          {
+            "tag": "Darkover"
+          }
+        ]
+      },
+      {
+        "ratingKey": "151801",
+        "key": "/library/metadata/151801/children",
+        "parentRatingKey": "151796",
+        "guid": "plex://album/000000000000000000000000",
+        "parentGuid": "plex://album/000000000000000000000000",
+        "type": "album",
+        "title": "Fixture Book",
+        "titleSort": "Fixture Book, Sorted",
+        "parentKey": "/library/metadata/151796",
+        "parentTitle": "Fixture Author",
+        "summary": "Invented summary for a fixture.",
+        "index": 1,
+        "thumb": "/library/metadata/151801/thumb/1752395325",
+        "parentThumb": "/library/metadata/151796/thumb/1752395192",
+        "addedAt": 1752395320,
+        "updatedAt": 1752395325,
+        "loudnessAnalysisVersion": "2",
+        "Image": [
+          {
+            "alt": "The Winds of Darkover",
+            "type": "coverPoster",
+            "url": "/library/metadata/151801/thumb/1752395325"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "22171c",
+          "topRight": "4f3b85",
+          "bottomRight": "463a82",
+          "bottomLeft": "643d89"
+        },
+        "Collection": [
+          {
+            "tag": "Darkover"
+          }
+        ]
+      },
+      {
+        "ratingKey": "151053",
+        "key": "/library/metadata/151053/children",
+        "parentRatingKey": "151052",
+        "guid": "plex://album/000000000000000000000000",
+        "parentGuid": "plex://album/000000000000000000000000",
+        "studio": "Simon & Schuster Audio",
+        "type": "album",
+        "title": "Fixture Book",
+        "parentKey": "/library/metadata/151052",
+        "parentTitle": "Fixture Author",
+        "summary": "Invented summary for a fixture.",
+        "index": 1,
+        "rating": 8.2,
+        "year": 2023,
+        "thumb": "/library/metadata/151053/thumb/1788228186",
+        "originallyAvailableAt": "2023-11-07",
+        "addedAt": 1752355976,
+        "updatedAt": 1788228186,
+        "loudnessAnalysisVersion": "2",
+        "Image": [
+          {
+            "alt": "The Future",
+            "type": "coverPoster",
+            "url": "/library/metadata/151053/thumb/1788228186"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "070707",
+          "topRight": "0c0b0c",
+          "bottomRight": "63602b",
+          "bottomLeft": "725a1e"
+        }
+      },
+      {
+        "ratingKey": "151053",
+        "key": "/library/metadata/151053/children",
+        "parentRatingKey": "151052",
+        "guid": "plex://album/000000000000000000000000",
+        "parentGuid": "plex://album/000000000000000000000000",
+        "studio": "Simon & Schuster Audio",
+        "type": "album",
+        "title": "Fixture Book",
+        "parentKey": "/library/metadata/151052",
+        "parentTitle": "Fixture Author",
+        "summary": "Invented summary for a fixture.",
+        "index": 1,
+        "rating": 8.2,
+        "year": 2023,
+        "thumb": "/library/metadata/151053/thumb/1788228186",
+        "originallyAvailableAt": "2023-11-07",
+        "addedAt": 1752355976,
+        "updatedAt": 1788228186,
+        "loudnessAnalysisVersion": "2",
+        "Image": [
+          {
+            "alt": "The Future",
+            "type": "coverPoster",
+            "url": "/library/metadata/151053/thumb/1788228186"
+          }
+        ],
+        "UltraBlurColors": {
+          "topLeft": "070707",
+          "topRight": "0c0b0c",
+          "bottomRight": "63602b",
+          "bottomLeft": "725a1e"
+        }
+      }
+    ]
+  }
+}

@@ -115,17 +115,72 @@ Grouped by what breaks if the real server disagrees.
       parseable, but nothing on this server needs it. Full captured payload is quoted in [[cu-107]]. Capture it and confirm `relay` is present
       and spelled as the model expects, and note whether `IPv6` connections appear at all —
       that decides whether [[cu-75]] is worth opening.
-- [ ] **End-to-end connection selection via `FakePlexServer`.** The chooser's tests inject
+- [x] **End-to-end connection selection via `FakePlexServer`.** The chooser's tests inject
       the probe, so the real `checkServer` wiring in `PlexConfig` is covered only by the
       Dagger graph resolving. Same harness cu-10 needs.
+      **Done 2026-09-02: `ConnectionProbeWiringTest`, 9 tests.** Drives the *production* probe
+      lambda — `plexMediaService.checkServer(uri).isSuccessful` — over real Retrofit + Moshi
+      against `FakePlexServer`, so the `{url}/identity` call, the encoded path parameter, the
+      converter and the `isSuccessful` reading are all exercised.
 
+      **Sabotage proves the gap was real:** a one-character typo in the endpoint
+      (`/identity` -> `/idendity`) — which would leave the app unable to connect to *any* server —
+      fails **6 of 9** new tests while **all 9** existing `ConnectionChooserTest` cases stay green.
+
+      Covered: a live probe succeeding, that it really requests `/identity`, 401 and 500 both
+      reading as unreachable, an empty `{}` body still counting as reachable, a dead LAN address
+      falling through to WAN, relay chosen when it is all there is, and nothing-reachable
+      returning null.
+
+      One honest limit recorded in the test: with *two* reachable addresses the winner is decided
+      by which `Deferred` settles first in `awaitFirstSuccess`'s `select`, and two real suspending
+      HTTP calls on an unconfined test dispatcher settle nondeterministically. Tier *preference*
+      with instant probes stays `ConnectionChooserTest`'s job; what is new here is that the
+      decision runs on real HTTP.
 ### Data and parsing
 
-- [ ] **cu-62 (draft) — Moshi codegen.** Reflection is lenient about absent/null fields
+- [x] **cu-62 — Moshi codegen.** Reflection is lenient about absent/null fields
       in ways generated adapters are not. The fixtures cover the fields they cover; a
       real library exercises the rest (missing narrators, odd chapter data, unusual
       collections). If codegen is adopted, this pass is where its risk is actually
       retired.
+      **Done 2026-09-02: `RealLibraryShapeTest`, 8 tests, against fixtures captured from the real
+      196-book library** (scrubbed of identifying values, key-sets preserved). [[cu-62]] is Done
+      and codegen *is* live (`ksp(libs.moshi.codegen)`, no `KotlinJsonAdapterFactory`), so the
+      condition is met.
+
+      cu-62 noted the leniency differences "did not materialise on fixture data" — true, and the
+      weak part, since hand-written fixtures contain the fields their author thought of. A survey
+      of all 196 real albums found **ten fields absent on at least one book**:
+
+      | field | absent on |
+      |---|---|
+      | `skipCount` | 190/196 |
+      | `Collection` | 170/196 |
+      | `viewCount` | 135/196 |
+      | `lastViewedAt` | 133/196 |
+      | `titleSort` | 57/196 |
+      | `rating`, `studio` | 30/196 |
+      | `parentThumb` | 16/196 |
+      | `year`, `originallyAvailableAt` | **1/196** |
+
+      The 1-of-196 cases are the point: a library where 195 books have `year` and one does not is
+      exactly the shape that passes every hand-written fixture and then throws on a real sync.
+
+      **The most valuable property turned out to be a different one than the item assumed.** The
+      real risk is not absent fields (the models carry defaults) but **unknown** ones: a real album
+      object sends `Image`, `UltraBlurColors`, `loudnessAnalysisVersion` and `originallyAvailableAt`,
+      none of which any model mentions. If codegen rejected unknown keys, every fetch would fail.
+      Sabotage: an explicit JSON `null` on a non-null field fails **7 of 8**; stripping the
+      unmodelled key fails exactly the test asserting it.
+
+      **A correction worth recording.** `PlexMediaSource` declares `hasNarrator = true` and
+      `hasSeries = true`, but **nothing parses `Style` or `Mood`** — `Audiobook` has no narrator or
+      series field. Those are D11 scaffolding ("declared but not yet load-bearing", CLAUDE.md). The
+      live server does send them, and only on the **detail** endpoint — `Style: ['Toby Longworth']`,
+      `Mood: ['Series: Eisenhorn']`, absent from all 196 list entries. I nearly wrote tests
+      asserting a feature that does not exist; the fixture keeps the real shape so it is ready when
+      someone implements it.
 - [x] **Plex metadata conventions.**
       **Verified 2026-09-01.** Confirmed: narrator/series render, and the library populated correctly from a real 500+ book library. Narrator via `Style` tags and series via `Mood` tags
       are a community convention, not a guarantee. Confirm a real library populates them
@@ -198,10 +253,27 @@ Grouped by what breaks if the real server disagrees.
       **no login wall**, downloaded books still playing, and — importantly — *no repeated
       401 storm* against plex.tv. The retry-once guard is unit-tested but never seen against
       a real server.
-- [ ] **cu-10 — end-to-end 401 handling via `FakePlexServer.stubUnauthorized`.** The
+- [x] **cu-10 — end-to-end 401 handling via `FakePlexServer.stubUnauthorized`.** The
       authenticator's tests exercise the decision, not the wiring; an integration test
       through MockWebServer would confirm the `AppModule` hookup actually fires.
+      **Done 2026-09-02: `ReauthWiringTest`, 7 tests.** A real `OkHttpClient` with
+      `PlexTokenAuthenticator` attached, against a real 401 from `FakePlexServer`.
 
+      **The gap was bigger than the item suggests.** `PlexTokenAuthenticator`'s own KDoc leans on
+      the framework for its central property — "OkHttp invokes it only on a 401 and threads the
+      previous attempt through `Response.priorResponse`, which is what makes 'retry exactly once' a
+      property of the framework rather than hand-rolled state" — but all 12 existing tests call
+      `authenticate(...)` directly with a hand-built `priorResponse`, i.e. they assert against
+      their own fixture.
+
+      Measured: with the **retry-once guard deleted from production code**, all **12** direct tests
+      still pass while the new wiring tests fail. Detaching the authenticator entirely also fails 4
+      of 7. Neither failure mode was previously detectable.
+
+      Covered: OkHttp actually invoking the authenticator, the refreshed token being persisted and
+      used on the retry, exactly-one refresh on a permanent 401 (no loop against plex.tv), 200 and
+      500 never reaching it, a refresh that yields nothing leaving the cached token alone, and an
+      unchanged token recording a signed-out account.
 ### Downloads (cu-12 / cu-76)
 
 - [x] **A large book (ideally ~2GB m4b) downloads to completion**, and memory is watched
@@ -661,6 +733,30 @@ its path") when the actual requirement was a *state*, reachable with `sm unmount
 The two most valuable findings came from being wrong first: `/:/timeline` 400s without
 `X-Plex-Client-Identifier` (found by omitting it), and `opportunistic` Private DNS does **not** fix
 the LAN route (found by recommending it and testing).
+
+### Third sweep: the three items that were code, not device work
+
+`FakePlexServer` and the Moshi item were never device work at all. Closing them took no hardware
+and added **24 tests** (562 -> 586), coverage 28.44% -> 28.54%.
+
+All three were the *same* blind spot, and it is the [[cu-107]] shape again: a seam left untested
+because the unit on each side was tested well. Each is now measured rather than argued —
+
+- **retry-once guard deleted from production**: all **12** existing `PlexTokenAuthenticatorTest`
+  cases still pass; the new wiring tests fail
+- **`/identity` misspelled `/idendity`**: **6 of 9** new probe tests fail; all **9**
+  `ConnectionChooserTest` cases stay green
+- **explicit JSON `null` on a non-null field**: **7 of 8** real-shape tests fail
+
+The lesson worth keeping: when a KDoc says a property comes from the framework ("OkHttp threads
+`priorResponse`") or that a dependency is "injected so this is testable without Retrofit", that
+sentence is naming an untested seam. Both did, in as many words.
+
+Two mistakes made along the way, both instructive. I first sabotaged codegen by removing a Kotlin
+default, which broke the *test compile* rather than a runtime parse — a compile-time sabotage proves
+nothing about adapter strictness. And an earlier sabotage appeared to pass only because KSP had not
+regenerated the adapter; the generated file still had the old default in it. **Check the generated
+source, not just the test result.**
 
 ### Still needs a human at the device
 
