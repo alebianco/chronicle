@@ -162,11 +162,27 @@ class SettingsList : FrameLayout {
       return oldItem.title == newItem.title
     }
 
+    /**
+     * Includes [PreferenceModel.defaultValue], which carries the current value of a switch.
+     *
+     * Comparing only title and explanation meant a row whose *value* changed was considered
+     * unchanged and never rebound. It went unnoticed because the two ways a value normally
+     * changes both repaint by themselves: a switch is toggled by the user, and
+     * [SwitchPreferenceViewHolder] sets `isChecked` in its own click handler; and a clickable
+     * row renders its value **into the title** ("Refresh frequency: 6 hours"), which this did
+     * compare.
+     *
+     * Settings import (cu-77) is the first path that changes several values at once without
+     * touching their views, and there the switches kept their old state on screen until the
+     * next time the list was built from scratch.
+     */
     override fun areContentsTheSame(
       oldItem: PreferenceModel,
       newItem: PreferenceModel,
     ): Boolean {
-      return oldItem.title == newItem.title && oldItem.explanation == newItem.explanation
+      return oldItem.title == newItem.title &&
+        oldItem.explanation == newItem.explanation &&
+        oldItem.defaultValue == newItem.defaultValue
     }
   }
 }
