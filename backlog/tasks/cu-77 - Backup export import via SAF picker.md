@@ -1,10 +1,10 @@
 ---
 id: cu-77
 title: Backup export/import via SAF picker
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-31'
-updated_date: '2026-09-01 08:29'
+updated_date: '2026-09-02 09:12'
 labels:
   - R1
   - trust
@@ -75,8 +75,14 @@ stale Play purchase token from the device entirely, which is better than merely 
 - [x] **Wipe app, restore file: identical state minus auth** — verified on a device, with the
       before/after settings compared explicitly rather than eyeballed
 - [x] Screenshot of both settings entry points (a UI claim needs one — cu-63's lesson)
-- [ ] Decide on the prefs-file split; if done, migration plus updated `BackupRulesTest`
-- [ ] Decide on the premium-key removal migration
+- [x] Decide on the prefs-file split; if done, migration plus updated `BackupRulesTest`
+      — **decided: split out to [[draft-108]].** Not needed for correctness (the allowlist and the
+      whole-file exclusion are each verified), and it touches credentials at rest, which is the
+      owner's call. The migration also carries a real sign-out risk if interrupted, which deserves
+      its own task rather than riding along with the picker work.
+- [x] Decide on the premium-key removal migration
+      — **decided: split out to [[draft-108]]**, same reasoning. Cheap and low-risk on its own, and
+      independent of the prefs-file split, so it can ship separately.
 
 ## Implementation Notes
 
@@ -155,17 +161,18 @@ over an existing name produced `chronicle-backup-2026-09-02 (1).json` and `(2).j
 the original filename showed an empty `settings` map from the very first export — before any
 setting had been written. That looked like an export bug for a while and was not one.
 
-### Still open
+### Split out rather than left open
 
-The two remaining criteria are **decisions, not code**, and are deliberately left for the owner
-since both touch stored credentials:
+Both remaining criteria were **decisions, not code**, and both touch credentials at rest — the
+owner's call per CLAUDE.md. They are now [[draft-108]] rather than an open checkbox on a closed
+task, so the SAF work can land without either being forgotten:
 
-- **The prefs-file split** (tokens into `ChronicleAuth.xml`). Not required for correctness — the
-  allowlist is enforced in one tested place and the whole-file Auto Backup exclusion is verified by
-  `BackupRulesTest` — but it would make the separation structural rather than dependent on the
-  allowlist staying correct. Needs a one-shot migration of three keys plus a `BackupRulesTest`
-  update.
+- **The prefs-file split** (tokens into `ChronicleAuth.xml`). Would make the separation
+  structural rather than dependent on the allowlist staying correct. Needs a one-shot migration of
+  three keys plus a `BackupRulesTest` update — and, noted while writing it up, that migration can
+  sign a user out if it is interrupted between the copy and the clear, so it wants an idempotent
+  design and a test of its own.
 - **The premium-key removal migration** (`key_is_premium`, `key_premium_token`, inert since
   cu-60). The allowlist already keeps them out of exports; a removal migration would delete a stale
   Play purchase token from the device entirely, which is strictly better than merely not exporting
-  it.
+  it. Independent of the split, and much cheaper — it could ship alone.
