@@ -28,14 +28,14 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   release source sets each provide their own `DebugHooks` object: `DebugHooksContract` makes the
   compiler check the shape, but only for the variant being built, so a drifted release twin used to
   pass every debug-only check and break the first release build (cu-70).
-- **Coverage ratchet**: `coverage-ratchet.sh` compares JaCoCo instruction coverage against the committed `coverage-baseline.txt` and fails on a drop; a rise ratchets the baseline up (commit the change). Baseline is deliberately a plain file in git so every movement is reviewable in a diff. To lower it on purpose: `./coverage-ratchet.sh --update`, and justify it in the commit message.
+- **Coverage ratchet**: `coverage-ratchet.sh` compares JaCoCo instruction coverage against the committed `coverage-baseline.txt` and fails on a drop of more than 0.05% (a deliberate tolerance for codegen jitter — note it is *not* a high-water mark, so repeated sub-threshold drops accumulate); a rise ratchets the baseline up (commit the change). Baseline is deliberately a plain file in git so every movement is reviewable in a diff. To lower it on purpose: `./coverage-ratchet.sh --update`, and justify it in the commit message.
 - Release builds: `./test_release_build.sh` (R8/ProGuard smoke test; see CONTRIBUTING.md "Release Builds & ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (Moshi models, Room entities), or dependencies. It asserts against the **dex** that Room/Retrofit/Dagger/Moshi classes survived R8 — these fail at runtime, not build time. Keep rules are deliberately narrow (cu-45): prefer adding one precise rule over widening a blanket `-keep`, which silently exempts code from R8.
 - **Instrumented tests run again, on two Gradle Managed Devices** (cu-54, was quarantined since `c5cfd46`). `./verify.sh --instrumented` adds them as a 7th stage; `./gradlew instrumentedCheckGroupGroupDebugAndroidTest` runs them directly. **API 27** (the minSdk floor, which catches a new API called without a version guard) and **API 35**, both AOSP `arm64-v8a`. Opt-in, not in the default gate: two emulators take minutes where the unit gate takes seconds. The suite is `LoggedInLaunchTest` — three cases against the cu-16 fixture server via `MockPlexMode`, so **no credentials and no live server**. It is deliberately small; it exists to make the Fragment/Activity/media-session layer reachable at all, not to cover it. Four traps it cost to learn, all recorded in cu-54: `MockWebServer.start()` must bind `127.0.0.1` explicitly (an AOSP image cannot resolve `localhost`, and the throw lands on a background thread with an *empty* crash buffer); Espresso needs `hamcrest:2.2` declared for androidTest (`hamcrest-all:1.3` resolves but `org.hamcrest.Matchers` reaches no dex); `testOptions.animationsDisabled = true` is required; and a `BottomNavigationItemView` sits under the system bars, so Espresso's stock `click()` refuses it — tab navigation is *not* covered for that reason.
 
 ## Project snapshot (truthful as of 2026-08-31 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin **2.2.10**, minSdk 27, target/compileSdk **36** (cu-6). Gradle 9.5.1 + AGP 8.13.2 — note AGP 8.x cannot use Gradle >= 9.6.0, and AGP 9.x absorbs the Kotlin plugin (its own migration).
-- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (reflection mode) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · LiveData + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
+- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`; the reflective `KotlinJsonAdapterFactory` was removed in cu-62) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · LiveData + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
 - **KSP, not KAPT** (cu-8/cu-58). `kotlin-kapt` is gone; Room and Dagger use `ksp(...)`. Any doc claiming KAPT is wrong.
   Note incremental builds are *slower* than they were under KAPT (+13% on an ordinary edit, +97% when an annotated type
   changes) — this is fixed per-invocation overhead in KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating
@@ -47,13 +47,16 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `app/src/release/`, so it is not compiled into release builds at all.
   The mock also serves cover art and a generated audio tone with HTTP range support (cu-64), and
   `--el play_book <id>` starts playback via `playFromMediaId` without needing tap coordinates. Audio
-  really does flow: all three track parts are fetched and decoded (`AudioFlinger` confirms 15.000s).
+  really does flow: all three track parts are fetched and decoded. The tone is **180 s** (8 kHz mono,
+  2.7 MB, a semitone step every 30 s so a log tells you where in the file playback is) — it was 5 s,
+  which ended within a second of starting and silently blocked every player-open verification for
+  three sessions while being diagnosed as a debug-hook gap (cu-115).
   An earlier claim that no request reached the mock was a logging blind spot, not a bug — the log sat
   below the early returns (cu-64). Seeks are still unexercised end-to-end, so the 206/range path is
   unit-tested only. `./capture-screens.sh <dir>` drives the app and screenshots the main
   screens; it asserts the app was actually foregrounded, because an earlier version silently captured
   the launcher.
-- Tests: **446 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **654 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -81,7 +84,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Four separate Room databases** (`BookDatabase` v9, `TrackDatabase` v5, `ChapterDatabase` v3, `CollectionsDatabase` v2), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration.
+- **Four separate Room databases** (`BookDatabase` v9, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
 - **Listening position is owned by the *tracks*, never the book** (decision-16, cu-90). Plex stores
   no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a cache of a derivation.
   `merge` carries the local value and **never** adopts `network.progress`; only `syncAudiobook`,
@@ -117,12 +120,37 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   that class's tests assert it gives up, because looping would hammer plex.tv. Plex tokens never
   expire on a timer; they are invalidated by an event (password change with "sign out connected
   devices", server re-claim).
-- **Auth tokens and settings share one `SharedPreferences` file** (`Chronicle.xml`), because both
-  prefs repos inject the single instance provided for `APP_NAME`. Two consequences: Auto Backup
-  can only exclude the file *whole* (`data_extraction_rules.xml` + `backup_rules.xml`, one per API
-  level — keep them in agreement, `BackupRulesTest` enforces it), and any settings export MUST use
-  the `BACKUP_SETTING_KEYS` allowlist. **Never enumerate `sharedPreferences.all` into a file or
-  payload** — it contains the Plex account token, the server token and the serialized user.
+- **Credentials live in their own `SharedPreferences` file** (`ChronicleAuth.xml`), split out of
+  `Chronicle.xml` in cu-108. All three secrets — the Plex account token, the server access token
+  and the serialized user — go through `credentialString`/`putCredential`/`removeCredential`,
+  which read auth-file-first with a legacy fallback and purge the old copy from `Chronicle.xml` on
+  write. Auto Backup excludes `ChronicleAuth.xml` and *not* `Chronicle.xml`
+  (`data_extraction_rules.xml` + `backup_rules.xml`, one per API level — keep them in agreement,
+  `BackupRulesTest` enforces it, and it checks both files by parsing `path=` rather than by
+  substring). Any settings export still MUST use the `BACKUP_SETTING_KEYS` allowlist and
+  **never enumerate `sharedPreferences.all` into a file or payload** — the allowlist, not the file
+  split, is what keeps an export clean, and a legacy install can still have a token in the old file.
+  Note the allowlist gates **keys, not values**: an imported string is written straight to prefs,
+  so a value with a closed set of valid options needs validating on the way in (cu-77).
+- **Do not do per-second work whose result cannot change** (cu-110). `ProgressUpdater` writes once
+  a second during playback and Room invalidates **per table**, so every `LiveData` on `Audiobook`
+  or `MediaItemTrack` re-emits at tick rate. The measured damage was not computation but
+  **re-rendering**: 1405 `View.measure` calls in 20 s, 88% janky frames, dropped taps. Four causes,
+  all the same shape — a constraint-graph rebuild for a constant aspect ratio, a slider refresh for
+  an invisible sheet, a DB read to resolve a track that had not changed, and an image reload for
+  identical artwork. Guard on *visibility* (`isShown`) and on *value changed*, and remember a
+  `RecyclerView` row legitimately rebinds every second, because the playing book's `progress` is in
+  `areContentsTheSame` — so a rebind must be cheap. **Profile, do not read**: four rounds of
+  inspection produced plausible wrong answers here; `am profile start --sampling` named it at once.
+- **A performance fix verified against the easy fixture is not verified** (cu-110/cu-115). The
+  single-track, 3-chapter fixture showed 1 jiffy/6 s and looked fixed; the 3-track, 8-chapter one
+  put it back to 431 jiffies/12 s and exposed the real dominant cause. Measure against the worst
+  realistic input.
+- **`postValue` defers to the next main-loop pass**, so a flag it sets cannot guard anything read
+  in the same pass (cu-110). `MediaServiceConnection.connectIfIdle` tested `isConnected.value`,
+  which `onConnected` publishes with `postValue` while clearing `isConnecting` immediately — so
+  both read idle while the browser was CONNECTED, and `MediaBrowserCompat.connect()` throws rather
+  than ignoring a redundant call. Ask the collaborator's own synchronous state instead.
 - **Never log an auth token.** `TokenLoggingTest` fails the build on any `Timber` call that
   interpolates one — it caught three live leaks, including one logging *two* tokens per media
   item. Logging *presence* (`token.isNotEmpty()`) is fine and is what the guard permits.
