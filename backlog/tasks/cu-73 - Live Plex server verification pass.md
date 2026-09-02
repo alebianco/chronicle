@@ -554,9 +554,22 @@ Three things worth carrying forward:
 
 Deliberate, and worth knowing before the next session:
 
-- **Private DNS is set to `one.one.one.one`** (DNS-over-TLS). This is the LAN-tier workaround for
-  this router, not a test artifact — leaving it on keeps Plex traffic on the LAN instead of routing
-  out to the WAN and back. Remove it only to reproduce the DNS failure.
+- **Private DNS is set to `one.one.one.one` in `hostname` (strict) mode.** This is the LAN-tier
+  workaround for this router, not a test artifact — leaving it on keeps Plex traffic on the LAN
+  instead of routing out to the WAN and back. Remove it only to reproduce the DNS failure.
+
+  **`opportunistic` mode does NOT work — tested, 2026-09-02.** It looks like the safer choice
+  (falls back to plaintext instead of hard-failing behind a captive portal) but it still sends
+  queries *to the router*, upgrading the transport only if the router supports DoT. So the
+  search-domain hijack returns: `ping` resolved
+  `...plex.direct.homenet.telecomitalia.it -> 127.0.0.1` again and the app fell straight back to
+  `Chose DIRECT connection`. Only **strict** mode bypasses the router's resolver.
+
+  The tradeoff is therefore real and unavoidable at the device level: strict mode fixes the LAN
+  route but cannot resolve anything if port 853 is blocked (hotel captive portals). The proper fix
+  is on the **router** — drop the `homenet.telecomitalia.it` DHCP search domain, or disable its DNS
+  rebind protection — which is an owner decision, not an app one. Chronicle cannot influence any of
+  this; the platform resolver is not app-controllable.
 - **`This Inevitable Ruin` (1.64 GB) is downloaded** and correctly flagged cached, left in place as
   the fixture for the still-open download items (offline playback of a *multi-hour* book, the
   `FAILED` retry, token rotation mid-download). 63 GB free, so it is not in the way.
