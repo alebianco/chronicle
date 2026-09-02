@@ -194,6 +194,132 @@ class BookRepositoryRefreshTest {
       assertEquals(listOf("1001", "1002"), insertedBooks().map { it.id })
     }
 
+  // ---------------------------------------------------------------------------------------
+  // refreshDataPaginated — the method the app actually calls.
+  //
+  // `LibrarySyncRepository.refreshLibrary` is the only refresh entry point in the app, and it
+  // calls *this* method; `refreshData` above is unreferenced outside tests. So every failure
+  // case proven above was proven about code no user ever runs. These are the same cases against
+  // the live path.
+  // ---------------------------------------------------------------------------------------
+
+  private fun serverPage(
+    books: List<PlexDirectory>,
+    totalSize: Long = books.size.toLong(),
+    offset: Long = 0,
+  ) = PlexMediaContainerWrapper(
+    PlexMediaContainer(
+      metadata = books,
+      size = books.size.toLong(),
+      totalSize = totalSize,
+      offset = offset,
+    ),
+  )
+
+  private fun serverHasPaginated(vararg books: PlexDirectory) {
+    coEvery { plexMediaService.retrieveAlbumPage(any(), any(), any()) } returns
+      serverPage(books.toList())
+  }
+
+  /**
+   * The one that matters. A fetch that throws must not be read as "the server has no books" —
+   * that deletes the entire local library, taking every book's listening position with it.
+   */
+  @Test
+  fun `a paginated network failure leaves the local library untouched`() =
+    runTest {
+      coEvery { bookDao.getAudiobooks() } returns
+        listOf(localBook("1001"), localBook("1002", title = "Neuromancer"))
+      coEvery { plexMediaService.retrieveAlbumPage(any(), any(), any()) } throws
+        IOException("offline")
+
+      repository().refreshDataPaginated()
+
+      coVerify(exactly = 0) { bookDao.removeAll(any()) }
+      coVerify(exactly = 0) { bookDao.insertAll(any()) }
+    }
+
+  /**
+   * The partial-failure case, which is the realistic one: pagination succeeds for a few pages
+   * and then the network drops. Every book not in the pages that arrived must survive.
+   */
+  @Test
+  fun `a failure part way through pagination deletes nothing`() =
+    runTest {
+      coEvery { bookDao.getAudiobooks() } returns
+        listOf(localBook("1001"), localBook("1002"), localBook("1003"))
+      // Page 1 arrives and reports more to come; page 2 throws.
+      coEvery { plexMediaService.retrieveAlbumPage(any(), 0, any()) } returns
+        serverPage(listOf(serverBook("1001")), totalSize = 3, offset = 0)
+      coEvery { plexMediaService.retrieveAlbumPage(any(), 100, any()) } throws
+        IOException("connection reset")
+
+      repository().refreshDataPaginated()
+
+      coVerify(exactly = 0) { bookDao.removeAll(any()) }
+      coVerify(exactly = 0) { bookDao.insertAll(any()) }
+    }
+
+  /**
+   * A missing library is a configuration failure, not an empty server. It used to `return` from
+   * the inner `withContext` lambda only, so it fell through to the deletion as well.
+   */
+  @Test
+  fun `no configured library deletes nothing`() =
+    runTest {
+      coEvery { bookDao.getAudiobooks() } returns listOf(localBook("1001"))
+      every { plexPrefsRepo.library } returns null
+
+      repository().refreshDataPaginated()
+
+      coVerify(exactly = 0) { bookDao.removeAll(any()) }
+      coVerify(exactly = 0) { bookDao.insertAll(any()) }
+    }
+
+  /** Offline mode must not reach the network on the live path either. */
+  @Test
+  fun `offline mode skips the paginated refresh entirely`() =
+    runTest {
+      every { prefsRepo.offlineMode } returns true
+
+      repository().refreshDataPaginated()
+
+      coVerify(exactly = 0) { plexMediaService.retrieveAlbumPage(any(), any(), any()) }
+      coVerify(exactly = 0) { bookDao.insertAll(any()) }
+    }
+
+  /** The success path still prunes exactly what the server dropped, and nothing more. */
+  @Test
+  fun `a successful paginated refresh removes only the book the server dropped`() =
+    runTest {
+      coEvery { bookDao.getAudiobooks() } returns
+        listOf(localBook("1001"), localBook("1002", title = "Neuromancer"))
+      serverHasPaginated(serverBook("1001"))
+
+      repository().refreshDataPaginated()
+
+      val removed = slot<List<String>>()
+      coVerify { bookDao.removeAll(capture(removed)) }
+      assertEquals(listOf("1002"), removed.captured)
+    }
+
+  /** decision-16 at the library level, on the live path: local progress is carried through. */
+  @Test
+  fun `a successful paginated refresh preserves local progress`() =
+    runTest {
+      coEvery { bookDao.getAudiobooks() } returns
+        listOf(localBook("1001", progress = 4_000L, lastViewedAt = 9_000L))
+      serverHasPaginated(serverBook("1001", lastViewedAtSeconds = 3L))
+
+      repository().refreshDataPaginated()
+
+      assertEquals(
+        "a library refresh must never blank the position it cannot recompute",
+        4_000L,
+        insertedBooks().single().progress,
+      )
+    }
+
   private val chapterDao = mockk<ChapterDao>(relaxed = true)
 
   private fun TestScope.repository() =

@@ -41,6 +41,9 @@ interface IBookRepository {
     trackCount: Int,
   )
 
+  /** The same, for many books in one transaction — see `BookDao.updateTrackDataForAll`. */
+  suspend fun updateTrackData(updates: List<BookTrackData>)
+
   /**
    * Returns a [LiveData<Audiobook>] corresponding to an [Audiobook] with the [Audiobook.id]
    * equal to [id]
@@ -230,30 +233,52 @@ class BookRepository
       }
 
       prefsRepo.lastRefreshTimeStamp = System.currentTimeMillis()
-      val networkBooks: MutableList<Audiobook> = mutableListOf()
-      withContext(dispatchers.io) {
-        try {
-          val libraryId = plexPrefsRepo.library?.id ?: return@withContext
-          var booksLeft = 1L
-          // Maximum number of pages of data we fetch. Failsafe in case of bad data from the
-          // server since we don't want infinite loops. This limits us to a maximum 1,000,000
-          // tracks for now
-          val maxIterations = 5000
-          var i = 0
-          while (booksLeft > 0 && i < maxIterations) {
-            val response =
-              plexMediaService
-                .retrieveAlbumPage(libraryId, i * 100)
-                .plexMediaContainer
-            booksLeft = response.totalSize - (response.offset + response.size)
-            networkBooks.addAll(response.asAudiobooks())
-            i++
+
+      // A refresh deletes every local book the fetch did not return, so an *incomplete* fetch
+      // must abort rather than fall through. It used to log and continue: a network drop on
+      // page 3 of 12 deleted the other nine pages' books, and a total failure deleted the whole
+      // library — each taking its listening position with it, which is exactly what
+      // [decision-16] and R1 exist to protect.
+      //
+      // The pages already fetched are deliberately discarded rather than merged. A partial list
+      // is indistinguishable from "the server dropped those books", and there is no safe way to
+      // tell the difference here, so the only correct answer is to change nothing and let the
+      // next refresh try again.
+      val networkBooks: List<Audiobook> =
+        withContext(dispatchers.io) {
+          val fetched: MutableList<Audiobook> = mutableListOf()
+          try {
+            val libraryId = plexPrefsRepo.library?.id
+            if (libraryId == null) {
+              Timber.w("No library configured; skipping refresh rather than pruning the library")
+              return@withContext null
+            }
+            var booksLeft = 1L
+            // Maximum number of pages of data we fetch. Failsafe in case of bad data from the
+            // server since we don't want infinite loops. This limits us to a maximum 1,000,000
+            // tracks for now
+            val maxIterations = 5000
+            var i = 0
+            while (booksLeft > 0 && i < maxIterations) {
+              val response =
+                plexMediaService
+                  .retrieveAlbumPage(libraryId, i * 100)
+                  .plexMediaContainer
+              booksLeft = response.totalSize - (response.offset + response.size)
+              fetched.addAll(response.asAudiobooks())
+              i++
+            }
+            fetched
+          } catch (t: Throwable) {
+            Timber.e(
+              t,
+              "Failed to retrieve books after ${fetched.size} of an unknown total; " +
+                "leaving the local library untouched",
+            )
+            null
           }
-        } catch (t: Throwable) {
-          Timber.i("Failed to retrieve books: $t")
-        }
-      }
-      //    ^^^ quit on network failure- nothing below matters without new books from server
+        } ?: return
+      //    ^^^ quit on an incomplete fetch- deleting books because they did not arrive is data loss
 
       val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
 
@@ -299,6 +324,13 @@ class BookRepository
     ) {
       withContext(dispatchers.io) {
         bookDao.updateTrackData(bookId, bookProgress, bookDuration, trackCount)
+      }
+    }
+
+    override suspend fun updateTrackData(updates: List<BookTrackData>) {
+      if (updates.isEmpty()) return
+      withContext(dispatchers.io) {
+        bookDao.updateTrackDataForAll(updates)
       }
     }
 
