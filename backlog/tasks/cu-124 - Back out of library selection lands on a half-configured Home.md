@@ -1,9 +1,10 @@
 ---
-id: DRAFT-124
+id: cu-124
 title: Back out of library selection lands on a half-configured Home
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-09-03'
+updated_date: '2026-09-03'
 labels: [R1, ui, auth, trust]
 dependencies: []
 priority: high
@@ -65,16 +66,43 @@ have the same hole — the log shows the app passing through `NO_SERVER_CHOSEN` 
 
 ## Acceptance Criteria
 
-- [ ] Backing out of library selection leaves the app in a state that is either consistent
+- [x] Backing out of library selection leaves the app in a state that is either consistent
       (configured) or visibly incomplete — never a working-looking Home with
       `LOGGED_IN_NO_LIBRARY_CHOSEN` underneath
-- [ ] The same is checked for `LOGGED_IN_NO_SERVER_CHOSEN` and `LOGGED_IN_NO_USER_CHOSEN`
-- [ ] A user in a partial state has a visible route back to finishing it
-- [ ] Test coverage for the navigation decision at each partial login state
-- [ ] Verified on device by backing out of the picker, not only in unit tests
+- [x] The same is checked for `LOGGED_IN_NO_SERVER_CHOSEN` and `LOGGED_IN_NO_USER_CHOSEN`
+- [x] A user in a partial state has a visible route back to finishing it
+- [x] Test coverage for the navigation decision at each partial login state
+- [x] Verified on device by backing out of the picker, not only in unit tests
 
 ## Related
 
 - [[cu-73]] — found during the live pass
 - [[DRAFT-125]] — the empty picker that makes backing out likely in the first place
 - [[DRAFT-123]] — no "login expired" message, so the user does not know why they are here
+
+
+## Implementation Notes
+
+**Option 1 from the draft, not option 2.** Backing out of onboarding now leaves the app rather
+than showing a banner over a half-configured Home.
+
+The draft leaned toward the banner, reasoning that trapping someone in a picker would be worse
+when [[cu-125]] could make it unusable through no fault of theirs. That concern is real but is now
+**addressed at its source**: cu-125 makes the picker explain a connection failure and name the
+remedy, so the user is no longer stuck there with a misleading message. With that fixed, the
+simpler answer is the honest one — nothing was chosen, so there is nothing to show.
+
+`MainActivityViewModel.isOnboarding` is true for all three partial states
+(`LOGGED_IN_NO_USER_CHOSEN`, `NO_SERVER_CHOSEN`, `NO_LIBRARY_CHOSEN`), which also covers the
+draft's question about whether the other two had the same hole. They did: the back handler's
+fall-through was per-*screen*, not per-state.
+
+**The bug was invisible in proportion to how much cached data existed.** Home rendered the previous
+session's 196 books from Room, so the app looked fully configured; on a fresh install the same code
+would have shown an empty Home and looked obviously wrong. Worth remembering when judging "it looks
+fine" on a populated device.
+
+**Three tests** on the state itself. The back-handler branch is in `MainActivity`, which has no
+unit coverage (see [[cu-123]]'s note on that structural gap), so what is pinned is the condition it
+reads. Regression-checked on device that ordinary back from a tab still returns to Home and stays
+in the app.

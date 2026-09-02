@@ -404,4 +404,47 @@ class MainActivityViewModelTest {
 
     assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
   }
+
+  /**
+   * Onboarding must be distinguishable from being in the app.
+   *
+   * The back handler keys off this. Backing out of a picker used to fall through to "switch to the
+   * Home tab", which rendered the previous session's books from Room — so the app looked fully
+   * configured while holding no library at all (cu-124).
+   */
+  @Test
+  fun `a partial login state counts as onboarding`() {
+    for (state in listOf(
+      IPlexLoginRepo.LoginState.LOGGED_IN_NO_USER_CHOSEN,
+      IPlexLoginRepo.LoginState.LOGGED_IN_NO_SERVER_CHOSEN,
+      IPlexLoginRepo.LoginState.LOGGED_IN_NO_LIBRARY_CHOSEN,
+    )) {
+      every { loginRepo.loginEvent } returns MutableLiveData(Event(state))
+      val vm = viewModel()
+      vm.isOnboarding.observeForever {}
+
+      assertEquals("$state must count as onboarding", true, vm.isOnboarding.value)
+    }
+  }
+
+  @Test
+  fun `a complete login is not onboarding`() {
+    every { loginRepo.loginEvent } returns
+      MutableLiveData(Event(IPlexLoginRepo.LoginState.LOGGED_IN_FULLY))
+    val vm = viewModel()
+    vm.isOnboarding.observeForever {}
+
+    assertEquals(false, vm.isOnboarding.value)
+  }
+
+  @Test
+  fun `being logged out is not onboarding`() {
+    // Not signed in at all is the login screen's business, not a half-finished setup.
+    every { loginRepo.loginEvent } returns
+      MutableLiveData(Event(IPlexLoginRepo.LoginState.NOT_LOGGED_IN))
+    val vm = viewModel()
+    vm.isOnboarding.observeForever {}
+
+    assertEquals(false, vm.isOnboarding.value)
+  }
 }

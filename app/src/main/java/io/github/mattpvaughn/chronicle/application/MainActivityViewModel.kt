@@ -12,6 +12,9 @@ import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRA
 import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_FULLY
+import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_NO_LIBRARY_CHOSEN
+import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_NO_SERVER_CHOSEN
+import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_NO_USER_CHOSEN
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.id
 import io.github.mattpvaughn.chronicle.features.player.isPlaying
@@ -67,6 +70,24 @@ class MainActivityViewModel(
   val isLoggedIn =
     loginRepo.loginEvent.map {
       it.peekContent() == LOGGED_IN_FULLY
+    }
+
+  /**
+   * True while the user is part-way through onboarding — signed in, but without a user, server or
+   * library chosen yet.
+   *
+   * The back handler needs this. Backing out of a picker used to fall through to "switch to the
+   * Home tab", which showed a Home rendered from the *previous* session's Room data — so the app
+   * looked fully configured while its own state said otherwise and the prefs held no library
+   * (cu-124). The emptier the cache, the more obviously broken it would have looked; with a full
+   * one it was invisible.
+   */
+  val isOnboarding =
+    loginRepo.loginEvent.map {
+      when (it.peekContent()) {
+        LOGGED_IN_NO_USER_CHOSEN, LOGGED_IN_NO_SERVER_CHOSEN, LOGGED_IN_NO_LIBRARY_CHOSEN -> true
+        else -> false
+      }
     }
 
   /**

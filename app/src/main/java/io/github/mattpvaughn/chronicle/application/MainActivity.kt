@@ -274,6 +274,20 @@ class MainActivity : AppCompatActivity() {
             return
           }
 
+          // Onboarding is not somewhere to escape *into the app* from. Back used to fall through
+          // to the Home-tab branch below, landing the user on a Home that looks fully working —
+          // because it renders the previous session's books out of Room — while the app's own
+          // state still said LOGGED_IN_NO_LIBRARY_CHOSEN and the prefs had no library at all.
+          // Owner's words: "super confusing for a user" (cu-124).
+          //
+          // Leaving the app is the honest response: nothing was chosen, so there is nothing to
+          // show. The user re-enters onboarding on next launch, or finishes it now.
+          if (viewModel.isOnboarding.value == true) {
+            isEnabled = false
+            onBackPressedDispatcher.onBackPressed()
+            return
+          }
+
           // Tabs are swapped with `replace(...).commit()` and never added to the back stack, so it
           // is always empty. Home is the root: from anywhere else, back goes there first rather
           // than leaving the app.
