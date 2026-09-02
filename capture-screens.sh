@@ -1,4 +1,4 @@
-#!/usr/b#!/usr/bin/env bash
+#!/usr/bin/env bash
 #
 # capture-screens.sh — screenshot the main screens against the cu-16 mock server.
 #
@@ -12,8 +12,12 @@
 set -euo pipefail
 
 OUT="${1:?usage: capture-screens.sh <output-dir>}"
-PKG=io.github.mattpvaughn.chronicle
-ACT="$PKG/.application.MainActivity"
+# The mock server lives in the debug variant only, so that is the package this drives. It used
+# to hardcode the release id: `am start` then targeted a package that is not installed, and the
+# foreground assertion below still passed, because `grep -q` matched `...chronicle.debug` as a
+# substring of the release name. Overridable for a release-variant capture.
+PKG="${CHRONICLE_PKG:-io.github.mattpvaughn.chronicle.debug}"
+ACT="$PKG/io.github.mattpvaughn.chronicle.application.MainActivity"
 mkdir -p "$OUT"
 
 shot() {
@@ -26,6 +30,45 @@ shot() {
 }
 
 tap() { adb shell input tap "$1" "$2"; }
+
+# Tap a view by resource id, resolving its centre from the live view hierarchy.
+#
+# The coordinates here used to be hardcoded for a 2560x1600 tablet, so on any other screen the
+# taps landed off-target — on a 1200x1920 device the settings tap was off-screen entirely, and the
+# run reported "captured settings" having captured the library again. The duplicate check caught
+# it, but only after the fact.
+#
+# `uiautomator dump` is usable for this since cu-110: the main thread no longer saturates, so the
+# UI actually reaches idle and the dump succeeds. Before that it failed with
+# "could not get idle state", which is why this script was written around blind coordinates.
+tap_id() {
+  local id="$1"
+  local xml
+  xml="$(mktemp)"
+  if ! adb shell uiautomator dump /sdcard/_ui.xml >/dev/null 2>&1; then
+    echo "ERROR: uiautomator dump failed; cannot resolve '$id'." >&2
+    exit 1
+  fi
+  adb pull /sdcard/_ui.xml "$xml" >/dev/null 2>&1
+  local coords
+  coords="$(python3 - "$xml" "$id" <<'PYINNER'
+import re, sys
+xml, wanted = sys.argv[1], sys.argv[2]
+d = open(xml, encoding="utf-8", errors="replace").read()
+m = re.search(
+    r'<node[^>]*resource-id="[^"]*id/%s"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"'
+    % re.escape(wanted), d)
+if not m:
+    sys.exit(1)
+x1, y1, x2, y2 = map(int, m.groups())
+print((x1 + x2) // 2, (y1 + y2) // 2)
+PYINNER
+)" || { echo "ERROR: '$id' not found in the view hierarchy." >&2; exit 1; }
+  rm -f "$xml"
+  echo "  tapping $id at $coords"
+  # shellcheck disable=SC2086
+  adb shell input tap $coords
+}
 
 echo "Installing debug APK..."
 ./gradlew assembleDebug -q >/dev/null
@@ -57,10 +100,10 @@ relaunch() {
 }
 relaunch
 
-# Library tab, then settings tab (bottom nav on a 2560x1600 tablet).
-tap 1280 1424
+# Library tab, then settings tab — resolved from the hierarchy, not hardcoded.
+tap_id nav_library
 shot library 5
-tap 1615 1424
+tap_id nav_settings
 shot settings 4
 
 # A capture that is byte-identical to the previous one means the tap did not change the screen —
@@ -83,7 +126,9 @@ fi
 
 # A screenshot is only evidence if the app was actually in the foreground.
 FG=$(adb shell dumpsys activity activities | grep -m1 "ResumedActivity" || true)
-if ! echo "$FG" | grep -q "$PKG"; then
+# Word-boundary match: a substring test passes when the *other* variant is in the foreground,
+# which is how the wrong-package bug above stayed invisible.
+if ! echo "$FG" | grep -qE "(^|[^A-Za-z0-9._])${PKG//./\\.}/"; then
   echo "ERROR: $PKG was not in the foreground at the end of the run."
   echo "       Captures may show the launcher. Foreground was: $FG"
   exit 1
