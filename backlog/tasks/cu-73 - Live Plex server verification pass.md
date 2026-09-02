@@ -303,7 +303,37 @@ janky frames and a 4950 ms 90th-percentile frame.
       26:11, position 06:40, chapter list matching the real file exactly.
 ### Authentication
 
-- [ ] **cu-10 — a rotated server token recovers silently.** Rotate the server's token
+- [~] **cu-10 — a rotated server token recovers silently.** — **Attempted 2026-09-03, session 4.
+      Could not be induced from outside the app; needs a debug hook ([[DRAFT-128]]).**
+
+      Three routes tried, each defeated by something working correctly:
+
+      1. **Corrupt `server_token` in `ChronicleAuth.xml` with the app stopped** →
+         `ChronicleApplication.setupNetwork` re-fetches `/api/v2/resources` on *every* launch and
+         writes the fresh server back, token included. Repaired before the first library request.
+         This is deliberate — the code comment says dropping it "meant a rotated server token was
+         re-fetched and discarded on every launch (cu-10)".
+      2. **Corrupt it while the app runs** → `SharedPreferences` caches in memory; the file is
+         never re-read. All 111 requests carried the real token.
+      3. **Corrupt it and block plex.tv** so the 4 s `RESOURCE_REFRESH_TIMEOUT_MS` expires and the
+         cached (bad) token survives → the invalid token *was* sent, but only to `/identity`,
+         which does not validate tokens and answers `200`. plex.tv remained reachable on other
+         addresses and the token was repaired regardless.
+
+      So the negative result is itself informative: **a stale server token is not reachable by
+      tampering, because the startup refresh repairs it first.** Truly rotating it requires
+      re-claiming the server — impossible here, the account is a *shared* user
+      (`server_owned=false`).
+
+      The `PlexTokenAuthenticator` decision logic is unit-covered and its wiring is covered by
+      `ReauthWiringTest` (7 tests, real OkHttp against a real 401). What remains unproven is only
+      the live end-to-end path, which needs the hook in DRAFT-128 — that would also unblock the
+      mid-download rotation item below.
+
+      **Device left clean:** iptables rules removed, real token restored automatically,
+      `LOGGED_IN_FULLY`.
+
+      Original text: Rotate the server's token
       (reset `PlexOnlineToken`, or re-claim the server) while the app holds a stale one,
       then play something. The 401 should be invisible: refreshed and retried, no message.
 - [!] **cu-10 — an invalidated account token degrades honestly.** — **RUN 2026-09-02, session 4.
