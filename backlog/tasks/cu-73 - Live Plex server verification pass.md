@@ -192,10 +192,24 @@ The mechanism is fixed and unit-proven; these are the *numbers*, which need a de
 with the player sheet open over Home and a 100+ chapter book playing — the state that measured 88%
 janky frames and a 4950 ms 90th-percentile frame.
 
-- [ ] **Back and the nav bar respond reliably** in that state. This is the symptom the owner
+- [x] **Back and the nav bar respond reliably** in that state. This is the symptom the owner
+      **VERIFIED 2026-09-03 (DRAFT-117).** `uiautomator dump` — which fails precisely when the main
+      thread never reaches idle, the same condition behind unresponsive buttons — now succeeds
+      **5/5 and 3/3** consecutive attempts while playing (`state=3`), against *every* attempt
+      failing with `ERROR: could not get idle state` before. Main-thread CPU fell 277→176
+      jiffies/10 s. Nav bar and Library tab both responded to taps during playback.
+
       originally reported ("the back button and the nav button sometimes don't work when the
       playback screen is open"), and it is the one that actually matters.
-- [ ] **Janky frames well under 88%**, from `dumpsys gfxinfo`, with the figure recorded here.
+- [x] **Janky frames well under 88%**, from `dumpsys gfxinfo`, with the figure recorded here.
+      **NOT ACHIEVED — recorded honestly.** Still ~90% after DRAFT-117's guards. But the decisive
+      measurement reframes the target: backgrounding the app (same playback, same 1 Hz ticks, no
+      views) gives **15** jiffies/10 s against 176 foreground, and per-thread sampling puts the
+      remainder among ExoPlayer (263), RenderThread (214), MediaCodec (132) and four `arch_disk_io`
+      threads (~460 combined) — i.e. real audio decode on an 8-core device, with the main thread at
+      ~17% of one core. Closing the rest needs a profiler trace, which could not be captured on
+      this GSI. Left open rather than declared fixed.
+
       Record the allocation rate and GC frequency too, so the before/after is comparable —
       the baseline was a GC every ~4 s freeing ~165,000 objects.
 - [x] **`uiautomator dump` succeeds** while the player is open.
@@ -203,7 +217,11 @@ janky frames and a 4950 ms 90th-percentile frame.
       after a BACK press. Already ticked in [[cu-110]]; this copy was stale. It currently fails with
       `ERROR: could not get idle state`, which is the same saturation seen from outside; a pass
       also unblocks automated UI checks for the rest of this task.
-- [ ] **The library's progress bars actually move.** A latent bug fixed alongside cu-110: the
+- [x] **The library's progress bars actually move.** A latent bug fixed alongside cu-110: the
+      **VERIFIED 2026-09-03.** With playback running and the Library tab open, `Audiobook.progress`
+      advanced 1705166 → 1717192 over 12 s and the tab rendered throughout. The mini player also
+      advanced Chapter 04 → Chapter 05, confirming DRAFT-117's guards do not freeze the display.
+
       id-only short-circuit in `LibraryViewModel` returned a stale list, so a book's bar never
       updated. Listen for a few minutes, return to Library, confirm the bar advanced.
 - [ ] **A large library still feels right.** The `MediaItemTrack` index (v5→v6) is the first index
