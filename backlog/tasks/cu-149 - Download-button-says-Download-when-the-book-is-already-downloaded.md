@@ -1,12 +1,16 @@
 ---
-id: DRAFT-139
+id: CU-149
 title: Download button says Download when the book is already downloaded
-status: Draft
+status: To Do
 assignee: []
-labels: [R2, a11y, ui]
+created_date: ''
+labels:
+  - R2
+  - a11y
+  - ui
+milestone: m-2
 dependencies: []
 priority: low
-milestone: m-2
 ---
 
 ## Description
