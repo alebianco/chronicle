@@ -157,6 +157,43 @@ interface PlexMediaService {
     @Query("X-Plex-Container-Size") containerSize: Int = 100,
   ): PlexMediaContainerWrapper
 
+  /**
+   * The distinct values of one tag filter for a library — every narrator, or every series (cu-143).
+   *
+   * `filterName` is `style` (narrator) or `mood` (series) by the Audnexus convention, and
+   * `type=$MEDIA_TYPE_ALBUM` scopes the answer to books rather than tracks or artists. The response
+   * carries a `Directory` per distinct value, each with a `key` (the tag id) and a `title` (the tag
+   * text) — so `plexDirectories` reads it with no new model.
+   *
+   * This exists because `Style`/`Mood` are **detail-only** on an item: the library listing omits
+   * them entirely (cu-24), so the only alternative is one `/library/metadata/{id}` per book. Here
+   * the cost is one request per *distinct value* instead, which for a household library is a small
+   * multiple rather than a per-book sweep.
+   *
+   * Community-documented rather than guaranteed, like the rest of the tag surface — verified in
+   * python-plexapi's `listFilterChoices`, which queries exactly this path.
+   */
+  @GET("/library/sections/{libraryId}/{filterName}?type=$MEDIA_TYPE_ALBUM")
+  suspend fun retrieveFilterChoices(
+    @Path("libraryId") libraryId: String,
+    @Path("filterName") filterName: String,
+  ): PlexMediaContainerWrapper
+
+  /**
+   * The books carrying one tag value (cu-143).
+   *
+   * `filterName` is `style` or `mood` as above and `tagKey` is the `key` from
+   * [retrieveFilterChoices] — a tag **id**, never the display text. Returns listing-shaped albums,
+   * so `asAudiobooks()` reads it unchanged; the point is not the metadata on each item but *which*
+   * items came back, which is what associates a narrator or series with a set of books.
+   */
+  @GET("/library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
+  suspend fun retrieveAlbumsWithTag(
+    @Path("libraryId") libraryId: String,
+    @Query("style") styleKey: String? = null,
+    @Query("mood") moodKey: String? = null,
+  ): PlexMediaContainerWrapper
+
   @GET("/library/sections/{libraryId}/collections?includeCollections=1")
   suspend fun retrieveCollectionsPaginated(
     @Path("libraryId") libraryId: String,

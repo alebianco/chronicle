@@ -195,6 +195,13 @@ class MockPlexServer(private val context: Context) {
    */
   private fun fixtureFor(path: String): String? =
     when {
+      // The tag-filter surface (cu-143), mirroring FakePlexServer. Must precede the `/all` and
+      // bare-section rules: `/library/sections/1/style` contains neither, so it would otherwise
+      // read as a library list.
+      path.contains("style=") -> "albums-style-${path.substringAfter("style=").substringBefore("&")}.json"
+      path.contains("mood=") -> "albums-mood-${path.substringAfter("mood=").substringBefore("&")}.json"
+      path.startsWith("/library/sections") && path.contains("/style") -> "filter-style.json"
+      path.startsWith("/library/sections") && path.contains("/mood") -> "filter-mood.json"
       path.startsWith("/library/sections") && path.contains("/all") -> "albums.json"
       path.startsWith("/library/sections") -> "libraries.json"
       path.contains("/children") -> "tracks.json"

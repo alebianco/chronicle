@@ -92,6 +92,14 @@ class FakePlexServer : ExternalResource() {
 
   private fun routeFor(path: String): MockResponse =
     when {
+      // The tag-filter surface (cu-143). Order matters against the `/all` and bare-section rules
+      // below: `/library/sections/1/style` contains neither "/all" nor a query, so without these
+      // it would fall through to `libraries.json` and the seeder would read a library list as a
+      // list of narrators.
+      path.contains("style=") -> json("albums-style-${path.substringAfter("style=").substringBefore("&")}.json")
+      path.contains("mood=") -> json("albums-mood-${path.substringAfter("mood=").substringBefore("&")}.json")
+      path.startsWith("/library/sections") && path.contains("/style") -> json("filter-style.json")
+      path.startsWith("/library/sections") && path.contains("/mood") -> json("filter-mood.json")
       path.startsWith("/library/sections") && path.contains("/all") -> json("albums.json")
       path.startsWith("/library/sections") -> json("libraries.json")
       // Tracks for an album; must be checked before the bare metadata route.

@@ -1,0 +1,10 @@
+{
+  "MediaContainer": {
+    "size": 2,
+    "identifier": "com.plexapp.plugins.library",
+    "Directory": [
+      { "key": "/library/sections/1/style/301", "title": "Michael Kramer" },
+      { "key": "/library/sections/1/style/302", "title": "Rob Inglis" }
+    ]
+  }
+}

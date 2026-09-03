@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **1095 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1115 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -358,15 +358,21 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   1.43.3 server, and there is no `includeFields`/`includeTags` that would add them. So today the
   index fills in as books are synced (`syncAudiobook` already fetches the detail), and
   `FacetList.unknownCount` exists so the UI is obliged to say how partial it is.
-  **But "an index cannot be built from a refresh" is false** — that was inferred from the listing
-  gap without checking whether another endpoint could enumerate the tags. Two routes exist
-  (researched in cu-25, filed as **cu-143**): the *filter enumeration* route, where
-  `/all?includeMeta=1&includeAdvanced=1&X-Plex-Container-Size=0` returns only filter metadata
-  naming the `style`/`mood` filter keys, `/library/sections/{id}/style?type=9` lists the distinct
-  values, and `/all?type=9&style={key}` lists each value's books — `3 + N + M` requests, verified
-  in python-plexapi's source; and the *multi-id* route, `/library/metadata/{id1},{id2},...`
-  ("Get one or more metadata items" in the API spec), which is spec-verified but not yet
-  live-tested. Don't re-derive this. `merge` needs a **third** rule for fields like these — the
+  **A refresh now seeds the index anyway** (cu-143): `TagIndexSeeder` enumerates a tag filter's
+  distinct values (`/library/sections/{id}/style?type=9`) and lists the books carrying each
+  (`/all?type=9&style={tagKey}`), so narrator and series fill in for books nobody has opened —
+  `1 + N` requests per field instead of one per book. Seeding runs **after** `Audiobook.merge` and
+  **never overwrites a non-empty field**: the detail response is precise and this index is the
+  coarser source, so overwriting would blank correct metadata on every refresh. Failure is per
+  value and never fatal, since the endpoints are community-documented. **Routing trap:**
+  `/library/sections/{id}/style` contains neither `/all` nor a query, so in both fixture servers it
+  fell through to the bare-section rule and answered `libraries.json` — the seeder would have read
+  a library list as a list of narrators; both routers match the tag paths first now. The route is
+  verified in python-plexapi's source and against fixtures, **not against a real server** — in
+  particular whether a live Plex returns `key` as `/library/sections/1/style/301`, which is what
+  the id is parsed out of. The *multi-id* route, `/library/metadata/{id1},{id2},...` ("Get one or
+  more metadata items" in the API spec), would be cheaper still but is spec-verified only. Don't
+  re-derive this. `merge` needs a **third** rule for fields like these — the
   network value when it has one, the local value when it does not: preferring the network blanks a
   narrator on every refresh, preferring the local one makes a re-tagged book uncorrectable.
   `Audiobook.seriesIndex` is parsed from `titleSort`, **not** Plex's `index`, which is the album

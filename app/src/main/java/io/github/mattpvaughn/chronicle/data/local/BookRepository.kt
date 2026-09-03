@@ -5,9 +5,13 @@ import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
+import io.github.mattpvaughn.chronicle.data.sources.plex.TagAssociation
+import io.github.mattpvaughn.chronicle.data.sources.plex.TagFilter
+import io.github.mattpvaughn.chronicle.data.sources.plex.TagIndexSeeder
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.toChapter
+import io.github.mattpvaughn.chronicle.data.sources.plex.withSeededTags
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -229,6 +233,16 @@ class BookRepository
           }
         }
 
+      // Fill in narrator and series for books that have never been opened (cu-143). Seeded
+      // *after* the merge so a value read from a book's own detail response always wins: this
+      // index is the coarser source and must not overwrite the precise one, which is the same
+      // rule `Audiobook.merge` applies to the network/local pair (cu-24).
+      //
+      // Best-effort by construction — `readAssociations` swallows its own failures and returns
+      // what it managed — because the endpoints are community-documented and a server that does
+      // not answer them must still get a working refresh, not a failed one.
+      val seededBooks = mergedBooks.withSeededTags(readTagAssociations())
+
       // remove books which have been deleted from server
       val networkIds = networkBooks.map { it.id }
       val removedFromNetwork =
@@ -241,8 +255,8 @@ class BookRepository
         val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
         Timber.i("Removed $removed items from DB")
 
-        Timber.i("Loaded books: ${mergedBooks.size}")
-        bookDao.insertAll(mergedBooks)
+        Timber.i("Loaded books: ${seededBooks.size}")
+        bookDao.insertAll(seededBooks)
       }
     }
 
@@ -387,6 +401,32 @@ class BookRepository
         bookDao.updateProgress(bookId, currentTime, progress)
       }
     }
+
+    /**
+     * Narrator and series associations for the whole library (cu-143).
+     *
+     * Built lazily rather than injected because it is only reachable from a refresh, and holding
+     * one would make the repository's constructor grow for a collaborator used in one method.
+     */
+    private val tagIndexSeeder by lazy {
+      TagIndexSeeder(plexMediaService, plexPrefsRepo, dispatchers)
+    }
+
+    /**
+     * Both tag fields' associations, or empty when the server will not answer.
+     *
+     * Never throws: a refresh that fails because an *optional* index could not be built would be
+     * a worse outcome than an index that stays partial, which is the state the app has been in
+     * since cu-24 anyway.
+     */
+    private suspend fun readTagAssociations(): List<TagAssociation> =
+      try {
+        tagIndexSeeder.readAssociations(TagFilter.STYLE) +
+          tagIndexSeeder.readAssociations(TagFilter.MOOD)
+      } catch (t: Throwable) {
+        Timber.i("Could not seed the narrator/series index: $t")
+        emptyList()
+      }
 
     override suspend fun searchAsync(query: String): List<Audiobook> {
       return withContext(dispatchers.io) {
