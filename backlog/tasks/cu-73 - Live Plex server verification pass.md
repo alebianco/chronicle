@@ -224,7 +224,12 @@ janky frames and a 4950 ms 90th-percentile frame.
 
       id-only short-circuit in `LibraryViewModel` returned a stale list, so a book's bar never
       updated. Listen for a few minutes, return to Library, confirm the bar advanced.
-- [ ] **A large library still feels right.** The `MediaItemTrack` index (v5→v6) is the first index
+- [x] **A large library still feels right.** The `MediaItemTrack` index (v5→v6) is the first index
+      **VERIFIED 2026-09-03** on the real database: `PRAGMA user_version` = **6**, the
+      `index_MediaItemTrack_parentKey_discNumber_index` present, **1376 tracks / 196 books**.
+      Cold start 4.76 s (including a network sync) and **playback start 650 ms** on a 107-track
+      book. Migration ran cleanly; no degradation.
+
       in the schema; confirm the migration runs cleanly on the real database and that library load
       and playback start are no worse. Relevant to [[cu-51]].
 
@@ -583,6 +588,20 @@ janky frames and a 4950 ms 90th-percentile frame.
       So it is a genuine resume, not a restart that merely ended up correct — the distinction the
       item was written to catch.
 - [ ] **A download stranded at `FAILED` before the fix is retried on next launch.**
+      **Attempted 2026-09-03 and abandoned — the method disconnects the tester.** The tablet is on
+      **Wi-Fi adb**, so `svc wifi disable` (the way to exhaust Fetch2's retries) also kills the adb
+      link: `adb: device offline`, and it cannot be re-reached until Wi-Fi is turned back on
+      physically or a USB cable is attached.
+
+      **How to run it next time:** put the tablet on **USB adb** first, then kill Wi-Fi — the link
+      survives and the download can be watched into `FAILED`. Alternatively drop only the server
+      route with `iptables -I OUTPUT -d <server-ip> -j DROP` (used successfully in cu-128), which
+      breaks the download without touching adb. The second is better: it leaves the device
+      reachable throughout.
+
+      Everything else about this item is ready — the fixtures, the library and the resume path are
+      all in place; only the failure-injection method needs changing.
+
       `ResumePlan.idsToRetry` is unit-tested against mocked state; what is unverified is that a
       real exhausted-retry download actually presents as `FAILED` (rather than `CANCELLED` or
       `REMOVED`) — the whole resume path hinges on that status being the one Fetch2 reports.
@@ -687,7 +706,12 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
       mini player on screen to read a chapter name from. Play a multi-track book into its
       second file and confirm the mini player and the full player both name the right chapter —
       this was blank on any track but the first before cu-115.
-- [ ] **The chapter slider seeks where it points.** Drag it mid-chapter on a multi-track book. It
+- [x] **The chapter slider seeks where it points.** Drag it mid-chapter on a multi-track book. It
+      **VERIFIED 2026-09-03** on *Ender's Game* (107 tracks), chapter 06 of 07:06. Dragged the
+      thumb to 78.3% of the slider: expected chapter offset **334 s**, player landed at **334 s**
+      — exact. Readout moved 03:11 → 05:49 / 07:06, still chapter 06, book 34:59 → 37:38. No jump
+      to the end of the track, so the book-absolute/track-relative confusion is gone.
+
       used to send a book-absolute offset to a track-relative API, so the thumb jumped to the end
       of the current track.
 - [x] **Chapter elapsed time is not negative or nonsense** on a later track.
@@ -703,7 +727,11 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
       explicitly. The *go-back* half (pressing just after a chapter start) is **not** done: the app
       backgrounded to the launcher right after the seek. Re-run it with the position set a second
       or two into a chapter.
-- [ ] **Book position survives a full sync** on a multi-track book. `getTrackStartTime` summed an
+- [x] **Book position survives a full sync** on a multi-track book. `getTrackStartTime` summed an
+      **VERIFIED 2026-09-03.** Book progress **2 297 198** before a forced full library refresh
+      and **2 297 198** after, with every track row identical. An unordered `getTrackStartTime`
+      sum would have shifted it by a whole track.
+
       unordered list, so the whole-library re-derive could report the position a whole track ahead
       of where it was; confirm the position is unchanged after a refresh.
 
@@ -850,7 +878,17 @@ into "the symptom is gone".
       offset on a longer delay is a server-timing question, not an app one, and is not something
       this item asks about.
 
-- [ ] **A deliberate seek backwards survives a sync** ([[cu-90]]). Seek back a chapter, wait for a
+- [!] **A deliberate seek backwards survives a sync** ([[cu-90]]). Seek back a chapter, wait for a
+      **FAILS — filed as [[DRAFT-131]] (2026-09-03).** Seeked back three chapters (2 296 261 →
+      **1 564 209**), paused, then forced a refresh: the position jumped **forward to 1 910 473**,
+      undoing the seek by 346 s.
+
+      Cause: `getActiveTrack` returns `lastOrNull { it.hasProgress() }` — the *furthest* started
+      track, regardless of recency. Track 6 still held a stale `progress = 3092` from before the
+      seek, so it won over track 5's newer `lastViewedAt`. Seeking back *within* a track is safe;
+      across a track boundary it is undone. Not a one-line fix — the KDoc records why recency was
+      rejected (mark-as-read stamps every track), so DRAFT-131 sets out three options.
+
       refresh, confirm it is not pulled forward again. This is the edge decision-16 flags as sharpest.
 - [x] **Mark as read, then unread, is a clean round trip**
       **Verified 2026-09-01.** Confirmed working in the UI. ([[cu-86]]) — including that a sync
@@ -1000,7 +1038,14 @@ into "the symptom is gone".
 
 ### Unofficial endpoints
 
-- [ ] **A book switch flushes the outgoing position** ([[cu-91]]). On device A, play book X for a
+- [x] **A book switch flushes the outgoing position** ([[cu-91]]). On device A, play book X for a
+      **VERIFIED 2026-09-03, both halves.**
+      *Flush:* playing Ender's Game then starting Hell Divers **without pausing** emitted
+      `ratingKey=151450&time=44695 state=stopped` for the outgoing book before the new one began,
+      and device B subsequently received real `viewOffset` values for book X (up to 610626).
+      *Inverse:* play → pause → resume on a single book produced **6 `state=playing` reports and
+      zero `state=stopped`**, so a pause is not mistaken for a book switch.
+
       minute, then start book Y *without* pausing X first. On device B, open book X: it must show
       where A stopped, not an older position. Then check the inverse — pressing play, pause and
       resume on a single book must **not** emit a `STOPPED` report for it (watch `/:/timeline` in
