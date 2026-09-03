@@ -155,7 +155,7 @@ class ChooseLibraryViewModel
             libraryContainer.plexMediaContainer.plexDirectories
               .filter { it.type == ARTIST.typeString }
               .map { it.asLibrary() }
-          Timber.i("Libraries: $tempLibraries")
+          Timber.i("Libraries: ${tempLibraries.map { it.name }}")
           _libraries.postValue(tempLibraries)
           // An empty list here is the one case where "no libraries found" is *true*: the server
           // answered and has none of the right type.

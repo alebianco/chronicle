@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import androidx.lifecycle.LiveData
-import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
@@ -221,7 +220,7 @@ class BookRepository
         val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
         Timber.i("Removed $removed items from DB")
 
-        Timber.i("Loaded books: $mergedBooks")
+        Timber.i("Loaded books: ${mergedBooks.size}")
         bookDao.insertAll(mergedBooks)
       }
     }
@@ -305,7 +304,7 @@ class BookRepository
         val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
         Timber.i("Removed $removed items from DB")
 
-        Timber.i("Loaded books: $mergedBooks")
+        Timber.i("Loaded books: ${mergedBooks.size}")
         bookDao.insertAll(mergedBooks)
       }
     }
@@ -469,7 +468,7 @@ class BookRepository
       Timber.i(
         "Loading chapter data. Book ID is ${audiobook.id}, it is ${
           if (audiobook.isCached) "cached" else "uncached"
-        }, tracks are $tracks",
+        }, tracks are ${tracks.map { it.id }}",
       )
       // `return withContext(...)`, not a bare statement: the three failure paths below use
       // `return@withContext false`, which returns from the *lambda*. With the result discarded the
@@ -485,11 +484,7 @@ class BookRepository
               val networkChapters =
                 plexMediaService.retrieveChapterInfo(track.id)
                   .plexMediaContainer.metadata.firstOrNull()?.plexChapters
-              if (BuildConfig.DEBUG) {
-                // prevent networkChapters from toString()ing and being slow even if timber
-                // tree isn't attached in the release build
-                Timber.i("Network chapters: $networkChapters")
-              }
+              Timber.i("Network chapters: ${networkChapters?.size ?: 0}")
               networkChapters.orEmpty().map { plexChapter ->
                 plexChapter.toChapter(
                   trackId = track.id,

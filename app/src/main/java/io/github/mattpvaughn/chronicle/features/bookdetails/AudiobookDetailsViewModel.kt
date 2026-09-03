@@ -116,7 +116,7 @@ class AudiobookDetailsViewModel(
       cachedFileManager.activeBookDownloads,
       audiobook,
     ) { activeDownloadIDs: Set<String>?, _audiobook: Audiobook? ->
-      Timber.i("Active downloads: $activeDownloadIDs")
+      Timber.i("Active downloads: ${activeDownloadIDs?.size ?: 0}")
       return@DoubleLiveData when {
         _audiobook?.isCached == true -> CACHED
         inputAudiobook.id in (activeDownloadIDs ?: emptySet()) -> CACHING

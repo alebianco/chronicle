@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.assembleChapters
@@ -63,11 +62,7 @@ class ChapterRepository
             val networkChapters =
               plexMediaService.retrieveChapterInfo(track.id)
                 .plexMediaContainer.metadata.firstOrNull()?.plexChapters
-            if (BuildConfig.DEBUG) {
-              // prevent networkChapters from toString()ing and being slow even if timber
-              // tree isn't attached in the release build
-              Timber.i("Network chapters: $networkChapters")
-            }
+            Timber.i("Network chapters: ${networkChapters?.size ?: 0}")
             networkChapters.orEmpty().map { plexChapter ->
               plexChapter.toChapter(
                 trackId = track.id,

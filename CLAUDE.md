@@ -65,7 +65,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **654 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **762 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -175,6 +175,19 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - **Never log an auth token.** `TokenLoggingTest` fails the build on any `Timber` call that
   interpolates one — it caught three live leaks, including one logging *two* tokens per media
   item. Logging *presence* (`token.isNotEmpty()`) is fine and is what the guard permits.
+- **Never log a whole collection either** (cu-134). `CollectionLoggingTest` fails the build on a
+  `Timber` call that interpolates a bare collection-shaped name; log a projection
+  (`${books.map { it.id }}`, `${books.size}`). `Audiobook.toString()` drags in the serialized
+  `chapters` column, so one `List<Audiobook>` is tens of kilobytes — a measured session produced
+  **3.38 MB across 2920 lines**, built on the main thread. Two things to know: **a
+  `BuildConfig.DEBUG` guard does not help**, because Kotlin builds the interpolated string
+  *before* `Timber` is called, so a debug build pays the full `toString()` either way (two sites
+  carried a comment claiming otherwise); and the check keys on the **name**, not the type,
+  because the two worst offenders had inferred types that only the compiler could resolve. The
+  name heuristic's real enemy is not plurals but **plural units** — `Millis`, `Minutes`,
+  `Bytes` are the commonest plural nouns here and all scalars, so `SCALAR_SUFFIX` excludes them
+  by suffix. cu-110 swept this class by hand and declared it clean; the review then found three
+  more, and this scan found four the review missed. Hence a build gate.
 - **Connections are tiered, not raced** (cu-11). `ConnectionChooser` tries LAN, then direct
   WAN, then relay, each tier getting a 1.5s budget before the next also starts (earlier
   attempts keep running, so a slow LAN address can still win). The **last** tier is awaited

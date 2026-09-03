@@ -125,7 +125,7 @@ class DownloadNotificationWorker(
    */
   private fun showDownloadsCompleteNotification(downloads: List<Download>) {
     val bookDownloads = downloads.groupByBookId()
-    Timber.i("Downloads: $bookDownloads")
+    Timber.i("Downloads: ${bookDownloads.mapValues { (_, forBook) -> forBook.size }}")
     val bookStatuses =
       bookDownloads.map { bookDownload ->
         // Don't show a notification for a cancelled download, users don't need to be
