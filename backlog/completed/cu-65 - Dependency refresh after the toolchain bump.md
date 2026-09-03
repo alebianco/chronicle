@@ -104,7 +104,7 @@ now.
 **OkHttp 4 → 5 and Retrofit 2 → 3.** Both are major migrations in the Plex networking layer that R1
 (cu-9/10/11) is about to rework, so doing them now means migrating code that is due to change. Also
 `FakePlexServer` depends on `okhttp3.mockwebserver`, which becomes `mockwebserver3` in OkHttp 5 — the
-test server has to move in the same change. Filed as [[cu-66]], dependent on R1.
+test server has to move in the same change. Filed as [[DRAFT-66]], dependent on R1.
 
 ### Verification
 
@@ -122,4 +122,4 @@ test server has to move in the same change. Filed as [[cu-66]], dependent on R1.
       highest version compileSdk 36 and Kotlin 2.2 allow, not the absolute latest; ceilings recorded above
 - [x] `./verify.sh` and `./test_release_build.sh` green
 - [x] App verified rendering and reaching playback on the emulator against the cu-16 mock
-- [x] OkHttp/Retrofit majors explicitly deferred, with a follow-up task filed ([[cu-66]])
+- [x] OkHttp/Retrofit majors explicitly deferred, with a follow-up task filed ([[DRAFT-66]])

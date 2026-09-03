@@ -58,7 +58,7 @@ milestone: m-1
 > **A clean re-test could not be completed**, because the phone is no longer a valid test device:
 > the password change killed its account token, and it still holds the *pre-restart* `plex.direct`
 > certificate hash (`32080aae…` vs the server's current `d8f64ea2…`), so it shows
-> "Can't connect to server" — the same TLS mismatch as [[DRAFT-125]]. It must be re-logged-in before
+> "Can't connect to server" — the same TLS mismatch as [[cu-125]]. It must be re-logged-in before
 > any two-device test means anything.
 >
 > **What remains genuinely unknown:** whether adoption works end to end on a device that *has not*

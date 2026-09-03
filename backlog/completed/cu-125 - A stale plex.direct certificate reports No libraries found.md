@@ -139,7 +139,7 @@ app holds a fresh resource list.
 - [[cu-73]] — found during the live pass; blocked re-login on the test device
 - [[cu-42]] — HTTPS enforcement; the refusal itself is correct and must stay
 - [[cu-11]] — `ConnectionChooser` tiering; both tiers failed here and the summary was accurate
-- [[DRAFT-124]] — the half-configured Home a user reaches by backing out of this picker
+- [[cu-124]] — the half-configured Home a user reaches by backing out of this picker
 
 
 ## Implementation Notes

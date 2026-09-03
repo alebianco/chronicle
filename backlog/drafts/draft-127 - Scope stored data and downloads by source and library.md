@@ -16,7 +16,7 @@ Owner proposal during the cu-73 live pass (session 4): *"should the db isolate d
 maybe? so selecting a different one does not merge data? … same for the downloaded files, isolate
 them by library in their path?"*
 
-Raised after [[DRAFT-126]] showed that choosing a different library at the login picker leaves the
+Raised after [[cu-126]] showed that choosing a different library at the login picker leaves the
 previous library's rows in Room and its downloads on disk, with no prompt. The current answer to
 "which library does this row belong to?" is **implicit** — whatever library was selected when it
 was written.
@@ -104,7 +104,7 @@ must degrade to "not cached", never to "deleted".
 ## Related
 
 - [[cu-73]] — raised during the live pass
-- [[DRAFT-126]] — the unguarded library switch that prompted this
+- [[cu-126]] — the unguarded library switch that prompted this
 - [[decision-11]] — multi-backend; this is a prerequisite for the ABS adapter
 - [[cu-15]] / [[cu-33]] — the MediaSource seam these fields were added for
 - [[cu-71]] — String ids; argues against re-encoding meaning into the id itself

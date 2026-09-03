@@ -86,7 +86,7 @@ that test nor `verify.sh` would notice. Stated rather than glossed.
   refreshes, and there are only two triggers (`onAvailable`, manual retry) funnelling through
   one method. Revisit if [[cu-73]] shows real thrash; building it speculatively would add a
   moving part with no failing case behind it.
-- **`IPv6` handling** — reported by Plex, still dropped by the model. Filed as [[cu-75]].
+- **`IPv6` handling** — reported by Plex, still dropped by the model. Filed as [[DRAFT-75]].
 - **Bandwidth-aware relay deprioritisation** beyond tier order. Measuring throughput to
   decide is a much larger feature needing a real server to validate, and tier ordering
   already achieves the goal of relay-last.

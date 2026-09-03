@@ -67,7 +67,7 @@ So the outcome is *eventually* consistent. What is missing is **consent and pred
    libraries** — the new one's books plus stale rows from the old.
 3. The eventual deletion of a multi-gigabyte download happens **silently**, with no prior warning,
    as a side effect of a choice the user was not told had that consequence.
-4. It is reachable without any intent to switch: [[DRAFT-124]] shows a failed re-auth clears the
+4. It is reachable without any intent to switch: [[cu-124]] shows a failed re-auth clears the
    library and drops the user straight into this picker.
 
 ### Fix direction
@@ -94,7 +94,7 @@ prompt should appear. The condition is "library changed **and** there is local d
 ## Related
 
 - [[cu-73]] — raised during the live pass
-- [[DRAFT-124]] — a failed re-auth drops the user into this picker without intending a change
+- [[cu-124]] — a failed re-auth drops the user into this picker without intending a change
 - [[cu-83]] / [[cu-85]] — prior cache-state defects; the same "do not silently un-cache" instinct
 
 

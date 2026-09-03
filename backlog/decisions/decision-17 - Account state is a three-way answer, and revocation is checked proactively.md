@@ -15,11 +15,11 @@ what actually happens.
 
 Measured on real devices against a real server, 2026-09-02/03:
 
-- **[[DRAFT-123]]** — a password change with "sign out connected devices" produced a genuine
+- **[[cu-123]]** — a password change with "sign out connected devices" produced a genuine
   `401 Unauthorized` from `plex.tv/api/v2/resources`, and the app said nothing.
   `onAccountRejected()` was reached **0 times**, and `account_signed_out` — a string that exists
   for exactly this — is referenced nowhere in code.
-- **[[DRAFT-122]]** — removing the device at plex.tv left the app fully working: **111 requests,
+- **[[cu-122]]** — removing the device at plex.tv left the app fully working: **111 requests,
   all `200`**. Plex invalidated *neither* token, so there was no rejection to react to. Owner's
   ruling: *"remove the device from the plex list should absolutely kick out chronicle."*
 - The two auth items in [[cu-73]] want **no login wall, downloads still playing, and a message**.

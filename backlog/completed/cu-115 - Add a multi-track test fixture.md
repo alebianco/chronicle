@@ -160,7 +160,7 @@ case the coordinate-frame bugs actually live in.
 Extending it is small and bounded: give tracks 2002 and 2003 chapter arrays whose
 `startTimeOffset`/`endTimeOffset` are **book-absolute** and straddle the 180000/360000 boundaries —
 the same layout `MultiTrackBook` uses. `PlexFixtureContractTest` will need its chapter assertions
-updated with it. Worth doing as part of [[DRAFT-117]], which needs sustained multi-track playback
+updated with it. Worth doing as part of [[cu-117]], which needs sustained multi-track playback
 on a device anyway.
 
 ## Closed (2026-09-02): the mock fixture now crosses track boundaries

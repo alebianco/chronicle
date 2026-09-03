@@ -134,7 +134,7 @@ Grouped by what breaks if the real server disagrees.
       and is `false` on every connection — so [[draft-75]] has its answer: the flag exists and is
       parseable, but nothing on this server needs it. Full captured payload is quoted in [[cu-107]]. Capture it and confirm `relay` is present
       and spelled as the model expects, and note whether `IPv6` connections appear at all —
-      that decides whether [[cu-75]] is worth opening.
+      that decides whether [[DRAFT-75]] is worth opening.
 - [x] **End-to-end connection selection via `FakePlexServer`.** The chooser's tests inject
       the probe, so the real `checkServer` wiring in `PlexConfig` is covered only by the
       Dagger graph resolving. Same harness cu-10 needs.
@@ -443,7 +443,7 @@ janky frames and a 4950 ms 90th-percentile frame.
       and no `plexConfig.clear()`, and the device-revocation case is detected proactively.
       Verified on device in both directions. Everything else in this item already passed.
 
-      Four of five criteria pass; the message does not appear. Filed as [[DRAFT-123]].**
+      Four of five criteria pass; the message does not appear. Filed as [[cu-123]].**
 
       Password changed with "sign out connected devices", both devices watched from a cleared log.
       `GET https://plex.tv/api/v2/resources` → **`401 Unauthorized`** (750 ms), so the token is
@@ -722,7 +722,7 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
       2026-09-02, session 4, on the mock.** Playback crossed track 2 → track 3 automatically and
       both the title ("A Short Rest") and the highlighted list entry (`03`, cyan) followed it;
       blank on any track but the first before cu-115. **The mini player half is unverifiable until
-      [[DRAFT-119]] is fixed** — it is hidden on `STATE_STOPPED` and never returns, so there is no
+      [[cu-119]] is fixed** — it is hidden on `STATE_STOPPED` and never returns, so there is no
       mini player on screen to read a chapter name from. Play a multi-track book into its
       second file and confirm the mini player and the full player both name the right chapter —
       this was blank on any track but the first before cu-115.
@@ -766,9 +766,9 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
       correctly (`PositionAdoptionTest`, 5 tests, passing against unmodified code). A clean re-test
       is still owed: the phone's token died with the password change and it holds the pre-restart
       certificate hash, so it cannot connect until it is logged in again. **Method rule: pull
-      `track_db`, `-wal` and `-shm` together, or run `sqlite3` on the device.** See [[DRAFT-121]].
+      `track_db`, `-wal` and `-shm` together, or run `sqlite3` on the device.** See [[cu-121]].
 
-      *Superseded verdict, kept for the trail:* — **FAILS. Filed as [[DRAFT-121]]
+      *Superseded verdict, kept for the trail:* — **FAILS. Filed as [[cu-121]]
       (2026-09-02, session 4, two real devices against ANTARES).**
 
       Tablet (API 32) played *Ender's Game* `151444` to **244973 ms** and reported it
@@ -899,7 +899,7 @@ into "the symptom is gone".
       this item asks about.
 
 - [!] **A deliberate seek backwards survives a sync** ([[cu-90]]). Seek back a chapter, wait for a
-      **FAILS — filed as [[DRAFT-131]] (2026-09-03).** Seeked back three chapters (2 296 261 →
+      **FAILS — filed as [[cu-131]] (2026-09-03).** Seeked back three chapters (2 296 261 →
       **1 564 209**), paused, then forced a refresh: the position jumped **forward to 1 910 473**,
       undoing the seek by 346 s.
 
@@ -943,7 +943,7 @@ into "the symptom is gone".
       and no `plexConfig.clear()`, and the device-revocation case is detected proactively.
       Verified on device in both directions. Everything else in this item already passed.
 
-      "Noticed" FAILS; "recoverable" untested as a consequence. Filed as [[DRAFT-123]].**
+      "Noticed" FAILS; "recoverable" untested as a consequence. Filed as [[cu-123]].**
 
       Same run as the cu-10 item above. The app does **not** say the login expired — it shows the
       cached library with grey art and dead sync, leaving the user to infer the cause.
@@ -970,10 +970,10 @@ into "the symptom is gone".
         still presents `CN=*.32080aae….plex.direct`. Both tiers failed,
         `Failure(reason=No connection answered)`. Chronicle is **right** to refuse (cu-42); the
         defect is reporting a connection/TLS failure as an empty library list. Filed as
-        [[DRAFT-125]].
+        [[cu-125]].
       - Backing out of the picker landed on a **working-looking Home** while the app's state was
         `LOGGED_IN_NO_LIBRARY_CHOSEN` with no library in prefs — owner's words: *"super confusing
-        for a user"*. Filed as [[DRAFT-124]].
+        for a user"*. Filed as [[cu-124]].
 
       The stale certificate was a **server-side condition**, **confirmed**: the owner restarted
       Plex Media Server and the cert immediately became `CN=*.d8f64ea2….plex.direct`, with strict
@@ -1135,7 +1135,7 @@ still viable.
 perishable. A note saying "left in place as the fixture" is not a guarantee; re-check before
 planning around it.
 
-### The bug: the mini player disappears for good when playback stops → [[DRAFT-119]]
+### The bug: the mini player disappears for good when playback stops → [[cu-119]]
 
 **This is the actual cause of [[cu-74]]**, which had guessed at a large-screen layout problem and
 asked whether it reproduced on a phone. It is not a layout bug at all. The mini player renders
@@ -1260,7 +1260,7 @@ Re-confirmed on a fresh login (both items were already ticked; this is independe
 - **cu-83 `file://` scheme** — the enqueued download target is
   `file:///storage/emulated/0/Android/data/…/155607.m4b`, scheme intact.
 
-### A security bug found on the first real download → [[DRAFT-120]]
+### A security bug found on the first real download → [[cu-120]]
 
 `AppModule` sets `.enableLogging(true)` on the Fetch2 config **unconditionally**, and Fetch2 logs
 `DownloadInfo.toString()` — which includes the headers map. Result: `X-Plex-Token=<working token>`
@@ -1342,7 +1342,7 @@ still a defect**, and the owner has ruled on it: *"remove the device from the pl
 absolutely kick out chronicle, this needs to be fixed asap (after the cu-73 checklist is
 completed)."*
 
-Filed as **[[DRAFT-122]]**, R0/security. The measured cause is that Plex invalidates *neither*
+Filed as **[[cu-122]]**, R0/security. The measured cause is that Plex invalidates *neither*
 token on device removal — the account token (`FdX…`) still gets `200 OK` from
 `plex.tv/api/v2/resources`, and the server token (`FxC…_6S`) still gets `200 OK` from ANTARES — so
 there is no rejection for the app to react to. `refreshServer` is only ever called from the
@@ -1795,8 +1795,8 @@ fixed in the same push —
 | [[cu-125]] | a TLS certificate mismatch reported as "No libraries found" |
 | [[cu-124]] | backing out of onboarding onto a working-looking, half-configured Home |
 | [[cu-126]] | a library switch at login leaving a union of two catalogues |
-| [[DRAFT-131]] | a backwards seek across a track boundary undone by a refresh — **still open** |
-| [[DRAFT-117]] | main-thread saturation during playback — **partially fixed** |
+| [[cu-131]] | a backwards seek across a track boundary undone by a refresh — **still open** |
+| [[cu-117]] | main-thread saturation during playback — **partially fixed** |
 
 Plus [[decision-17]] on how account state is determined, and [[cu-128]]'s debug hook.
 

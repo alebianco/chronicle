@@ -85,7 +85,7 @@ the degraded Home screen currently has nothing pointing them at Settings.
 
 ### Relationship to DRAFT-122
 
-[[DRAFT-122]] (device removed at plex.tv → app keeps working) is the *same class of defect* from
+[[cu-122]] (device removed at plex.tv → app keeps working) is the *same class of defect* from
 the other end: there, Plex issues no rejection at all, so nothing can be detected reactively.
 Here, Plex issues a textbook rejection and the app throws it away.
 
@@ -113,7 +113,7 @@ both together — possibly as one ADR on how account state is determined.
 ## Related
 
 - [[cu-73]] — the two auth items that this blocks
-- [[DRAFT-122]] — device revocation not detected; probably one shared fix
+- [[cu-122]] — device revocation not detected; probably one shared fix
 - [[cu-10]] — the 401/re-auth design; the authenticator itself is correct and unchanged
 - [[cu-84]] — "offline is not signed out", the rule any fix must preserve
 

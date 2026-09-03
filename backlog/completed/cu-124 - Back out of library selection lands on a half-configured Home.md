@@ -20,7 +20,7 @@ with a logged account ... super confusing for a user"*.
 ### What happens
 
 1. Re-login via **Settings → ACCOUNT → Sign in again** → OAuth completes.
-2. The app routes to **CHOOSE LIBRARY** (see [[DRAFT-125]] for why the list is empty).
+2. The app routes to **CHOOSE LIBRARY** (see [[cu-125]] for why the list is empty).
 3. Press **Back** without selecting anything.
 4. **You land on Home, apparently signed in and working** — cover art loads, the library renders,
    books are playable.
@@ -44,7 +44,7 @@ app looks fully configured precisely *because* the old data survived — the emp
 more obviously broken it would look. A user in this state has no way to tell that library selection
 never completed, and the next sync or refresh will behave as though no library is chosen.
 
-It also interacts badly with [[DRAFT-123]]: there is no "login expired" message, so the user may
+It also interacts badly with [[cu-123]]: there is no "login expired" message, so the user may
 not know why they were sent to a picker in the first place.
 
 ### Fix direction (not decided)
@@ -57,7 +57,7 @@ Two candidate readings, and the choice is a product decision:
 2. **Or make Home honest** — allow the state, but surface a persistent banner ("Finish choosing a
    library to sync") that routes back to the picker.
 
-Option 2 is friendlier given [[DRAFT-125]] can make the picker genuinely unusable through no fault
+Option 2 is friendlier given [[cu-125]] can make the picker genuinely unusable through no fault
 of the user: trapping someone in a picker that lists nothing would be worse than letting them out.
 A banner plus a working escape is probably the right combination.
 
@@ -77,8 +77,8 @@ have the same hole — the log shows the app passing through `NO_SERVER_CHOSEN` 
 ## Related
 
 - [[cu-73]] — found during the live pass
-- [[DRAFT-125]] — the empty picker that makes backing out likely in the first place
-- [[DRAFT-123]] — no "login expired" message, so the user does not know why they are here
+- [[cu-125]] — the empty picker that makes backing out likely in the first place
+- [[cu-123]] — no "login expired" message, so the user does not know why they are here
 
 
 ## Implementation Notes

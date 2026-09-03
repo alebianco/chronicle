@@ -15,7 +15,7 @@ milestone: m-2
 
 > **Diagnosed 2026-09-02 (cu-73 session 4): this is not a layout bug.** The cause is
 > `MainActivityViewModel.playbackObserver` hiding the sheet on `STATE_STOPPED`/`STATE_NONE`
-> with no reachable path back — see [[DRAFT-119]], which carries the repro and the fix. The
+> with no reachable path back — see [[cu-119]], which carries the repro and the fix. The
 > mini player renders correctly at 1200x1920 portrait on a real device; every earlier
 > observation was simply made after playback had already stopped. Candidate 1 below
 > (zero-height constraints at 16:10) is **ruled out**; candidate 2 is essentially right.
