@@ -119,6 +119,7 @@ class AudiobookAdapter(
         },
       )
       binding.gridItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
+      binding.gridItemRoot.setOnLongClickListener { audiobookClick.onLongClick(audiobook) }
       binding.title.text = audiobook.title
       binding.author.text = audiobook.author
       binding.bookCoverImg.contentDescription = audiobook.title
@@ -147,6 +148,7 @@ class AudiobookAdapter(
     ) {
       // Was binding expressions in list_item_audiobook_text_only.xml.
       binding.textOnlyItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
+      binding.textOnlyItemRoot.setOnLongClickListener { audiobookClick.onLongClick(audiobook) }
       binding.title.text = audiobook.title
       binding.author.text = audiobook.author
       binding.bookProgress.text = formatProgress(audiobook)
@@ -216,6 +218,7 @@ class DetailsStyleViewHolder(
     // Was binding expressions in list_item_audiobook_with_details.xml.
     setSquareAspectRatio(binding.detailsItemRoot, isSquare)
     binding.detailsItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
+    binding.detailsItemRoot.setOnLongClickListener { audiobookClick.onLongClick(audiobook) }
     binding.title.text = audiobook.title
     binding.author.text = audiobook.author
     binding.bookProgressString.text = formatProgress(audiobook)

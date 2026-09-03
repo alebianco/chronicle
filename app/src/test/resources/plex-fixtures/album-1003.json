@@ -1,0 +1,35 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "totalSize": 1,
+    "offset": 0,
+    "Metadata": [
+      {
+        "ratingKey": "1003",
+        "key": "/library/metadata/1003/children",
+        "parentRatingKey": 9003,
+        "title": "Mistborn Book 10",
+        "titleSort": "Mistborn Book 10",
+        "parentTitle": "Brandon Sanderson",
+        "type": "album",
+        "thumb": "/library/metadata/1003/thumb/1600000003",
+        "summary": "Deliberately numbered to exercise natural sort ordering.",
+        "year": 2011,
+        "parentYear": 2011,
+        "addedAt": 1600000500,
+        "updatedAt": 1600000600,
+        "lastViewedAt": 0,
+        "viewedLeafCount": 0,
+        "leafCount": 1,
+        "viewCount": 0,
+        "duration": 180000,
+        "index": 1,
+        "plexGenres": [
+          {
+            "tag": "Fantasy"
+          }
+        ]
+      }
+    ]
+  }
+}

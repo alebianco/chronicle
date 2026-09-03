@@ -93,11 +93,13 @@ class HomeFragment : Fragment() {
 
     binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
 
-    binding.recentlyAddedRecyclerview.adapter = makeAudiobookAdapter()
+    binding.recentlyAddedRecyclerview.adapter = makeAudiobookAdapter(openDetails)
     binding.recentlyAddedRecyclerview.itemAnimator?.changeDuration = 0
-    binding.onDeckRecyclerview.adapter = makeAudiobookAdapter()
+    // Continue Listening resumes on tap; details stays reachable by long press (cu-18). The other
+    // two shelves open details, which is right for a book you have not started.
+    binding.onDeckRecyclerview.adapter = makeAudiobookAdapter(resumeOnClick)
     binding.onDeckRecyclerview.itemAnimator?.changeDuration = 0
-    binding.downloadedRecyclerview.adapter = makeAudiobookAdapter()
+    binding.downloadedRecyclerview.adapter = makeAudiobookAdapter(openDetails)
     binding.downloadedRecyclerview.itemAnimator?.changeDuration = 0
     val searchAdapter =
       AudiobookSearchAdapter(
@@ -154,6 +156,14 @@ class HomeFragment : Fragment() {
         }
       },
     )
+
+    // A resume that could not start — offline with an uncached book. A tap that silently does
+    // nothing is the worst outcome: the user cannot tell a broken app from an unavailable book.
+    viewModel.resumeError.observe(viewLifecycleOwner) {
+      it.getContentIfNotHandled()?.let { messageRes ->
+        Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
+      }
+    }
 
     // A refresh failure. It arrives as a string resource because it is raised on an IO
     // dispatcher, where `Toast.show()` throws; the toast belongs here, on the main thread.
@@ -228,17 +238,37 @@ class HomeFragment : Fragment() {
     )
   }
 
-  private fun makeAudiobookAdapter(): AudiobookAdapter {
+  /** Opens the details screen — the right default for a book that has not been started. */
+  private val openDetails =
+    object : AudiobookClick {
+      override fun onClick(audiobook: Audiobook) = openAudiobookDetails(audiobook)
+    }
+
+  /**
+   * Resumes on tap, with the details screen on a long press.
+   *
+   * A shelf whose premise is "carry on where you left off" should not need a second screen and a
+   * second tap to do it (cu-18).
+   */
+  private val resumeOnClick =
+    object : AudiobookClick {
+      // `viewModel` is a lateinit set in onCreate, and these properties initialize during
+      // construction — so the read has to stay inside the lambda body, where it happens at click
+      // time. Hoisting it to the initializer would throw on the first Home render.
+      override fun onClick(audiobook: Audiobook) = viewModel.resume(audiobook)
+
+      override fun onLongClick(audiobook: Audiobook): Boolean {
+        openAudiobookDetails(audiobook)
+        return true
+      }
+    }
+
+  private fun makeAudiobookAdapter(audiobookClick: AudiobookClick): AudiobookAdapter {
     return AudiobookAdapter(
       initialViewStyle = VIEW_STYLE_COVER_GRID,
       isVertical = false,
       isSquare = prefsRepo.bookCoverStyle == BOOK_COVER_STYLE_SQUARE,
-      audiobookClick =
-        object : AudiobookClick {
-          override fun onClick(audiobook: Audiobook) {
-            openAudiobookDetails(audiobook)
-          }
-        },
+      audiobookClick = audiobookClick,
     )
   }
 

@@ -1,0 +1,35 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "totalSize": 1,
+    "offset": 0,
+    "Metadata": [
+      {
+        "ratingKey": "1002",
+        "key": "/library/metadata/1002/children",
+        "parentRatingKey": 9002,
+        "title": "Dune",
+        "titleSort": "Dune",
+        "parentTitle": "Frank Herbert",
+        "type": "album",
+        "thumb": "/library/metadata/1002/thumb/1600000002",
+        "summary": "A desert planet and the spice melange.",
+        "year": 1965,
+        "parentYear": 1965,
+        "addedAt": 1600000300,
+        "updatedAt": 1600000400,
+        "lastViewedAt": 0,
+        "viewedLeafCount": 0,
+        "leafCount": 2,
+        "viewCount": 0,
+        "duration": 360000,
+        "index": 1,
+        "plexGenres": [
+          {
+            "tag": "Science Fiction"
+          }
+        ]
+      }
+    ]
+  }
+}

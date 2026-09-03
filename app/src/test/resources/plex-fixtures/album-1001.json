@@ -1,0 +1,35 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "totalSize": 1,
+    "offset": 0,
+    "Metadata": [
+      {
+        "ratingKey": "1001",
+        "key": "/library/metadata/1001/children",
+        "parentRatingKey": 9001,
+        "title": "The Hobbit",
+        "titleSort": "Hobbit, The",
+        "parentTitle": "J R R Tolkien",
+        "type": "album",
+        "thumb": "/library/metadata/1001/thumb/1600000001",
+        "summary": "Bilbo Baggins is swept into a quest.",
+        "year": 1937,
+        "parentYear": 1937,
+        "addedAt": 1600000000,
+        "updatedAt": 1600000100,
+        "lastViewedAt": 1600000200,
+        "viewedLeafCount": 1,
+        "leafCount": 3,
+        "viewCount": 0,
+        "duration": 540000,
+        "index": 1,
+        "plexGenres": [
+          {
+            "tag": "Fantasy"
+          }
+        ]
+      }
+    ]
+  }
+}

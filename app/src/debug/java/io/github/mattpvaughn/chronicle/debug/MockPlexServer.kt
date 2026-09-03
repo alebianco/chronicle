@@ -173,6 +173,18 @@ class MockPlexServer(private val context: Context) {
     }
 
   /**
+   * The album fixture for a book id, the track fixture for anything else.
+   *
+   * Book ids in this fixture pack are `100x` and track ids `200x`, so the prefix is enough — and
+   * an unknown id falls through to the track fixture, which is what `retrieveChapterInfo` asks
+   * for and the only caller that passes an id this does not know.
+   */
+  private fun metadataFixtureFor(path: String): String {
+    val id = path.removePrefix("/library/metadata/").substringBefore('/').substringBefore('?')
+    return if (ALBUM_FIXTURE_IDS.contains(id)) "album-$id.json" else "track-with-chapters.json"
+  }
+
+  /**
    * Routes a request path to a fixture. Ordering matters: the tracks route is a
    * suffix of the metadata route. Mirrors `FakePlexServer.routeFor` in the test
    * source set.
@@ -182,7 +194,15 @@ class MockPlexServer(private val context: Context) {
       path.startsWith("/library/sections") && path.contains("/all") -> "albums.json"
       path.startsWith("/library/sections") -> "libraries.json"
       path.contains("/children") -> "tracks.json"
-      path.startsWith("/library/metadata") -> "track-with-chapters.json"
+      // `/library/metadata/<id>` is used by **two** endpoints with identical query parameters:
+      // `retrieveAlbum` (which wants the album) and `retrieveChapterInfo` (which wants the track
+      // and its chapters). Nothing in the request distinguishes them, so route on the id.
+      //
+      // This used to answer `track-with-chapters.json` for both, so `fetchBookAsync` received
+      // tracks for an album request — and `bookDao.update` is `@Insert(REPLACE)`, so a track was
+      // *inserted* into the Audiobook table and appeared on the home shelves as a phantom book
+      // (cu-18, seen on a device).
+      path.startsWith("/library/metadata") -> metadataFixtureFor(path)
       path.startsWith("/library/collections") -> "collections.json"
       path.contains("/resources") -> "resources.json"
       path.contains("/home/users") -> "home-users.json"
@@ -191,4 +211,9 @@ class MockPlexServer(private val context: Context) {
       // Progress reports and scrobbles return an empty 200 from a real server.
       else -> null
     }
+
+  private companion object {
+    /** The book ids in `albums.json`; each has an `album-<id>.json` detail fixture. */
+    val ALBUM_FIXTURE_IDS = setOf("1001", "1002", "1003")
+  }
 }

@@ -6,6 +6,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.model.MediaId
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import timber.log.Timber
 
 @JsonClass(generateAdapter = true)
 data class PlexMediaContainerWrapper(
@@ -43,7 +44,34 @@ data class PlexGenre(val tag: String = "")
 fun PlexMediaContainer.asAudiobooks(): List<Audiobook> {
   return metadata
     .filter { MediaId.isValidOrLog(it.ratingKey, "book '${it.title}'") }
+    .filter(::isBookShaped)
     .map { Audiobook.from(it) }
+}
+
+/**
+ * Whether [directory] can be a book at all.
+ *
+ * `retrieveAlbum` and `retrieveChapterInfo` are the **same URL with the same query parameters**
+ * (`/library/metadata/{id}?includeChapters=1`), so nothing about the request says which shape is
+ * expected back, and `fetchBookAsync` hands whatever arrives to `bookDao.update` — which is
+ * `@Insert(REPLACE)` and therefore *inserts* an unknown id rather than failing. A track answered
+ * to an album request became a phantom book row the user could see, not play, and not remove
+ * (cu-18, found on the Continue Listening shelf).
+ *
+ * A **known** non-album is refused. An absent or unrecognised `type` is *accepted*: Plex does not
+ * guarantee the field, and a strict check would drop an entire library from a server that omits
+ * it — turning a cosmetic duplicate into an empty app. Refusing only what we positively recognise
+ * as something else keeps the worst case no worse than before.
+ */
+private fun isBookShaped(directory: PlexDirectory): Boolean {
+  val type = directory.type
+  if (type.isEmpty()) return true
+  if (type == MediaType.ALBUM.typeString) return true
+  val known = MediaType.TYPES.any { it.typeString == type }
+  if (!known) return true
+
+  Timber.w("Ignoring '${directory.title}': a $type cannot be a book")
+  return false
 }
 
 fun PlexMediaContainer.asTrackList(): List<MediaItemTrack> {

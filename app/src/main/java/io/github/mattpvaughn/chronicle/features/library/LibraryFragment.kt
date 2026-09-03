@@ -384,5 +384,17 @@ class LibraryFragment : Fragment() {
 
   interface AudiobookClick {
     fun onClick(audiobook: Audiobook)
+
+    /**
+     * A long press on the same cover.
+     *
+     * Defaulted to "not handled" so every existing shelf keeps its behaviour: only the Continue
+     * Listening shelf overrides it, where a tap resumes and the long press is how the details
+     * screen stays reachable (cu-18).
+     *
+     * @return whether the press was consumed, which is what `setOnLongClickListener` wants — a
+     *   `false` lets the platform fall through to the click.
+     */
+    fun onLongClick(audiobook: Audiobook): Boolean = false
   }
 }

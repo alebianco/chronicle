@@ -252,4 +252,45 @@ class PlexFixtureContractTest {
 
     assertTrue(parsed.plexMediaContainer.metadata.isEmpty())
   }
+
+  /**
+   * The album-detail route must answer with an **album**, not tracks.
+   *
+   * `retrieveAlbum` and `retrieveChapterInfo` hit the same URL with the same query parameters, and
+   * the fixture server used to answer `track-with-chapters.json` for both. `fetchBookAsync` then
+   * received tracks for an album request and `bookDao.update` — an `@Insert(REPLACE)` — inserted
+   * one into the Audiobook table, which surfaced on the home shelves as a phantom book with a
+   * track's title and its book's name in the author field (cu-18).
+   *
+   * Pinned as a contract because the routing exists **twice**, in `FakePlexServer` here and in
+   * `MockPlexServer` for the debug app, and both had the same defect.
+   */
+  @Test
+  fun `each book id has an album detail fixture containing exactly that album`() {
+    FakePlexServer.ALBUM_FIXTURE_IDS.forEach { id ->
+      val books = container("album-$id.json").plexMediaContainer.asAudiobooks()
+
+      assertEquals("album-$id.json must hold one album", 1, books.size)
+      assertEquals("album-$id.json must hold album $id", id, books.first().id)
+    }
+  }
+
+  /** And the ids it lists are exactly the ones the library listing offers. */
+  @Test
+  fun `the album detail fixtures cover every book in the library listing`() {
+    val listed = container("albums.json").plexMediaContainer.asAudiobooks().map { it.id }.toSet()
+
+    assertEquals(listed, FakePlexServer.ALBUM_FIXTURE_IDS)
+  }
+
+  /**
+   * The track fixture must still yield no books now that [asAudiobooks] filters on type — this is
+   * the guard that makes a future routing mistake cosmetic rather than corrupting.
+   */
+  @Test
+  fun `the track fixture yields no books`() {
+    val books = container("track-with-chapters.json").plexMediaContainer.asAudiobooks()
+
+    assertEquals(emptyList<String>(), books.map { it.id })
+  }
 }

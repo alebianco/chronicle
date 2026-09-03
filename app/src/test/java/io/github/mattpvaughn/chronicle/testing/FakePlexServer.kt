@@ -80,13 +80,24 @@ class FakePlexServer : ExternalResource() {
     stub(pathPrefix, MockResponse().setResponseCode(401))
   }
 
+  /** The album fixture for a known book id, the track fixture otherwise. See [routeFor]. */
+  private fun metadataFixtureFor(path: String): String {
+    val id = path.removePrefix("/library/metadata/").substringBefore('/').substringBefore('?')
+    return if (id in ALBUM_FIXTURE_IDS) "album-$id.json" else "track-with-chapters.json"
+  }
+
   private fun routeFor(path: String): MockResponse =
     when {
       path.startsWith("/library/sections") && path.contains("/all") -> json("albums.json")
       path.startsWith("/library/sections") -> json("libraries.json")
       // Tracks for an album; must be checked before the bare metadata route.
       path.contains("/children") -> json("tracks.json")
-      path.startsWith("/library/metadata") -> json("track-with-chapters.json")
+      // `/library/metadata/<id>` serves **two** endpoints with identical query parameters:
+      // `retrieveAlbum` and `retrieveChapterInfo`. Nothing in the request distinguishes them, so
+      // route on the id. Answering the track fixture for both made `fetchBookAsync` receive
+      // tracks for an album request, and `bookDao.update` is `@Insert(REPLACE)` — so a track was
+      // inserted into the Audiobook table as a phantom book (cu-18).
+      path.startsWith("/library/metadata") -> json(metadataFixtureFor(path))
       path.startsWith("/library/collections") -> json("collections.json")
       path.contains("/resources") -> json("resources.json")
       path.contains("/home/users") -> json("home-users.json")
@@ -145,6 +156,9 @@ class FakePlexServer : ExternalResource() {
       .setBody(fixture(fixture))
 
   companion object {
+    /** The book ids in `albums.json`; each has an `album-<id>.json` detail fixture. */
+    val ALBUM_FIXTURE_IDS = setOf("1001", "1002", "1003")
+
     /** Reads a binary fixture from the test classpath. */
     fun fixtureBytes(name: String): ByteArray =
       FakePlexServer::class.java.classLoader

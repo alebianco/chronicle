@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **773 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **801 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -231,6 +231,19 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   from `/api/v2/resources` and is checked *before* `local`, because Plex can report a relay
   route with `local = 1`. Don't reorder `ConnectionTier` — its declaration order *is* the
   preference order.
+- **`retrieveAlbum` and `retrieveChapterInfo` are the same URL** (cu-18) —
+  `/library/metadata/{id}?includeChapters=1` — so nothing in the *request* says whether an album or
+  a track is expected back, and both fixture servers (`MockPlexServer` for the debug app,
+  `FakePlexServer` for the unit tests) routed every `/library/metadata/*` to
+  `track-with-chapters.json`. An album request therefore got tracks, and since
+  `bookDao.update` is `@Insert(REPLACE)` a **track was inserted into the `Audiobook` table** and
+  appeared on the home shelves as a phantom book with a track's title and its book's name in the
+  author field. Both routers now key on the **id** (`album-<id>.json` per book, one album each —
+  a file listing all of them would make `fetchBookAsync`'s `firstOrNull()` answer the same book for
+  every request). `PlexFixtureContractTest` pins it, because the routing exists twice and both
+  copies had the same defect. `asAudiobooks()` also refuses a *known* non-album `type` now; an
+  absent or unrecognised one is **accepted** deliberately, since Plex does not guarantee the field
+  and a strict check would empty the library of a server that omits it.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.

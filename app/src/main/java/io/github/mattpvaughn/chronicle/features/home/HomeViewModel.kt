@@ -1,7 +1,9 @@
 package io.github.mattpvaughn.chronicle.features.home
 
 import android.content.SharedPreferences
+import android.os.Bundle
 import androidx.lifecycle.*
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -10,6 +12,9 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.library.LibraryViewModel
+import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
+import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
+import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.booksKey
@@ -24,6 +29,7 @@ class HomeViewModel(
   private val bookRepository: IBookRepository,
   private val librarySyncRepository: LibrarySyncRepository,
   private val prefsRepo: PrefsRepo,
+  private val mediaServiceConnection: MediaServiceConnection,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -33,6 +39,7 @@ class HomeViewModel(
       private val bookRepository: IBookRepository,
       private val librarySyncRepository: LibrarySyncRepository,
       private val prefsRepo: PrefsRepo,
+      private val mediaServiceConnection: MediaServiceConnection,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
@@ -41,6 +48,7 @@ class HomeViewModel(
             bookRepository,
             librarySyncRepository,
             prefsRepo,
+            mediaServiceConnection,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -88,6 +96,17 @@ class HomeViewModel(
   private var _messageForUser = MutableLiveData<Event<String>>()
   val messageForUser: LiveData<Event<String>>
     get() = _messageForUser
+
+  /**
+   * A resume that could not start, as a string resource.
+   *
+   * An `Int` rather than a `String` because this is raised from a ViewModel with no `Context`, and
+   * user-facing text belongs in `strings.xml` — the same shape as
+   * `LibrarySyncRepository.errorMessage`.
+   */
+  private val _resumeError = MutableLiveData<Event<Int>>()
+  val resumeError: LiveData<Event<Int>>
+    get() = _resumeError
 
   var recentlyAdded: DoubleLiveData<List<Audiobook>, Boolean, List<Audiobook>> =
     DoubleLiveData(
@@ -156,6 +175,37 @@ class HomeViewModel(
     plexConfig.isConnected.removeObserver(serverConnectionObserver)
     prefsRepo.unregisterPrefsListener(offlineModeListener)
     super.onCleared()
+  }
+
+  /**
+   * Resume [audiobook] from its saved position, without going through the details screen.
+   *
+   * This is what makes the Continue Listening shelf worth having: a shelf whose whole premise is
+   * "carry on where you left off" should not need a second screen and a second tap to do it
+   * (cu-18). Details is still reachable by long-pressing the same cover.
+   *
+   * `USE_SAVED_TRACK_PROGRESS` rather than an offset we compute here — the service owns resolving
+   * the saved position from the tracks, and duplicating that resolution is the mistake cu-136 was
+   * about.
+   */
+  fun resume(audiobook: Audiobook) {
+    if (plexConfig.isConnected.value != true && !audiobook.isCached) {
+      _resumeError.postValue(Event(R.string.cannot_play_media_no_server))
+      return
+    }
+
+    val play = {
+      mediaServiceConnection.transportControls?.playFromMediaId(
+        audiobook.id,
+        Bundle().apply { putLong(KEY_START_TIME_TRACK_OFFSET, USE_SAVED_TRACK_PROGRESS) },
+      )
+      Unit
+    }
+    if (mediaServiceConnection.isConnected.value != true) {
+      mediaServiceConnection.connect(onConnected = play)
+    } else {
+      play()
+    }
   }
 
   fun setSearchActive(isSearchActive: Boolean) {
