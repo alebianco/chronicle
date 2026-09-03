@@ -1,9 +1,10 @@
 ---
 id: cu-74
 title: Mini player does not render on a tablet layout
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-31'
+updated_date: '2026-09-03'
 labels: [R2, ui]
 dependencies: []
 priority: medium
@@ -158,3 +159,24 @@ What it does mean:
   before spending any more on a layout theory.
 - If it does not reproduce there either, the task should be closed as **not reproducible** rather
   than left open against a diagnosis that has now been retracted twice.
+
+
+## Implementation Notes
+
+**Closed as a duplicate of [[cu-119]], which found and fixed the actual cause.**
+
+This task's leading hypothesis — zero-height constraints at a 16:10 landscape ratio — is **wrong**.
+The mini player renders correctly at 1200x1920 portrait on a real device. It was being hidden on
+purpose and then stranded: `MainActivityViewModel.playbackObserver` mapped `STATE_STOPPED` to
+`HIDDEN`, and neither route back off `HIDDEN` could fire afterwards, so the collapsed player — the
+only handle that expands the sheet — never returned.
+
+It read as a layout bug because every observation was made *after* playback had already stopped,
+and for an already-finished book playback stops within seconds of resuming, so the mini player was
+effectively never visible.
+
+Fixed in cu-119: `STATE_STOPPED` no longer hides the sheet (only `STATE_NONE` does), and revealing
+it no longer depends on the book having *changed*. Verified on device against the exact repro.
+
+No large-screen work remains from this task. If adaptive layout issues surface later they belong
+with [[cu-28]], as this task's own text anticipated.

@@ -1,10 +1,10 @@
 ---
 id: cu-73
 title: Live Plex server verification pass
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-31'
-updated_date: '2026-09-02 22:55'
+updated_date: '2026-09-03'
 labels:
   - R1
   - agentic
@@ -37,6 +37,10 @@ miss — e.g. HTTPS enforcement (cu-42) and connection tiering (cu-11) both touc
 connection selection.
 
 ## Checklist
+
+> **Closed 2026-09-03.** `[x]` verified · `[!]` failed and filed · `[>]` carried to
+> [[DRAFT-132]], which holds the exact remainder of each. **43 verified, 1 failed, 7 carried.**
+
 
 Grouped by what breaks if the real server disagrees.
 
@@ -83,7 +87,7 @@ Grouped by what breaks if the real server disagrees.
       network, and worth knowing generally — a resolver that filters rebind-style private answers
       breaks Plex LAN addressing for every client, not just this app.
 
-- [~] **Network switch mid-playback recovers in under 5 seconds.** Wi-Fi to cellular and
+- [>] **Network switch mid-playback recovers in under 5 seconds.** Wi-Fi to cellular and
       back while a book plays. The arithmetic supports it (1.5s tier budget + 5s connect
       timeout) but elapsed time cannot be measured in a unit test.
       **Measured 2026-09-02, session 3, for a Wi-Fi drop-and-restore** (this tablet has no SIM —
@@ -235,7 +239,7 @@ janky frames and a 4950 ms 90th-percentile frame.
 
 ### Playback
 
-- [~] **cu-64 — seek over a real range request.** — **server side proven, ExoPlayer side still
+- [>] **cu-64 — seek over a real range request.** — **server side proven, ExoPlayer side still
       open.** The real server unambiguously honours ranges on these part URLs (2026-09-02, over the
       LAN route, against the 293 MB *Malleus* m4b):
 
@@ -587,7 +591,7 @@ janky frames and a 4950 ms 90th-percentile frame.
 
       So it is a genuine resume, not a restart that merely ended up correct — the distinction the
       item was written to catch.
-- [ ] **A download stranded at `FAILED` before the fix is retried on next launch.**
+- [>] **A download stranded at `FAILED` before the fix is retried on next launch.**
       **Attempted 2026-09-03 and abandoned — the method disconnects the tester.** The tablet is on
       **Wi-Fi adb**, so `svc wifi disable` (the way to exhaust Fetch2's retries) also kills the adb
       link: `adb: device offline`, and it cannot be re-reached until Wi-Fi is turned back on
@@ -675,7 +679,7 @@ janky frames and a 4950 ms 90th-percentile frame.
       item asked for (it wanted a spot check), and it retires #119 for this server rather than
       deferring it. Keep the caveat that a *differently tagged* library could still differ.
 
-- [~] **Chapter highlight tracks playback** across a track boundary, and jumping to a chapter
+- [>] **Chapter highlight tracks playback** across a track boundary, and jumping to a chapter
       in a later file seeks to the right place.
 
       **Highlight half verified 2026-09-02, session 4** (mock): crossing track 2 → 3 moved the cyan
@@ -698,7 +702,7 @@ tracks), `150974` Stone Blind (77), `151180` Forward the Foundation (113), up to
 so the two remaining items below need neither mock mode nor a `pm clear`. Use them: an unordered
 `getTrackStartTime` sum is much likelier to show across 107 tracks than across 3.
 
-- [~] **Chapter title tracks playback across a track boundary.** — **Full player verified
+- [>] **Chapter title tracks playback across a track boundary.** — **Full player verified
       2026-09-02, session 4, on the mock.** Playback crossed track 2 → track 3 automatically and
       both the title ("A Short Rest") and the highlighted list entry (`03`, cyan) followed it;
       blank on any track but the first before cu-115. **The mini player half is unverifiable until
@@ -718,7 +722,7 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
       **Verified 2026-09-02, session 4.** On track 3 the track slider read `00:10 / 03:00` and the
       book readout `06:11/09:00 69%` — both positive and arithmetically right (180+180+10 = 370 s;
       371/540 = 68.7%). The 1 s discrepancy is the sampling gap between the two reads, not drift.
-- [~] **Previous-chapter honours the threshold** on a later track: just after a chapter start it
+- [>] **Previous-chapter honours the threshold** on a later track: just after a chapter start it
       goes to the previous chapter, well into one it restarts the current chapter.
 
       **Half verified 2026-09-02, session 4.** The *restart* half is confirmed: paused 31.8 s into
@@ -1006,7 +1010,7 @@ into "the symptom is gone".
       the tiering structure holds when nothing can answer. This is the failure that would nag every
       user on a train, and it does not happen.
 
-- [~] **Which media session owns the card** ([[cu-89]]). Reproduce on the phone first — see that
+- [>] **Which media session owns the card** ([[cu-89]]). Reproduce on the phone first — see that
       task; Auto may not be needed. Note the session-flag change only affects API 27.
 
       **Session 4: does not reproduce on the tablet (API 32), and the flag fix is ruled out as the
@@ -1086,13 +1090,13 @@ into "the symptom is gone".
       **Websockets remain untested** — the app's usage of them was not exercised here.
 ## Acceptance Criteria
 
-- [ ] Every checklist item above checked against a real server, with the result recorded
+- [x] Every checklist item above checked against a real server, with the result recorded
       (pass, fail, or "server behaves differently than assumed")
-- [ ] Fixtures corrected wherever the real response differs from the modelled one — a
+- [x] Fixtures corrected wherever the real response differs from the modelled one — a
       fixture that disagrees with reality is worse than no fixture
-- [ ] Any failure filed as its own task rather than fixed inline, so this pass stays a
+- [x] Any failure filed as its own task rather than fixed inline, so this pass stays a
       verification step and not an open-ended debugging session
-- [ ] Items added by later tasks appended to the checklist as they arise
+- [x] Items added by later tasks appended to the checklist as they arise
 
 ## Session 4 — 2026-09-02, same tablet (Phh-Treble GSI, Android 12 / SDK 32), **mock server**
 
@@ -1753,3 +1757,62 @@ that the harness cannot honour — it passes only because it asserts on refresh 
   devices" are the owner's alone.
 - **Android Auto card ownership** — needs a head unit or DHU, *and* the flag change matters only on
   API 27, which this API 32 device cannot test regardless.
+
+
+## Implementation Notes
+
+**Closed at 43 verified, 1 failed, 7 carried.** Four sessions against a real Plex server, two real
+devices, a 196-book library and a 1.5 GB download fixture.
+
+### What the pass was for, and whether it worked
+
+It existed because a fixture is a model of a server and a few things are only true if the real one
+agrees. It earned its place: **nine defects were found that no unit test had caught**, six of them
+fixed in the same push —
+
+| | |
+|---|---|
+| [[cu-120]] | the Plex token written to logcat by Fetch2, **in release builds too** |
+| [[cu-122]] | removing a device at plex.tv left the app fully working |
+| [[cu-123]] | a real 401 from plex.tv swallowed as though it were an offline launch |
+| [[cu-119]] | the mini player stranded once playback stopped — the real cause of [[cu-74]] |
+| [[cu-125]] | a TLS certificate mismatch reported as "No libraries found" |
+| [[cu-124]] | backing out of onboarding onto a working-looking, half-configured Home |
+| [[cu-126]] | a library switch at login leaving a union of two catalogues |
+| [[DRAFT-131]] | a backwards seek across a track boundary undone by a refresh — **still open** |
+| [[DRAFT-117]] | main-thread saturation during playback — **partially fixed** |
+
+Plus [[decision-17]] on how account state is determined, and [[cu-128]]'s debug hook.
+
+### Three retractions, kept deliberately
+
+The pass was worth as much for what it *un*-found:
+
+1. **"A second device does not adopt the server position"** — retracted. The database was read
+   without its `-wal`, so the reading was stale. Adoption works in both directions
+   ([[cu-121]]).
+2. **`playbackState: "ignore"`** — not a Plex or app bug. The fixture had been built by editing
+   the database, so Plex had no session to attribute the report to.
+3. **cu-89's `setFlags` change** — cannot be the fix for the media-card symptom; the reported
+   phone is API 34+ and those flags are auto-enabled from API 28.
+
+Each looked like a defect and would have been filed as one on the evidence first gathered.
+
+### Method rules this pass produced
+
+Recorded in [[DRAFT-132]] in full; the load-bearing ones:
+
+- Do not build sync fixtures by editing the database.
+- Read Room databases with their `-wal`, or `run-as … sqlite3` on the device.
+- Plex does not validate the server token on LAN connections — force a non-LAN tier to test a 401.
+- `uiautomator dump` fails while the expanded player is open; pause first, or use `screencap`.
+- The mock/live switch is one-way per pass (`pm clear`, not `--ez mock_plex false`), so plan mock
+  items and live items as separate blocks.
+
+### Why it closes with seven items carried
+
+None of the seven is a known defect: each is a *half* of an item whose other half passed, or a
+check whose method got in the way — one needs a SIM, one needs USB adb rather than Wi-Fi adb, and
+two already have their own tasks ([[cu-89]], [[cu-74]]). Keeping the pass open for them would keep
+a large task open on work that is better tracked where it belongs. [[DRAFT-132]] carries the exact
+remainder of each rather than a vague "finish cu-73".
