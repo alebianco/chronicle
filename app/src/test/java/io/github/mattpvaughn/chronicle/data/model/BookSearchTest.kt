@@ -20,16 +20,26 @@ class BookSearchTest {
     author: String = "",
     narrator: String = "",
     series: String = "",
+    seriesIndex: Int = 0,
     isCached: Boolean = false,
   ) = Audiobook(
     id = id,
     source = 1L,
     title = title,
+    titleSort = title,
     author = author,
     narrator = narrator,
     series = series,
+    seriesIndex = seriesIndex,
     isCached = isCached,
   )
+
+  /** A book in the Mistborn series, for the ordering cases below. */
+  private fun seriesBook(
+    id: String,
+    title: String,
+    index: Int,
+  ) = book(id = id, title = title, series = "Mistborn", seriesIndex = index)
 
   private val library =
     listOf(
@@ -191,6 +201,78 @@ class BookSearchTest {
     val second = books.searchFuzzy("Dune").map { it.book.id }
 
     assertEquals(first, second)
+  }
+
+  // ---- series ordering ----
+
+  /**
+   * A series group is in reading order, not alphabetical.
+   *
+   * Reading order is the whole reason to search a series name. Sorting by title put *The Hero of
+   * Ages* (book 3) between books 1 and 2, which is worse than useless: it reads as an ordering, so
+   * the user trusts it.
+   */
+  @Test
+  fun `a series group is ordered by series index`() {
+    val books =
+      listOf(
+        seriesBook("3", "The Hero of Ages", index = 3),
+        seriesBook("1", "The Final Empire", index = 1),
+        seriesBook("2", "The Well of Ascension", index = 2),
+      )
+
+    val group = books.groupedSearch("Mistborn").group(SearchField.Series)
+
+    assertEquals(listOf(1, 2, 3), group?.results?.map { it.book.seriesIndex })
+  }
+
+  @Test
+  fun `a series group orders by index even when it disagrees with the title`() {
+    val books =
+      listOf(
+        seriesBook("b", "Alpha", index = 2),
+        seriesBook("a", "Zulu", index = 1),
+      )
+
+    val group = books.groupedSearch("Mistborn").group(SearchField.Series)
+
+    assertEquals(listOf("Zulu", "Alpha"), group?.results?.map { it.book.title })
+  }
+
+  /**
+   * An unnumbered extra belongs at the end of a series, not in front of book one.
+   *
+   * `inSeriesOrder` already decides this (cu-24); the point here is that the search defers to it
+   * rather than imposing an ordering of its own.
+   */
+  @Test
+  fun `a series book with no index sorts after the numbered ones`() {
+    val books =
+      listOf(
+        seriesBook("extra", "Secret History", index = 0),
+        seriesBook("1", "The Final Empire", index = 1),
+      )
+
+    val group = books.groupedSearch("Mistborn").group(SearchField.Series)
+
+    assertEquals(
+      listOf("The Final Empire", "Secret History"),
+      group?.results?.map { it.book.title },
+    )
+  }
+
+  /** Only the series group is re-ordered; a title group stays ranked by match quality. */
+  @Test
+  fun `a title group is still ordered by score, not by series index`() {
+    val books =
+      listOf(
+        book("fuzzy", title = "Dunes of Mars", series = "Mistborn", seriesIndex = 1),
+        book("exact", title = "Dune", series = "Mistborn", seriesIndex = 9),
+      )
+
+    val group = books.groupedSearch("Dune").group(SearchField.Title)
+
+    assertEquals("exact", group?.results?.first()?.book?.id)
   }
 
   // ---- grouping ----

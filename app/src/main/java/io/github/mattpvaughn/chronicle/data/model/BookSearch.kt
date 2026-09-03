@@ -125,8 +125,26 @@ fun List<Audiobook>.groupedSearch(query: String): GroupedSearchResults {
       .entries
       // Field order, not match count: the headings must not swap places as the query grows.
       .sortedBy { it.key.ordinal }
-      .map { SearchGroup(field = it.key, results = it.value) }
+      .map { SearchGroup(field = it.key, results = it.value.orderedFor(it.key)) }
   return GroupedSearchResults(groups)
+}
+
+/**
+ * Orders one group's results the way that group is read.
+ *
+ * Only the **series** group differs: reading order is the whole reason to search a series name, and
+ * ranking by match quality there sorts alphabetically by title — which put *The Hero of Ages*
+ * (book 3) between books 1 and 2. Every other group stays ranked by how well it matched, since
+ * "closest match first" is what a title or narrator query means.
+ *
+ * Delegates to [inSeriesOrder] rather than sorting here, so the reading order the browse screen
+ * uses (cu-24, including its rule that an unnumbered extra sorts *after* the numbered books) is
+ * the one the search shows. A second copy would drift.
+ */
+private fun List<SearchResult>.orderedFor(field: SearchField): List<SearchResult> {
+  if (field != SearchField.Series) return this
+  val byBookId = associateBy { it.book.id }
+  return map { it.book }.inSeriesOrder().mapNotNull { byBookId[it.id] }
 }
 
 /**

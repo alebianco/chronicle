@@ -86,9 +86,22 @@ front, is filed as **cu-143** (it also makes a CLAUDE.md gotcha false).
   one row under BOOKS despite matching title and series; typing `hobbit` a character at a time
   settles on the correct final result.
 
+**Defect found after merge (owner review, 2026-09-03)**
+
+The series group was ordered by *match score*, whose final tiebreak is the title — so a Mistborn
+search returned books `[1, 3, 2]`, putting *The Hero of Ages* between books 1 and 2. Reading order
+is the whole reason to search a series name, and an ordering the user trusts but that is wrong is
+worse than an obviously arbitrary one. `groupedSearch` now routes the series group through
+`inSeriesOrder()` (cu-24), so search and browse share one reading order; every other group stays
+ranked by match quality, which is what a title or narrator query means. Three tests, all
+sabotage-verified. I had tested that series *matching* worked and never checked the *order* of the
+matches.
+
 **Follow-ups**
 
 - **cu-143** (new task) — seed narrator/series for the whole library at refresh time, so grouping
   is not limited to already-synced books.
+- **cu-145** (new task) — show narrator and series *on a book*; cu-24's data surfaces only in
+  browse and search today, never on the detail screen, grid or player.
 - `/hubs/search` as a complement for un-synced books is *not* filed: it needs cu-143 first, which
   may make it unnecessary.
