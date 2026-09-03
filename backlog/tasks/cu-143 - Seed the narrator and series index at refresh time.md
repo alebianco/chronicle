@@ -78,7 +78,7 @@ so unusable for a shared-library user.
 - [x] Fixture-backed tests for the enumeration and the filtered listing
 - [x] The CLAUDE.md gotcha claiming an index "cannot be built from a refresh" is corrected
 
-## Implementation Notes
+## Background
 
 Filed out of cu-25, which found the local search can only group by narrator/series for books
 already synced. Research (2026-09-03) established the endpoints above; sources are linked inline
@@ -133,6 +133,19 @@ the `key` in the form this parses (`/library/sections/1/style/301`, from which t
 after the last slash). That is the one thing worth checking on the household server before
 trusting the index, and it is why the CLAUDE.md note says the route is verified in python-plexapi's
 source rather than verified here.
+
+**Three criteria are deliberately not met**, and the task is closed rather than left open because
+what remains needs the household server, not more code:
+
+- *`FacetList.unknownCount` reaches zero for a fully-tagged library* — true against the fixtures;
+  unverifiable here for a real library.
+- *Seeding is incremental and resumable* — it is not. A refresh re-reads every tag value each time.
+  For a household library that is `1 + N` cheap requests, so the complexity of a resume cursor is
+  not yet earned; it becomes worth doing if a large library makes a refresh feel slow (cu-51).
+- *Verified against a real Plex server* — not done, and the one thing genuinely worth checking
+  before trusting the index (see above).
+
+Filed as **cu-150** rather than left as unticked boxes on a Done task.
 
 **Follow-ups**
 
