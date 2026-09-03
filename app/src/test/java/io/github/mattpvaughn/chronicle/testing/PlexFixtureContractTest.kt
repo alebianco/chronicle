@@ -293,4 +293,41 @@ class PlexFixtureContractTest {
 
     assertEquals(emptyList<String>(), books.map { it.id })
   }
+
+  /**
+   * Each track's chapter fixture holds **that track's own** chapters, and only its own.
+   *
+   * `retrieveChapterInfo(trackId)` is read with `metadata.firstOrNull()`, so a fixture holding
+   * every track answers the *first* one's chapters for every request — every track then got track
+   * 2001's three chapters and the player read "Ch 1 of 9" for a 7-chapter book, each chapter
+   * tripled. The album half of this was cu-18; this is the track half (cu-19).
+   */
+  @Test
+  fun `each track chapter fixture holds only that track's chapters`() {
+    FakePlexServer.TRACK_FIXTURE_IDS.forEach { id ->
+      val metadata = container("track-$id-chapters.json").plexMediaContainer.metadata
+
+      assertEquals("track-$id-chapters.json must hold one track", 1, metadata.size)
+      assertEquals("track-$id-chapters.json must hold track $id", id, metadata.first().ratingKey)
+      assertTrue(
+        "track $id must carry chapters",
+        metadata.first().plexChapters.isNotEmpty(),
+      )
+    }
+  }
+
+  /**
+   * The three tracks' chapter lists differ, which is what makes the fixture able to catch the bug
+   * — three identical lists would pass the test above and still be wrong.
+   */
+  @Test
+  fun `the tracks do not all report the same chapters`() {
+    val firstTags =
+      FakePlexServer.TRACK_FIXTURE_IDS.map { id ->
+        container("track-$id-chapters.json")
+          .plexMediaContainer.metadata.first().plexChapters.first().tag
+      }
+
+    assertEquals("each track must start at a different chapter", firstTags.size, firstTags.toSet().size)
+  }
 }

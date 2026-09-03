@@ -146,6 +146,19 @@
     <string name="download_failed_notification_title">Download failed</string>
     <string name="download_failed_notification_content">Download failed: %1$s</string>
     <string name="downloads_completed_summary_mixed">Downloads completed, %1$d succeeded, %2$d failed</string>
+    <!-- Player progress, per the §3.1 design brief: two-level, human-formatted, never raw
+         h:mm:ss/h:mm:ss (cu-19). -->
+    <!-- e.g. "Ch 8 of 14" -->
+    <string name="player_chapter_of">Ch %1$d of %2$d</string>
+    <!-- e.g. "32:10 left in chapter" -->
+    <string name="player_left_in_chapter">%1$s left in chapter</string>
+    <!-- e.g. "6h 12m left in book" -->
+    <string name="player_left_in_book">%1$s left in book</string>
+    <!-- Separator between the parts of the progress line. -->
+    <string name="player_progress_separator" translatable="false">" · "</string>
+    <!-- Shown instead of a chapter count when the book reports no chapters. -->
+    <string name="player_no_chapters">No chapters</string>
+
     <plurals name="downloads_failed_summary">
         <item quantity="one">Download failed</item>
         <item quantity="other">Downloads failed</item>

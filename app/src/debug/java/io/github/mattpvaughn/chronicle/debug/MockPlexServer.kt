@@ -181,7 +181,11 @@ class MockPlexServer(private val context: Context) {
    */
   private fun metadataFixtureFor(path: String): String {
     val id = path.removePrefix("/library/metadata/").substringBefore('/').substringBefore('?')
-    return if (ALBUM_FIXTURE_IDS.contains(id)) "album-$id.json" else "track-with-chapters.json"
+    return when {
+      id in ALBUM_FIXTURE_IDS -> "album-$id.json"
+      id in TRACK_FIXTURE_IDS -> "track-$id-chapters.json"
+      else -> "track-with-chapters.json"
+    }
   }
 
   /**
@@ -202,6 +206,21 @@ class MockPlexServer(private val context: Context) {
       // tracks for an album request — and `bookDao.update` is `@Insert(REPLACE)`, so a track was
       // *inserted* into the Audiobook table and appeared on the home shelves as a phantom book
       // (cu-18, seen on a device).
+      // A book id gets its album; a **track** id gets that track's own chapters. Both halves matter:
+      // cu-18 fixed the album half, and the track half was still one file holding all three tracks
+      // — and the app reads `metadata.firstOrNull()`, so every track received *track 2001's*
+      // chapters. The player then read "Ch 1 of 9" for a 7-chapter book, each chapter tripled
+      // (cu-19).
+      // `/library/metadata/<id>` serves **two** endpoints with identical query parameters:
+      // `retrieveAlbum` (which wants the album) and `retrieveChapterInfo` (which wants the track
+      // and its chapters). Nothing in the request distinguishes them, so route on the id.
+      //
+      // Both halves of this were wrong. Answering `track-with-chapters.json` for an *album*
+      // request meant `fetchBookAsync` received tracks, and `bookDao.update` is
+      // `@Insert(REPLACE)`, so a track was inserted into the Audiobook table and showed on the
+      // home shelves as a phantom book (cu-18). And one chapter fixture holding all three tracks
+      // meant every track got *track 2001's* chapters, since the app reads
+      // `metadata.firstOrNull()` — the player read "Ch 1 of 9" for a 7-chapter book (cu-19).
       path.startsWith("/library/metadata") -> metadataFixtureFor(path)
       path.startsWith("/library/collections") -> "collections.json"
       path.contains("/resources") -> "resources.json"
@@ -215,5 +234,8 @@ class MockPlexServer(private val context: Context) {
   private companion object {
     /** The book ids in `albums.json`; each has an `album-<id>.json` detail fixture. */
     val ALBUM_FIXTURE_IDS = setOf("1001", "1002", "1003")
+
+    /** The track ids in `tracks.json`; each has a `track-<id>-chapters.json` fixture. */
+    val TRACK_FIXTURE_IDS = setOf("2001", "2002", "2003")
   }
 }

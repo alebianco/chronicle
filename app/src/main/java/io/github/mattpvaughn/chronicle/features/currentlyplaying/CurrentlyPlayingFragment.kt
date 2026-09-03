@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.os.Bundle
-import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -26,6 +25,8 @@ import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter
 import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
+import io.github.mattpvaughn.chronicle.util.formatCoarseDuration
+import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
@@ -159,6 +160,54 @@ class CurrentlyPlayingFragment : Fragment() {
     }
 
     /**
+     * The book half of the readout: `6h 12m left in book`.
+     *
+     * The wording lives in `strings.xml` and the arithmetic in the ViewModel, so this only joins
+     * them — which is why it takes a `PlayerProgress` rather than reading the ViewModel itself.
+     */
+    fun bookProgressText(progress: CurrentlyPlayingViewModel.PlayerProgress?): String {
+      if (progress == null) return ""
+      return getString(
+        R.string.player_left_in_book,
+        formatCoarseDuration(progress.millisLeftInBook),
+      )
+    }
+
+    /**
+     * The chapter's place in the book: `Ch 3 of 6`, or `No chapters` when the book has none.
+     *
+     * Not blank in that case: the old readout fell back to the track's raw position here, and
+     * leaving it empty would drop information rather than reformat it. "Ch 0 of 0" would read as
+     * a bug, so the state is named instead — the chapter title beside it already falls back to
+     * the track's title.
+     */
+    fun chapterPositionText(progress: CurrentlyPlayingViewModel.PlayerProgress?): String {
+      if (progress == null) return ""
+      if (!progress.hasChapters) return getString(R.string.player_no_chapters)
+      return getString(
+        R.string.player_chapter_of,
+        progress.chapterNumber,
+        progress.chapterCount,
+      )
+    }
+
+    /**
+     * How much of the current chapter is left: `2:30 left in chapter`.
+     *
+     * With no chapters there is no chapter to count down, so this falls back to the **book**'s
+     * remaining time rather than going blank — which is the more useful of the two anyway, and
+     * keeps the line populated for a chapter-less book where the old readout showed the track's.
+     */
+    fun chapterRemainingText(progress: CurrentlyPlayingViewModel.PlayerProgress?): String {
+      if (progress == null) return ""
+      if (!progress.hasChapters) return bookProgressText(progress)
+      return getString(
+        R.string.player_left_in_chapter,
+        formatPrecisePosition(progress.millisLeftInChapter),
+      )
+    }
+
+    /**
      * Writes the expanded player's text, but only while it is on screen.
      *
      * Same reasoning as [refreshSlider]'s `isShown` guard (cu-110), applied to the five text
@@ -166,32 +215,35 @@ class CurrentlyPlayingFragment : Fragment() {
      * re-measures; five of them on every 1 Hz tick, for a sheet the user cannot see, is the
      * measured cause of the remaining playback jank.
      *
-     * Uses `binding.progress` as the probe rather than each view in turn: they live in the same
-     * sheet, so one ancestor chain decides all of them.
+     * Uses the seekbar as the probe rather than each view in turn: they live in the same sheet, so
+     * one ancestor chain decides all of them. It must be a view that is present in **both**
+     * orientations — probing `binding.progress` blanked the whole block in landscape, where that
+     * view is GONE (cu-19).
      */
     fun renderPlayerText() {
-      if (!binding.progress.isShown) {
+      // Anchored on the seekbar, not on `binding.progress`. That view carries
+      // `android:visibility="@integer/currently_playing_artwork_visibility"`, which is GONE in
+      // landscape — so `isShown` was permanently false there and this returned early *every*
+      // time, leaving the chapter position, the chapter duration, the percentage and the chapter
+      // title all blank on a landscape tablet. The guard's intent (skip the work while the sheet
+      // is collapsed, cu-110/cu-117) is right; keying it on a view that one orientation hides
+      // outright was not. The seekbar is present in both, and `refreshSlider` already uses it.
+      if (!binding.chapterProgressSeekbar.isShown) {
         return
       }
 
       // `setText` with an equal CharSequence still invalidates, so compare first — the strings
-      // genuinely repeat, since a second of a 47-hour book leaves the percentage unchanged.
-      binding.progress.setTextIfChanged(viewModel.progressString.value.orEmpty())
+      // genuinely repeat, since a second of a 47-hour book leaves the readout unchanged.
+      //
+      // Two-level, human-formatted progress, never raw h:mm:ss/h:mm:ss (§3.1 rule 3, cu-19):
+      // "Ch 3 of 6" · "2:30 left in chapter" on one line, "6h 12m left in book" on the other.
+      val progress = viewModel.playerProgress.value
+      binding.progress.setTextIfChanged(bookProgressText(progress))
       binding.progressPercentage.setTextIfChanged(
         viewModel.progressPercentageString.value.orEmpty(),
       )
-
-      val chapter = viewModel.chapterProgressString.value
-      binding.chapterProgress.setTextIfChanged(
-        if (chapter.isNullOrEmpty()) viewModel.trackProgress.value.orEmpty() else chapter,
-      )
-      binding.chapterDuration.setTextIfChanged(
-        if ((viewModel.chapterDuration.value ?: 0L) == 0L) {
-          viewModel.trackDuration.value.orEmpty()
-        } else {
-          viewModel.chapterDurationString.value.orEmpty()
-        },
-      )
+      binding.chapterProgress.setTextIfChanged(chapterPositionText(progress))
+      binding.chapterDuration.setTextIfChanged(chapterRemainingText(progress))
 
       val currentChapter = viewModel.currentChapter.value
       binding.chapterTitle.setTextIfChanged(
@@ -301,7 +353,7 @@ class CurrentlyPlayingFragment : Fragment() {
     // right hook because `isShown` is exactly what it reports on, and it needs no knowledge of
     // the bottom sheet's state living over in MainActivity.
     var wasShown = false
-    binding.progress.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+    binding.chapterProgressSeekbar.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
       val shown = view.isShown
       if (shown && !wasShown) {
         renderPlayerText()
@@ -309,10 +361,11 @@ class CurrentlyPlayingFragment : Fragment() {
       wasShown = shown
     }
 
-    viewModel.progressString.observe(viewLifecycleOwner) { renderPlayerText() }
+    // One source for the progress line now, instead of four strings that each re-rendered the
+    // whole block (cu-19). `playerProgress` is already distinctUntilChanged, so this fires only
+    // when a displayed number actually moved.
+    viewModel.playerProgress.observe(viewLifecycleOwner) { renderPlayerText() }
     viewModel.progressPercentageString.observe(viewLifecycleOwner) { renderPlayerText() }
-    viewModel.chapterProgressString.observe(viewLifecycleOwner) { renderPlayerText() }
-    viewModel.chapterDurationString.observe(viewLifecycleOwner) { renderPlayerText() }
     viewModel.currentChapter.observe(viewLifecycleOwner) { renderPlayerText() }
     viewModel.audiobook.observe(viewLifecycleOwner) { renderPlayerArtwork() }
     plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
@@ -356,11 +409,10 @@ class CurrentlyPlayingFragment : Fragment() {
       },
     )
 
+    // The scrub tooltip is a position, so it keeps its seconds — but through the same formatter
+    // as the rest of the player, not `DateUtils`, which pads to `0:32:10` at the hour (cu-19).
     binding.chapterProgressSeekbar.setLabelFormatter { value: Float ->
-      DateUtils.formatElapsedTime(
-        StringBuilder(),
-        value.toLong() / 1000,
-      )
+      formatPrecisePosition(value.toLong())
     }
 
     viewModel.activeChapter.observe(viewLifecycleOwner) { chapter ->

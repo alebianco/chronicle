@@ -1,0 +1,50 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "Metadata": [
+      {
+        "ratingKey": "2002",
+        "parentRatingKey": 1001,
+        "title": "Roast Mutton",
+        "parentTitle": "The Hobbit",
+        "type": "track",
+        "index": 2,
+        "parentIndex": 1,
+        "duration": 180000,
+        "Media": [
+          {
+            "Part": [
+              {
+                "key": "/library/parts/3002/1600000000/file.wav",
+                "size": 52428800
+              }
+            ]
+          }
+        ],
+        "Chapter": [
+          {
+            "id": 4003,
+            "tag": "Chapter 3: A Short Rest",
+            "index": 3,
+            "startTimeOffset": 150000,
+            "endTimeOffset": 225000
+          },
+          {
+            "id": 4004,
+            "tag": "Chapter 4: Over Hill and Under Hill",
+            "index": 4,
+            "startTimeOffset": 225000,
+            "endTimeOffset": 300000
+          },
+          {
+            "id": 4005,
+            "tag": "Chapter 5: Riddles in the Dark",
+            "index": 5,
+            "startTimeOffset": 300000,
+            "endTimeOffset": 375000
+          }
+        ]
+      }
+    ]
+  }
+}

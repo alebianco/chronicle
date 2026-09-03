@@ -1,0 +1,57 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "Metadata": [
+      {
+        "ratingKey": "2003",
+        "parentRatingKey": 1001,
+        "title": "A Short Rest",
+        "parentTitle": "The Hobbit",
+        "type": "track",
+        "index": 3,
+        "parentIndex": 1,
+        "duration": 180000,
+        "Media": [
+          {
+            "Part": [
+              {
+                "key": "/library/parts/3003/1600000000/file.wav",
+                "size": 52428800
+              }
+            ]
+          }
+        ],
+        "Chapter": [
+          {
+            "id": 4005,
+            "tag": "Chapter 5: Riddles in the Dark",
+            "index": 5,
+            "startTimeOffset": 300000,
+            "endTimeOffset": 375000
+          },
+          {
+            "id": 4006,
+            "tag": "Chapter 6: Out of the Frying-Pan",
+            "index": 6,
+            "startTimeOffset": 375000,
+            "endTimeOffset": 450000
+          },
+          {
+            "id": 4007,
+            "tag": "Chapter 7: Queer Lodgings",
+            "index": 7,
+            "startTimeOffset": 450000,
+            "endTimeOffset": 525000
+          },
+          {
+            "id": 4008,
+            "tag": "",
+            "index": 8,
+            "startTimeOffset": 525000,
+            "endTimeOffset": 540000
+          }
+        ]
+      }
+    ]
+  }
+}

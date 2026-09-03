@@ -1,0 +1,50 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "Metadata": [
+      {
+        "ratingKey": "2001",
+        "parentRatingKey": 1001,
+        "title": "An Unexpected Party",
+        "parentTitle": "The Hobbit",
+        "type": "track",
+        "index": 1,
+        "parentIndex": 1,
+        "duration": 180000,
+        "Media": [
+          {
+            "Part": [
+              {
+                "key": "/library/parts/3001/1600000000/file.wav",
+                "size": 52428800
+              }
+            ]
+          }
+        ],
+        "Chapter": [
+          {
+            "id": 4001,
+            "tag": "Chapter 1: An Unexpected Party",
+            "index": 1,
+            "startTimeOffset": 0,
+            "endTimeOffset": 75000
+          },
+          {
+            "id": 4002,
+            "tag": "Chapter 2: Roast Mutton",
+            "index": 2,
+            "startTimeOffset": 75000,
+            "endTimeOffset": 150000
+          },
+          {
+            "id": 4003,
+            "tag": "Chapter 3: A Short Rest",
+            "index": 3,
+            "startTimeOffset": 150000,
+            "endTimeOffset": 225000
+          }
+        ]
+      }
+    ]
+  }
+}

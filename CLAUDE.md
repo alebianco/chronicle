@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **801 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **823 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -189,6 +189,25 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   - Room stores plain `INTEGER` via `OffsetConverters`, so **no migration** — verified by diffing
     the exported schema. `Audiobook.progress` and `ProgressUpdater` stay `Long` on purpose: they
     already keep the two frames as separate named locals, so names do the work there.
+- **The player's progress readout is human-formatted, never `h:mm:ss/h:mm:ss`** (cu-19).
+  `formatCoarseDuration` (`6h 12m`, `<1m`) for a span, `formatPrecisePosition` (`32:10`) for a
+  position inside a chapter — both in `util/DurationFormat.kt`, both pure over millis so the
+  wording is testable without a `Context`. RESEARCH_FINDINGS §3.1 rule 3 is the source; a 47-hour
+  book used to read `47:12:33/52:04:11`. `RawDurationFormatTest` asserts the four progress views
+  are written from those two and that the ViewModel exposes no raw pair. It is scoped to the
+  **readout**, not to `DateUtils`: a sleep-timer countdown genuinely *is* `h:mm:ss`, and a first
+  cut that banned the call outright flagged three legitimate uses.
+- **An `isShown` guard must probe a view that exists in every orientation** (cu-19).
+  `renderPlayerText` guarded on `binding.progress`, which carries
+  `android:visibility="@integer/currently_playing_artwork_visibility"` — GONE in `values-land`. So
+  on a landscape tablet the guard returned early *every* time and the whole text block stayed
+  blank: chapter position, chapter duration, percentage and chapter title. The guard's intent
+  (cu-110/cu-117 — skip the work while the sheet is collapsed) is right; the anchor was not. It
+  probes `chapterProgressSeekbar` now, which is what `refreshSlider` already used. **A
+  `uiautomator` dump cannot see this**: it omits an empty `TextView` from the tree, so a blank view
+  and an absent one look identical — and a dump taken *during playback* fails with "could not get
+  idle state" while leaving the previous file in place, so a stale read looks like success. Pause
+  first and assert the file exists.
 - **Do not do per-second work whose result cannot change** (cu-110). `ProgressUpdater` writes once
   a second during playback and Room invalidates **per table**, so every `LiveData` on `Audiobook`
   or `MediaItemTrack` re-emits at tick rate. The measured damage was not computation but
@@ -244,6 +263,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   copies had the same defect. `asAudiobooks()` also refuses a *known* non-album `type` now; an
   absent or unrecognised one is **accepted** deliberately, since Plex does not guarantee the field
   and a strict check would empty the library of a server that omits it.
+  The **track** half of the same routing was fixed in cu-19: `retrieveChapterInfo(trackId)` is
+  read with `metadata.firstOrNull()`, so one fixture holding all three tracks answered *track
+  2001's* chapters for every track and the player read "Ch 1 of 9" for a 7-chapter book. Each
+  track now has its own `track-<id>-chapters.json`. A chapter spanning a track boundary
+  legitimately appears on **both** tracks, so a count above the distinct-chapter count is correct.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.

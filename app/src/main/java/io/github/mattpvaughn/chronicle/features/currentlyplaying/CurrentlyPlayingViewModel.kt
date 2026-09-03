@@ -51,6 +51,47 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @ExperimentalCoroutinesApi
+/**
+ * The two-level progress readout, derived from the four facts it needs.
+ *
+ * A free function rather than a method so it is testable without the LiveData graph, and so the
+ * arithmetic sits in one place: `millisLeftInChapter` and `millisLeftInBook` are **both** in the
+ * book frame (`Chapter.bookEndTimeOffset` and the book's total duration against a [BookOffset]),
+ * which is the distinction cu-136 made a type.
+ *
+ * `chapterNumber` is 1-based for display, and `0` when the chapter is not in the list — a book
+ * with no chapters, or a chapter list that has not loaded yet. The view omits the chapter part
+ * rather than printing "Ch 0 of 0".
+ *
+ * Chapters are sorted before indexing because the list arrives from the DB and the network in no
+ * guaranteed order, and a position label that depends on query order is wrong at random.
+ */
+internal fun playerProgressOf(
+  chapter: Chapter?,
+  bookPosition: BookOffset,
+  chapterList: List<Chapter>,
+  bookDurationMillis: Long,
+): CurrentlyPlayingViewModel.PlayerProgress {
+  val ordered = chapterList.sorted()
+  val index =
+    if (chapter == null || chapter == EMPTY_CHAPTER) {
+      -1
+    } else {
+      ordered.indexOfFirst { it.id == chapter.id && it.trackId == chapter.trackId }
+    }
+  return CurrentlyPlayingViewModel.PlayerProgress(
+    chapterNumber = if (index >= 0) index + 1 else 0,
+    chapterCount = ordered.size,
+    millisLeftInChapter =
+      if (chapter == null || chapter == EMPTY_CHAPTER) {
+        0L
+      } else {
+        (chapter.bookEndTimeOffset - bookPosition).coerceAtLeast(0L)
+      },
+    millisLeftInBook = (bookDurationMillis - bookPosition.millis).coerceAtLeast(0L),
+  )
+}
+
 class CurrentlyPlayingViewModel(
   private val bookRepository: IBookRepository,
   private val trackRepository: ITrackRepository,
@@ -245,14 +286,6 @@ class CurrentlyPlayingViewModel(
       millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
     }.asLiveData(viewModelScope.coroutineContext)
 
-  val chapterProgressString =
-    chapterProgress.map { progress ->
-      return@map DateUtils.formatElapsedTime(
-        StringBuilder(),
-        progress / 1000,
-      )
-    }
-
   val chapterProgressForSlider =
     currentlyPlaying.chapter.combine(
       currentlyPlaying.bookPosition,
@@ -279,13 +312,51 @@ class CurrentlyPlayingViewModel(
       return@map it.bookEndTimeOffset - it.bookStartTimeOffset
     }
 
-  val chapterDurationString =
-    chapterDuration.map { duration ->
-      return@map DateUtils.formatElapsedTime(
-        StringBuilder(),
-        duration / 1000,
+  /**
+   * The two-level progress the player shows, as data rather than a formatted string.
+   *
+   * §3.1 convergent-grammar rule 3: chapter position **and** time-left-in-book, never raw
+   * `h:mm:ss/h:mm:ss`. Exposed as numbers and an index so the *wording* stays in the view layer
+   * where `strings.xml` and a `Context` live (rule 2) — which also means this is unit-testable
+   * without Robolectric.
+   *
+   * [chapterNumber] is 1-based for display and `0` when the book reports no chapters; the view
+   * then omits the chapter part rather than printing "Ch 0 of 0".
+   */
+  data class PlayerProgress(
+    val chapterNumber: Int,
+    val chapterCount: Int,
+    val millisLeftInChapter: Long,
+    val millisLeftInBook: Long,
+  ) {
+    val hasChapters: Boolean get() = chapterCount > 0 && chapterNumber > 0
+  }
+
+  /**
+   * Recomputed from the chapter, the book position and the chapter list.
+   *
+   * `distinctUntilChanged` because all three sources re-emit on every 1 Hz progress tick while the
+   * displayed values change once a second at most — the churn cu-93 measured at 228 recomputations
+   * a minute came from exactly this shape.
+   *
+   * The derivation itself is [playerProgressOf], a pure function: this wiring only supplies it
+   * with the four inputs. Keeping them apart is what makes the arithmetic testable — reaching it
+   * through the LiveData graph needs `audiobookId` to have been populated by the ViewModel's own
+   * init observers, which is plumbing rather than behaviour.
+   */
+  val playerProgress: LiveData<PlayerProgress> =
+    TripleLiveData(
+      currentChapter,
+      currentlyPlaying.bookPosition.asLiveData(viewModelScope.coroutineContext),
+      chapters,
+    ) { chapter, bookPosition, chapterList ->
+      playerProgressOf(
+        chapter = chapter,
+        bookPosition = bookPosition ?: BookOffset.ZERO,
+        chapterList = chapterList.orEmpty(),
+        bookDurationMillis = tracks.value?.getDuration() ?: 0L,
       )
-    }
+    }.distinctUntilChanged()
 
   /**
    * Suppresses slider writes while the user owns the position.
@@ -369,37 +440,6 @@ class CurrentlyPlayingViewModel(
   val isPlaying: LiveData<Boolean> =
     mediaServiceConnection.playbackState.map { state ->
       return@map state.isPlaying
-    }
-
-  val trackProgress =
-    currentTrack.map { track ->
-      return@map DateUtils.formatElapsedTime(
-        StringBuilder(),
-        track.progress / 1000,
-      )
-    }
-
-  val trackDuration =
-    currentTrack.map { track ->
-      return@map DateUtils.formatElapsedTime(StringBuilder(), track.duration / 1000)
-    }
-
-  val progressString =
-    tracks.map { tracks: List<MediaItemTrack> ->
-      if (tracks.isEmpty()) {
-        return@map "0:00/0:00"
-      }
-      val progressStr =
-        DateUtils.formatElapsedTime(
-          StringBuilder(),
-          tracks.getProgress().millis / 1000L,
-        )
-      val durationStr =
-        DateUtils.formatElapsedTime(
-          StringBuilder(),
-          tracks.getDuration() / 1000L,
-        )
-      return@map "$progressStr/$durationStr"
     }
 
   /**

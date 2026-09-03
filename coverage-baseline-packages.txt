@@ -8,7 +8,7 @@ io/github/mattpvaughn/chronicle/data/sources/plex/model 52.31
 io/github/mattpvaughn/chronicle/debug 1.40
 io/github/mattpvaughn/chronicle/features/bookdetails 21.09
 io/github/mattpvaughn/chronicle/features/collections 0.00
-io/github/mattpvaughn/chronicle/features/currentlyplaying 18.60
+io/github/mattpvaughn/chronicle/features/currentlyplaying 19.93
 io/github/mattpvaughn/chronicle/features/download 10.68
 io/github/mattpvaughn/chronicle/features/home 16.09
 io/github/mattpvaughn/chronicle/features/library 2.18
@@ -18,5 +18,5 @@ io/github/mattpvaughn/chronicle/features/search 0.00
 io/github/mattpvaughn/chronicle/features/settings 12.22
 io/github/mattpvaughn/chronicle/injection/modules 42.83
 io/github/mattpvaughn/chronicle/navigation 0.00
-io/github/mattpvaughn/chronicle/util 38.81
+io/github/mattpvaughn/chronicle/util 44.03
 io/github/mattpvaughn/chronicle/views 11.48
