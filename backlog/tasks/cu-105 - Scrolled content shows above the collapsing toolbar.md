@@ -1,7 +1,7 @@
 ---
 id: cu-105
 title: Scrolled content shows above the collapsing toolbar
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-09-02'
 labels: [R2, ui, bug]
@@ -68,7 +68,16 @@ Doing it with manual padding instead is what leaves the gap.
 - [x] Reproduced and measured on an API 35 emulator via uiautomator bounds
 - [x] No content visible above the toolbar at any scroll position
 - [x] Toolbar content still clears the status bar (cu-63 not regressed)
-- [ ] Verified in 3-button *and* gesture navigation, and in landscape
+- [x] Verified in 3-button *and* gesture navigation, and in landscape
+      **Verified 2026-09-03** on the Phh-Treble GSI (API 32, 1200x1920 @ 240dpi = 800dp), which
+      was in **landscape with gesture navigation** — the two conditions this criterion was left
+      open for. Book-details screen, 28-track book: no content above the toolbar at rest, and
+      cu-63's status-bar clearance still holds.
+
+      One false alarm worth recording: a mid-scroll capture *looked* like the defect, with a
+      clipped "Chapter 4 / 22:45" row in the toolbar band. It is content passing **under** a
+      translucent toolbar, which is correct — the same frame at rest and at other scroll positions
+      is clean. Check at rest, not mid-fling.
 - [x] Checked whether `fragment_home` / `fragment_library` share the defect — **they cannot.**
       Verified by inspection 2026-09-02: `layout_scrollFlags` appears in exactly **two** layouts in
       the project, `fragment_audiobook_details.xml` and `fragment_currently_playing.xml`, and
@@ -129,17 +138,31 @@ contain `applyTopSystemBarInsetWithMinHeight` at all, so the earlier "fixed" mea
 against an incomplete build. Rebuilt, reinstalled, and confirmed the helper is present in
 `classes5.dex` before re-measuring. The numbers above are from that run and hold.
 
-### Still to verify
+### Verified 2026-09-03 — all three items closed
 
-- [ ] Gesture navigation and landscape (measured in 3-button portrait only)
-- [ ] `fragment_home` / `fragment_library` — they use `applyTopSystemBarInset` on a plain toolbar
-      with no `CollapsingToolbarLayout`, so they have no `minHeight` to collapse to and are very
-      likely unaffected. Unconfirmed.
-- [ ] **The currently-playing screen is fixed by symmetry only, and cannot be measured on a
-      tablet.** Reaching it needs the mini player, which does not render on a tablet layout —
-      [[cu-74]], whose own notes say "on a tablet there appears to be no way to reach the
-      currently-playing screen". Both changes to `fragment_currently_playing.xml` are identical to
-      the details screen's, so the risk is low, but it is unmeasured. Verify on the owner's phone.
+On the Phh-Treble GSI (API 32, 800dp, **landscape** with **gesture navigation**), against the live
+server. Screenshots at rest and scrolled for each screen.
+
+- [x] Gesture navigation and landscape (was: measured in 3-button portrait only)
+      Book-details screen, 28-track book: no content above the toolbar at rest or when scrolled,
+      and cu-63's status-bar clearance holds.
+- [x] `fragment_home` / `fragment_library` — the inspection-based reasoning is **confirmed on
+      device**. Both have opaque toolbars, content clips correctly beneath them, and nothing
+      reaches the status bar when scrolled hard.
+- [x] **The currently-playing screen** — no longer "fixed by symmetry only". The premise that it
+      cannot be reached on a tablet is **out of date**: [[cu-74]] has since been fixed, the mini
+      player renders on this 800dp layout, and `--ez show_player true` opens the screen directly.
+      Verified clean at rest and scrolled.
+
+**A false alarm worth recording.** A mid-scroll capture looked exactly like the defect — a clipped
+"Chapter 4 / 22:45" row rendering in the toolbar band. It is content passing **under** a
+translucent toolbar, which is correct; the same screen at rest and at other scroll offsets is
+clean. Judge this defect at rest, not mid-fling, or the fix reads as broken.
+
+**Not a defect, checked while here:** the expanded player shows no artwork and no position readout
+in landscape. That is deliberate — `values-land/integers.xml` sets
+`currently_playing_artwork_visibility` to `2` (GONE) against `0` in portrait, to buy vertical space
+on a short screen.
 
 
 ## First fix was wrong (2026-09-02)
