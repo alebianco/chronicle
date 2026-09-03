@@ -16,6 +16,7 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.local.SeriesIndexRulesLoader
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.model.mergeServerRefresh
@@ -61,6 +62,9 @@ open class ChronicleApplication :
 
   @Inject
   lateinit var prefsRepo: PrefsRepo
+
+  @Inject
+  lateinit var seriesIndexRulesLoader: SeriesIndexRulesLoader
 
   @Inject
   lateinit var unhandledExceptionHandler: CoroutineExceptionHandler
@@ -123,6 +127,7 @@ open class ChronicleApplication :
     // it must run before setupNetwork, which would otherwise try to refresh
     // connections against the real plex.tv and clear them.
     DebugHooks.onApplicationCreate(this)
+    installSeriesIndexRules()
     setupNetwork(plexPrefs)
     updateDownloadedFileState()
     super.onCreate()
@@ -131,6 +136,7 @@ open class ChronicleApplication :
   /**
    * Updates the book and track repositories to reflect the true state of downloaded files
    */
+
   private fun updateDownloadedFileState() {
     applicationScope.launch {
       withContext(Dispatchers.IO) {
@@ -140,6 +146,20 @@ open class ChronicleApplication :
       // one retry, then nothing re-enqueued it (cu-76). Launch is the first chance to pick
       // it back up.
       cachedFileManager.resumeInterruptedDownloads()
+    }
+  }
+
+  /**
+   * Installs the user's own series-index parsing rules, if they wrote a file (cu-148).
+   *
+   * Launched rather than awaited: a refresh that beats the install reads the built-in rules, which
+   * is the behaviour the app has always had, and `Audiobook.from` re-reads the installed set on
+   * every call — so a rule arriving a moment late applies from the next book onward rather than
+   * being missed. Blocking startup on an optional file would be the worse trade.
+   */
+  private fun installSeriesIndexRules() {
+    applicationScope.launch {
+      seriesIndexRulesLoader.install()
     }
   }
 

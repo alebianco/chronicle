@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **1115 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1139 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -407,8 +407,15 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   tvnamer user real debugging time; and **`MatchResult.groups["name"]` throws** for a group the
   *matching* pattern never declared rather than returning null, so four of the seven built-ins
   (which declare no `series` group) crashed every match until every named read went through
-  `namedGroupOrNull`. Nobody calls `installSeriesIndexPatterns` yet — the file format and the
-  tester UI are cu-148.
+  `namedGroupOrNull`. A user's own rules live in **`series-index-rules.json`** in the app's files
+  directory (cu-148) — `{version, order, rules:[{name, pattern, description}]}`, absent by default,
+  and **every** failure degrades to the built-ins: malformed JSON, a newer version, an unknown
+  order, a nameless rule, an uncompilable regex. `order` is parsed as a *string* rather than a Moshi
+  enum on purpose, since an unknown constant would make Moshi reject the whole file and take the
+  valid rules with it. The load runs off the main thread (StrictMode penalises a disk read in
+  `Application.onCreate`) and is launched rather than awaited. The tester UI is **cu-151**, and it
+  is not optional polish — tvnamer's #216 is a user who could not tell whether their pattern or the
+  tool was wrong.
 - **A tag list's `@Json` name must be checked against a captured response, not a fixture** (cu-24).
   `plexGenres` carried **no** `@Json(name = "Genre")` for the life of the project, so Moshi looked
   for a key literally called `plexGenres` and `Audiobook.genre` was empty against every real
