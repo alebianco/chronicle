@@ -188,6 +188,17 @@ class SettingsViewModel(
     }
   }
 
+  /**
+   * Names [stored] using the chooser's own localized label.
+   *
+   * The decision lives in `BookCoverStyle.kt` and is unit-tested; only the string lookup is here.
+   * An unrecognized value falls back to the default rather than throwing — a pre-fix install can
+   * hold `"Rectangle"`, and the key is importable with no value validation (cu-133).
+   */
+  private fun formatBookCoverStyle(stored: String): String =
+    Injector.get().applicationContext().resources
+      .getString(BookCoverStyle.ofStoredOrDefault(stored).choiceRes)
+
   private fun makePreferences(): List<PreferenceModel> {
     val list =
       mutableListOf(
@@ -200,7 +211,13 @@ class SettingsViewModel(
           title =
             FormattableString.ResourceString(
               stringRes = R.string.settings_book_cover_type_value,
-              placeHolderStrings = listOf(prefsRepo.bookCoverStyle),
+              // The chooser's own localized label, not the persisted English literal. The
+              // literal is what made a stored "Rectangle" read back as "Rectangle" under an
+              // option offered as "Rectangular" (cu-101).
+              placeHolderStrings =
+                listOf(
+                  formatBookCoverStyle(prefsRepo.bookCoverStyle),
+                ),
             ),
           explanation =
             FormattableString.from(
@@ -211,14 +228,9 @@ class SettingsViewModel(
               override fun onClick() {
                 showOptionsMenu(
                   options =
-                    listOf(
-                      FormattableString.from(
-                        R.string.settings_book_cover_type_square,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_book_cover_type_rect,
-                      ),
-                    ),
+                    BookCoverStyle.choices.map {
+                      FormattableString.from(it.choiceRes)
+                    },
                   title =
                     FormattableString.from(
                       R.string.settings_book_cover_type_label,
@@ -230,17 +242,15 @@ class SettingsViewModel(
                           formattableString is FormattableString.ResourceString,
                         )
 
-                        when (formattableString.stringRes) {
-                          R.string.settings_book_cover_type_rect -> {
-                            prefsRepo.bookCoverStyle = "Rectangle"
-                          }
-                          R.string.settings_book_cover_type_square -> {
-                            prefsRepo.bookCoverStyle = "Square"
-                          }
-                          else -> throw NoWhenBranchMatchedException(
-                            "Unknown book cover type",
-                          )
-                        }
+                        // Throws rather than silently ignoring, matching the refresh-rate
+                        // chooser below: the options come from BookCoverStyle.choices, so an
+                        // unrecognized resource here means a wiring mistake, not user input.
+                        val style =
+                          BookCoverStyle.ofChoice(formattableString.stringRes)
+                            ?: throw NoWhenBranchMatchedException(
+                              "Unknown item: ${formattableString.stringRes}",
+                            )
+                        prefsRepo.bookCoverStyle = style.stored
                         setBottomSheetVisibility(false)
                       }
                     },
@@ -504,26 +514,9 @@ class SettingsViewModel(
               override fun onClick() {
                 showOptionsMenu(
                   options =
-                    listOf(
-                      FormattableString.from(
-                        R.string.settings_jump_10_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_15_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_20_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_30_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_60_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_90_seconds,
-                      ),
-                    ),
+                    JumpInterval.choices.map {
+                      FormattableString.from(it.choiceRes)
+                    },
                   title =
                     FormattableString.from(
                       R.string.settings_jump_forward_title,
@@ -535,15 +528,10 @@ class SettingsViewModel(
                           formattableString is FormattableString.ResourceString,
                         )
                         prefsRepo.jumpForwardSeconds =
-                          when (formattableString.stringRes) {
-                            R.string.settings_jump_10_seconds -> 10L
-                            R.string.settings_jump_15_seconds -> 15L
-                            R.string.settings_jump_20_seconds -> 20L
-                            R.string.settings_jump_30_seconds -> 30L
-                            R.string.settings_jump_60_seconds -> 60L
-                            R.string.settings_jump_90_seconds -> 90L
-                            else -> 30L
-                          }
+                          JumpInterval.secondsOfChoice(
+                            formattableString.stringRes,
+                            orElse = JumpInterval.DEFAULT_FORWARD_SECONDS,
+                          )
                         setBottomSheetVisibility(false)
                       }
                     },
@@ -573,26 +561,9 @@ class SettingsViewModel(
               override fun onClick() {
                 showOptionsMenu(
                   options =
-                    listOf(
-                      FormattableString.from(
-                        R.string.settings_jump_10_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_15_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_20_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_30_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_60_seconds,
-                      ),
-                      FormattableString.from(
-                        R.string.settings_jump_90_seconds,
-                      ),
-                    ),
+                    JumpInterval.choices.map {
+                      FormattableString.from(it.choiceRes)
+                    },
                   title =
                     FormattableString.from(
                       R.string.settings_jump_backward_title,
@@ -604,15 +575,10 @@ class SettingsViewModel(
                           formattableString is FormattableString.ResourceString,
                         )
                         prefsRepo.jumpBackwardSeconds =
-                          when (formattableString.stringRes) {
-                            R.string.settings_jump_10_seconds -> 10L
-                            R.string.settings_jump_15_seconds -> 15L
-                            R.string.settings_jump_20_seconds -> 20L
-                            R.string.settings_jump_30_seconds -> 30L
-                            R.string.settings_jump_60_seconds -> 60L
-                            R.string.settings_jump_90_seconds -> 90L
-                            else -> 10L
-                          }
+                          JumpInterval.secondsOfChoice(
+                            formattableString.stringRes,
+                            orElse = JumpInterval.DEFAULT_BACKWARD_SECONDS,
+                          )
                         setBottomSheetVisibility(false)
                       }
                     },
