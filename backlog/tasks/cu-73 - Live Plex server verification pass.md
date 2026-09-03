@@ -393,7 +393,13 @@ janky frames and a 4950 ms 90th-percentile frame.
       Original text: Rotate the server's token
       (reset `PlexOnlineToken`, or re-claim the server) while the app holds a stale one,
       then play something. The 401 should be invisible: refreshed and retried, no message.
-- [!] **cu-10 — an invalidated account token degrades honestly.** — **RUN 2026-09-02, session 4.
+- [x] **cu-10 — an invalidated account token degrades honestly.** — **RUN 2026-09-02, session 4.
+      **RESOLVED 2026-09-03 by [[cu-123]] / [[cu-122]] (decision-17).** The missing piece was the
+      notification: `account_signed_out` is now surfaced as an indefinite Snackbar with a
+      SIGN IN AGAIN action, a revoked account keeps `LOGGED_IN_FULLY` so there is no login wall
+      and no `plexConfig.clear()`, and the device-revocation case is detected proactively.
+      Verified on device in both directions. Everything else in this item already passed.
+
       Four of five criteria pass; the message does not appear. Filed as [[DRAFT-123]].**
 
       Password changed with "sign out connected devices", both devices watched from a cleared log.
@@ -685,7 +691,7 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
 
 ### Sync drift (cu-14)
 
-- [ ] **A second device's position is adopted.** — **The session-4 "FAILS" verdict is RETRACTED
+- [x] **A second device's position is adopted.** — **The session-4 "FAILS" verdict is RETRACTED
       (2026-09-03): the measurement was flawed, and nothing is known to be broken.** The phone's
       position was read from a copy of `track_db` **without its `-wal`**, and Room runs in WAL mode,
       so the read reported stale data. With the WAL the same device held **14768 ms** and a
@@ -854,7 +860,13 @@ into "the symptom is gone".
       are reasoned starting points, **not measured** — this check is what sets them. Use a
       quiet-voiced narrator and check chapter boundaries as well as mid-sentence pauses. Expect to
       revise the constants.
-- [!] **An expired token is noticed and recoverable** ([[cu-84]]). — **RUN 2026-09-02, session 4.
+- [x] **An expired token is noticed and recoverable** ([[cu-84]]). — **RUN 2026-09-02, session 4.
+      **RESOLVED 2026-09-03 by [[cu-123]] / [[cu-122]] (decision-17).** The missing piece was the
+      notification: `account_signed_out` is now surfaced as an indefinite Snackbar with a
+      SIGN IN AGAIN action, a revoked account keeps `LOGGED_IN_FULLY` so there is no login wall
+      and no `plexConfig.clear()`, and the device-revocation case is detected proactively.
+      Verified on device in both directions. Everything else in this item already passed.
+
       "Noticed" FAILS; "recoverable" untested as a consequence. Filed as [[DRAFT-123]].**
 
       Same run as the cu-10 item above. The app does **not** say the login expired — it shows the

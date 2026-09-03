@@ -1,7 +1,7 @@
 ---
 id: DRAFT-117
 title: A second cause of main-thread saturation during playback
-status: Done
+status: Draft
 assignee: []
 labels: [R1, performance, bug, trust]
 dependencies: [cu-110]
@@ -10,6 +10,11 @@ milestone: m-1
 ---
 
 ## Description
+
+> **Frontmatter correction, 2026-09-03: this was marked `status: Done` while every acceptance
+> criterion is unticked and no fix has shipped.** The mislabelling arrived with `54ca95e` and made
+> the only remaining R1 item look finished. Corrected to `Draft`; the work below is still to do.
+
 
 Found by finally *measuring* [[cu-110]] on a device (2026-09-02), once the audio fixture was long
 enough for playback to sustain. cu-110's mechanism is fixed — zero Home-shelf recomputes in a 30 s
