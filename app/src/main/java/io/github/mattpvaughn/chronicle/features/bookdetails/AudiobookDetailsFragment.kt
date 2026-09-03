@@ -22,6 +22,7 @@ import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Chapter
+import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus
@@ -40,6 +41,45 @@ import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
 class AudiobookDetailsFragment : Fragment() {
+  /**
+   * The narrator and series lines, shown only when there is something to say (cu-145).
+   *
+   * Each row is `gone` in XML and un-hidden here, rather than shown-and-blanked: cu-24 learns
+   * narrator and series only for books the user has opened, and cu-146 leaves the series position
+   * unknown wherever the tagging carried no number — so most books are missing one or both today.
+   * An empty "Narrated by" line states the book has no narrator, which is a wrong claim rather
+   * than a missing one.
+   *
+   * The series line navigates into the browse facet for that series, which cu-24 already built;
+   * the tap target is only attached when there is a series to reach, so a dead row cannot ripple.
+   */
+  private fun bindMetadataLines(
+    binding: FragmentAudiobookDetailsBinding,
+    book: Audiobook?,
+  ) {
+    val narrator = book?.let { BookMetadataLines.narrator(it) }
+    binding.narrator.isVisible = narrator != null
+    if (narrator != null) {
+      binding.narrator.text = getString(R.string.book_narrated_by, narrator)
+    }
+
+    val series = book?.let { BookMetadataLines.series(it) }
+    binding.series.isVisible = series != null
+    if (series != null && book != null) {
+      binding.series.text = series
+      // Spoken as an action, since it is tappable and the text alone reads as a label (cu-149's
+      // lesson: a control's label must say what a tap does).
+      binding.series.contentDescription = getString(R.string.book_series_browse, book.series)
+      binding.series.setOnClickListener {
+        navigator.showFacetBooks(FacetKind.Series, book.series)
+      }
+    } else {
+      // Clear the listener rather than leaving a stale one on a recycled view.
+      binding.series.setOnClickListener(null)
+      binding.series.isClickable = false
+    }
+  }
+
   companion object {
     fun newInstance() = AudiobookDetailsFragment()
 
@@ -105,6 +145,7 @@ class AudiobookDetailsFragment : Fragment() {
     viewModel.audiobook.observe(viewLifecycleOwner) { book ->
       binding.bookTitle.text = book?.title.orEmpty()
       binding.author.text = book?.author.orEmpty()
+      bindMetadataLines(binding, book)
       binding.infoSummary.text = book?.summary.orEmpty()
       binding.detailsArtwork.contentDescription = book?.title.orEmpty()
       bindImageRounded(

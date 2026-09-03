@@ -121,12 +121,58 @@ xmlns:tools="http://schemas.android.com/tools"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:lines="1"
-                    app:layout_constraintBottom_toBottomOf="@id/play_button_container"
+                    app:layout_constraintBottom_toTopOf="@id/narrator"
                     app:layout_constraintLeft_toLeftOf="@id/book_title"
                     app:layout_constraintRight_toRightOf="@id/book_title"
                     app:layout_constraintTop_toBottomOf="@id/book_title"
-                    app:layout_constraintVertical_chainStyle="packed"
                     tools:text="Author name won't overflow" />
+
+                <!--
+                  Narrator and series (cu-145). cu-24 has stored both since it landed and nothing
+                  showed them on the book itself — the data reached the browse screen and the
+                  search results and never the page about the book.
+
+                  Both are `gone` in XML, not `visible`: cu-24 fills them in only for books the
+                  user has opened and cu-146 leaves the series position unknown wherever the
+                  tagging carried no number, so *most* books have one or both missing until cu-143
+                  seeds the index. The fragment un-hides each only when there is something to say —
+                  a blank "Narrated by" line claims the book has no narrator, which is a wrong
+                  statement rather than a missing one. `gone` is also what stops the row flashing
+                  its default for a frame before the observer runs (cu-58).
+
+                  They join the packed chain between the author and the play button, so the whole
+                  block stays vertically centred whether zero, one or both are showing.
+                -->
+                <TextView
+                    android:id="@+id/narrator"
+                    style="@style/TextAppearance.Body2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:lines="1"
+                    android:textColor="@color/textSecondary"
+                    android:visibility="gone"
+                    app:layout_constraintBottom_toTopOf="@id/series"
+                    app:layout_constraintLeft_toLeftOf="@id/book_title"
+                    app:layout_constraintRight_toRightOf="@id/book_title"
+                    app:layout_constraintTop_toBottomOf="@id/author"
+                    tools:text="Narrated by Michael Kramer"
+                    tools:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/series"
+                    style="@style/TextAppearance.Body2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:lines="1"
+                    android:textColor="@color/textSecondary"
+                    android:visibility="gone"
+                    app:layout_constraintBottom_toBottomOf="@id/play_button_container"
+                    app:layout_constraintLeft_toLeftOf="@id/book_title"
+                    app:layout_constraintRight_toRightOf="@id/book_title"
+                    app:layout_constraintTop_toBottomOf="@id/narrator"
+                    tools:text="Mistborn, Book 2"
+                    tools:visibility="visible" />
 
                 <FrameLayout
                     android:id="@+id/play_button_container"

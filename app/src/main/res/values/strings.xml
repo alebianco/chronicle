@@ -166,6 +166,10 @@
     <!-- Shown instead of a chapter count when the book reports no chapters. -->
     <string name="player_no_chapters">No chapters</string>
 
+    <!-- Book detail metadata lines (cu-145). -->
+    <string name="book_narrated_by">Narrated by %1$s</string>
+    <string name="book_series_browse">Browse the %1$s series</string>
+
     <string name="browse_title">Browse</string>
     <string name="browse_by_author">Author</string>
     <string name="browse_by_narrator">Narrator</string>
