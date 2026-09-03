@@ -292,6 +292,73 @@ class RoomSchemaTest {
   }
 
   /**
+   * The v11 -> v12 migration rescales `seriesIndex` to hundredths (cu-146).
+   *
+   * No column changes — the exported v11 and v12 schemas have identical columns and even the same
+   * `identityHash`, since Room hashes the schema rather than the version. So this migration is
+   * *only* a data rewrite, and nothing but this test can catch it being wrong: a v11 row holding
+   * `2` for book two would read as 0.02 afterwards and sort before every correctly-parsed book.
+   *
+   * The unknown sentinel must be left alone, because zero means "no position" in both units and
+   * multiplying it would be a silent no-op that later reads as a real position if the unit changed
+   * again.
+   */
+  @Test
+  fun `the book database rescales a series index when migrating from v11`() {
+    val db =
+      migrated(
+        klass = BookDatabase::class.java,
+        oldVersion = 11,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook` (`id` TEXT NOT NULL, " +
+            "`source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, " +
+            "`author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, " +
+            "`genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, " +
+            "`addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+            "`lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, " +
+            "`isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, " +
+            "`favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, " +
+            "`leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, " +
+            "`chapters` TEXT NOT NULL, `playbackSpeed` REAL NOT NULL, " +
+            "`narrator` TEXT NOT NULL, `series` TEXT NOT NULL, " +
+            "`seriesIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        seedSql =
+          "INSERT INTO Audiobook (id, source, title, titleSort, author, thumb, parentId, " +
+            "genre, summary, year, addedAt, updatedAt, lastViewedAt, duration, isCached, " +
+            "progress, favorited, viewedLeafCount, leafCount, viewCount, chapters, " +
+            "playbackSpeed, narrator, series, seriesIndex) " +
+            "VALUES ('1001', 1, 'Well of Ascension', 'Mistborn, Book 2', 'Sanderson', '', '0', " +
+            "'', '', 2007, 0, 0, 1700000000000, 3600000, 1, 1234567, 0, 0, 3, 0, '', 0, " +
+            "'Michael Kramer', 'Mistborn', 2), " +
+            "('1002', 1, 'Standalone', 'Standalone', 'Someone', '', '0', " +
+            "'', '', 2001, 0, 0, 0, 3600000, 0, 0, 0, 0, 1, 0, '', 0, '', '', 0)",
+        migrations = BOOK_MIGRATIONS,
+      )
+
+    db.query("SELECT id, seriesIndex, narrator, progress FROM Audiobook ORDER BY id", emptyArray())
+      .use { cursor ->
+        assertTrue("the pre-existing row must survive the upgrade", cursor.moveToFirst())
+        assertEquals("1001", cursor.getString(0))
+        assertEquals(
+          "book two must land on 200, not stay at 2 — a stale value sorts before book one",
+          2 * Audiobook.SERIES_INDEX_SCALE,
+          cursor.getInt(1),
+        )
+        assertEquals("the rescale must not disturb other columns", "Michael Kramer", cursor.getString(2))
+        assertEquals(1_234_567L, cursor.getLong(3))
+
+        assertTrue(cursor.moveToNext())
+        assertEquals("1002", cursor.getString(0))
+        assertEquals(
+          "an unknown position must stay unknown, not become a real one",
+          Audiobook.NO_SERIES_INDEX,
+          cursor.getInt(1),
+        )
+      }
+    db.close()
+  }
+
+  /**
    * Creates a database file at an old schema, opens it through Room at the current version, and
    * hands back the opened database so a test can assert the rows survived.
    *

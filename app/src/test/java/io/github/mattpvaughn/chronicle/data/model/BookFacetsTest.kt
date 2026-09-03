@@ -224,34 +224,15 @@ class BookFacetsTest {
   }
 
   // ---- the titleSort index parse ----
+  //
+  // The parser's own cases live in SeriesIndexParserTest (cu-146), which covers the real-world
+  // formats and the hundredths unit. Kept here is only what BookFacets itself depends on: that an
+  // unknown position is the zero sentinel, since inSeriesOrder keys on exactly that.
 
   @Test
-  fun `a series index is read out of titleSort`() {
-    assertEquals(2, Audiobook.seriesIndexFromTitleSort("Mistborn, Book 2"))
-    assertEquals(2, Audiobook.seriesIndexFromTitleSort("Mistborn, Bk 2"))
-    assertEquals(2, Audiobook.seriesIndexFromTitleSort("Mistborn #2"))
-    assertEquals(2, Audiobook.seriesIndexFromTitleSort("Mistborn, 2"))
-    assertEquals(10, Audiobook.seriesIndexFromTitleSort("Mistborn, Book 10"))
-  }
-
-  @Test
-  fun `a titleSort with no index yields zero`() {
-    assertEquals(0, Audiobook.seriesIndexFromTitleSort("Mistborn"))
-    assertEquals(0, Audiobook.seriesIndexFromTitleSort(""))
-  }
-
-  /**
-   * Anchored to the end deliberately: a series name containing a number must not be mistaken for
-   * the position.
-   */
-  @Test
-  fun `a number inside the series name is not the index`() {
-    assertEquals(5, Audiobook.seriesIndexFromTitleSort("Book 2 of the Saga, Book 5"))
-    assertEquals(
-      "a leading number with no trailing one is not a position",
-      0,
-      Audiobook.seriesIndexFromTitleSort("2001: A Space Odyssey"),
-    )
+  fun `a titleSort with no index yields the unknown sentinel`() {
+    assertEquals(Audiobook.NO_SERIES_INDEX, Audiobook.seriesIndexFromTitleSort("Mistborn"))
+    assertEquals(Audiobook.NO_SERIES_INDEX, Audiobook.seriesIndexFromTitleSort(""))
   }
 
   // ---- surviving a library refresh ----

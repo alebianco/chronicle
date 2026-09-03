@@ -99,7 +99,7 @@ fun List<Audiobook>.booksInFacet(
  */
 fun List<Audiobook>.inSeriesOrder(): List<Audiobook> =
   sortedWith(
-    compareBy<Audiobook> { if (it.seriesIndex == 0) Int.MAX_VALUE else it.seriesIndex }
+    compareBy<Audiobook> { if (it.seriesIndex == Audiobook.NO_SERIES_INDEX) Int.MAX_VALUE else it.seriesIndex }
       .thenBy(
         Comparator { left, right -> BookSortComparators.compareTitlesNaturally(left, right) },
       ) { it.titleSort.ifEmpty { it.title } },

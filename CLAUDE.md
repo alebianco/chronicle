@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **1008 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1039 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -109,7 +109,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Five separate Room databases** (`BookDatabase` v11, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
+- **Five separate Room databases** (`BookDatabase` v12, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
 - **Listening position is owned by the *tracks*, never the book** (decision-16, cu-90). Plex stores
   no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a cache of a derivation.
   `merge` carries the local value and **never** adopts `network.progress`; only `syncAudiobook`,
@@ -362,7 +362,25 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   network value when it has one, the local value when it does not: preferring the network blanks a
   narrator on every refresh, preferring the local one makes a re-tagged book uncorrectable.
   `Audiobook.seriesIndex` is parsed from `titleSort`, **not** Plex's `index`, which is the album
-  ordering index and is 1 for nearly every audiobook.
+  ordering index and is 1 for nearly every audiobook — and **not** from `Mood`, which carries the
+  series name without a number.
+- **The series index is parsed from anywhere in `titleSort`, in hundredths** (cu-146). The parser
+  was **end-anchored** and both dominant taggers put the number at the *front* — Audnexus writes
+  `"<Series>, Book <n> - <Title>"`, seanap prescribes `"<Series> <n> - <Title>"` — so it read
+  **1 of 8** real formats, the one being our own fixture, which happened to end with the number
+  (the cu-24 fixture trap in a new field). `SERIES_INDEX_PATTERNS` now holds seven patterns tried
+  **most specific first**, and that order is load-bearing: `audnexus` must precede `label-first`
+  or `"Book 2 of the Saga, Book 5"` reads 2, which is exactly what the old anchoring protected.
+  Values are **hundredths** (`SERIES_INDEX_SCALE`, so book 2 is `200`) because a novella genuinely
+  sits at 1.5 — but they stay `Int`, because `NO_SERIES_INDEX` (0) is compared for equality and
+  float equality against a sentinel is unreliable. The column stays `INTEGER`, so v11→v12 changes
+  **no shape** — the exported schemas differ only by version and share an `identityHash`, since
+  Room hashes the schema, not the version. The migration rescales *data*, and nothing but
+  `RoomSchemaTest`'s v11 case can catch it being wrong. Two forms the old parser accepted
+  (`"Mistborn, Bk 2"`, `"Mistborn, 2"`) were silently dropped when un-anchoring and restored after
+  `BookFacetsTest` failed — don't remove `Bk` or the loosest `comma-trail` pattern. `Book 0` reads
+  as **unknown** on purpose (0 is the sentinel), so a prequel numbered zero sorts last; a test says
+  so.
 - **A tag list's `@Json` name must be checked against a captured response, not a fixture** (cu-24).
   `plexGenres` carried **no** `@Json(name = "Genre")` for the life of the project, so Moshi looked
   for a key literally called `plexGenres` and `Audiobook.genre` was empty against every real

@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.testing
 
 import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.UsersResponse
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
@@ -357,14 +358,26 @@ class PlexFixtureContractTest {
     }
   }
 
-  /** And the series position, which is what orders a series list. */
+  /**
+   * And the series position, which is what orders a series list.
+   *
+   * Stored in hundredths since cu-146, so book 1 is 100 — expressed through the scale here rather
+   * than as a literal, because a bare `100` reads as book one hundred.
+   */
   @Test
   fun `album detail fixtures carry a series position`() {
-    assertEquals(1, container("album-1001.json").plexMediaContainer.asAudiobooks().single().seriesIndex)
-    assertEquals(1, container("album-1002.json").plexMediaContainer.asAudiobooks().single().seriesIndex)
+    val scale = Audiobook.SERIES_INDEX_SCALE
+    assertEquals(
+      1 * scale,
+      container("album-1001.json").plexMediaContainer.asAudiobooks().single().seriesIndex,
+    )
+    assertEquals(
+      1 * scale,
+      container("album-1002.json").plexMediaContainer.asAudiobooks().single().seriesIndex,
+    )
     assertEquals(
       "double digits, so a string sort would put this before book 2",
-      10,
+      10 * scale,
       container("album-1003.json").plexMediaContainer.asAudiobooks().single().seriesIndex,
     )
   }

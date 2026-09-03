@@ -108,6 +108,24 @@ data class Audiobook(
      */
     const val MIN_VALID_SPEED = 0.5f
 
+    /**
+     * [seriesIndex] value meaning "no position known".
+     *
+     * Zero is not a series position — books are numbered from one — so it is unambiguous. Callers
+     * sort it **last**: an unnumbered extra belongs at the end of a series, not before book one.
+     */
+    const val NO_SERIES_INDEX = 0
+
+    /**
+     * The unit [seriesIndex] is stored in: hundredths of a book (cu-146).
+     *
+     * So book 2 is `200` and the novella at 1.5 is `150`. Hundredths rather than whole numbers
+     * because a fractional position is real — Audnexus writes `Book 1.5` — and rather than a
+     * `Float` because [NO_SERIES_INDEX] is compared for equality, which floats do not do reliably,
+     * and because the Room column stays `INTEGER` either way.
+     */
+    const val SERIES_INDEX_SCALE = 100
+
     fun from(dir: PlexDirectory) =
       Audiobook(
         id = dir.ratingKey,
@@ -139,26 +157,114 @@ data class Audiobook(
       )
 
     /**
-     * The book's position in its series, parsed out of `titleSort`.
+     * The book's position in its series, in hundredths, or 0 when none can be read.
      *
-     * The Audnexus convention writes `"<Series>, Book <n>"` there. Plex's own `index` field is the
-     * album's ordering index and is 1 for nearly every audiobook, so it cannot be used for this —
-     * a facet list ordered by it would put every book first.
+     * **There is no numeric series field in Plex.** Album `index` is 1 on essentially every
+     * audiobook (it is the album-ordering index), `parentIndex` is a *track's* disc number, and the
+     * `Mood` tag carries the series name without a number. So this string, written by whichever
+     * tagger the user ran, is the only carrier — and it is on the *listing* as well as the detail
+     * response, unlike `Style`/`Mood` (cu-24), so it costs no extra request.
      *
-     * Returns 0 when no position can be read, which sorts before any real one and lets the caller
-     * fall back to the numeric-aware title comparator.
+     * Read in **hundredths** ([SERIES_INDEX_SCALE]) rather than whole numbers because a novella
+     * genuinely sits at 1.5 — Audnexus' own volume regex admits `1.5`, `1-3` and `4+` — and an
+     * `Int` truncating that to 1 would collide with book one. Hundredths keep the value exact while
+     * remaining an integer compare, which matters because **0 is the "unknown" sentinel** and float
+     * equality against a sentinel is not reliable. The column stays `INTEGER`, so this is a unit
+     * change rather than a type change.
+     *
+     * Returns 0 when nothing can be read, which callers sort **last** — an unnumbered extra belongs
+     * at the end of a series, not in front of book one (see [inSeriesOrder]).
      */
-    internal fun seriesIndexFromTitleSort(titleSort: String): Int =
-      SERIES_INDEX_PATTERN.find(titleSort)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    internal fun seriesIndexFromTitleSort(titleSort: String): Int {
+      for (pattern in SERIES_INDEX_PATTERNS) {
+        val match = pattern.find(titleSort) ?: continue
+        val position = match.groupValues[1].toDoubleOrNull() ?: continue
+        // Reject a non-positive or out-of-range match and keep looking with the looser patterns.
+        // `position <= 0` also means a literal `Book 0` reads as *unknown*: a series that numbers
+        // its prequel zero therefore sorts it last rather than first. Distinguishing "known to be
+        // zero" from "unknown" needs a second state, since 0 is the sentinel, and that is not worth
+        // a nullable column for a rare tagging choice — `SeriesIndexParserTest` pins the behaviour
+        // so it reads as a decision rather than a bug.
+        if (position <= 0.0 || position >= 1000.0) continue
+        return Math.round(position * SERIES_INDEX_SCALE).toInt()
+      }
+      return NO_SERIES_INDEX
+    }
 
     /**
-     * `Book 3`, `Bk 3`, `#3`, or a bare `, 3` at the end.
+     * The formats real taggers write, **most specific first**.
      *
-     * Deliberately anchored to the *end* of the string: a series whose own name contains a number
-     * ("Book 2 of the Fixture Saga, Book 5") must take the trailing one.
+     * Order is load-bearing, not cosmetic. [SERIES_INDEX_AUDNEXUS] must precede
+     * [SERIES_INDEX_LABEL_FIRST] so that `"Book 2 of the Fixture Saga, Book 5"` reads 5 and not 2 —
+     * a series whose own *name* contains a number was the reason the previous parser anchored to
+     * the end of the string, and preferring the comma-plus-label form is what keeps that protection
+     * without the anchor.
+     *
+     * The previous parser *was* end-anchored, and both dominant taggers put the number at the
+     * front, so it read **1 of 8** real formats — the one being our own fixture, which happened to
+     * end with the number.
      */
-    private val SERIES_INDEX_PATTERN =
-      Regex("(?:book|bk|#|,)\\s*(\\d+)\\s*$", RegexOption.IGNORE_CASE)
+    private val SERIES_INDEX_PATTERNS by lazy {
+      listOf(
+        SERIES_INDEX_AUDNEXUS,
+        SERIES_INDEX_LABEL_FIRST,
+        SERIES_INDEX_LABEL_MID,
+        SERIES_INDEX_HASH,
+        SERIES_INDEX_SEANAP,
+        SERIES_INDEX_NUM_FIRST,
+        SERIES_INDEX_COMMA_TRAIL,
+      )
+    }
+
+    /** One to three digits, optionally with up to two decimal places. */
+    private const val SERIES_NUMBER = """\d{1,3}(?:\.\d{1,2})?"""
+
+    /**
+     * `Mistborn, Book 2 - The Well of Ascension` — what Audnexus generates.
+     *
+     * Also accepts an omnibus (`Book 1-3`) or an open range (`Book 4+`), taking the **first** book:
+     * a collection containing books one to three belongs where book one does.
+     */
+    private val SERIES_INDEX_AUDNEXUS =
+      Regex(
+        """^.+?,\s*(?:Book|Bk\.?|Vol\.?|Volume)\s+($SERIES_NUMBER)(?:\s*[-+]\s*\d{1,3})?\b(?:\s*-\s*|\s*$)""",
+        RegexOption.IGNORE_CASE,
+      )
+
+    /** `Book 5: Sourcery: Discworld` — the label opens the string. */
+    private val SERIES_INDEX_LABEL_FIRST =
+      Regex("""^(?:Vol\.?|Volume|Book|Bk\.?)\s*($SERIES_NUMBER)\b(?:\s*[-.:]\s*|\s+)""", RegexOption.IGNORE_CASE)
+
+    /** `1994 - Book 1 - Wizards First Rule` — a label after a leading year or author. */
+    private val SERIES_INDEX_LABEL_MID =
+      Regex("""(?:\s|^)[-–]\s*(?:Vol\.?|Volume|Book|Bk\.?)\s*($SERIES_NUMBER)\b""", RegexOption.IGNORE_CASE)
+
+    /** `Stormlight Archive #4`, `Book Title (Mistborn #2)` — the Goodreads/Audible display form. */
+    private val SERIES_INDEX_HASH =
+      Regex("""[(\[]?\s*[^()\[\]#]+?\s*#($SERIES_NUMBER)\s*[)\]]?""")
+
+    /** `Expanse 1 - Leviathan Wakes` — what seanap's guide prescribes. */
+    private val SERIES_INDEX_SEANAP =
+      Regex("""^.+?\s+($SERIES_NUMBER)\s*-\s+""")
+
+    /**
+     * `01 - Book Title`, `1. Wizards First Rule` — an Audiobookshelf-shaped tree, where the series
+     * name is the parent folder and never reaches the string.
+     *
+     * The separator is required, which is what stops `101 Dalmatians` being read as book 101.
+     */
+    private val SERIES_INDEX_NUM_FIRST =
+      Regex("""^($SERIES_NUMBER)\s*(?:-\s+|\.\s+)""")
+
+    /**
+     * `Mistborn, 2` — a trailing bare number after a comma, with no label.
+     *
+     * Last, because it is the loosest: it must not win over a labelled form elsewhere in the
+     * string. Kept because the previous parser accepted it, and dropping a form it handled would
+     * be a regression — `BookFacetsTest` caught exactly that during this change.
+     */
+    private val SERIES_INDEX_COMMA_TRAIL =
+      Regex("""^.+?,\s*($SERIES_NUMBER)\s*$""")
 
     /**
      * Merges updated local fields with a network copy of the book. Respects network metadata
@@ -209,7 +315,7 @@ data class Audiobook(
           playbackSpeed = local.playbackSpeed,
           narrator = network.narrator.ifEmpty { local.narrator },
           series = network.series.ifEmpty { local.series },
-          seriesIndex = if (network.seriesIndex != 0) network.seriesIndex else local.seriesIndex,
+          seriesIndex = if (network.seriesIndex != NO_SERIES_INDEX) network.seriesIndex else local.seriesIndex,
         )
       } else {
         network.copy(
@@ -223,7 +329,7 @@ data class Audiobook(
           playbackSpeed = local.playbackSpeed,
           narrator = network.narrator.ifEmpty { local.narrator },
           series = network.series.ifEmpty { local.series },
-          seriesIndex = if (network.seriesIndex != 0) network.seriesIndex else local.seriesIndex,
+          seriesIndex = if (network.seriesIndex != NO_SERIES_INDEX) network.seriesIndex else local.seriesIndex,
         )
       }
     }

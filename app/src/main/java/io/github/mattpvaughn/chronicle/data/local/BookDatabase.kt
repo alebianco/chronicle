@@ -133,6 +133,29 @@ val BOOK_MIGRATION_10_11 =
   }
 
 /**
+ * Rescales `seriesIndex` from whole books to hundredths (cu-146).
+ *
+ * The column stays `INTEGER` — this is a *unit* change, not a type change — so no column is added
+ * or altered and the exported schema is identical apart from its version. The migration exists
+ * anyway because rows written by v11 hold `2` for book two, which reads as 0.02 in the new unit:
+ * a stale row would sort before every correctly-parsed book instead of in its place.
+ *
+ * `Audiobook.from` recomputes the value from `titleSort` on every fetch, so a library refresh would
+ * heal these on its own — but not until one happens, and the wrong order is visible immediately.
+ *
+ * Rows at [Audiobook.NO_SERIES_INDEX] are left alone: zero means "unknown" in both units.
+ */
+val BOOK_MIGRATION_11_12 =
+  object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL(
+        "UPDATE Audiobook SET seriesIndex = seriesIndex * ${Audiobook.SERIES_INDEX_SCALE} " +
+          "WHERE seriesIndex != ${Audiobook.NO_SERIES_INDEX}",
+      )
+    }
+  }
+
+/**
  * Every migration, in order, as one list.
  *
  * Named rather than inlined into the builder so a test can open a real database file at an older
@@ -151,9 +174,10 @@ val BOOK_MIGRATIONS =
     BOOK_MIGRATION_8_9,
     BOOK_MIGRATION_9_10,
     BOOK_MIGRATION_10_11,
+    BOOK_MIGRATION_11_12,
   )
 
-@Database(entities = [Audiobook::class], version = 11, exportSchema = true)
+@Database(entities = [Audiobook::class], version = 12, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract val bookDao: BookDao
 }
