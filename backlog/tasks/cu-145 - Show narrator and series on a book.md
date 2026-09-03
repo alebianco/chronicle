@@ -48,7 +48,7 @@ nothing composed" failure §3.1 diagnoses.
 - [x] Tests for the "known", "series without index" and "neither known" states
 - [x] Contributes no new per-second work to the player (cu-110)
 
-## Implementation Notes
+## Background
 
 Filed out of cu-25. Two things worth knowing before starting:
 
