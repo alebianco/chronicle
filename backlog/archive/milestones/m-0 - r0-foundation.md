@@ -16,7 +16,7 @@ derived from **task files**, so once they move the milestone reports **0/0** and
 fix, and is why the count below is recorded here by hand.
 
 The tasks themselves are not lost: `backlog task cu-<n>` still resolves and `grep -r` across
-`backlog/` still finds them. Only `backlog search` skips `completed/`.
+`backlog/` still finds them. Only `backlog search` skips `completed/` — tracked upstream as [Backlog.md#825](https://github.com/MrLesk/Backlog.md/issues/825).
 
 ## Closed 2026-08-31 — 15/15 tasks Done
 

@@ -24,4 +24,4 @@ flips *both* at once.
 
 The tasks are not lost: `backlog task cu-<n>` still resolves, `grep -r` across `backlog/` still
 finds them, and wiki-links from live tasks still point at real files. Only `backlog search` skips
-`completed/`.
+`completed/` — tracked upstream as [Backlog.md#825](https://github.com/MrLesk/Backlog.md/issues/825), so the gap is expected to close.

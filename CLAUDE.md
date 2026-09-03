@@ -256,7 +256,10 @@ Tasks are markdown files in **`backlog/tasks/`** (Backlog.md format: `task-<id> 
   file before archiving, since the CLI can no longer compute it.
   Completed tasks stay inside `backlog/` and in git — `backlog task cu-<n>` still resolves and
   `grep -r` still finds them, which is how the gotchas above cite tasks. The one cost is that
-  **`backlog search` does not index `completed/`**.
+  **`backlog search` does not index `completed/`** — tracked upstream as
+  [Backlog.md#825](https://github.com/MrLesk/Backlog.md/issues/825), so this is a known gap with a fix requested rather than a permanent
+  limitation. Until it lands, reach a completed task by id (`backlog task cu-<n>`) or by
+  `grep -r`, which is how the gotchas above cite tasks anyway.
   **A colon in a `title:` must be quoted** (`title: "Toolchain bump: SDK 36"`). An unquoted one
   breaks YAML parsing and the task becomes invisible to *every* CLI operation — `backlog task
   <id>` reports "not found" while the file sits in place. Nine files had this, four of them
