@@ -1,8 +1,10 @@
 ---
-id: DRAFT-132
+id: cu-132
 title: Finish the live verification items cu-73 could not complete
-status: Draft
+status: To Do
 assignee: []
+created_date: '2026-09-03'
+updated_date: '2026-09-03'
 labels: [R2, verification, agentic]
 dependencies: []
 priority: medium

@@ -121,4 +121,4 @@ is asserted to be `(discNumber, index)`, never list order.
 
 **Left open:** end-to-end confirmation on the live server with a real multi-track book. The SQL and
 the wiring are verified, but the full seek → refresh → position-holds loop was not re-run on device
-because the tablet became unreachable. Carried in [[DRAFT-132]].
+because the tablet became unreachable. Carried in [[cu-132]].

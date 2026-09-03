@@ -1,8 +1,10 @@
 ---
-id: DRAFT-117
+id: cu-117
 title: A second cause of main-thread saturation during playback
-status: Draft
+status: To Do
 assignee: []
+created_date: '2026-09-03'
+updated_date: '2026-09-03'
 labels: [R2, performance, bug]
 dependencies: [cu-110]
 priority: high

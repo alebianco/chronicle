@@ -38,8 +38,24 @@ connection selection.
 
 ## Checklist
 
-> **Closed 2026-09-03.** `[x]` verified · `[!]` failed and filed · `[>]` carried to
-> [[DRAFT-132]], which holds the exact remainder of each. **43 verified, 1 failed, 7 carried.**
+> **Closed 2026-09-03.** `[x]` verified · `[!]` failed and filed · `[>]` carried.
+> **43 verified, 1 failed, 7 carried.**
+>
+> **Where the carried items went — nothing lives only in this closed file:**
+>
+> | carried item | now tracked as |
+> |---|---|
+> | `FAILED` download retried on next launch | [[cu-132]] |
+> | network switch Wi-Fi ↔ cellular | [[cu-132]] |
+> | cu-64 seek over a real range request (ExoPlayer side) | [[cu-132]] |
+> | chapter highlight — jump to a chapter in a later file | [[cu-132]] |
+> | chapter title across a boundary — mini-player half | [[cu-132]] |
+> | previous-chapter threshold — go-back half | [[cu-132]] |
+> | which media session owns the card | [[cu-89]] |
+>
+> The one genuine failure is fixed: [[cu-131]]. `cu-132` is a **task**, not a draft, so it appears
+> on the board — a draft would only have been visible to `backlog draft list`, which is how
+> deferred work gets lost.
 
 
 Grouped by what breaks if the real server disagrees.
@@ -1800,7 +1816,7 @@ Each looked like a defect and would have been filed as one on the evidence first
 
 ### Method rules this pass produced
 
-Recorded in [[DRAFT-132]] in full; the load-bearing ones:
+Recorded in [[cu-132]] in full; the load-bearing ones:
 
 - Do not build sync fixtures by editing the database.
 - Read Room databases with their `-wal`, or `run-as … sqlite3` on the device.
@@ -1814,5 +1830,6 @@ Recorded in [[DRAFT-132]] in full; the load-bearing ones:
 None of the seven is a known defect: each is a *half* of an item whose other half passed, or a
 check whose method got in the way — one needs a SIM, one needs USB adb rather than Wi-Fi adb, and
 two already have their own tasks ([[cu-89]], [[cu-74]]). Keeping the pass open for them would keep
-a large task open on work that is better tracked where it belongs. [[DRAFT-132]] carries the exact
-remainder of each rather than a vague "finish cu-73".
+a large task open on work that is better tracked where it belongs. [[cu-132]] carries the exact
+remainder of each rather than a vague "finish cu-73" — **as a task, not a draft**, so it is on the
+board rather than in a triage queue nobody opens.

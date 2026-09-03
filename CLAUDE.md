@@ -246,7 +246,14 @@ Tasks are markdown files in **`backlog/tasks/`** (Backlog.md format: `task-<id> 
 
 **Docs map** (everything non-code is under `backlog/` — see `backlog/README.md`):
 - `backlog/tasks/` — the work (one file per task). `backlog/drafts/` — uncommitted ideas awaiting owner
-  triage. **A draft's `id` must use the `DRAFT-<n>` prefix**, not `cu-<n>`: Backlog.md keys its drafts
+  triage.
+  **Deferred work is not a draft.** A draft is an *idea nobody has committed to*; work that was
+  started, scoped and then postponed is a **task** with `status: To Do`. The difference matters
+  mechanically: `backlog board` and `backlog task list` show tasks, while drafts surface only in
+  `backlog draft list`, so a deferred item filed as a draft and linked from a **closed** task is
+  invisible in every normal view — which is exactly how it gets lost (cu-73/cu-132). When closing a
+  task with unfinished items, promote the remainder to a task and list in the closing notes *where
+  each item went*. **A draft's `id` must use the `DRAFT-<n>` prefix**, not `cu-<n>`: Backlog.md keys its drafts
   view on that prefix, not on the directory or on `status: Draft`, so a draft filed as `cu-<n>` is
   invisible in the board and to `backlog draft list`. Keep `<n>` from the cu number it will take, and
   `backlog draft promote DRAFT-<n>` turns it back into a `cu-` task on promotion.
