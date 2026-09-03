@@ -323,11 +323,13 @@ class MediaPlayerService :
   override fun broadcastUpdate(
     sleepTimerAction: SleepTimerAction,
     durationMillis: Long,
+    isActive: Boolean,
   ) {
     val broadcastIntent =
       Intent(SleepTimer.ACTION_SLEEP_TIMER_CHANGE).apply {
         putExtra(ARG_SLEEP_TIMER_ACTION, sleepTimerAction)
         putExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, durationMillis)
+        putExtra(SleepTimer.ARG_SLEEP_TIMER_IS_ACTIVE, isActive)
       }
     localBroadcastManager.sendBroadcast(broadcastIntent)
   }
@@ -346,7 +348,13 @@ class MediaPlayerService :
               ARG_SLEEP_TIMER_ACTION,
               SleepTimerAction::class.java,
             )
-          if (action != null) {
+          // UPDATE travels the *other* way: it is what the timer publishes to the UI, on this same
+          // action. Feeding it back into the timer is a loop — harmless while `update` only
+          // reassigned a Long to itself, but it silently overwrote the timer's mode once the state
+          // carried one, turning an end-of-chapter timer into a zero-length countdown that expired
+          // on the next tick (cu-21). The timer is told what to do by the UI; it is never told
+          // what it just said.
+          if (action != null && action != SleepTimerAction.UPDATE) {
             sleepTimer.handleAction(action, durationMillis)
           }
         }

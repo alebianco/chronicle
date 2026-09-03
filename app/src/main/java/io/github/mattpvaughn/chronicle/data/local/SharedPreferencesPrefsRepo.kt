@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.data.local
 import android.content.SharedPreferences
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_ALLOW_AUTO
+import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_AUTO_RESTART_SLEEP_TIMER
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_AUTO_REWIND_ENABLED
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_BOOK_COVER_STYLE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_BOOK_SORT_BY
@@ -58,6 +59,15 @@ interface PrefsRepo {
 
   /** Whether the app will extend the sleep timer upon device shake */
   var shakeToSnooze: Boolean
+
+  /**
+   * Whether an expired sleep timer re-arms itself when playback resumes (cu-21).
+   *
+   * Defaults **on**: the timer firing means "I fell asleep", and the usual next action is to resume
+   * and want the same timer again. A preference exists because silently re-arming a timer the user
+   * believes they dismissed would be worse than not re-arming at all.
+   */
+  var autoRestartSleepTimer: Boolean
 
   /** Pause when audio focus lost */
   var pauseOnFocusLost: Boolean
@@ -134,6 +144,7 @@ interface PrefsRepo {
     const val KEY_AUTO_REWIND_ENABLED = "key_auto_rewind_enabled"
     const val KEY_ALLOW_AUTO = "key_allow_auto"
     const val KEY_SHAKE_TO_SNOOZE_ENABLED = "key_shake_to_snooze_enabled"
+    const val KEY_AUTO_RESTART_SLEEP_TIMER = "key_auto_restart_sleep_timer"
     const val KEY_PAUSE_ON_FOCUS_LOST = "key_pause_on_focus_lost"
     const val KEY_BOOK_SORT_BY = "key_sort_by"
     const val KEY_IS_LIBRARY_SORT_DESCENDING = "key_is_sort_descending"
@@ -272,6 +283,16 @@ class SharedPreferencesPrefsRepo
       set(
       value
       ) = sharedPreferences.edit().putBoolean(KEY_SHAKE_TO_SNOOZE_ENABLED, value).apply()
+
+    private val defaultAutoRestartSleepTimer = true
+    override var autoRestartSleepTimer: Boolean
+      get() =
+        sharedPreferences.getBoolean(
+          KEY_AUTO_RESTART_SLEEP_TIMER,
+          defaultAutoRestartSleepTimer,
+        )
+      set(value) =
+        sharedPreferences.edit().putBoolean(KEY_AUTO_RESTART_SLEEP_TIMER, value).apply()
 
     private val defaultPauseOnFocusLost = true
     override var pauseOnFocusLost: Boolean

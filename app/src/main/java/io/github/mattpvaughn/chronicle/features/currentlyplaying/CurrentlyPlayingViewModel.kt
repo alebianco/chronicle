@@ -31,6 +31,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_ACTION
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_DURATION_MILLIS
+import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_IS_ACTIVE
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction.*
 import io.github.mattpvaughn.chronicle.util.*
@@ -828,14 +829,10 @@ class CurrentlyPlayingViewModel(
 
   fun showSleepTimerOptions() {
     val title =
-      if (isSleepTimerActive.value != true) {
-        FormattableString.from(R.string.sleep_timer)
-      } else {
-        FormattableString.ResourceString(
-          R.string.sleep_timer_active_title,
-          placeHolderStrings = listOf(sleepTimerTimeRemainingString.value ?: "<Error>"),
-        )
-      }
+      sleepTimerTitle(
+        isActive = isSleepTimerActive.value == true,
+        remainingMillis = sleepTimerTimeRemaining.value ?: 0L,
+      )
     val options =
       if (isSleepTimerActive.value == true) {
         listOf(
@@ -891,16 +888,13 @@ class CurrentlyPlayingViewModel(
                 BEGIN to duration
               }
               R.string.sleep_timer_duration_end_of_chapter -> {
-                val duration =
-                  (
-                    (
-                      (chapterDuration.value ?: 0L) - (
-                        chapterProgress.value
-                          ?: 0L
-                      )
-                    ) / prefsRepo.playbackSpeed
-                  ).toLong()
-                BEGIN to duration
+                // No duration. This used to compute
+                // `(chapterDuration - chapterProgress) / playbackSpeed` and start an ordinary
+                // countdown, which is wrong twice: a seek does not change the deadline, so it
+                // fired mid-chapter or long after; and the speed was baked in at pick time, so any
+                // later change desynced it — now likelier, since cu-20 made speed per book. The
+                // timer watches the chapter itself instead (cu-21).
+                BEGIN_END_OF_CHAPTER to 0L
               }
               R.string.sleep_timer_append -> {
                 val additionalTime = 5 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
@@ -981,24 +975,40 @@ class CurrentlyPlayingViewModel(
           return
         }
         val timeLeftMillis = intent.getLongExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, 0L)
-        val shouldSleepSleepTimerBeActive = timeLeftMillis > 0L
-        _isSleepTimerActive.postValue(shouldSleepSleepTimerBeActive)
+        // Read, not inferred from the duration: an end-of-chapter timer is active with 0 remaining
+        // (cu-21). The fallback keeps an older sender working.
+        val isActive =
+          intent.getBooleanExtra(ARG_SLEEP_TIMER_IS_ACTIVE, timeLeftMillis > 0L)
+        _isSleepTimerActive.postValue(isActive)
         sleepTimerTimeRemaining.value = timeLeftMillis
 
-        if (shouldSleepSleepTimerBeActive) {
-          setSleepTimerTitle(
-            FormattableString.ResourceString(
-              stringRes = R.string.sleep_timer_active_title,
-              placeHolderStrings =
-                listOf(
-                  sleepTimerTimeRemainingString.value ?: "<Error>",
-                ),
-            ),
-          )
-        } else {
-          setSleepTimerTitle(FormattableString.from(R.string.sleep_timer))
-        }
+        // Three cases, not two. An end-of-chapter timer is active with nothing to count down, so
+        // naming a remaining time is impossible and falling back to the generic title would say
+        // "Sleep timer" while the menu below it offers a cancel (cu-21).
+        setSleepTimerTitle(sleepTimerTitle(isActive, timeLeftMillis))
       }
+    }
+
+  /**
+   * The chooser's title for a given timer state.
+   *
+   * Three cases, not two. An end-of-chapter timer is active with nothing to count down, so naming
+   * a remaining time is impossible and falling back to the generic title would read "Sleep timer"
+   * while the menu below offered a cancel (cu-21). Shared by the broadcast receiver and
+   * [showSleepTimerOptions] so the two cannot disagree.
+   */
+  private fun sleepTimerTitle(
+    isActive: Boolean,
+    remainingMillis: Long,
+  ): FormattableString =
+    when {
+      isActive && remainingMillis > 0L ->
+        FormattableString.ResourceString(
+          stringRes = R.string.sleep_timer_active_title,
+          placeHolderStrings = listOf(sleepTimerTimeRemainingString.value ?: "<Error>"),
+        )
+      isActive -> FormattableString.from(R.string.sleep_timer_active_end_of_chapter)
+      else -> FormattableString.from(R.string.sleep_timer)
     }
 
   private fun setSleepTimerTitle(formattableString: FormattableString) {

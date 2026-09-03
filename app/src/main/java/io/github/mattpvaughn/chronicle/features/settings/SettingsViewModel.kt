@@ -484,6 +484,16 @@ class SettingsViewModel(
         ),
         PreferenceModel(
           type = PreferenceType.BOOLEAN,
+          title = FormattableString.from(R.string.settings_auto_restart_sleep_timer_title),
+          explanation =
+            FormattableString.from(
+              R.string.settings_auto_restart_sleep_timer_explanation,
+            ),
+          key = PrefsRepo.KEY_AUTO_RESTART_SLEEP_TIMER,
+          defaultValue = prefsRepo.autoRestartSleepTimer,
+        ),
+        PreferenceModel(
+          type = PreferenceType.BOOLEAN,
           title = FormattableString.from(R.string.settings_pause_on_focus_lost_title),
           explanation =
             FormattableString.from(

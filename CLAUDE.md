@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **845 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **868 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -237,6 +237,23 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   and an absent one look identical — and a dump taken *during playback* fails with "could not get
   idle state" while leaving the previous file in place, so a stale read looks like success. Pause
   first and assert the file exists.
+- **`ACTION_SLEEP_TIMER_CHANGE` is bidirectional, and the service must not answer itself** (cu-21).
+  Commands travel *into* the timer on that action and its ticks travel *out* on the same one, so a
+  service that handles every broadcast it hears feeds the timer its own output. That was invisible
+  while `SleepTimer.update` reassigned a Long to itself; once the state carried a **mode**, the loop
+  rewrote an end-of-chapter timer as a zero-length countdown that expired on the next tick. The
+  service filters `SleepTimerAction.UPDATE`, which is **outbound-only**.
+- **A sleep timer's expiry and its cancellation are different facts** (cu-21). `cancel()` forgets
+  the duration; `expire()` keeps it in `SleepTimerState.Expired` so `onPlaybackResumed` can re-arm
+  it — and it re-arms to `FixedDuration.originalMillis`, *not* the remaining time, because a timer
+  always expires with almost none left (a first cut restored a one-second timer). An expired timer
+  keeps ticking on purpose: that is how it notices playback resuming. **End-of-chapter carries no
+  deadline** — it stores the chapter id and compares each tick, so a seek or a speed change cannot
+  desync it, which a computed `(chapterDuration - chapterProgress) / speed` countdown did both ways.
+  Decisions live in `SleepTimerLogic` (pure, no Android types); `SimpleSleepTimer` owns the state
+  and the plumbing. Note `isTicking` is tracked **separately** from the state: `BEGIN` is
+  `update(duration)` then `start(true)`, and `update` already leaves the state `Running`, so a
+  guard that asks the state whether it is active makes every `BEGIN` a silent no-op.
 - **Do not do per-second work whose result cannot change** (cu-110). `ProgressUpdater` writes once
   a second during playback and Room invalidates **per table**, so every `LiveData` on `Audiobook`
   or `MediaItemTrack` re-emits at tick rate. The measured damage was not computation but

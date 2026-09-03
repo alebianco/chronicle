@@ -69,9 +69,21 @@ the same landscape constraint set.
       `currently_playing_artwork_visibility` — it is text, not artwork
 - [ ] Verified on the 800dp landscape tablet **and** in portrait, since the constraint set differs
 - [ ] `RawDurationFormatTest` still passes: the line must stay human-formatted when it appears
+- [ ] The sleep-timer countdown is visible in landscape (see the confirmed case below)
 
 ## Notes
 
 While here, check the other views constrained to `details_artwork` for the same problem —
 `progressPercentage` is constrained to it too and *does* render, so the constraint alone is not
 fatal; it is the shared visibility integer that hides `progress`.
+
+**One more confirmed case, found during cu-21 (2026-09-03): `sleep_timer_countdown`.** It is a
+`0dp x 0dp` overlay constrained on all four sides to `details_artwork`, which is GONE in
+`values-land` (`currently_playing_artwork_visibility` = 2). So in landscape the countdown has
+nothing to size against and never appears: the sleep-timer *icon* lights up correctly, but the
+remaining time is invisible — the user can see a timer is set and not how long is left.
+
+Verified on the tablet with a 5-minute timer: portrait shows `04:45` counting down in the artwork
+overlay; landscape shows the lit icon and no text. This is the same root cause as `progress`, so
+whatever constraint set fixes that should cover this — it is listed as a criterion rather than a
+separate task for that reason. Pre-existing; cu-21 only surfaced it.
