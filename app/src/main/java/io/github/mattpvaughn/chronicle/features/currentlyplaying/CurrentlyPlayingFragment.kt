@@ -27,6 +27,7 @@ import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
@@ -51,6 +52,15 @@ class CurrentlyPlayingFragment : Fragment() {
   private val viewModel: CurrentlyPlayingViewModel by lazy {
     ViewModelProvider(this, viewModelFactory).get(CurrentlyPlayingViewModel::class.java)
   }
+
+  /**
+   * What [renderPlayerArtwork] last bound, so an unchanged book skips the rebind (cu-117).
+   *
+   * Fields on the fragment rather than locals in `onCreateView`, because they must persist across
+   * emissions. Reset with the view, since a recreated view has nothing bound.
+   */
+  private var boundTitle: String? = null
+  private var boundThumb: String? = null
 
   companion object {
     fun newInstance() = CurrentlyPlayingFragment()
@@ -82,6 +92,11 @@ class CurrentlyPlayingFragment : Fragment() {
   ): View {
     // Activity and context are non-null on view creation. This informs lint about that
     val binding = FragmentCurrentlyPlayingBinding.inflate(inflater, container, false)
+
+    // A new view has nothing bound, so the artwork guard must not think it already did the work
+    // — otherwise the recreated sheet opens with no cover (cu-117).
+    boundTitle = null
+    boundThumb = null
 
     viewModel.showUserMessage.observeEvent(viewLifecycleOwner) { message ->
       Toast.makeText(context, message, LENGTH_SHORT).show()
@@ -143,6 +158,77 @@ class CurrentlyPlayingFragment : Fragment() {
       binding.sleepTimerCountdown.text = it
     }
 
+    /**
+     * Writes the expanded player's text, but only while it is on screen.
+     *
+     * Same reasoning as [refreshSlider]'s `isShown` guard (cu-110), applied to the five text
+     * observers that were left unguarded (cu-117). Each `TextView.text` write invalidates and
+     * re-measures; five of them on every 1 Hz tick, for a sheet the user cannot see, is the
+     * measured cause of the remaining playback jank.
+     *
+     * Uses `binding.progress` as the probe rather than each view in turn: they live in the same
+     * sheet, so one ancestor chain decides all of them.
+     */
+    fun renderPlayerText() {
+      if (!binding.progress.isShown) {
+        return
+      }
+
+      // `setText` with an equal CharSequence still invalidates, so compare first — the strings
+      // genuinely repeat, since a second of a 47-hour book leaves the percentage unchanged.
+      binding.progress.setTextIfChanged(viewModel.progressString.value.orEmpty())
+      binding.progressPercentage.setTextIfChanged(
+        viewModel.progressPercentageString.value.orEmpty(),
+      )
+
+      val chapter = viewModel.chapterProgressString.value
+      binding.chapterProgress.setTextIfChanged(
+        if (chapter.isNullOrEmpty()) viewModel.trackProgress.value.orEmpty() else chapter,
+      )
+      binding.chapterDuration.setTextIfChanged(
+        if ((viewModel.chapterDuration.value ?: 0L) == 0L) {
+          viewModel.trackDuration.value.orEmpty()
+        } else {
+          viewModel.chapterDurationString.value.orEmpty()
+        },
+      )
+
+      val currentChapter = viewModel.currentChapter.value
+      binding.chapterTitle.setTextIfChanged(
+        if (currentChapter?.title.isNullOrEmpty()) {
+          viewModel.currentTrack.value?.title.orEmpty()
+        } else {
+          currentChapter?.title.orEmpty()
+        },
+      )
+    }
+
+    /**
+     * Binds the expanded player's cover art, only when the displayed book actually changed.
+     *
+     * `audiobook` is Room-backed and `ProgressUpdater` rewrites `Audiobook.progress` every second,
+     * so this emitted at tick rate with identical title and artwork while `bindImageRounded` did a
+     * Dagger lookup, a `Uri` parse and a Coil load each time. `MainActivity` already guards its
+     * mini-player copy this way (cu-117); this is the expanded sheet's.
+     *
+     * Not gated on `isShown`: the artwork must be bound before the sheet is expanded, or it opens
+     * blank. The change check is what makes it cheap.
+     */
+    fun renderPlayerArtwork() {
+      val book = viewModel.audiobook.value
+      val title = book?.title.orEmpty()
+      val thumb = book?.thumb
+      if (title == boundTitle && thumb == boundThumb) {
+        return
+      }
+      boundTitle = title
+      boundThumb = thumb
+
+      binding.bookTitle.setTextIfChanged(title)
+      binding.detailsArtwork.contentDescription = title
+      bindImageRounded(binding.detailsArtwork, thumb, plexConfig.isConnected.value == true)
+    }
+
     // The slider falls back to track values when there is no chapter. valueTo
     // must be set before value: Material's Slider throws if value falls outside
     // the current range, which DataBinding handled internally.
@@ -194,35 +280,41 @@ class CurrentlyPlayingFragment : Fragment() {
     viewModel.chapterProgressForSlider.observe(viewLifecycleOwner) { refreshSlider() }
     viewModel.trackProgressForSlider.observe(viewLifecycleOwner) { refreshSlider() }
 
-    viewModel.progressString.observe(viewLifecycleOwner) { binding.progress.text = it }
-    viewModel.progressPercentageString.observe(viewLifecycleOwner) {
-      binding.progressPercentage.text = it
+    // Every observer below fires on the 1 Hz progress tick, and each one writes to a view in the
+    // expanded player. While the sheet is *collapsed* those views cannot be seen, but the writes
+    // still invalidate them and drive measure/layout over the whole activity — the same defect
+    // `refreshSlider` already guards, in the five places it was not applied (cu-117).
+    //
+    // Measured on a 28-track book: playing in the foreground drew ~60-75 frames per 20 s at ~30%
+    // jank, while the identical playback with the app *backgrounded* drew 4 frames at 0% and the
+    // main thread fell from 76 to 3 jiffies/10 s. So the cost is rendering views nobody is
+    // looking at.
+    //
+    // `refreshTextIfVisible` carries the `isShown` check for the same reason as the slider: it
+    // accounts for every ancestor, so a collapsed sheet reads false. [renderPlayerText] then
+    // re-runs all of it when the sheet becomes visible, so expanding shows current values even if
+    // playback is paused and no further tick is coming — the slider can rely on the next tick,
+    // text cannot.
+    // Catch the sheet becoming visible. The text observers below skip their writes while the
+    // sheet is collapsed, so without this an expand during *paused* playback would show whatever
+    // was last written — there is no further tick to correct it. A layout-change listener is the
+    // right hook because `isShown` is exactly what it reports on, and it needs no knowledge of
+    // the bottom sheet's state living over in MainActivity.
+    var wasShown = false
+    binding.progress.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+      val shown = view.isShown
+      if (shown && !wasShown) {
+        renderPlayerText()
+      }
+      wasShown = shown
     }
-    viewModel.chapterProgressString.observe(viewLifecycleOwner) { chapter ->
-      binding.chapterProgress.text =
-        if (chapter.isNullOrEmpty()) viewModel.trackProgress.value.orEmpty() else chapter
-    }
-    viewModel.chapterDurationString.observe(viewLifecycleOwner) { durationString ->
-      binding.chapterDuration.text =
-        if ((viewModel.chapterDuration.value ?: 0L) == 0L) {
-          viewModel.trackDuration.value.orEmpty()
-        } else {
-          durationString
-        }
-    }
-    viewModel.currentChapter.observe(viewLifecycleOwner) { chapter ->
-      binding.chapterTitle.text =
-        if (chapter?.title.isNullOrEmpty()) {
-          viewModel.currentTrack.value?.title.orEmpty()
-        } else {
-          chapter?.title.orEmpty()
-        }
-    }
-    viewModel.audiobook.observe(viewLifecycleOwner) { book ->
-      binding.bookTitle.text = book?.title.orEmpty()
-      binding.detailsArtwork.contentDescription = book?.title.orEmpty()
-      bindImageRounded(binding.detailsArtwork, book?.thumb, plexConfig.isConnected.value == true)
-    }
+
+    viewModel.progressString.observe(viewLifecycleOwner) { renderPlayerText() }
+    viewModel.progressPercentageString.observe(viewLifecycleOwner) { renderPlayerText() }
+    viewModel.chapterProgressString.observe(viewLifecycleOwner) { renderPlayerText() }
+    viewModel.chapterDurationString.observe(viewLifecycleOwner) { renderPlayerText() }
+    viewModel.currentChapter.observe(viewLifecycleOwner) { renderPlayerText() }
+    viewModel.audiobook.observe(viewLifecycleOwner) { renderPlayerArtwork() }
     plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
       bindImageRounded(
         binding.detailsArtwork,

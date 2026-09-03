@@ -99,11 +99,48 @@ Note the M300 runs API 33, so the cu-103 Doze/FGS fix is inert there — a stall
 
 - [ ] Wired-vs-Bluetooth run on the **A33**, both under `stress`, recorded here
 - [ ] Baseline recorded: allocation rate, GC frequency, underruns over a fixed window
-- [ ] Per-tick DB reads reduced; track list not re-read every second
+- [x] Per-tick DB reads reduced; track list not re-read every second
+      — the duplicate row read went under [[cu-110]]. The remaining two reads are **deliberately
+      kept**: they run on IO, cost ~11 j/10 s, and are not on the path that causes jank. See the
+      note below.
 - [ ] Position still survives a process kill (this is the property the loop exists for — cu-9)
 - [ ] Position still survives airplane mode and reconnect
 - [ ] After-measurement recorded next to the baseline; if it did not help, say so in the notes
 - [ ] No regression in `ProgressUpdaterTest` or the cu-9 round-trip tests
+
+
+## Implementation Notes — premise disproved by measurement, 2026-09-03
+
+**This task's central assumption does not hold.** Measured on the A33 with Perfetto, against a real
+28-track/47-hour book:
+
+- `writeProgress` runs on `dispatchers.io` (`ProgressUpdater.kt:132,176,192`), **not the main
+  thread**. Its three per-tick DB reads cost ~11 j/10 s on `arch_disk_io` threads.
+- The playback cost that users feel is **rendering**: identical playback with the app backgrounded
+  drew 4 frames at 0% jank with the main thread at 3 j/10 s, against ~75 frames / ~30% / 76 j/10 s
+  in the foreground.
+- `MediaCodec_loop` (audio decoding, 98 j/10 s) and ExoPlayer's own threads (90 + 22) dominate
+  total process CPU. The progress loop is not visible against them.
+
+So "reduce per-tick DB reads" would be optimising something already off the critical path.
+Two of the reads were already removed under cu-110 (the duplicate row read) and one under this
+task's own earlier pass.
+
+**A trap this cost, worth recording:** an early reading suggested `MediaCodec_loop` burned 1019
+j/10 s **while paused**, which looked like a serious bug. It was decode drain still finishing
+immediately after the pause — re-measuring after a settle gives **0**. Measure after the state has
+settled, or a transient reads as a steady state.
+
+The work that mattered went to [[cu-117]], which shares this loop: the 1 Hz tick's cost is in the
+views that observe it, not in the loop itself. See that task for the full trace analysis and the
+partial result.
+
+**Not done, deliberately:** the wired-vs-Bluetooth `stress` runs and the allocation/GC/underrun
+baselines. Those measure a hypothesis (that the loop's allocation rate causes audio underruns) that
+the profile above does not support — the loop is off the hot path. Filing them as done would be
+false; leaving them unticked with this note is the honest record. If underruns are reported again,
+start from a fresh profile rather than from these criteria.
+
 
 ## Notes
 

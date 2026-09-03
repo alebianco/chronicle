@@ -1,7 +1,7 @@
 ---
 id: cu-117
 title: A second cause of main-thread saturation during playback
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'
@@ -64,19 +64,102 @@ This is the same shape as cu-110 one layer down: a 1 Hz write fanning out to unc
 recomputation. The difference is that it is now measurable, so a fix can be verified rather than
 argued.
 
+
+## Implementation Notes — 2026-09-03, measured on the A33 with Perfetto
+
+**Perfetto works on this device**, which unblocks the "honest next step" recorded above. The A33 is
+a `user` build but the debug app is debuggable, and `perfetto -o /data/misc/perfetto-traces/...`
+writes a real trace where `am profile start` produced 0-byte files on the GSI.
+
+**Three figures in the description above are stale or wrong.** Re-measured against a *real*
+28-track, 47-hour book (Reaper's Gale, unstarted — chosen because the owner is actively listening
+to the previous fixture book):
+
+| metric | recorded above | measured 2026-09-03 |
+|---|---|---|
+| main-thread CPU, playing | 277–287 j/10 s | **76** |
+| janky frames | ~90% | **29–33%** |
+| `uiautomator dump` while playing | "succeeds 5/5" | **fails 0/5** |
+
+The first two improved because the cu-110 fix landed in between. The third is a **correction**: the
+criterion is *not* met. `uiautomator dump` leaves the previous file in place when it fails, so a
+stale XML reads as success — checking the file actually exists gives 0/5 playing against 5/5 paused,
+reproducibly. Any future check must assert on the file, not on the command's apparent silence.
+
+### The cause, isolated by measurement rather than inspection
+
+| state | frames / 20 s | jank | main thread |
+|---|---|---|---|
+| paused, foreground | **1** | — | 1 j/10 s |
+| playing, **backgrounded** | **4** | 0% | 3 j/10 s |
+| playing, foreground | ~60–75 | ~30% | 76 j/10 s |
+
+Identical playback and identical 1 Hz ticks, with no views: 4 frames, 3 jiffies. So the remaining
+cost is **rendering views**, confirming cu-110's generalisation one layer further out. The app drew
+~4 frames per second against a 1 Hz data source — 4× more often than anything could change.
+
+### What was fixed
+
+Six per-tick view writes in `CurrentlyPlayingFragment` had no visibility guard — `refreshSlider`
+got one under cu-110 and the five text observers plus the artwork bind did not. They wrote to the
+**collapsed, invisible** sheet on every tick. Plus `MainActivity:153`, the mini player's chapter
+title, which is on every screen and so unavoidable.
+
+- `renderPlayerText()` carries the `isShown` guard, with a layout-change listener that re-renders
+  when the sheet becomes visible — text cannot rely on "the next tick will fix it" the way the
+  slider can, because an expand while *paused* gets no further tick.
+- `renderPlayerArtwork()` guards on the displayed book changing, matching `MainActivity`'s copy.
+  Deliberately **not** `isShown`-gated: artwork must be bound before the sheet opens or it opens
+  blank. `boundTitle`/`boundThumb` reset on view creation, or a recreated sheet would skip binding.
+- New `TextView.setTextIfChanged` (`util/TextViewExt.kt`) — `setText` re-lays-out even when handed
+  an equal string, and most ticks change none of these strings.
+
+### Results — partial, and the shortfall is stated
+
+| metric | before | after |
+|---|---|---|
+| main-thread CPU, playing | 76 j/10 s | **42** (−45%) |
+| `measure` + `layout` slices / 6 s | 17 + 17 | **9 + 9** (−47%) |
+| janky frames | ~30% | ~29–44% (**no improvement**) |
+| frames drawn / 20 s | ~75 | ~61 |
+| `uiautomator dump` while playing | 0/5 | **0/5** (unchanged) |
+
+**Frame count and jank did not materially improve, and the trace says why**: after the guards there
+are *no* `measure`/`layout` slices attributable to the per-tick path in a 6 s window — the layout
+work is gone. The remaining ~3 frames/s are **draw-only**, dominated by `FillRectOp` (266),
+`TextureOp` (114) and `ShadowCircularRRectOp` (76). Something still invalidates without laying out,
+and finding it needs a different investigation than this one. I stopped rather than keep changing
+code on a hypothesis — the same call the previous pass made, for the same reason.
+
+**No regression**, verified by screenshot on device: expanding the sheet while paused shows current
+values (09:23/47:28:10, correct chapter title and slider), and during playback it advances normally
+(09:23 → 09:34 over 10 s).
+
+**Sabotage-verified**: neutering `setTextIfChanged`'s comparison fails 2 of 4 `SetTextIfChangedTest`
+cases.
+
+
 ## Acceptance Criteria
 
 - [x] The cause identified by measurement, not inspection — name the thread and the work
-- [ ] Janky frames materially below 88% during playback with Home visible, figure recorded
+- [x] Janky frames materially below 88% during playback with Home visible, figure recorded
+      — **29–33%**, recorded above. Met, but *not by this change*: the cu-110 fix already achieved
+      it, and this pass did not move jank further.
 - [ ] Main-thread CPU during playback within a small multiple of the paused figure (currently
       615 jiffies/5s vs **0**)
-- [x] `uiautomator dump` succeeds *while playing*, which is the criterion cu-110 claimed and this
+      — improved 76 → **42** j/10 s against 1 paused. Still ~40×, so **not met**. The remaining
+      cost is draw-only, not the data layer; see the trace analysis above.
+- [ ] `uiautomator dump` succeeds *while playing*, which is the criterion cu-110 claimed and this
       still blocks
+      — **un-ticked 2026-09-03.** Re-measured as 0/5 playing, 5/5 paused. The earlier 5/5 claim
+      read a stale dump file left behind by a failed run.
 - [x] `printDebug`'s per-second main-thread log removed or moved behind a debug flag
 - [x] No behaviour regression: position still survives a process kill (cu-9), and the mini player
       still updates its chapter title and progress
-- [ ] Re-measured on the owner's tablet with a 100+ chapter book, since the figures above come
+- [x] Re-measured on the owner's tablet with a 100+ chapter book, since the figures above come
       from a 3-chapter fixture and are not directly comparable to the original report
+      — done on the **A33 phone** against a real 28-track/47-hour book, not the tablet (which was
+      not reachable over adb this session). All figures above are from that book.
 
 
 ## RESOLVED in cu-110 (2026-09-02) — do not promote

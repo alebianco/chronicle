@@ -49,6 +49,7 @@ import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -150,7 +151,12 @@ class MainActivity : AppCompatActivity() {
       binding.currentlyPlayingContainer.visibility =
         if (loggedIn == true) View.VISIBLE else View.INVISIBLE
     }
-    viewModel.currentChapterTitle.observe(this) { binding.chapterTitle.text = it }
+    // The mini player is on every screen, so this is the one per-tick view write that no screen
+    // can avoid. `setText` re-lays-out even when handed an equal string, and a chapter title is
+    // identical for minutes at a time (cu-117).
+    viewModel.currentChapterTitle.observe(this) {
+      binding.chapterTitle.setTextIfChanged(it.orEmpty())
+    }
     // Bind only when the *displayed* fields change. `audiobook` is Room-backed and
     // `ProgressUpdater` writes `Audiobook.progress` once a second during playback, so this emits
     // at tick rate with a book whose title and artwork are identical — and `bindImageRounded` does
