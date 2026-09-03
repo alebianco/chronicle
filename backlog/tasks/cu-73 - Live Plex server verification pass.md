@@ -335,10 +335,25 @@ janky frames and a 4950 ms 90th-percentile frame.
       returning `200` for 110 requests after the reshare, so a running app notices nothing until
       it restarts. That is why the earlier tampering attempts (below) could never produce a 401.
 
-      **So the authenticator's live 401 path remains unexercised end-to-end** — it is covered by
-      12 unit tests plus `ReauthWiringTest`, but no live rotation reaches it, because the startup
-      refresh always wins. [[DRAFT-128]]'s debug hook is still the way to exercise it, and is the
-      only route to the mid-download variant.
+      ~~So the authenticator's live 401 path remains unexercised end-to-end.~~ **Now exercised,
+      2026-09-03, via [[cu-128]]'s hook** — and the reason it had resisted every attempt turned out
+      to be neither the app nor the startup refresh:
+
+      **Plex does not validate the server token on a LAN connection.** Measured from the tablet,
+      independently of Chronicle:
+
+      | route | bogus token |
+      |---|---|
+      | LAN `…plex.direct:32400/library/sections` | **`200`** |
+      | WAN `87-17-202-231…:32400/library/sections` | **`401`** |
+      | `plex.tv/api/v2/resources` | `400` |
+
+      So the 401 path is **unreachable on the LAN by design**. Forced onto the WAN tier it works
+      exactly as cu-10 specifies: `Refreshed the server token after a 401; retrying once` (twice),
+      all requests ending `200`, the real token restored, and **nothing shown to the user**.
+
+      Anyone re-testing this must force a non-LAN tier first, or they will conclude the
+      authenticator is broken when it is the server being permissive.
 
       *Earlier in the session, before the owner clarified they control the server:* three
       tampering routes were tried and all failed, each defeated by correct behaviour —
@@ -548,7 +563,16 @@ janky frames and a 4950 ms 90th-percentile frame.
       real exhausted-retry download actually presents as `FAILED` (rather than `CANCELLED` or
       `REMOVED`) — the whole resume path hinges on that status being the one Fetch2 reports.
       — **[[cu-109]] is fixed, so this is unblocked and simply not yet run.**
-- [ ] **A rotated server token mid-download recovers.** cu-10's re-auth now sits in the download
+- [x] **A rotated server token mid-download recovers.** — **VERIFIED 2026-09-03 via [[cu-128]]'s hook.**
+      Ender's Game (107 tracks) downloading over the **WAN tier** (the LAN exempts tokens from
+      validation — see the note above), then `--ez invalidate_server_token true` fired mid-flight.
+
+      Result: `Refreshed the server token after a 401; retrying once` **3 times** in the download
+      path, **0** `status=FAILED`, every Fetch2 line `error=NONE`, and the book completed —
+      `isCached=1`, **109 files on disk**. So cu-10's re-auth genuinely works through
+      `OkHttpDownloader`, the combination the item flagged as never having run.
+
+      *Original text:* cu-10's re-auth now sits in the download
       path via `OkHttpDownloader`; that combination has never run. Rotate the token during a
       download and expect a retry that succeeds, not a failed book.
 
