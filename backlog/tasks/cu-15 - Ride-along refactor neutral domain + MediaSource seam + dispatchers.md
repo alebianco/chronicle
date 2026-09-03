@@ -1,6 +1,6 @@
 ---
 id: cu-15
-title: Ride-along refactor: neutral domain + MediaSource seam + dispatchers
+title: "Ride-along refactor: neutral domain + MediaSource seam + dispatchers"
 status: Done
 assignee: [claude]
 created_date: '2026-07-13'

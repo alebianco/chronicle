@@ -1,6 +1,6 @@
 ---
 id: decision-7
-title: Fork name: Chronicle Unabridged
+title: "Fork name: Chronicle Unabridged"
 date: '2026-07-13'
 status: accepted
 ---

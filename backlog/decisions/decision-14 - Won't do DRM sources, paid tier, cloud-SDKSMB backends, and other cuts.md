@@ -1,6 +1,6 @@
 ---
 id: decision-14
-title: Won't do: DRM sources, paid tier, cloud-SDK/SMB backends, and other cuts
+title: "Won't do: DRM sources, paid tier, cloud-SDK/SMB backends, and other cuts"
 date: '2026-07-13'
 status: accepted
 ---

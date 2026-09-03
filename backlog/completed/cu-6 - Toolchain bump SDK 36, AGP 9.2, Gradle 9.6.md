@@ -1,6 +1,6 @@
 ---
 id: cu-6
-title: Toolchain bump: SDK 36, AGP 9.2, Gradle 9.6
+title: "Toolchain bump: SDK 36, AGP 9.2, Gradle 9.6"
 status: Done
 assignee: [claude]
 created_date: '2026-07-13'

@@ -1,6 +1,6 @@
 ---
 id: decision-13
-title: Task tracking: Backlog.md-format markdown in backlog/
+title: "Task tracking: Backlog.md-format markdown in backlog/"
 date: '2026-07-13'
 status: accepted
 ---

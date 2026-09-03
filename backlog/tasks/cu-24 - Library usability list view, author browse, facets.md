@@ -1,6 +1,6 @@
 ---
 id: cu-24
-title: Library usability: list view, author browse, facets
+title: "Library usability: list view, author browse, facets"
 status: To Do
 assignee: []
 created_date: '2026-07-13'

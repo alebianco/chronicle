@@ -1,6 +1,6 @@
 ---
 id: cu-11
-title: Connection resiliency: LAN/WAN/relay tiering
+title: "Connection resiliency: LAN/WAN/relay tiering"
 status: Done
 assignee: [claude]
 created_date: '2026-07-13'

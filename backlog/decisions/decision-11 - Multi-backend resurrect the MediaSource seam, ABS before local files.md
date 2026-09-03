@@ -1,6 +1,6 @@
 ---
 id: decision-11
-title: Multi-backend: resurrect the MediaSource seam, ABS before local files
+title: "Multi-backend: resurrect the MediaSource seam, ABS before local files"
 date: '2026-07-13'
 status: accepted
 ---

@@ -1,6 +1,6 @@
 ---
 id: cu-17
-title: Backup framework: export/import of local state
+title: "Backup framework: export/import of local state"
 status: Done
 assignee: [claude]
 created_date: '2026-07-13'
