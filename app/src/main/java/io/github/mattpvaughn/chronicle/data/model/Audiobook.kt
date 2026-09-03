@@ -165,106 +165,53 @@ data class Audiobook(
      * tagger the user ran, is the only carrier — and it is on the *listing* as well as the detail
      * response, unlike `Style`/`Mood` (cu-24), so it costs no extra request.
      *
-     * Read in **hundredths** ([SERIES_INDEX_SCALE]) rather than whole numbers because a novella
-     * genuinely sits at 1.5 — Audnexus' own volume regex admits `1.5`, `1-3` and `4+` — and an
-     * `Int` truncating that to 1 would collide with book one. Hundredths keep the value exact while
-     * remaining an integer compare, which matters because **0 is the "unknown" sentinel** and float
-     * equality against a sentinel is not reliable. The column stays `INTEGER`, so this is a unit
-     * change rather than a type change.
+     * The rules themselves live in `SeriesIndexPatterns.kt` as **data**, so a library tagged by
+     * some other convention can be handled by adding a pattern rather than shipping a new build
+     * (cu-147, modelled on tvnamer). This function is the thin adapter: it asks the configured set
+     * and converts the answer to the stored unit.
+     *
+     * Values are **hundredths** ([SERIES_INDEX_SCALE]) because a novella genuinely sits at 1.5 —
+     * Audnexus' own volume regex admits `1.5`, `1-3` and `4+` — and an `Int` truncating that to 1
+     * would collide with book one. Hundredths keep the value exact while remaining an integer
+     * compare, which matters because **0 is the "unknown" sentinel** and float equality against a
+     * sentinel is not reliable. The Room column stays `INTEGER`, so this is a unit rather than a
+     * type change.
      *
      * Returns 0 when nothing can be read, which callers sort **last** — an unnumbered extra belongs
      * at the end of a series, not in front of book one (see [inSeriesOrder]).
      */
-    internal fun seriesIndexFromTitleSort(titleSort: String): Int {
-      for (pattern in SERIES_INDEX_PATTERNS) {
-        val match = pattern.find(titleSort) ?: continue
-        val position = match.groupValues[1].toDoubleOrNull() ?: continue
-        // Reject a non-positive or out-of-range match and keep looking with the looser patterns.
-        // `position <= 0` also means a literal `Book 0` reads as *unknown*: a series that numbers
-        // its prequel zero therefore sorts it last rather than first. Distinguishing "known to be
-        // zero" from "unknown" needs a second state, since 0 is the sentinel, and that is not worth
-        // a nullable column for a rare tagging choice — `SeriesIndexParserTest` pins the behaviour
-        // so it reads as a decision rather than a bug.
-        if (position <= 0.0 || position >= 1000.0) continue
-        return Math.round(position * SERIES_INDEX_SCALE).toInt()
-      }
-      return NO_SERIES_INDEX
+    internal fun seriesIndexFromTitleSort(titleSort: String): Int = seriesIndexPatterns.match(titleSort)?.storedIndex ?: NO_SERIES_INDEX
+
+    /**
+     * The rule set in force, compiled once.
+     *
+     * A `var` with a private setter so a user-configured set can replace it at startup
+     * ([installSeriesIndexPatterns]) without every caller having to thread it through.
+     * `Audiobook.from` runs per book on a library refresh, so recompiling per call would rebuild
+     * several thousand expressions on a 1000-book library (the cu-51 target).
+     */
+    var seriesIndexPatterns: SeriesIndexPatternSet = SeriesIndexPatternSet(DEFAULT_SERIES_INDEX_PATTERNS)
+      private set
+
+    /**
+     * Replaces the rule set, keeping the built-ins as a fallback tier unless told otherwise.
+     *
+     * [PatternOrder.BEFORE] by default, because first-match-wins is the whole disambiguation
+     * mechanism: a user adding a rule for their own convention must be able to pre-empt a built-in
+     * that reads their titles wrongly, while a pattern that matches nothing then degrades to
+     * today's behaviour rather than emptying the index.
+     */
+    fun installSeriesIndexPatterns(
+      userPatterns: List<SeriesIndexPattern>,
+      order: PatternOrder = PatternOrder.BEFORE,
+    ) {
+      seriesIndexPatterns = SeriesIndexPatternSet.of(userPatterns, order)
     }
 
-    /**
-     * The formats real taggers write, **most specific first**.
-     *
-     * Order is load-bearing, not cosmetic. [SERIES_INDEX_AUDNEXUS] must precede
-     * [SERIES_INDEX_LABEL_FIRST] so that `"Book 2 of the Fixture Saga, Book 5"` reads 5 and not 2 —
-     * a series whose own *name* contains a number was the reason the previous parser anchored to
-     * the end of the string, and preferring the comma-plus-label form is what keeps that protection
-     * without the anchor.
-     *
-     * The previous parser *was* end-anchored, and both dominant taggers put the number at the
-     * front, so it read **1 of 8** real formats — the one being our own fixture, which happened to
-     * end with the number.
-     */
-    private val SERIES_INDEX_PATTERNS by lazy {
-      listOf(
-        SERIES_INDEX_AUDNEXUS,
-        SERIES_INDEX_LABEL_FIRST,
-        SERIES_INDEX_LABEL_MID,
-        SERIES_INDEX_HASH,
-        SERIES_INDEX_SEANAP,
-        SERIES_INDEX_NUM_FIRST,
-        SERIES_INDEX_COMMA_TRAIL,
-      )
+    /** Restores the built-in rule set. Exists so a test cannot leak a pattern set into the next. */
+    fun resetSeriesIndexPatterns() {
+      seriesIndexPatterns = SeriesIndexPatternSet(DEFAULT_SERIES_INDEX_PATTERNS)
     }
-
-    /** One to three digits, optionally with up to two decimal places. */
-    private const val SERIES_NUMBER = """\d{1,3}(?:\.\d{1,2})?"""
-
-    /**
-     * `Mistborn, Book 2 - The Well of Ascension` — what Audnexus generates.
-     *
-     * Also accepts an omnibus (`Book 1-3`) or an open range (`Book 4+`), taking the **first** book:
-     * a collection containing books one to three belongs where book one does.
-     */
-    private val SERIES_INDEX_AUDNEXUS =
-      Regex(
-        """^.+?,\s*(?:Book|Bk\.?|Vol\.?|Volume)\s+($SERIES_NUMBER)(?:\s*[-+]\s*\d{1,3})?\b(?:\s*-\s*|\s*$)""",
-        RegexOption.IGNORE_CASE,
-      )
-
-    /** `Book 5: Sourcery: Discworld` — the label opens the string. */
-    private val SERIES_INDEX_LABEL_FIRST =
-      Regex("""^(?:Vol\.?|Volume|Book|Bk\.?)\s*($SERIES_NUMBER)\b(?:\s*[-.:]\s*|\s+)""", RegexOption.IGNORE_CASE)
-
-    /** `1994 - Book 1 - Wizards First Rule` — a label after a leading year or author. */
-    private val SERIES_INDEX_LABEL_MID =
-      Regex("""(?:\s|^)[-–]\s*(?:Vol\.?|Volume|Book|Bk\.?)\s*($SERIES_NUMBER)\b""", RegexOption.IGNORE_CASE)
-
-    /** `Stormlight Archive #4`, `Book Title (Mistborn #2)` — the Goodreads/Audible display form. */
-    private val SERIES_INDEX_HASH =
-      Regex("""[(\[]?\s*[^()\[\]#]+?\s*#($SERIES_NUMBER)\s*[)\]]?""")
-
-    /** `Expanse 1 - Leviathan Wakes` — what seanap's guide prescribes. */
-    private val SERIES_INDEX_SEANAP =
-      Regex("""^.+?\s+($SERIES_NUMBER)\s*-\s+""")
-
-    /**
-     * `01 - Book Title`, `1. Wizards First Rule` — an Audiobookshelf-shaped tree, where the series
-     * name is the parent folder and never reaches the string.
-     *
-     * The separator is required, which is what stops `101 Dalmatians` being read as book 101.
-     */
-    private val SERIES_INDEX_NUM_FIRST =
-      Regex("""^($SERIES_NUMBER)\s*(?:-\s+|\.\s+)""")
-
-    /**
-     * `Mistborn, 2` — a trailing bare number after a comma, with no label.
-     *
-     * Last, because it is the loosest: it must not win over a labelled form elsewhere in the
-     * string. Kept because the previous parser accepted it, and dropping a form it handled would
-     * be a regression — `BookFacetsTest` caught exactly that during this change.
-     */
-    private val SERIES_INDEX_COMMA_TRAIL =
-      Regex("""^.+?,\s*($SERIES_NUMBER)\s*$""")
 
     /**
      * Merges updated local fields with a network copy of the book. Respects network metadata

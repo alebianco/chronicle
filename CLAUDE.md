@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **1039 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1061 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -381,6 +381,20 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `BookFacetsTest` failed — don't remove `Bk` or the loosest `comma-trail` pattern. `Book 0` reads
   as **unknown** on purpose (0 is the sentinel), so a prequel numbered zero sorts last; a test says
   so.
+  **The rules are data, not constants** (cu-147, decision-18). They live in
+  `data/model/SeriesIndexPatterns.kt` as named `SeriesIndexPattern`s with named capture groups, and
+  `Audiobook.installSeriesIndexPatterns(patterns, order)` lets a user's own rules go **before**,
+  **after** or **instead of** the built-ins — modelled on tvnamer, but deliberately *not* copying
+  three of its failure modes: a user config there replaces every built-in (its own maintainer's
+  open issue #191), required groups are validated only *after* a match so a bad rule aborts a parse
+  a later rule would have handled, and there is no way to see why a rule did not match (#216).
+  Hence `SeriesIndexPatternSet.explain()`, which reports every rule's verdict. Two traps: **do not
+  use `RegexOption.COMMENTS`** — like Python's `re.VERBOSE` it strips literal spaces, which cost a
+  tvnamer user real debugging time; and **`MatchResult.groups["name"]` throws** for a group the
+  *matching* pattern never declared rather than returning null, so four of the seven built-ins
+  (which declare no `series` group) crashed every match until every named read went through
+  `namedGroupOrNull`. Nobody calls `installSeriesIndexPatterns` yet — the file format and the
+  tester UI are cu-148.
 - **A tag list's `@Json` name must be checked against a captured response, not a fixture** (cu-24).
   `plexGenres` carried **no** `@Json(name = "Genre")` for the life of the project, so Moshi looked
   for a key literally called `plexGenres` and `Audiobook.genre` was empty against every real
