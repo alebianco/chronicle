@@ -89,6 +89,18 @@ class UnguardedMenuAccessTest {
     )
   }
 
+  /**
+   * Guards the guard: both scans above assert `emptyList()`, so a `fragmentSources` that resolves
+   * to nothing passes them trivially. Sabotaging the path to a non-existent directory used to
+   * leave the build green (cu-102 review, 2026-09-02).
+   */
+  @Test
+  fun `the scan actually inspects fragments`() {
+    val scanned = fragmentSources.size
+
+    assert(scanned >= 8) { "expected to scan the app's fragments, saw $scanned" }
+  }
+
   private companion object {
     /**
      * A lookup against a **toolbar's own** menu, e.g. `binding.detailsToolbar.menu.findItem(x)`.

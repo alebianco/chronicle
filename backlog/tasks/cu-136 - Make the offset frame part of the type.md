@@ -1,12 +1,18 @@
 ---
-id: DRAFT-116
+id: cu-136
 title: Make the offset frame part of the type
-status: Draft
+status: To Do
 assignee: []
-labels: [R2, architecture, bug]
-dependencies: [cu-115]
-priority: medium
+created_date: '2026-09-03'
+updated_date: '2026-09-03'
+labels:
+  - R2
+  - architecture
+  - bug
 milestone: m-2
+dependencies:
+  - cu-115
+priority: medium
 ---
 
 ## Description

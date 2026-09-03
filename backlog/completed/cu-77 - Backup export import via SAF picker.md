@@ -74,7 +74,11 @@ stale Play purchase token from the device entirely, which is better than merely 
 - [x] A malformed value is skipped rather than crashing the restore; covered by a test
 - [x] **Wipe app, restore file: identical state minus auth** — verified on a device, with the
       before/after settings compared explicitly rather than eyeballed
-- [x] Screenshot of both settings entry points (a UI claim needs one — cu-63's lesson)
+- [ ] Screenshot of both settings entry points (a UI claim needs one — cu-63's lesson)
+      **Un-ticked 2026-09-03**: the branch review found this checked with no screenshot in the
+      repo. The feature itself was verified on a device (see the criterion above), but the visual
+      evidence this criterion asks for was never captured. Left unchecked rather than quietly
+      dropped — the same class of error as a safety test on the wrong method.
 - [x] Decide on the prefs-file split; if done, migration plus updated `BackupRulesTest`
       — **decided: split out to [[cu-108]].** Not needed for correctness (the allowlist and the
       whole-file exclusion are each verified), and it touches credentials at rest, which is the

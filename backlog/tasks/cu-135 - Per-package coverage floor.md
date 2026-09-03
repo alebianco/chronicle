@@ -1,12 +1,17 @@
 ---
-id: DRAFT-114
+id: cu-135
 title: Per-package coverage floor
-status: Draft
+status: To Do
 assignee: []
-labels: [R2, agentic, testing]
+created_date: '2026-09-03'
+updated_date: '2026-09-03'
+labels:
+  - R2
+  - agentic
+  - testing
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
 ---
 
 ## Description

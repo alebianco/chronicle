@@ -1,12 +1,18 @@
 ---
-id: DRAFT-113
+id: cu-134
 title: Guard against logging whole model collections
-status: Draft
+status: To Do
 assignee: []
-labels: [R2, performance, agentic]
-dependencies: [cu-110]
-priority: medium
+created_date: '2026-09-03'
+updated_date: '2026-09-03'
+labels:
+  - R2
+  - performance
+  - agentic
 milestone: m-2
+dependencies:
+  - cu-110
+priority: medium
 ---
 
 ## Description

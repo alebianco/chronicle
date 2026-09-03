@@ -1,12 +1,18 @@
 ---
-id: DRAFT-112
-title: Validate setting values on import, not just keys
-status: Draft
+id: cu-133
+title: 'Validate setting values on import, not just keys'
+status: To Do
 assignee: []
-labels: [R2, bug, robustness]
-dependencies: [cu-17]
-priority: high
+created_date: '2026-09-03'
+updated_date: '2026-09-03'
+labels:
+  - R2
+  - bug
+  - robustness
 milestone: m-2
+dependencies:
+  - cu-17
+priority: high
 ---
 
 ## Description
