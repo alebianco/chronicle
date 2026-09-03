@@ -1,7 +1,7 @@
 ---
 id: cu-133
 title: 'Validate setting values on import, not just keys'
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'

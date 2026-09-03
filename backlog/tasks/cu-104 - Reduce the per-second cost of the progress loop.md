@@ -1,8 +1,9 @@
 ---
 id: cu-104
 title: Reduce the per-second cost of the progress loop
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-01'
 labels: [R2, performance, trust]
 dependencies: []
@@ -109,7 +110,7 @@ Note the M300 runs API 33, so the cu-103 Doze/FGS fix is inert there — a stall
 - [ ] No regression in `ProgressUpdaterTest` or the cu-9 round-trip tests
 
 
-## Implementation Notes — premise disproved by measurement, 2026-09-03
+## Implementation Notes — closed: premise disproved by measurement, 2026-09-03
 
 **This task's central assumption does not hold.** Measured on the A33 with Perfetto, against a real
 28-track/47-hour book:

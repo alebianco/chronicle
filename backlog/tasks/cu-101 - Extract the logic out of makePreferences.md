@@ -1,7 +1,7 @@
 ---
 id: cu-101
 title: Extract the logic out of makePreferences
-status: In Review
+status: Done
 assignee: [claude]
 created_date: '2026-09-01'
 labels: [R2, architecture, debt]

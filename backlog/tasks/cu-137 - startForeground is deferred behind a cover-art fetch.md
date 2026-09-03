@@ -1,7 +1,7 @@
 ---
 id: cu-137
 title: startForeground is deferred behind a cover-art fetch
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'
