@@ -9,7 +9,7 @@
         "key": "/library/metadata/1001/children",
         "parentRatingKey": 9001,
         "title": "The Hobbit",
-        "titleSort": "Hobbit, The",
+        "titleSort": "Middle-earth, Book 1",
         "parentTitle": "J R R Tolkien",
         "type": "album",
         "thumb": "/library/metadata/1001/thumb/1600000001",
@@ -24,9 +24,19 @@
         "viewCount": 0,
         "duration": 540000,
         "index": 1,
-        "plexGenres": [
+        "Genre": [
           {
             "tag": "Fantasy"
+          }
+        ],
+        "Style": [
+          {
+            "tag": "Rob Inglis"
+          }
+        ],
+        "Mood": [
+          {
+            "tag": "Series: Middle-earth"
           }
         ]
       }

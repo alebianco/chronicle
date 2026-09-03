@@ -117,6 +117,22 @@ val BOOK_MIGRATION_9_10 =
   }
 
 /**
+ * Adds narrator and series, from the Audnexus `Style`/`Mood` tags (cu-24).
+ *
+ * Empty and 0 defaults mean **not known yet**, which is the truthful state for every existing row:
+ * these come from the per-book detail response, so they populate as books are synced rather than
+ * on a library refresh.
+ */
+val BOOK_MIGRATION_10_11 =
+  object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL("ALTER TABLE Audiobook ADD COLUMN narrator TEXT NOT NULL DEFAULT ''")
+      db.execSQL("ALTER TABLE Audiobook ADD COLUMN series TEXT NOT NULL DEFAULT ''")
+      db.execSQL("ALTER TABLE Audiobook ADD COLUMN seriesIndex INTEGER NOT NULL DEFAULT 0")
+    }
+  }
+
+/**
  * Every migration, in order, as one list.
  *
  * Named rather than inlined into the builder so a test can open a real database file at an older
@@ -134,9 +150,10 @@ val BOOK_MIGRATIONS =
     BOOK_MIGRATION_7_8,
     BOOK_MIGRATION_8_9,
     BOOK_MIGRATION_9_10,
+    BOOK_MIGRATION_10_11,
   )
 
-@Database(entities = [Audiobook::class], version = 10, exportSchema = true)
+@Database(entities = [Audiobook::class], version = 11, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract val bookDao: BookDao
 }

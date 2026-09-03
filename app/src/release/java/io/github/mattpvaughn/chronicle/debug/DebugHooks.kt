@@ -1,11 +1,13 @@
 package io.github.mattpvaughn.chronicle.debug
 
 import android.content.Intent
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.navigation.Navigator
 
 /**
  * Release build: every debug hook is a no-op.
@@ -31,6 +33,12 @@ object DebugHooks : DebugHooksContract {
 
   /** Returns the api unchanged: no wrapper, and no failure injection, in a release build. */
   override fun wrapProgressApi(api: ProgressApi): ProgressApi = api
+
+  override fun onShowBrowseIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+    navigator: Navigator,
+  ) = Unit
 
   override fun onShowPlayerIntent(
     intent: Intent?,

@@ -31,7 +31,34 @@ data class PlexDirectory(
   val leafCount: Long = 0,
   val lastViewedAt: Long = 0,
   val viewCount: Long = 0,
+  /**
+   * Plex sends this as `Genre`.
+   *
+   * The `@Json` name was **missing** until cu-24, so Moshi looked for a key literally called
+   * `plexGenres` and the field was always empty against a real server. Every test passed, because
+   * the hand-written fixtures were written to match the code rather than the wire — which is
+   * precisely why the facet tests below are pinned against the *captured* fixtures instead.
+   */
+  @Json(name = "Genre")
   val plexGenres: List<PlexGenre> = emptyList(),
+  /**
+   * The narrator, by the Audnexus/seanap tagging convention (cu-24).
+   *
+   * Plex's music schema has no narrator field, so the community convention puts it in `Style`.
+   * **Never treat this as music semantics** — a "style" here is a person's name.
+   *
+   * Only present on the per-book detail response (`/library/metadata/{id}`), not on the library
+   * listing: verified against fixtures captured from a real Plex 1.43.3 server.
+   */
+  @Json(name = "Style")
+  val plexStyles: List<PlexTag> = emptyList(),
+  /**
+   * The series, by the same convention: `Mood` tags, usually as `Series: <name>` (cu-24).
+   *
+   * The prefix is stripped on the way in — see `seriesName`. Like [plexStyles], detail-only.
+   */
+  @Json(name = "Mood")
+  val plexMoods: List<PlexTag> = emptyList(),
   @Json(name = "Chapter")
   val plexChapters: List<PlexChapter> = emptyList(),
   val duration: Long = 0L,

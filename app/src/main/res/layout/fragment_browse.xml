@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Browsing the library by author, narrator or series (cu-24).
+
+  One screen with a facet selector at the top and a value list below. Tapping a value shows that
+  facet's books, which reuses the library's own book list rather than growing a third one.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorPrimaryDark">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/browse_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/colorPrimary"
+        app:layout_constraintTop_toTopOf="parent"
+        app:navigationIcon="@drawable/ic_arrow_back_white"
+        app:title="@string/browse_title"
+        app:titleTextColor="@color/textPrimary" />
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/facet_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/colorPrimary"
+        app:layout_constraintTop_toBottomOf="@id/browse_toolbar"
+        app:tabIndicatorColor="@color/colorAccent"
+        app:tabMode="fixed"
+        app:tabSelectedTextColor="@color/textPrimary"
+        app:tabTextColor="@color/textSecondary" />
+
+    <!--
+      Kotlin-driven visibility, so GONE in XML: a view whose default is visible flashes its
+      default for a frame before the binding runs (cu-58).
+    -->
+    <TextView
+        android:id="@+id/facet_coverage"
+        style="@style/TextAppearance.Body2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/colorPrimary"
+        android:padding="@dimen/margin_normal"
+        android:textColor="@color/textSecondary"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/facet_tabs"
+        tools:text="12 of 196 books synced. Narrator and series are read when a book is opened."
+        tools:visibility="visible" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/facet_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/facet_coverage" />
+
+    <TextView
+        android:id="@+id/facet_empty"
+        style="@style/TextAppearance.Body1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/screen_horizontal_padding"
+        android:textColor="@color/textSecondary"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/facet_coverage"
+        tools:text="No narrators yet."
+        tools:visibility="visible" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

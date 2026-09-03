@@ -1,11 +1,13 @@
 package io.github.mattpvaughn.chronicle.debug
 
 import android.content.Intent
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.navigation.Navigator
 
 /**
  * The shape both `DebugHooks` twins must have.
@@ -67,6 +69,20 @@ interface DebugHooksContract {
    * Release returns [api] unchanged, so there is no wrapper and no branch in a release build.
    */
   fun wrapProgressApi(api: ProgressApi): ProgressApi
+
+  /**
+   * Opens the browse-by-facet screen when `show_browse` is set (cu-24).
+   *
+   * Exists because the bottom navigation is **not reachable** from `adb shell input tap`: a
+   * `BottomNavigationItemView` sits under the system bars, which is the same obstacle that left tab
+   * navigation uncovered in cu-54's instrumented suite. Without this, the browse screen could not
+   * be opened on a device at all except by hand.
+   */
+  fun onShowBrowseIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+    navigator: Navigator,
+  )
 
   /**
    * Expands the currently-playing sheet, so the player — and the "position not synced" badge on

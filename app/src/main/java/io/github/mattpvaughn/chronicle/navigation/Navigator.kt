@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Observer
 import io.github.mattpvaughn.chronicle.R
+import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -12,6 +13,8 @@ import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsFrag
 import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsFragment.Companion.ARG_AUDIOBOOK_ID
 import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsFragment.Companion.ARG_AUDIOBOOK_TITLE
 import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsFragment.Companion.ARG_IS_AUDIOBOOK_CACHED
+import io.github.mattpvaughn.chronicle.features.browse.BrowseFragment
+import io.github.mattpvaughn.chronicle.features.browse.FacetBooksFragment
 import io.github.mattpvaughn.chronicle.features.collections.CollectionDetailsFragment
 import io.github.mattpvaughn.chronicle.features.collections.CollectionsFragment
 import io.github.mattpvaughn.chronicle.features.home.HomeFragment
@@ -158,6 +161,25 @@ class Navigator
       fragmentManager.beginTransaction()
         .replace(R.id.fragNavHost, detailsFrag)
         .addToBackStack(AudiobookDetailsFragment.TAG)
+        .commit()
+    }
+
+    /** The browse-by-facet screen (cu-24). */
+    fun showBrowse() {
+      fragmentManager.beginTransaction()
+        .replace(R.id.fragNavHost, BrowseFragment.newInstance())
+        .addToBackStack(BrowseFragment.TAG)
+        .commit()
+    }
+
+    /** The books under one facet value (cu-24). */
+    fun showFacetBooks(
+      kind: FacetKind,
+      value: String,
+    ) {
+      fragmentManager.beginTransaction()
+        .replace(R.id.fragNavHost, FacetBooksFragment.newInstance(kind, value))
+        .addToBackStack(FacetBooksFragment.TAG)
         .commit()
     }
 

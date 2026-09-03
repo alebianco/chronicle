@@ -341,6 +341,10 @@ class LibraryFragment : Fragment() {
 
         override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
           return when (menuItem.itemId) {
+            R.id.menu_browse -> {
+              navigator.showBrowse()
+              true
+            }
             R.id.menu_filter -> {
               viewModel.setFilterMenuVisible(
                 viewModel.isFilterShown.value?.not() ?: false,

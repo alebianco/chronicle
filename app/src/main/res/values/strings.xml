@@ -159,6 +159,26 @@
     <!-- Shown instead of a chapter count when the book reports no chapters. -->
     <string name="player_no_chapters">No chapters</string>
 
+    <string name="browse_title">Browse</string>
+    <string name="browse_by_author">Author</string>
+    <string name="browse_by_narrator">Narrator</string>
+    <string name="browse_by_series">Series</string>
+    <string name="browse_no_authors">No authors yet — the library has not been loaded.</string>
+    <string name="browse_no_narrators">No narrators known yet. Open a book to read its narrator from the server.</string>
+    <string name="browse_no_series">No series known yet. Open a book to read its series from the server.</string>
+    <!--
+      Plex only sends narrator and series on a per-book request, so this index fills in as books
+      are opened. Saying so is the point: a partial list presented as complete reads as "these are
+      all the narrators I have".
+    -->
+    <plurals name="browse_coverage">
+        <item quantity="one">%1$d book has no narrator or series yet. These are read from the server when a book is opened.</item>
+        <item quantity="other">%1$d books have no narrator or series yet. These are read from the server when a book is opened.</item>
+    </plurals>
+    <plurals name="facet_book_count">
+        <item quantity="one">%1$d book</item>
+        <item quantity="other">%1$d books</item>
+    </plurals>
     <plurals name="downloads_failed_summary">
         <item quantity="one">Download failed</item>
         <item quantity="other">Downloads failed</item>

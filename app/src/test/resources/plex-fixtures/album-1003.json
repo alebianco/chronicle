@@ -9,7 +9,7 @@
         "key": "/library/metadata/1003/children",
         "parentRatingKey": 9003,
         "title": "Mistborn Book 10",
-        "titleSort": "Mistborn Book 10",
+        "titleSort": "Mistborn, Book 10",
         "parentTitle": "Brandon Sanderson",
         "type": "album",
         "thumb": "/library/metadata/1003/thumb/1600000003",
@@ -24,9 +24,19 @@
         "viewCount": 0,
         "duration": 180000,
         "index": 1,
-        "plexGenres": [
+        "Genre": [
           {
             "tag": "Fantasy"
+          }
+        ],
+        "Style": [
+          {
+            "tag": "Michael Kramer"
+          }
+        ],
+        "Mood": [
+          {
+            "tag": "Series: Mistborn"
           }
         ]
       }

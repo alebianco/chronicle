@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 /**
  * Opens every database through Room itself.
@@ -235,6 +236,57 @@ class RoomSchemaTest {
         cursor.getFloat(1),
         0f,
       )
+    }
+    db.close()
+  }
+
+  /**
+   * The v10 -> v11 migration adds narrator and series (cu-24).
+   *
+   * Existing rows must read **empty**, meaning "not known yet" — an upgrade that invented a value
+   * would put a phantom narrator in the facet list for every book in the library.
+   */
+  @Test
+  fun `the book database survives being opened after migrating from v10`() {
+    val db =
+      migrated(
+        klass = BookDatabase::class.java,
+        oldVersion = 10,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook` (`id` TEXT NOT NULL, " +
+            "`source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, " +
+            "`author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, " +
+            "`genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, " +
+            "`addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+            "`lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, " +
+            "`isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, " +
+            "`favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, " +
+            "`leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, " +
+            "`chapters` TEXT NOT NULL, `playbackSpeed` REAL NOT NULL, PRIMARY KEY(`id`))",
+        seedSql =
+          "INSERT INTO Audiobook (id, source, title, titleSort, author, thumb, parentId, " +
+            "genre, summary, year, addedAt, updatedAt, lastViewedAt, duration, isCached, " +
+            "progress, favorited, viewedLeafCount, leafCount, viewCount, chapters, " +
+            "playbackSpeed) " +
+            "VALUES ('1001', 1, 'Dune', 'Dune', 'Frank Herbert', '', '0', '', '', 1965, 0, 0, " +
+            "1700000000000, 3600000, 1, 1234567, 0, 0, 3, 0, '', 1.5)",
+        migrations = BOOK_MIGRATIONS,
+      )
+
+    db.query(
+      "SELECT progress, playbackSpeed, narrator, series, seriesIndex FROM Audiobook",
+      emptyArray(),
+    ).use { cursor ->
+      assertTrue("the pre-existing row must survive the upgrade", cursor.moveToFirst())
+      assertEquals(
+        "an upgrade that loses progress loses the user's place",
+        1_234_567L,
+        cursor.getLong(0),
+      )
+      assertEquals("a per-book speed must survive too", 1.5f, cursor.getFloat(1), 0f)
+      assertEquals("an upgraded book has no narrator yet, not a phantom one", "", cursor.getString(2))
+      assertEquals("", cursor.getString(3))
+      assertEquals(0, cursor.getInt(4))
     }
     db.close()
   }
@@ -549,4 +601,44 @@ class RoomSchemaTest {
       )
       db.close()
     }
+
+  /**
+   * An exported schema's file must declare the version its **name** says (cu-24).
+   *
+   * Room rewrites `<version>.json` from the current entities, and if the version bump and the
+   * entity change land in the same build it overwrites the **old** file — leaving `10.json`
+   * containing v11's shape. That happened while writing this task. Those files are the authority a
+   * migration's column list is written from (see `BOOK_MIGRATION_8_9`), so a corrupted one
+   * silently misinforms the next migration written against it.
+   *
+   * The check is the filename against the `"version"` inside, which is what actually disagrees —
+   * comparing column counts between neighbours does not catch it, because an overwritten file is
+   * an exact copy of the newer one and compares equal.
+   */
+  @Test
+  fun `every exported schema declares the version its filename claims`() {
+    val roots = File("schemas").listFiles().orEmpty().filter { it.isDirectory }
+    assertTrue("no schema directories found under ${File("schemas").absolutePath}", roots.isNotEmpty())
+
+    var checked = 0
+    roots.forEach { dir ->
+      dir.listFiles { f -> f.name.endsWith(".json") }.orEmpty().forEach { file ->
+        val fromName = file.name.removeSuffix(".json").toInt()
+        val declared =
+          Regex(""""version"\s*:\s*(\d+)""")
+            .find(file.readText())
+            ?.groupValues
+            ?.get(1)
+            ?.toInt()
+        assertEquals(
+          "${dir.name}/${file.name} declares version $declared — an older exported schema has " +
+            "been overwritten with a newer entity's shape",
+          fromName,
+          declared,
+        )
+        checked++
+      }
+    }
+    assertTrue("no schema files were checked", checked > 0)
+  }
 }

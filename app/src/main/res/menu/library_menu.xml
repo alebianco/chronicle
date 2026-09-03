@@ -15,6 +15,13 @@
         android:visible="false"
         app:showAsAction="ifRoom" />
 
+    <!-- Browse by author, narrator or series (cu-24). -->
+    <item
+        android:id="@+id/menu_browse"
+        android:icon="@drawable/ic_browse"
+        android:title="@string/browse_title"
+        app:showAsAction="ifRoom" />
+
     <item
         android:id="@+id/menu_filter"
         android:icon="@drawable/ic_filter_list_white"

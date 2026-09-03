@@ -24,7 +24,7 @@
         "viewCount": 0,
         "duration": 540000,
         "index": 1,
-        "plexGenres": [
+        "Genre": [
           {
             "tag": "Fantasy"
           }
@@ -50,7 +50,7 @@
         "viewCount": 0,
         "duration": 360000,
         "index": 1,
-        "plexGenres": [
+        "Genre": [
           {
             "tag": "Science Fiction"
           }
@@ -76,7 +76,7 @@
         "viewCount": 0,
         "duration": 180000,
         "index": 1,
-        "plexGenres": [
+        "Genre": [
           {
             "tag": "Fantasy"
           }

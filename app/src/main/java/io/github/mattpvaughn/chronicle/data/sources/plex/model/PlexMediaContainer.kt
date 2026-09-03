@@ -31,6 +31,16 @@ data class PlexMediaContainer(
 data class PlexGenre(val tag: String = "")
 
 /**
+ * A `<Style>` or `<Mood>` tag — narrator and series by the Audnexus convention (cu-24).
+ *
+ * Same single-field shape as [PlexGenre], kept as its own type because these are **not** genres:
+ * naming it `PlexGenre` at three call sites is how "narrator" would eventually be read as music
+ * metadata and formatted as one.
+ */
+@JsonClass(generateAdapter = true)
+data class PlexTag(val tag: String = "")
+
+/**
  * Where a server response becomes local models — and therefore the one place to reject an id that
  * is unsafe to use as a filename (cu-111).
  *

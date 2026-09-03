@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.debug
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.Injector
@@ -11,6 +12,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.navigation.Navigator
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.HttpException
@@ -37,6 +39,7 @@ object DebugHooks : DebugHooksContract {
   private const val EXTRA_FAIL_SYNC = "fail_sync"
   private const val KEY_FAIL_SYNC = "fail_sync"
   private const val EXTRA_SHOW_PLAYER = "show_player"
+  private const val EXTRA_SHOW_BROWSE = "show_browse"
   private const val EXTRA_INVALIDATE_SERVER_TOKEN = "invalidate_server_token"
 
   /**
@@ -197,6 +200,38 @@ object DebugHooks : DebugHooksContract {
     // Presence, never the value — logging a real token is what TokenLoggingTest exists to stop,
     // and the replacement is a constant, so there is nothing useful to print either way.
     Timber.i("invalidate_server_token: server access token replaced with a bogus value")
+  }
+
+  /**
+   * Opens the browse screen, so its facets can be checked without tapping a bottom-nav tab.
+   *
+   * ```
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/\
+   *   io.github.mattpvaughn.chronicle.application.MainActivity --ez show_browse true
+   * ```
+   *
+   * The tab itself cannot be driven from `input tap` — a `BottomNavigationItemView` sits under the
+   * system bars, the same obstacle recorded in cu-54 — so without this the screen is unreachable
+   * from a script (cu-24).
+   */
+  override fun onShowBrowseIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+    navigator: Navigator,
+  ) {
+    if (intent == null || !intent.getBooleanExtra(EXTRA_SHOW_BROWSE, false)) {
+      return
+    }
+    // Posted, not called straight away: this runs from `onCreate`, where the FragmentManager has
+    // no host yet and a `commit()` throws `FragmentManager has not been attached to a host`. The
+    // `show_player` hook sidesteps the same problem by observing LiveData; this needs no state, so
+    // one pass of the main loop is enough.
+    Timber.i("Opening the browse screen (show_browse)")
+    activity.window.decorView.post {
+      if (!activity.isFinishing && !activity.isDestroyed) {
+        navigator.showBrowse()
+      }
+    }
   }
 
   /**

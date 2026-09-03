@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **926 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **962 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -109,7 +109,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Five separate Room databases** (`BookDatabase` v10, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
+- **Five separate Room databases** (`BookDatabase` v11, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
 - **Listening position is owned by the *tracks*, never the book** (decision-16, cu-90). Plex stores
   no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a cache of a derivation.
   `merge` carries the local value and **never** adopts `network.progress`; only `syncAudiobook`,
@@ -333,6 +333,33 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   legitimately appears on **both** tracks, so a count above the distinct-chapter count is correct.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
+  Both are **detail-only** (cu-24): `/library/metadata/{id}` carries them, the library listing
+  `/library/sections/{id}/all` does **not** — verified against fixtures captured from a real Plex
+  1.43.3 server. So a narrator/series index cannot be built from a refresh; it fills in as books are
+  synced (`syncAudiobook` already fetches the detail), and `FacetList.unknownCount` exists so the UI
+  is obliged to say how partial it is. `merge` needs a **third** rule for fields like these — the
+  network value when it has one, the local value when it does not: preferring the network blanks a
+  narrator on every refresh, preferring the local one makes a re-tagged book uncorrectable.
+  `Audiobook.seriesIndex` is parsed from `titleSort`, **not** Plex's `index`, which is the album
+  ordering index and is 1 for nearly every audiobook.
+- **A tag list's `@Json` name must be checked against a captured response, not a fixture** (cu-24).
+  `plexGenres` carried **no** `@Json(name = "Genre")` for the life of the project, so Moshi looked
+  for a key literally called `plexGenres` and `Audiobook.genre` was empty against every real
+  server — while every test passed, because the hand-written fixtures were written to match the
+  *code*. The `*-real-shape.json` fixtures are captured from a real server and are the authority;
+  pin new parsing tests against those.
+- **An exported Room schema for a released version must never change** (cu-24). Room rewrites
+  `<version>.json` from the current entities, and when a version bump and an entity change land in
+  the same build it overwrites the **older** file — leaving `10.json` containing v11's shape. Those
+  files are the authority a migration's column list is written from (`BOOK_MIGRATION_8_9` says so),
+  so a corrupted one silently misinforms the next migration. `RoomSchemaTest` checks each file's
+  name against the `version` inside it; comparing column counts between neighbours does **not**
+  work, because an overwritten file is an exact copy of the newer one and compares equal.
+- **The bottom navigation cannot be driven by `adb shell input tap`** — a `BottomNavigationItemView`
+  sits under the system bars (the obstacle recorded in cu-54). Screens behind a tab need a debug
+  hook to be reachable from a script: `--ez show_browse true` is one (cu-24). Such a hook must
+  **post** rather than navigate immediately — called from `onCreate` a `commit()` throws
+  `FragmentManager has not been attached to a host`.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.
 - **Cleartext HTTP is refused app-wide** (cu-42). `res/xml/network_security_config.xml` sets
   `cleartextTrafficPermitted="false"` with **no exceptions**; a debug-only override in

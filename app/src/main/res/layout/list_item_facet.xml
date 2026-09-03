@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One facet value and its book count (cu-24). -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/facet_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:paddingStart="@dimen/screen_horizontal_padding"
+    android:paddingTop="@dimen/margin_normal"
+    android:paddingEnd="@dimen/screen_horizontal_padding"
+    android:paddingBottom="@dimen/margin_normal">
+
+    <TextView
+        android:id="@+id/facet_value"
+        style="@style/TextAppearance.Body1"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/textPrimary"
+        app:layout_constraintEnd_toStartOf="@id/facet_count"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="Rob Inglis" />
+
+    <TextView
+        android:id="@+id/facet_count"
+        style="@style/TextAppearance.Body2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/textSecondary"
+        app:layout_constraintBottom_toBottomOf="@id/facet_value"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/facet_value"
+        tools:text="12 books" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

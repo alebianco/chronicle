@@ -330,4 +330,42 @@ class PlexFixtureContractTest {
 
     assertEquals("each track must start at a different chapter", firstTags.size, firstTags.toSet().size)
   }
+
+  /**
+   * The album *detail* fixtures carry Audnexus tags (cu-24).
+   *
+   * They exist so narrator and series are reachable in mock mode at all — the criterion is about
+   * "Audnexus-tagged libraries", and without tags in the fixtures there is nothing to browse. Pinned
+   * here because the tags live in three separate files and a silent loss would make the facet
+   * screens look empty rather than broken.
+   */
+  @Test
+  fun `each album detail fixture carries a narrator and a series`() {
+    val expected =
+      mapOf(
+        "1001" to ("Rob Inglis" to "Middle-earth"),
+        "1002" to ("Scott Brick, Simon Vance" to "Dune"),
+        "1003" to ("Michael Kramer" to "Mistborn"),
+      )
+
+    expected.forEach { (id, narratorAndSeries) ->
+      val book =
+        container("album-$id.json").plexMediaContainer.asAudiobooks().single()
+      val (narrator, series) = narratorAndSeries
+      assertEquals("narrator for $id", narrator, book.narrator)
+      assertEquals("series for $id", series, book.series)
+    }
+  }
+
+  /** And the series position, which is what orders a series list. */
+  @Test
+  fun `album detail fixtures carry a series position`() {
+    assertEquals(1, container("album-1001.json").plexMediaContainer.asAudiobooks().single().seriesIndex)
+    assertEquals(1, container("album-1002.json").plexMediaContainer.asAudiobooks().single().seriesIndex)
+    assertEquals(
+      "double digits, so a string sort would put this before book 2",
+      10,
+      container("album-1003.json").plexMediaContainer.asAudiobooks().single().seriesIndex,
+    )
+  }
 }

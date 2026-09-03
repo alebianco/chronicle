@@ -119,6 +119,7 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onFailSyncIntent(intent)
     DebugHooks.onInvalidateServerTokenIntent(intent)
     DebugHooks.onShowPlayerIntent(intent, this, viewModel)
+    DebugHooks.onShowBrowseIntent(intent, this, navigator)
     // Debug-only: `--el play_book <id>` starts playback once the media service is
     // connected. connect{} is required — transportControls is null until then,
     // which is why driving playback from a bare intent alone does not work.
@@ -439,6 +440,7 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onFailSyncIntent(intent)
     DebugHooks.onInvalidateServerTokenIntent(intent)
     DebugHooks.onShowPlayerIntent(intent, this, viewModel)
+    DebugHooks.onShowBrowseIntent(intent, this, navigator)
     if (mediaServiceConnection.isConnected.value == true) {
       DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
     } else {

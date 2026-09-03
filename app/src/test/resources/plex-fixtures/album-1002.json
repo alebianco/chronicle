@@ -9,7 +9,7 @@
         "key": "/library/metadata/1002/children",
         "parentRatingKey": 9002,
         "title": "Dune",
-        "titleSort": "Dune",
+        "titleSort": "Dune, Book 1",
         "parentTitle": "Frank Herbert",
         "type": "album",
         "thumb": "/library/metadata/1002/thumb/1600000002",
@@ -24,9 +24,22 @@
         "viewCount": 0,
         "duration": 360000,
         "index": 1,
-        "plexGenres": [
+        "Genre": [
           {
             "tag": "Science Fiction"
+          }
+        ],
+        "Style": [
+          {
+            "tag": "Scott Brick"
+          },
+          {
+            "tag": "Simon Vance"
+          }
+        ],
+        "Mood": [
+          {
+            "tag": "Series: Dune"
           }
         ]
       }

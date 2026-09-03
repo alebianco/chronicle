@@ -13,6 +13,8 @@ import io.github.mattpvaughn.chronicle.data.sources.MediaSource.Companion.NO_SOU
 import io.github.mattpvaughn.chronicle.data.sources.SourceManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.narrators
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.seriesName
 import io.github.mattpvaughn.chronicle.features.player.*
 import kotlin.time.Duration.Companion.minutes
 
@@ -59,6 +61,27 @@ data class Audiobook(
    * speed. Read it through [effectiveSpeed] — the only place the sentinel is interpreted.
    */
   val playbackSpeed: Float = NO_SPEED_OVERRIDE,
+  /**
+   * The narrator(s), by the Audnexus `Style` convention (cu-24).
+   *
+   * Comma-separated when a recording has several, because this is a display and grouping value
+   * rather than a relation — a book with two narrators appears under both in the facet list, which
+   * `BookFacets` splits on the way through.
+   *
+   * Empty means **not known**, not "has none": `Style` is only on the per-book detail response, so
+   * a book that has never been synced has nothing here regardless of how it is tagged.
+   */
+  val narrator: String = "",
+  /** The series, by the `Mood` convention, with any `Series:` prefix already stripped (cu-24). */
+  val series: String = "",
+  /**
+   * This book's place in [series], or 0 when unknown.
+   *
+   * Plex's `index` is the album's track-ordering index and is 1 for most audiobooks, so it is
+   * **not** usable as a series position. The Audnexus convention puts the position in `titleSort`
+   * ("Mistborn, Book 2"), which is what this is parsed from.
+   */
+  val seriesIndex: Int = 0,
 ) {
   /**
    * The speed this book should play at: its own override when it has one, otherwise [globalSpeed].
@@ -107,7 +130,35 @@ data class Audiobook(
         viewedLeafCount = dir.viewedLeafCount,
         leafCount = dir.leafCount,
         viewCount = dir.viewCount,
+        // Audnexus tagging convention (cu-24). Both are empty on a library *listing* — Plex only
+        // sends `Style`/`Mood` on the per-book detail response — so these fill in when a book is
+        // synced, and `merge` below is what stops a later refresh from blanking them again.
+        narrator = dir.narrators().joinToString(separator = ", "),
+        series = dir.seriesName(),
+        seriesIndex = seriesIndexFromTitleSort(dir.titleSort),
       )
+
+    /**
+     * The book's position in its series, parsed out of `titleSort`.
+     *
+     * The Audnexus convention writes `"<Series>, Book <n>"` there. Plex's own `index` field is the
+     * album's ordering index and is 1 for nearly every audiobook, so it cannot be used for this —
+     * a facet list ordered by it would put every book first.
+     *
+     * Returns 0 when no position can be read, which sorts before any real one and lets the caller
+     * fall back to the numeric-aware title comparator.
+     */
+    internal fun seriesIndexFromTitleSort(titleSort: String): Int =
+      SERIES_INDEX_PATTERN.find(titleSort)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+
+    /**
+     * `Book 3`, `Bk 3`, `#3`, or a bare `, 3` at the end.
+     *
+     * Deliberately anchored to the *end* of the string: a series whose own name contains a number
+     * ("Book 2 of the Fixture Saga, Book 5") must take the trailing one.
+     */
+    private val SERIES_INDEX_PATTERN =
+      Regex("(?:book|bk|#|,)\\s*(\\d+)\\s*$", RegexOption.IGNORE_CASE)
 
     /**
      * Merges updated local fields with a network copy of the book. Respects network metadata
@@ -120,7 +171,14 @@ data class Audiobook(
      * Always retain fields from local copy: [duration], [isCached], [favorited], [chapters],
      * [source], [playbackSpeed]. [playbackSpeed] is a local-only override the server knows nothing
      * about, so `network.playbackSpeed` is always the [NO_SPEED_OVERRIDE] default — adopting it
-     * would silently drop the user's per-book speed on every library refresh. [chapters] and [duration] are retained because they can be calculated only when
+     * would silently drop the user's per-book speed on every library refresh.
+     *
+     * [narrator], [series] and [seriesIndex] are different again: the server *can* supply them, but
+     * only on the per-book detail response (cu-24). A library refresh merges from the **listing**,
+     * where they are always absent — so they are taken from the network copy when it has a value
+     * and kept from the local one when it does not. Preferring the network unconditionally would
+     * blank a narrator on every refresh; preferring the local one unconditionally would make a
+     * re-tagged book impossible to correct. [chapters] and [duration] are retained because they can be calculated only when
      * all child [MediaItemTrack]s are loaded; [duration], [source] and [isCached] because they are
      * local values that do not exist on the server.
      *
@@ -149,6 +207,9 @@ data class Audiobook(
           chapters = local.chapters,
           source = local.source,
           playbackSpeed = local.playbackSpeed,
+          narrator = network.narrator.ifEmpty { local.narrator },
+          series = network.series.ifEmpty { local.series },
+          seriesIndex = if (network.seriesIndex != 0) network.seriesIndex else local.seriesIndex,
         )
       } else {
         network.copy(
@@ -160,6 +221,9 @@ data class Audiobook(
           favorited = local.favorited,
           chapters = local.chapters,
           playbackSpeed = local.playbackSpeed,
+          narrator = network.narrator.ifEmpty { local.narrator },
+          series = network.series.ifEmpty { local.series },
+          seriesIndex = if (network.seriesIndex != 0) network.seriesIndex else local.seriesIndex,
         )
       }
     }
