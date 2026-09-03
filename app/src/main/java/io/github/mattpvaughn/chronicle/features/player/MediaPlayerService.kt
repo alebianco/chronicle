@@ -778,7 +778,7 @@ class MediaPlayerService :
                 val track = trackRepository.getTrackAsync(trackId)
                 val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
 
-                if (tracks.getDuration() == tracks.getProgress()) {
+                if (tracks.getDuration() == tracks.getProgress().millis) {
                   mediaController.transportControls.stop()
                 }
                 progressUpdater.updateProgress(

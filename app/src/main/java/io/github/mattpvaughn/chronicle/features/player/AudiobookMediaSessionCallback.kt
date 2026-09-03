@@ -503,7 +503,7 @@ class AudiobookMediaSessionCallback
       if (networkTracks.isOk) {
         bookRepository.updateTrackData(
           bookId,
-          networkTracks.value.getProgress(),
+          networkTracks.value.getProgress().millis,
           networkTracks.value.getDuration(),
           networkTracks.value.size,
         )

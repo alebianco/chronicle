@@ -82,7 +82,7 @@ class PerTickRepublishTest {
     // The guard must not suppress the one thing that legitimately changes per tick.
     val s = singleton()
     s.update(book = book, track = track("1"), tracks = listOf(track("1"), track("2")))
-    val first = s.bookPosition.value
+    val first = s.bookPosition.value.millis
 
     s.update(
       book = book,
@@ -90,7 +90,7 @@ class PerTickRepublishTest {
       tracks = listOf(track("1", progress = 9_000L), track("2")),
     )
 
-    assertEquals("position must keep moving", 9_000L, s.bookPosition.value)
+    assertEquals("position must keep moving", 9_000L, s.bookPosition.value.millis)
     assertEquals(0L, first)
   }
 }

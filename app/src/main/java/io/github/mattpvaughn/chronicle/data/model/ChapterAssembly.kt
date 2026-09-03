@@ -21,7 +21,7 @@ inline fun assembleChapters(
   chaptersForTrack: (MediaItemTrack) -> List<Chapter>,
 ): List<Chapter> {
   val assembled = mutableListOf<Chapter>()
-  var trackStartOffset = 0L
+  var trackStartOffset = BookOffset.ZERO
   for (track in tracks) {
     val reported = chaptersForTrack(track)
     if (reported.isEmpty()) {

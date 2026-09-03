@@ -4,6 +4,7 @@ import android.text.format.DateUtils
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.TypeConverter
+import androidx.room.TypeConverters
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import timber.log.Timber
 
@@ -22,6 +23,7 @@ import timber.log.Timber
  * one chapter index. [id] stays as a plain column — it is still what the server said, and
  * `updateCachedStatus` addresses rows by it.
  */
+@TypeConverters(OffsetConverters::class)
 @Entity(primaryKeys = ["bookId", "trackId", "discNumber", "index"])
 data class Chapter(
   val title: String = "",
@@ -45,10 +47,10 @@ data class Chapter(
    * gain, while cu-82 is already scheduled to retire that dual write.
    */
   @ColumnInfo(name = "startTimeOffset")
-  val bookStartTimeOffset: Long = 0L,
+  val bookStartTimeOffset: BookOffset = BookOffset.ZERO,
   /** Milliseconds from the start of the **book** to the end of the chapter. See [bookStartTimeOffset]. */
   @ColumnInfo(name = "endTimeOffset")
-  val bookEndTimeOffset: Long = 0L,
+  val bookEndTimeOffset: BookOffset = BookOffset.ZERO,
   val downloaded: Boolean = false,
   val trackId: String = TRACK_NOT_FOUND,
   val bookId: String = NO_AUDIOBOOK_FOUND_ID,
@@ -77,12 +79,16 @@ data class Chapter(
 val EMPTY_CHAPTER = Chapter("")
 
 /**
- * Returns the chapter which contains the [timeStamp] (the playback progress of the track containing
- * this chapter), or [EMPTY_TRACK] if there is no chapter
+ * The chapter on track [trackId] containing [bookPosition], or [EMPTY_CHAPTER] if none does.
+ *
+ * **[bookPosition] is a book offset, not a track one**, despite the track id alongside it: the
+ * comparison is against [Chapter.bookStartTimeOffset]. The old parameter name, `timeStamp`, said
+ * nothing about the frame, and `MultiTrackChapterTest` pins both halves of the ambiguity — a book
+ * offset resolves, an in-track offset finds nothing. Now the type says it (cu-136).
  */
 fun List<Chapter>.getChapterAt(
   trackId: String,
-  timeStamp: Long,
+  bookPosition: BookOffset,
 ): Chapter {
   for (chapter in this) {
     // Half-open: `start <= t < end`. The range used to be inclusive at *both* ends, so a position
@@ -93,13 +99,13 @@ fun List<Chapter>.getChapterAt(
     //
     // This now agrees with [chapterAtBookProgress], which was already half-open. Two lookups over
     // the same data disagreeing at a boundary is the actual defect; the inclusive end was it.
-    if (chapter.trackId == trackId && timeStamp >= chapter.bookStartTimeOffset && timeStamp < chapter.bookEndTimeOffset) {
+    if (chapter.trackId == trackId && bookPosition >= chapter.bookStartTimeOffset && bookPosition < chapter.bookEndTimeOffset) {
       return chapter
     }
   }
   // The final chapter's own end is a real position — a book paused at its very last millisecond is
   // in the last chapter, not nowhere. Half-open excludes it, so accept it explicitly.
-  return lastOrNull { it.trackId == trackId && timeStamp == it.bookEndTimeOffset } ?: EMPTY_CHAPTER
+  return lastOrNull { it.trackId == trackId && bookPosition == it.bookEndTimeOffset } ?: EMPTY_CHAPTER
 }
 
 /**
@@ -115,7 +121,7 @@ fun List<Chapter>.getChapterAt(
  * guaranteed order. Returns the last chapter for a position at or past the end, rather than
  * [EMPTY_CHAPTER], so a finished book still reports where it finished.
  */
-fun List<Chapter>.chapterAtBookProgress(bookProgress: Long): Chapter {
+fun List<Chapter>.chapterAtBookProgress(bookProgress: BookOffset): Chapter {
   if (isEmpty()) {
     return EMPTY_CHAPTER
   }
@@ -165,8 +171,8 @@ class ChapterListConverter {
       title = split[0].unescapeSeparators(),
       id = split[1],
       index = split[2].toLong(),
-      bookStartTimeOffset = split[3].toLong(),
-      bookEndTimeOffset = split[4].toLong(),
+      bookStartTimeOffset = BookOffset(split[3].toLong()),
+      bookEndTimeOffset = BookOffset(split[4].toLong()),
       discNumber = discNumber,
       downloaded = downloaded,
       trackId = trackId,
@@ -181,8 +187,8 @@ class ChapterListConverter {
         it.title.escapeSeparators(),
         it.id,
         it.index,
-        it.bookStartTimeOffset,
-        it.bookEndTimeOffset,
+        it.bookStartTimeOffset.millis,
+        it.bookEndTimeOffset.millis,
         it.discNumber,
         it.downloaded,
         it.trackId,

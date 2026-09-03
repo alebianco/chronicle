@@ -1,6 +1,9 @@
 package io.github.mattpvaughn.chronicle.features.player
 
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.TrackIndex
+import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 import io.github.mattpvaughn.chronicle.data.model.getActiveTrack
 import io.github.mattpvaughn.chronicle.data.model.getTrackStartTime
 import timber.log.Timber
@@ -15,24 +18,52 @@ import kotlin.math.max
 class TrackListStateManager {
   /** The list of [MediaItemTrack]s currently playing */
   var trackList: List<MediaItemTrack> = emptyList()
+    set(value) {
+      field = value
+      sortedTracks = value.sorted()
+    }
 
-  /** The index of the current track within [trackList] */
-  var currentTrackIndex: Int = 0
+  /**
+   * [trackList] in the order the player's playlist uses. See [currentTrackIndex].
+   *
+   * Sorted once on assignment rather than on each read: [currentBookPosition] and [currentTrack]
+   * are read on the 1 Hz progress path, and sorting there would be exactly the per-tick work whose
+   * result cannot change that cu-110 was about.
+   */
+  private var sortedTracks: List<MediaItemTrack> = emptyList()
+
+  /**
+   * The index of the current track within the **sorted** [trackList].
+   *
+   * Sorted, because this feeds `Player.seekTo`'s `mediaItemIndex`, which addresses the player's
+   * playlist — and that playlist is built in sorted order. Both callers happen to assign a
+   * DAO-ordered list, so the two agreed by convention rather than by construction; [TrackIndex]
+   * plus the explicit sort in [seekToActiveTrack] makes it hold by construction (cu-136).
+   */
+  var currentTrackIndex: TrackIndex = TrackIndex(0)
     private set
 
-  /** The number of milliseconds from the start of the currently playing track */
-  var currentTrackProgress: Long = 0
+  /** The offset from the start of the currently playing track. */
+  var currentTrackProgress: TrackOffset = TrackOffset.ZERO
     private set
 
   private val currentTrack: MediaItemTrack
-    get() = trackList[currentTrackIndex]
+    get() = sortedTracks[currentTrackIndex.value]
 
   /**
-   * The number of milliseconds between current playback position and the start of the first
-   * track. This is not authoritative, as [MediaItemTrack.duration] is not necessarily correct
+   * The position measured from the start of the **book** — the preceding tracks' durations plus
+   * [currentTrackProgress]. Not authoritative, since [MediaItemTrack.duration] is not necessarily
+   * correct.
+   *
+   * **Has no production caller any more.** Its one reader was `seekRelative`'s service-is-dead
+   * branch, which wrote it into `MediaItemTrack.progress` — a *track* column — inflating the row
+   * by every preceding track's duration (cu-136). Kept rather than deleted because the two frames
+   * being available side by side is what `TrackListStateManagerFrameTest` pins, and a future
+   * caller wanting a book position should find one here instead of deriving it inline for a
+   * seventh time.
    */
-  val currentBookPosition: Long
-    get() = trackList.getTrackStartTime(currentTrack) + currentTrackProgress
+  val currentBookPosition: BookOffset
+    get() = BookOffset(sortedTracks.getTrackStartTime(currentTrack) + currentTrackProgress.millis)
 
   /**
    * Update [currentTrackIndex] to [activeTrackIndex] and [currentTrackProgress] to
@@ -47,8 +78,8 @@ class TrackListStateManager {
         "Cannot set current track index = $activeTrackIndex if tracklist.size == ${trackList.size}",
       )
     }
-    currentTrackIndex = activeTrackIndex
-    currentTrackProgress = offsetFromTrackStart
+    currentTrackIndex = TrackIndex(activeTrackIndex)
+    currentTrackProgress = TrackOffset(offsetFromTrackStart)
   }
 
   /**
@@ -57,9 +88,13 @@ class TrackListStateManager {
    */
   fun seekToActiveTrack() {
     Timber.i("Seeking to active track")
-    val activeTrack = trackList.getActiveTrack()
-    currentTrackIndex = trackList.indexOf(activeTrack)
-    currentTrackProgress = activeTrack.progress
+    // `getActiveTrack()` sorts internally, so the index must come from the sorted list too. It
+    // used to come from the unsorted `trackList`, which agreed only because both callers pass a
+    // DAO-ordered list — one caller away from seeking to the wrong track (cu-136).
+    val ordered = sortedTracks
+    val activeTrack = ordered.getActiveTrack()
+    currentTrackIndex = TrackIndex(ordered.indexOf(activeTrack))
+    currentTrackProgress = TrackOffset(activeTrack.progress)
   }
 
   /** Seeks forwards or backwards in the playlist by [offsetMillis] millis*/
@@ -74,34 +109,36 @@ class TrackListStateManager {
   /** Seek backwards by [offset] ms. [offset] must be a positive [Long] */
   private fun seekBackwards(offset: Long) {
     check(offset >= 0) { "Attempted to seek by a negative number: $offset" }
+    val ordered = sortedTracks
     var offsetRemaining =
-      offset + (trackList[currentTrackIndex].duration - currentTrackProgress)
-    for (index in currentTrackIndex downTo 0) {
-      if (offsetRemaining < trackList[index].duration) {
-        currentTrackProgress = max(0, trackList[index].duration - offsetRemaining)
-        currentTrackIndex = index
+      offset + (ordered[currentTrackIndex.value].duration - currentTrackProgress.millis)
+    for (index in currentTrackIndex.value downTo 0) {
+      if (offsetRemaining < ordered[index].duration) {
+        currentTrackProgress = TrackOffset(max(0, ordered[index].duration - offsetRemaining))
+        currentTrackIndex = TrackIndex(index)
         return
       } else {
-        offsetRemaining -= trackList[index].duration
+        offsetRemaining -= ordered[index].duration
       }
     }
-    currentTrackIndex = 0
-    currentTrackProgress = 0
+    currentTrackIndex = TrackIndex(0)
+    currentTrackProgress = TrackOffset.ZERO
   }
 
   private fun seekForwards(offset: Long) {
     check(offset >= 0) { "Attempted to seek by a negative number: $offset" }
-    var offsetRemaining = offset + currentTrackProgress
-    for (index in currentTrackIndex until trackList.size) {
-      if (offsetRemaining < trackList[index].duration) {
-        currentTrackIndex = index
-        currentTrackProgress = offsetRemaining
+    val ordered = sortedTracks
+    var offsetRemaining = offset + currentTrackProgress.millis
+    for (index in currentTrackIndex.value until ordered.size) {
+      if (offsetRemaining < ordered[index].duration) {
+        currentTrackIndex = TrackIndex(index)
+        currentTrackProgress = TrackOffset(offsetRemaining)
         return
       } else {
-        offsetRemaining -= trackList[index].duration
+        offsetRemaining -= ordered[index].duration
       }
     }
-    currentTrackIndex = trackList.size - 1
-    currentTrackProgress = trackList.lastOrNull()?.duration ?: 0L
+    currentTrackIndex = TrackIndex(ordered.size - 1)
+    currentTrackProgress = TrackOffset(ordered.lastOrNull()?.duration ?: 0L)
   }
 }

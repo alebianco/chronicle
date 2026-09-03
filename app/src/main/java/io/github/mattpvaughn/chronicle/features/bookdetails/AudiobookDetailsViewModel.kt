@@ -172,7 +172,7 @@ class AudiobookDetailsViewModel(
       val progressStr =
         DateUtils.formatElapsedTime(
           StringBuilder(),
-          tracks.getProgress() / 1000L,
+          tracks.getProgress().millis / 1000L,
         )
       val durationStr =
         DateUtils.formatElapsedTime(
@@ -433,7 +433,7 @@ class AudiobookDetailsViewModel(
   }
 
   fun jumpToChapter(
-    offset: Long = 0,
+    bookStartTimeOffset: BookOffset = BookOffset.ZERO,
     trackId: String = TRACK_NOT_FOUND,
     hasUserConfirmation: Boolean = false,
   ) {
@@ -448,7 +448,7 @@ class AudiobookDetailsViewModel(
           object : BottomChooserItemListener() {
             override fun onItemClicked(formattableString: FormattableString) {
               when (formattableString) {
-                FormattableString.yes -> jumpToChapter(offset, trackId, true)
+                FormattableString.yes -> jumpToChapter(bookStartTimeOffset, trackId, true)
                 FormattableString.no -> Unit
                 else -> throw NoWhenBranchMatchedException()
               }
@@ -462,14 +462,11 @@ class AudiobookDetailsViewModel(
     val jumpToChapterAction = {
       audiobook.value?.let { book ->
         // The offset arrives book-absolute from the chapter list, but is applied as an in-track
-        // offset by the service. Same conversion as CurrentlyPlayingViewModel (cu-96).
+        // offset by the service (cu-96). One conversion, one home (cu-136).
         val inTrackOffset =
-          tracks.value?.let { loaded ->
-            val trackStart =
-              loaded.sorted().takeWhile { it.id != trackId }.sumOf { it.duration }
-            (offset - trackStart).coerceAtLeast(0L)
-          } ?: offset
-        pausePlay(book.id, inTrackOffset, trackId, forcePlayFromMediaId = true)
+          tracks.value?.let { loaded -> inTrackOffsetOf(bookStartTimeOffset, trackId, loaded) }
+            ?: TrackOffset(bookStartTimeOffset.millis)
+        pausePlay(book.id, inTrackOffset.millis, trackId, forcePlayFromMediaId = true)
       }
     }
     if (mediaServiceConnection.isConnected.value != true) {

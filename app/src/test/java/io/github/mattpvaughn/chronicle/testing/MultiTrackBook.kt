@@ -1,8 +1,10 @@
 package io.github.mattpvaughn.chronicle.testing
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 
 /**
  * A book made of **several** track files, with chapters that cross track boundaries (cu-115).
@@ -50,11 +52,22 @@ object MultiTrackBook {
   const val TRACK_COUNT = 3
   const val BOOK_DURATION = TRACK_DURATION * TRACK_COUNT
 
-  /** 2m30s into track 2 — mid-track *and* mid-chapter, in both frames at once. */
+  /**
+   * 2m30s into track 2 — mid-track *and* mid-chapter, in both frames at once.
+   *
+   * Kept as raw millis alongside the typed forms below so a test can assert against a literal;
+   * [MID_BOOK_OFFSET] and [MID_TRACK_POSITION] are what the typed APIs take (cu-136).
+   */
   const val MID_BOOK_POSITION = 750_000L
 
   /** The same instant expressed in the *other* frame: 150_000 into track 2. */
   const val MID_TRACK_OFFSET = 150_000L
+
+  /** [MID_BOOK_POSITION] in the book frame. */
+  val MID_BOOK_OFFSET = BookOffset(MID_BOOK_POSITION)
+
+  /** [MID_TRACK_OFFSET] in the track frame. */
+  val MID_TRACK_POSITION = TrackOffset(MID_TRACK_OFFSET)
 
   /** The track that [MID_BOOK_POSITION] falls in. */
   const val MID_TRACK_ID = "2002"
@@ -111,8 +124,8 @@ object MultiTrackBook {
         title = "Chapter $i",
         index = i.toLong(),
         discNumber = 1,
-        bookStartTimeOffset = start,
-        bookEndTimeOffset = start + CHAPTER_DURATION,
+        bookStartTimeOffset = BookOffset(start),
+        bookEndTimeOffset = BookOffset(start + CHAPTER_DURATION),
       )
     }
 

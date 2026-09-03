@@ -1,7 +1,10 @@
 package io.github.mattpvaughn.chronicle.features.player
 
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.TrackIndex
+import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -33,8 +36,8 @@ class ChapterSeekTargetTest {
     index = index,
     trackId = trackId,
     bookId = "1001",
-    bookStartTimeOffset = bookStart,
-    bookEndTimeOffset = bookStart + 60_000L,
+    bookStartTimeOffset = BookOffset(bookStart),
+    bookEndTimeOffset = BookOffset(bookStart + 60_000L),
   )
 
   /** On the first track the two frames coincide — the single-file case that always worked. */
@@ -42,7 +45,7 @@ class ChapterSeekTargetTest {
   fun `a chapter on the first track keeps its offset`() {
     val target = chapterSeekTarget(chapter("t1", bookStart = 120_000L), tracks)
 
-    assertEquals(ChapterSeekTarget(trackIndex = 0, inTrackOffsetMillis = 120_000L), target)
+    assertEquals(ChapterSeekTarget(trackIndex = TrackIndex(0), inTrackOffset = TrackOffset(120_000L)), target)
   }
 
   /**
@@ -56,7 +59,7 @@ class ChapterSeekTargetTest {
 
     assertEquals(
       "900000ms into the book is 300000ms into track 2, not 900000",
-      ChapterSeekTarget(trackIndex = 1, inTrackOffsetMillis = 300_000L),
+      ChapterSeekTarget(trackIndex = TrackIndex(1), inTrackOffset = TrackOffset(300_000L)),
       target,
     )
   }
@@ -67,7 +70,7 @@ class ChapterSeekTargetTest {
     val target = chapterSeekTarget(chapter("t3", bookStart = 2_400_000L), tracks)
 
     assertEquals(
-      ChapterSeekTarget(trackIndex = 2, inTrackOffsetMillis = 600_000L),
+      ChapterSeekTarget(trackIndex = TrackIndex(2), inTrackOffset = TrackOffset(600_000L)),
       target,
     )
   }
@@ -77,7 +80,7 @@ class ChapterSeekTargetTest {
   fun `a chapter at the start of its track is at offset zero`() {
     val target = chapterSeekTarget(chapter("t2", bookStart = 600_000L), tracks)
 
-    assertEquals(ChapterSeekTarget(trackIndex = 1, inTrackOffsetMillis = 0L), target)
+    assertEquals(ChapterSeekTarget(trackIndex = TrackIndex(1), inTrackOffset = TrackOffset(0L)), target)
   }
 
   /**
@@ -90,7 +93,7 @@ class ChapterSeekTargetTest {
 
     val target = chapterSeekTarget(chapter("t2", bookStart = 900_000L), shuffled)
 
-    assertEquals(ChapterSeekTarget(trackIndex = 1, inTrackOffsetMillis = 300_000L), target)
+    assertEquals(ChapterSeekTarget(trackIndex = TrackIndex(1), inTrackOffset = TrackOffset(300_000L)), target)
   }
 
   /**
@@ -111,7 +114,7 @@ class ChapterSeekTargetTest {
   fun `an offset before its own track clamps to zero`() {
     val target = chapterSeekTarget(chapter("t3", bookStart = 60_000L), tracks)
 
-    assertEquals(ChapterSeekTarget(trackIndex = 2, inTrackOffsetMillis = 0L), target)
+    assertEquals(ChapterSeekTarget(trackIndex = TrackIndex(2), inTrackOffset = TrackOffset(0L)), target)
   }
 
   /** The threshold arithmetic: both operands book-absolute, so the answer is real. */
@@ -119,8 +122,8 @@ class ChapterSeekTargetTest {
   fun `millis into chapter is measured in the book frame`() {
     val ch = chapter("t2", bookStart = 900_000L)
 
-    assertEquals(0L, millisIntoChapter(ch, bookPosition = 900_000L))
-    assertEquals(5_000L, millisIntoChapter(ch, bookPosition = 905_000L))
+    assertEquals(0L, millisIntoChapter(ch, BookOffset(900_000L)))
+    assertEquals(5_000L, millisIntoChapter(ch, BookOffset(905_000L)))
   }
 
   /**
@@ -134,6 +137,6 @@ class ChapterSeekTargetTest {
     val ch = chapter("t2", bookStart = 900_000L)
     val inTrackPosition = 300_000L
 
-    assertEquals(-600_000L, millisIntoChapter(ch, bookPosition = inTrackPosition))
+    assertEquals(-600_000L, millisIntoChapter(ch, BookOffset(inTrackPosition)))
   }
 }

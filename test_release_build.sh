@@ -89,10 +89,21 @@ done
 
 # Every Moshi model must survive under its own name: these parse live Plex JSON,
 # and a stripped or renamed model fails at parse time, not build time.
+#
+# Only classes actually carrying @JsonClass count. This used to take *every* `data class` in any
+# file containing the annotation, which is a different claim: SettingsBackup.kt holds one annotated
+# DTO plus four `internal` sealed-interface members that never touch JSON, so R8 rightly inlined
+# them and the check reported four phantom failures (cu-136). Widening proguard-rules.pro to
+# silence that would have exempted correctly-optimised code from R8 — the opposite of cu-45's rule
+# that keeps stay narrow. A nested class also has a `Parent$Child` descriptor, so the flat
+# `PKG.Child` name it looked for could not have matched even if the class had survived.
 for f in app/src/main/java/**/*.kt(N); do
   grep -q "@JsonClass" "${f}" || continue
   PKG=$(grep -m1 '^package ' "${f}" | cut -d' ' -f2)
-  for cls in ${(f)"$(grep -oE 'data class [A-Za-z0-9_]+' ${f} | cut -d' ' -f3)"}; do
+  # The `data class` on the line *after* an @JsonClass annotation, which is where Moshi codegen
+  # requires it. -A1 keeps the pairing rather than trusting file-level co-occurrence.
+  ANNOTATED=$(grep -A1 '@JsonClass' "${f}" | grep -oE 'data class [A-Za-z0-9_]+' | cut -d' ' -f3)
+  for cls in ${(f)ANNOTATED}; do
     if ! grep -qxF "${PKG}.${cls}" "${DESCRIPTORS}"; then
       print "${RED}❌ Moshi model missing from dex: ${PKG}.${cls} (${f:t})${NC}"
       MISSING=$((MISSING + 1))

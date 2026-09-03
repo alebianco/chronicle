@@ -13,6 +13,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_CHAPTER
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_TRACK
@@ -82,7 +83,7 @@ class CurrentlyPlayingViewModelTest {
       every { this@mockk.book } returns MutableStateFlow(EMPTY_AUDIOBOOK)
       every { track } returns MutableStateFlow(EMPTY_TRACK)
       every { chapter } returns MutableStateFlow(EMPTY_CHAPTER)
-      every { bookPosition } returns MutableStateFlow(0L)
+      every { bookPosition } returns MutableStateFlow(BookOffset.ZERO)
     }
 
   /**
@@ -100,7 +101,7 @@ class CurrentlyPlayingViewModelTest {
       every { this@mockk.book } returns MutableStateFlow(MultiTrackBook.book())
       every { track } returns MutableStateFlow(activeTrack)
       every { chapter } returns MutableStateFlow(chapterThree)
-      every { bookPosition } returns MutableStateFlow(MultiTrackBook.MID_BOOK_POSITION)
+      every { bookPosition } returns MutableStateFlow(MultiTrackBook.MID_BOOK_OFFSET)
     }
   }
 
@@ -232,7 +233,7 @@ class CurrentlyPlayingViewModelTest {
           every { this@mockk.book } returns MutableStateFlow(MultiTrackBook.book())
           every { track } returns MutableStateFlow(activeTrack)
           every { chapter } returns MutableStateFlow(laterChapter)
-          every { bookPosition } returns MutableStateFlow(MultiTrackBook.MID_BOOK_POSITION)
+          every { bookPosition } returns MutableStateFlow(MultiTrackBook.MID_BOOK_OFFSET)
         }
 
       val progress = observedValue(viewModel(positioned).chapterProgress)

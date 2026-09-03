@@ -26,7 +26,7 @@ class TrackListStateManagerTest {
     manager.updatePosition(activeTrackIndex = 2, offsetFromTrackStart = 30L)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair(2, 30L)),
     )
   }
@@ -45,7 +45,7 @@ class TrackListStateManagerTest {
 
     // assert track index correct
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
   }
@@ -55,14 +55,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(1, 25)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
 
     manager.seekByRelative(20)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (45L))),
     )
   }
@@ -72,14 +72,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(1, 25)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
 
     manager.seekByRelative(40)
 
     assertThat(
-      Pair(manager.currentTrackProgress, manager.currentTrackIndex),
+      Pair(manager.currentTrackProgress.millis, manager.currentTrackIndex.value),
       `is`(Pair(15L, 2)),
     )
   }
@@ -89,14 +89,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(1, 25)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
 
     manager.seekByRelative(1000)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((2), (50L))),
     )
   }
@@ -106,14 +106,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(2, 50)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((2), (50L))),
     )
 
     manager.seekByRelative(1000)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((2), (50L))),
     )
   }
@@ -123,14 +123,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(1, 25)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
 
     manager.seekByRelative(-15)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair(1, 10L)),
     )
   }
@@ -140,14 +140,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(1, 25)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
 
     manager.seekByRelative(-40)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((0), (35L))),
     )
   }
@@ -157,14 +157,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(0, 0)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((0), (0L))),
     )
 
     manager.seekByRelative(-20)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((0), (0L))),
     )
   }
@@ -174,14 +174,14 @@ class TrackListStateManagerTest {
     manager.updatePosition(1, 25)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
 
     manager.seekByRelative(-1000)
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((0), (0L))),
     )
   }
@@ -191,7 +191,7 @@ class TrackListStateManagerTest {
     manager.seekToActiveTrack()
 
     assertThat(
-      Pair(manager.currentTrackIndex, manager.currentTrackProgress),
+      Pair(manager.currentTrackIndex.value, manager.currentTrackProgress.millis),
       `is`(Pair((1), (25L))),
     )
   }

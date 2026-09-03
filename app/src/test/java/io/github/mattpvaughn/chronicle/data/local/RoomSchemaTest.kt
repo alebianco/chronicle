@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.test.core.app.ApplicationProvider
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -191,8 +192,8 @@ class RoomSchemaTest {
     id = id,
     index = index,
     discNumber = discNumber,
-    bookStartTimeOffset = 0L,
-    bookEndTimeOffset = bookEndTimeOffset,
+    bookStartTimeOffset = BookOffset(0L),
+    bookEndTimeOffset = BookOffset(bookEndTimeOffset),
     trackId = trackId,
     bookId = bookId,
   )

@@ -24,8 +24,8 @@ class ChapterBoundaryTest {
     id = index.toString(),
     index = index,
     discNumber = 1,
-    bookStartTimeOffset = start,
-    bookEndTimeOffset = end,
+    bookStartTimeOffset = BookOffset(start),
+    bookEndTimeOffset = BookOffset(end),
     downloaded = false,
     trackId = TRACK,
     bookId = "155594",
@@ -44,21 +44,21 @@ class ChapterBoundaryTest {
     assertEquals(
       "26879000 is Chapter 20's first millisecond, not Chapter 19's last",
       "Chapter 20",
-      chapters.getChapterAt(TRACK, 26_879_000L).title,
+      chapters.getChapterAt(TRACK, BookOffset(26_879_000L)).title,
     )
   }
 
   /** One millisecond earlier is genuinely still the earlier chapter. */
   @Test
   fun `a position just before a boundary is the earlier chapter`() {
-    assertEquals("Chapter 19", chapters.getChapterAt(TRACK, 26_878_999L).title)
+    assertEquals("Chapter 19", chapters.getChapterAt(TRACK, BookOffset(26_878_999L)).title)
   }
 
   /** Both lookups must return the same chapter for the same position. */
   @Test
   fun `the two lookups agree on a boundary`() {
-    val byTrack = chapters.getChapterAt(TRACK, 26_879_000L)
-    val byBook = chapters.chapterAtBookProgress(26_879_000L)
+    val byTrack = chapters.getChapterAt(TRACK, BookOffset(26_879_000L))
+    val byBook = chapters.chapterAtBookProgress(BookOffset(26_879_000L))
 
     assertEquals(
       "two lookups over the same data disagreeing at a boundary is the defect itself",
@@ -70,8 +70,8 @@ class ChapterBoundaryTest {
   @Test
   fun `the two lookups agree mid-chapter`() {
     assertEquals(
-      chapters.chapterAtBookProgress(28_000_000L).title,
-      chapters.getChapterAt(TRACK, 28_000_000L).title,
+      chapters.chapterAtBookProgress(BookOffset(28_000_000L)).title,
+      chapters.getChapterAt(TRACK, BookOffset(28_000_000L)).title,
     )
   }
 
@@ -81,19 +81,19 @@ class ChapterBoundaryTest {
    */
   @Test
   fun `the final chapter's own end still resolves to it`() {
-    assertEquals("Chapter 21", chapters.getChapterAt(TRACK, 31_300_300L).title)
+    assertEquals("Chapter 21", chapters.getChapterAt(TRACK, BookOffset(31_300_300L)).title)
   }
 
   /** A position past the end of the book matches nothing for a track-scoped lookup. */
   @Test
   fun `a position past the book end is the empty chapter`() {
-    assertEquals(EMPTY_CHAPTER, chapters.getChapterAt(TRACK, 40_000_000L))
+    assertEquals(EMPTY_CHAPTER, chapters.getChapterAt(TRACK, BookOffset(40_000_000L)))
   }
 
   /** A different track must not match, however well the timestamp fits. */
   @Test
   fun `a timestamp from another track matches nothing`() {
-    assertEquals(EMPTY_CHAPTER, chapters.getChapterAt("999999", 28_000_000L))
+    assertEquals(EMPTY_CHAPTER, chapters.getChapterAt("999999", BookOffset(28_000_000L)))
   }
 
   private companion object {

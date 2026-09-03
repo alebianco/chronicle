@@ -6,6 +6,9 @@ import androidx.media3.common.Player
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
+import io.github.mattpvaughn.chronicle.data.model.TrackIndex
+import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import timber.log.Timber
 import kotlin.math.abs
@@ -33,9 +36,29 @@ fun Player.seekRelative(
     Timber.i("Seeking via trackliststatemanager")
     trackListStateManager.updatePosition(currentMediaItemIndex, currentPosition)
     trackListStateManager.seekByRelative(durationMillis)
-    seekTo(trackListStateManager.currentTrackIndex, trackListStateManager.currentTrackProgress)
+    seekTo(
+      trackListStateManager.currentTrackIndex,
+      trackListStateManager.currentTrackProgress,
+    )
   }
 }
+
+/**
+ * Seek to [target], the only shape `Player.seekTo(mediaItemIndex, positionMs)` actually accepts.
+ *
+ * Taking the typed target rather than two `Int`/`Long` arguments is the point of cu-136: the
+ * index is into the *sorted* playlist and the offset is *within that track*, and both were
+ * previously plain numbers that four separate bugs got the wrong way round.
+ */
+fun Player.seekTo(
+  trackIndex: TrackIndex,
+  inTrackOffset: TrackOffset,
+) = seekTo(trackIndex.value, inTrackOffset.millis)
+
+private fun Player.seekTo(
+  target: ChapterSeekTarget,
+  nudgeMillis: Long = 0L,
+) = seekTo(target.trackIndex, target.inTrackOffset + nudgeMillis)
 
 /** Skip to next chapter */
 fun Player.skipToNext(
@@ -62,7 +85,7 @@ fun Player.skipToNext(
     }
     // The 300ms nudge keeps the seek inside the new chapter rather than on its boundary, where
     // `getChapterAt` could still resolve the previous one.
-    seekTo(target.trackIndex, target.inTrackOffsetMillis + CHAPTER_SEEK_NUDGE_MILLIS)
+    seekTo(target, nudgeMillis = CHAPTER_SEEK_NUDGE_MILLIS)
     progressUpdater.updateProgressWithoutParameters()
   } else {
     val toast =
@@ -90,9 +113,16 @@ fun Player.skipToPrevious(
   // Both operands must be book-absolute. This used to subtract a book-absolute chapter start from
   // `currentPosition`, which is *in-track* — on a multi-track book that yields a large negative,
   // so the branch always chose "previous chapter" and never "restart this one" (cu-96).
+  // Sorted, because `currentMediaItemIndex` addresses the player's playlist and that is built in
+  // sorted order — the same `TrackIndex` distinction `chapterSeekTarget` documents. The unsorted
+  // read was safe only by its caller's grace (cu-136).
   val bookPosition =
-    trackListStateManager.trackList.take(currentMediaItemIndex).sumOf { it.duration } +
-      currentPosition
+    BookOffset(
+      trackListStateManager.trackList
+        .sorted()
+        .take(currentMediaItemIndex)
+        .sumOf { it.duration } + currentPosition,
+    )
   var previousChapterIndex: Int =
     if (millisIntoChapter(currentlyPlaying.chapter.value, bookPosition) <
       (SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS * MILLIS_PER_SECOND)
@@ -113,6 +143,6 @@ fun Player.skipToPrevious(
     Timber.e("Chapter ${previousChapter.id} names track ${previousChapter.trackId}, not loaded")
     return
   }
-  seekTo(target.trackIndex, target.inTrackOffsetMillis)
+  seekTo(target)
   progressUpdater.updateProgressWithoutParameters()
 }

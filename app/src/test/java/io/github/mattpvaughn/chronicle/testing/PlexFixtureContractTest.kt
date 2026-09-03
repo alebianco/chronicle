@@ -102,8 +102,8 @@ class PlexFixtureContractTest {
 
     assertEquals(3, chapters.size)
     assertEquals("Chapter 1: An Unexpected Party", chapters[0].title)
-    assertEquals(0L, chapters[0].bookStartTimeOffset)
-    assertEquals(75_000L, chapters[0].bookEndTimeOffset)
+    assertEquals(0L, chapters[0].bookStartTimeOffset.millis)
+    assertEquals(75_000L, chapters[0].bookEndTimeOffset.millis)
   }
 
   /**

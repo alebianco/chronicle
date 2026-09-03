@@ -26,8 +26,8 @@ class ChapterListConverterTest {
       title = "Chapter One",
       id = "11",
       index = 1L,
-      bookStartTimeOffset = 0L,
-      bookEndTimeOffset = 60_000L,
+      bookStartTimeOffset = BookOffset(0L),
+      bookEndTimeOffset = BookOffset(60_000L),
       discNumber = 1,
       downloaded = false,
       trackId = "3001",
@@ -46,8 +46,8 @@ class ChapterListConverterTest {
     val chapters =
       listOf(
         chapter,
-        chapter.copy(title = "Chapter Two", id = "12", index = 2L, bookStartTimeOffset = 60_000L),
-        chapter.copy(title = "Chapter Three", id = "13", index = 3L, bookStartTimeOffset = 120_000L),
+        chapter.copy(title = "Chapter Two", id = "12", index = 2L, bookStartTimeOffset = BookOffset(60_000L)),
+        chapter.copy(title = "Chapter Three", id = "13", index = 3L, bookStartTimeOffset = BookOffset(120_000L)),
       )
 
     assertEquals(chapters, converter.toChapterList(converter.toString(chapters)))
@@ -73,12 +73,12 @@ class ChapterListConverterTest {
   @Test
   fun `large offsets survive as Long`() {
     // A 30-hour book in millis exceeds Int.MAX_VALUE; a narrowing bug would wrap.
-    val long = chapter.copy(bookStartTimeOffset = 108_000_000L, bookEndTimeOffset = 109_000_000L)
+    val long = chapter.copy(bookStartTimeOffset = BookOffset(108_000_000L), bookEndTimeOffset = BookOffset(109_000_000L))
 
     val restored = converter.toChapterList(converter.toString(listOf(long)))
 
-    assertEquals(108_000_000L, restored[0].bookStartTimeOffset)
-    assertEquals(109_000_000L, restored[0].bookEndTimeOffset)
+    assertEquals(108_000_000L, restored[0].bookStartTimeOffset.millis)
+    assertEquals(109_000_000L, restored[0].bookEndTimeOffset.millis)
   }
 
   /**

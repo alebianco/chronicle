@@ -7,6 +7,7 @@ import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -90,7 +91,7 @@ class AudiobookDetailsPlaybackTest {
     val viewModel = viewModel()
     viewModel.audiobook.observeForever { }
 
-    viewModel.jumpToChapter(offset = 5_000L, trackId = "2001", hasUserConfirmation = true)
+    viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001", hasUserConfirmation = true)
 
     val extras = slot<Bundle>()
     verify { transportControls.playFromMediaId(eq("1001"), capture(extras)) }
@@ -104,7 +105,7 @@ class AudiobookDetailsPlaybackTest {
     val viewModel = viewModel()
     viewModel.audiobook.observeForever { }
 
-    viewModel.jumpToChapter(offset = 5_000L, trackId = "2001")
+    viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001")
 
     verify(exactly = 0) { transportControls.playFromMediaId(any(), any()) }
   }

@@ -33,7 +33,7 @@ class MultiTrackPositionTest {
   /** Book position is the active track's offset plus every track before it. */
   @Test
   fun `book progress combines the track offset with the tracks before it`() {
-    assertEquals(MID_BOOK_POSITION, MultiTrackBook.midBookTracks().getProgress())
+    assertEquals(MID_BOOK_POSITION, MultiTrackBook.midBookTracks().getProgress().millis)
   }
 
   @Test
@@ -83,11 +83,11 @@ class MultiTrackPositionTest {
     val ordered = MultiTrackBook.midBookTracks()
     val shuffled = listOf(ordered[2], ordered[0], ordered[1])
 
-    assertEquals(MID_BOOK_POSITION, ordered.getProgress())
+    assertEquals(MID_BOOK_POSITION, ordered.getProgress().millis)
     assertEquals(
       "an unordered query result must not move the listener's place",
       MID_BOOK_POSITION,
-      shuffled.getProgress(),
+      shuffled.getProgress().millis,
     )
   }
 
@@ -103,6 +103,6 @@ class MultiTrackPositionTest {
       }
 
     assertEquals(MID_TRACK_ID, tracks.getActiveTrack().id)
-    assertEquals(MID_BOOK_POSITION, tracks.getProgress())
+    assertEquals(MID_BOOK_POSITION, tracks.getProgress().millis)
   }
 }

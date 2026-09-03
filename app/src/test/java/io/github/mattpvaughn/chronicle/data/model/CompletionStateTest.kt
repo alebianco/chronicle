@@ -136,7 +136,7 @@ class CompletionStateTest {
     assertEquals(
       "a book marked as read must not report a position part way through it",
       0L,
-      marked.getProgress(),
+      marked.getProgress().millis,
     )
   }
 }

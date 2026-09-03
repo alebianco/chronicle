@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
 import com.squareup.moshi.JsonClass
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 
 @JsonClass(generateAdapter = true)
@@ -36,8 +37,8 @@ fun PlexChapter.toChapter(
     id = id.toString(),
     index = index,
     discNumber = discNumber.takeIf { it != 0 } ?: trackDiscNumber,
-    bookStartTimeOffset = startTimeOffset,
-    bookEndTimeOffset = endTimeOffset,
+    bookStartTimeOffset = BookOffset(startTimeOffset),
+    bookEndTimeOffset = BookOffset(endTimeOffset),
     downloaded = downloaded,
     trackId = trackId,
     bookId = bookId,

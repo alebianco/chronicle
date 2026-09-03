@@ -1,7 +1,10 @@
 package io.github.mattpvaughn.chronicle.features.player
 
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.TrackIndex
+import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 
 /**
  * Where to seek for a chapter, in the coordinates `Player.seekTo` actually takes (cu-96).
@@ -17,8 +20,8 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
  * a track list, testable without a player, a device, or a real multi-track book.
  */
 data class ChapterSeekTarget(
-  val trackIndex: Int,
-  val inTrackOffsetMillis: Long,
+  val trackIndex: TrackIndex,
+  val inTrackOffset: TrackOffset,
 )
 
 /**
@@ -36,15 +39,55 @@ fun chapterSeekTarget(
   chapter: Chapter,
   tracks: List<MediaItemTrack>,
 ): ChapterSeekTarget? {
+  // The index must come from the **sorted** list, because that is the order the player's playlist
+  // is built in and `seekTo`'s `mediaItemIndex` addresses. [TrackIndex] says which list (cu-136).
   val ordered = tracks.sorted()
   val trackIndex = ordered.indexOfFirst { it.id == chapter.trackId }
   if (trackIndex == -1) return null
 
-  val trackStart = ordered.take(trackIndex).sumOf { it.duration }
-  // Clamped at zero: a chapter whose recorded offset precedes its own track means the two disagree,
-  // and seeking to a negative position would throw. Starting the track over is the safe reading.
-  val inTrack = (chapter.bookStartTimeOffset - trackStart).coerceAtLeast(0L)
-  return ChapterSeekTarget(trackIndex = trackIndex, inTrackOffsetMillis = inTrack)
+  // Clamped at zero inside [inTrackOffsetOf]: a chapter whose recorded offset precedes its own
+  // track means the two disagree, and seeking to a negative position would throw. Starting the
+  // track over is the safe reading.
+  val inTrack =
+    inTrackOffsetInSorted(chapter.bookStartTimeOffset, chapter.trackId, ordered) ?: return null
+  return ChapterSeekTarget(trackIndex = TrackIndex(trackIndex), inTrackOffset = inTrack)
+}
+
+/**
+ * [bookOffset] expressed as an offset within the track named by [trackId].
+ *
+ * The one home for book → track. Three separate sites inlined this arithmetic —
+ * `CurrentlyPlayingViewModel.jumpToChapter`, `CurrentlyPlayingViewModel.seekTo` and
+ * `AudiobookDetailsViewModel.jumpToChapter` — all three written as
+ * `tracks.takeWhile { it.id != trackId }.sumOf { it.duration }`, which **sums every track when
+ * the id is absent** rather than reporting that it could not resolve one. Two of the six bugs in
+ * this family were exactly that shape, so the duplication is the defect (cu-136).
+ *
+ * @param tracks the book's tracks, in any order — sorted internally, because the order that
+ *   matters is the player's playlist order and not the caller's.
+ * @return null when [trackId] is not among [tracks]. A caller that cannot resolve a track must
+ *   decide what to do; guessing an offset seeks somewhere arbitrary.
+ */
+fun inTrackOffsetOf(
+  bookOffset: BookOffset,
+  trackId: String,
+  tracks: List<MediaItemTrack>,
+): TrackOffset? = inTrackOffsetInSorted(bookOffset, trackId, tracks.sorted())
+
+/**
+ * [inTrackOffsetOf] for a list already in playback order, so a caller that has sorted does not
+ * sort twice on a per-seek path.
+ */
+private fun inTrackOffsetInSorted(
+  bookOffset: BookOffset,
+  trackId: String,
+  ordered: List<MediaItemTrack>,
+): TrackOffset? {
+  val trackIndex = ordered.indexOfFirst { it.id == trackId }
+  if (trackIndex == -1) return null
+
+  val trackStart = BookOffset(ordered.take(trackIndex).sumOf { it.duration })
+  return TrackOffset(bookOffset - trackStart).coerceAtLeastZero()
 }
 
 /**
@@ -56,5 +99,5 @@ fun chapterSeekTarget(
  */
 fun millisIntoChapter(
   chapter: Chapter,
-  bookPosition: Long,
+  bookPosition: BookOffset,
 ): Long = bookPosition - chapter.bookStartTimeOffset

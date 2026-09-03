@@ -241,8 +241,8 @@ class CurrentlyPlayingViewModel(
   val chapterProgress =
     currentlyPlaying.chapter.combine(
       currentlyPlaying.bookPosition,
-    ) { chapter: Chapter, bookPosition: Long ->
-      (bookPosition - chapter.bookStartTimeOffset).coerceAtLeast(0L)
+    ) { chapter: Chapter, bookPosition: BookOffset ->
+      millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
     }.asLiveData(viewModelScope.coroutineContext)
 
   val chapterProgressString =
@@ -256,8 +256,8 @@ class CurrentlyPlayingViewModel(
   val chapterProgressForSlider =
     currentlyPlaying.chapter.combine(
       currentlyPlaying.bookPosition,
-    ) { chapter: Chapter, bookPosition: Long ->
-      (bookPosition - chapter.bookStartTimeOffset).coerceAtLeast(0L)
+    ) { chapter: Chapter, bookPosition: BookOffset ->
+      millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
     }.filter { !isSliding }
       // distinctUntilChanged, because `currentlyPlaying` publishes book, track *and* chapter on
       // every progress tick and each fans out through this combine. The device logged 228
@@ -322,14 +322,14 @@ class CurrentlyPlayingViewModel(
    * The timeout matters: a seek that never lands — a dead network on a streamed book — must not
    * freeze the slider forever. Releasing late looks like a brief lag; never releasing looks broken.
    */
-  private fun awaitSeek(target: Long) {
+  private fun awaitSeek(target: TrackOffset) {
     // Only the newest seek may release the guard; see [seekSettleJob].
     seekSettleJob?.cancel()
     seekSettleJob =
       viewModelScope.launch {
         withTimeoutOrNull(SEEK_SETTLE_TIMEOUT) {
           currentlyPlaying.track.first { track ->
-            abs(track.progress - target) < SEEK_SETTLE_TOLERANCE
+            abs(TrackOffset(track.progress) - target) < SEEK_SETTLE_TOLERANCE
           }
         }
         isSliding = false
@@ -392,7 +392,7 @@ class CurrentlyPlayingViewModel(
       val progressStr =
         DateUtils.formatElapsedTime(
           StringBuilder(),
-          tracks.getProgress() / 1000L,
+          tracks.getProgress().millis / 1000L,
         )
       val durationStr =
         DateUtils.formatElapsedTime(
@@ -505,7 +505,7 @@ class CurrentlyPlayingViewModel(
         if (tracks.isOk) {
           bookRepository.updateTrackData(
             bookId,
-            tracks.value.getProgress(),
+            tracks.value.getProgress().millis,
             tracks.value.getDuration(),
             tracks.value.size,
           )
@@ -599,7 +599,7 @@ class CurrentlyPlayingViewModel(
             // so on a later track this went negative and the threshold test always took the
             // restart-current-chapter branch — the same mix-up cu-96 fixed in the service, left
             // unfixed in this mirror copy.
-            val intoChapter = currentlyPlaying.bookPosition.value - current.bookStartTimeOffset
+            val intoChapter = millisIntoChapter(current, currentlyPlaying.bookPosition.value)
             if (intoChapter < SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS) {
               chapters.getOrNull(here - 1)?.bookStartTimeOffset
             } else {
@@ -607,7 +607,11 @@ class CurrentlyPlayingViewModel(
             }
           }
         transportControls?.sendCustomAction(action, null)
-        target?.let { awaitSeek(it) }
+        // `awaitSeek` waits on the *track* progress the player reports, so the predicted book
+        // offset has to be converted first — it is the chapter's own track we are landing in.
+        target?.let { bookTarget ->
+          awaitSeek(inTrackOffsetFor(bookTarget, currentlyPlaying.chapter.value.trackId))
+        }
       } else {
         val currentChapterIndex =
           currentlyPlaying.book.value.chapters.indexOf(
@@ -705,9 +709,16 @@ class CurrentlyPlayingViewModel(
             manager.trackList = _tracks
             manager.seekToActiveTrack()
             manager.seekByRelative(offset)
-            val updatedTrack = _tracks[manager.currentTrackIndex]
+            // `updateTrackProgress` writes `MediaItemTrack.progress`, which is the offset within
+            // *that track* — so it takes `currentTrackProgress`, not `currentBookPosition`. It
+            // used to take the book position, inflating the row by the sum of every preceding
+            // track's duration, and `getActiveTrack` (furthest-started) then read a corrupt
+            // position. Single-track books were unaffected, which is why it survived (cu-136).
+            //
+            // The index is into the sorted list, matching `manager.currentTrackIndex`.
+            val updatedTrack = _tracks.sorted()[manager.currentTrackIndex.value]
             trackRepository.updateTrackProgress(
-              manager.currentBookPosition,
+              manager.currentTrackProgress.millis,
               updatedTrack.id,
               System.currentTimeMillis(),
             )
@@ -719,7 +730,7 @@ class CurrentlyPlayingViewModel(
 
   /** Jumps to a given track with [MediaItemTrack.id] == [trackId] */
   fun jumpToChapter(
-    bookStartTimeOffset: Long = 0,
+    bookStartTimeOffset: BookOffset = BookOffset.ZERO,
     trackId: String = TRACK_NOT_FOUND,
     hasUserConfirmation: Boolean = false,
   ) {
@@ -752,18 +763,17 @@ class CurrentlyPlayingViewModel(
 
     val jumpToChapterAction = {
       audiobook.value?.let { book ->
-        // `pausePlay` forwards this as KEY_START_TIME_TRACK_OFFSET, which the service applies as an
-        // offset *within* the starting track — but a chapter's offset is book-absolute (cu-96).
-        // They coincide on a single-file book, so this only misbehaves on a multi-track one.
-        val inTrackOffset =
-          tracks.value?.let { loaded ->
-            val trackStart =
-              loaded.sorted().takeWhile { it.id != trackId }.sumOf { it.duration }
-            (bookStartTimeOffset - trackStart).coerceAtLeast(0L)
-          } ?: bookStartTimeOffset
+        // `pausePlay` forwards this as KEY_START_TIME_TRACK_OFFSET, which the service applies as
+        // an offset *within* the starting track — but a chapter's offset is book-absolute (cu-96).
+        //
+        // The conversion goes through `chapterSeekTarget`, the one home for it. This site used to
+        // inline the arithmetic with `takeWhile { it.id != trackId }`, which silently sums *every*
+        // track when the id is absent — where `chapterSeekTarget` returns null and the caller can
+        // decline to seek (cu-136).
+        val inTrackOffset = inTrackOffsetFor(bookStartTimeOffset, trackId)
         pausePlay(
           book.id,
-          bookStartTimeOffset = inTrackOffset,
+          bookStartTimeOffset = inTrackOffset.millis,
           trackId = trackId,
           forcePlay = true,
         )
@@ -964,6 +974,26 @@ class CurrentlyPlayingViewModel(
     super.onCleared()
   }
 
+  /**
+   * [bookOffset] expressed as an offset within the track named by [trackId].
+   *
+   * Delegates to [chapterSeekTarget], which is the single home for this conversion — it needs the
+   * *sorted* track list and the track's own start, and the two sites that inlined the arithmetic
+   * instead are exactly where cu-115 found bugs.
+   *
+   * Falls back to treating the book offset as an in-track one when the tracks are not loaded or
+   * the id is unknown. That is only correct on a single-track book, and it is what both inlined
+   * copies already did — kept deliberately rather than refusing to seek, because the alternative
+   * is a dead button, and preserved here so the fallback exists in one place where it can be seen.
+   */
+  private fun inTrackOffsetFor(
+    bookOffset: BookOffset,
+    trackId: String,
+  ): TrackOffset {
+    val loaded = tracks.value ?: return TrackOffset(bookOffset.millis)
+    return inTrackOffsetOf(bookOffset, trackId, loaded) ?: TrackOffset(bookOffset.millis)
+  }
+
   fun seekTo(percentProgress: Double) {
     val id: String = (audiobookId.value ?: TRACK_NOT_FOUND).toString()
     if (currentChapter.value == EMPTY_CHAPTER) {
@@ -976,7 +1006,7 @@ class CurrentlyPlayingViewModel(
         mediaServiceConnection.transportControls?.playFromMediaId(id, extras)
         // Same hold as the chapter branch; without it the guard is released while the restart is
         // still in flight.
-        awaitSeek(curr.progress)
+        awaitSeek(TrackOffset(curr.progress))
       }
     } else {
       // Seeking within the current chapter.
@@ -989,17 +1019,10 @@ class CurrentlyPlayingViewModel(
         // `MediaControllerCompat.TransportControls.seekTo` is a position **within the current
         // media item**, not within the book — so handing it a book offset overshoots on any
         // multi-track book, and Media3 clamps rather than throwing, which presents as the thumb
-        // jumping to the end of the current track (cu-115). Convert, exactly as the
-        // jump-to-chapter path above already does.
-        val inTrackOffset =
-          tracks.value?.let { loaded ->
-            val ordered = loaded.sorted()
-            val trackStart =
-              ordered.takeWhile { it.id != chapter.trackId }.sumOf { it.duration }
-            (bookOffset - trackStart).coerceAtLeast(0L)
-          } ?: bookOffset
+        // jumping to the end of the current track (cu-115). One conversion, one home (cu-136).
+        val inTrackOffset = inTrackOffsetFor(bookOffset, chapter.trackId)
 
-        mediaServiceConnection.transportControls?.seekTo(inTrackOffset)
+        mediaServiceConnection.transportControls?.seekTo(inTrackOffset.millis)
         // Keep the slider on the requested position until playback reports it. Without this the
         // next progress tick overwrites the thumb with the pre-seek position (cu-93).
         //

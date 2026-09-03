@@ -221,18 +221,6 @@ fun List<MediaItemTrack>.getTrackStartTime(track: MediaItemTrack): Long {
   return inPlaybackOrder.take(index).sumOf { it.duration }
 }
 
-/**
- * Returns the timestamp (in ms) corresponding to the progress of [track] with respect to the
- * entire playlist
- */
-fun List<MediaItemTrack>.getTrackProgressInAudiobook(track: MediaItemTrack): Long {
-  if (isEmpty()) {
-    return 0
-  }
-  val previousTracks = this.subList(0, indexOf(track))
-  return previousTracks.map { it.duration }.sum() + track.progress
-}
-
 /** Returns the track containing the timestamp (as offset from the start of the [List] provided */
 fun List<MediaItemTrack>?.getTrackContainingOffset(offset: Long): MediaItemTrack {
   if (isNullOrEmpty()) {
@@ -249,15 +237,20 @@ fun List<MediaItemTrack>?.getTrackContainingOffset(offset: Long): MediaItemTrack
 }
 
 /**
- * @return the progress of the current track plus the duration of all previous tracks
+ * The listening position as an offset from the start of the **book**.
+ *
+ * This is the canonical track → book conversion: the active track's own progress plus the
+ * durations of every track before it. Returning a [BookOffset] is what stops the result being
+ * handed to something that wants an in-track value — the mistake behind cu-13/49/93/96/115
+ * (cu-136).
  */
-fun List<MediaItemTrack>.getProgress(): Long {
+fun List<MediaItemTrack>.getProgress(): BookOffset {
   if (isEmpty()) {
-    return 0
+    return BookOffset.ZERO
   }
   val currentTrackProgress = getActiveTrack().progress
   val previousTracksDuration = getTrackStartTime(getActiveTrack())
-  return currentTrackProgress + previousTracksDuration
+  return BookOffset(currentTrackProgress + previousTracksDuration)
 }
 
 /**
@@ -267,7 +260,7 @@ fun List<MediaItemTrack>.getProgressPercentage(): Int {
   if (isEmpty() || getDuration() == 0L) {
     return 0
   }
-  return ((getProgress() / getDuration().toDouble()) * 100).roundToInt()
+  return ((getProgress().millis / getDuration().toDouble()) * 100).roundToInt()
 }
 
 /**
@@ -346,7 +339,7 @@ fun MediaItemTrack.toMediaMetadata(plexConfig: PlexConfig): MediaMetadataCompat 
  */
 fun List<MediaItemTrack>.asChapterList(): List<Chapter> {
   val outList = mutableListOf<Chapter>()
-  var cumStartOffset = 0L
+  var cumStartOffset = BookOffset.ZERO
   for (track in this) {
     outList.add(track.asChapter(cumStartOffset))
     cumStartOffset += track.duration
@@ -361,7 +354,7 @@ fun List<MediaItemTrack>.asChapterList(): List<Chapter> {
  * within the book, so using the raw duration made every chapter after the first report an end
  * earlier than its own start, and [getChapterAt] then matched nothing.
  */
-fun MediaItemTrack.asChapter(startOffset: Long): Chapter {
+fun MediaItemTrack.asChapter(startOffset: BookOffset): Chapter {
   return Chapter(
     title = title,
     id = id,

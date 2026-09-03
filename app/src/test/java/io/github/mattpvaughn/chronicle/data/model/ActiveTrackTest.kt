@@ -113,7 +113,7 @@ class ActiveTrackTest {
         track("3", 3, duration = 3_000L),
       )
 
-    assertEquals(1_000L + 500L, tracks.getProgress())
+    assertEquals(1_000L + 500L, tracks.getProgress().millis)
   }
 
   /** Book progress must be monotonic in the same scenario as the active-track test above. */
@@ -129,13 +129,13 @@ class ActiveTrackTest {
     assertEquals(
       "the old rule reported 200ms into a 6s book; the real position is in track 3",
       1_000L + 2_000L + 300L,
-      tracks.getProgress(),
+      tracks.getProgress().millis,
     )
   }
 
   @Test
   fun `an empty list has no progress`() {
-    assertEquals(0L, emptyList<MediaItemTrack>().getProgress())
+    assertEquals(0L, emptyList<MediaItemTrack>().getProgress().millis)
   }
 
   @Test
@@ -143,7 +143,7 @@ class ActiveTrackTest {
     val tracks = listOf(track("1", 1, duration = 5_000L, progress = 2_500L))
 
     assertEquals("1", tracks.getActiveTrack().id)
-    assertEquals(2_500L, tracks.getProgress())
+    assertEquals(2_500L, tracks.getProgress().millis)
   }
 
   /** A fully played book sits at its last track, not back at the first. */

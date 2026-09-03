@@ -136,7 +136,7 @@ class WatchedRoundTripTest {
       assertEquals(
         "marking a book read must not invent a position inside it",
         0L,
-        written().getProgress(),
+        written().getProgress().millis,
       )
     }
 

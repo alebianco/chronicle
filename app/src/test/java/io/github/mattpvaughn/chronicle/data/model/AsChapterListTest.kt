@@ -47,8 +47,8 @@ class AsChapterListTest {
         track("3", 3, 3_000L),
       ).asChapterList()
 
-    assertEquals(listOf(0L, 1_000L, 3_000L), chapters.map { it.bookStartTimeOffset })
-    assertEquals(listOf(1_000L, 3_000L, 6_000L), chapters.map { it.bookEndTimeOffset })
+    assertEquals(listOf(0L, 1_000L, 3_000L), chapters.map { it.bookStartTimeOffset.millis })
+    assertEquals(listOf(1_000L, 3_000L, 6_000L), chapters.map { it.bookEndTimeOffset.millis })
   }
 
   /**
@@ -103,7 +103,7 @@ class AsChapterListTest {
       )
     val chapters = tracks.asChapterList()
 
-    val found = chapters.getChapterAt("2", 1_500L)
+    val found = chapters.getChapterAt("2", BookOffset(1_500L))
 
     assertEquals("2", found.trackId)
     assertEquals("Track 2", found.title)
@@ -119,7 +119,7 @@ class AsChapterListTest {
     val chapters = listOf(track("1", 1, 5_000L)).asChapterList()
 
     assertEquals(1, chapters.size)
-    assertEquals(0L, chapters[0].bookStartTimeOffset)
-    assertEquals(5_000L, chapters[0].bookEndTimeOffset)
+    assertEquals(0L, chapters[0].bookStartTimeOffset.millis)
+    assertEquals(5_000L, chapters[0].bookEndTimeOffset.millis)
   }
 }

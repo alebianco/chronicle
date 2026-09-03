@@ -77,7 +77,7 @@ class LibrarySyncRepository
               val tracksInAudiobook = tracksByBook[book.id].orEmpty()
               BookTrackData(
                 bookId = book.id,
-                bookProgress = tracksInAudiobook.getProgress(),
+                bookProgress = tracksInAudiobook.getProgress().millis,
                 bookDuration = tracksInAudiobook.getDuration(),
                 trackCount = tracksInAudiobook.size,
               )

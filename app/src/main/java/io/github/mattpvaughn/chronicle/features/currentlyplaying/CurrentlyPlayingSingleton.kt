@@ -27,7 +27,7 @@ interface CurrentlyPlaying {
    * a large negative number (cu-115). On a single-track book the two are the same value, which is
    * why it went unnoticed for so long.
    */
-  val bookPosition: StateFlow<Long>
+  val bookPosition: StateFlow<BookOffset>
 
   fun setOnChapterChangeListener(listener: OnChapterChangeListener)
 
@@ -52,7 +52,7 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
   override val book = MutableStateFlow(EMPTY_AUDIOBOOK)
   override val track = MutableStateFlow(EMPTY_TRACK)
   override val chapter = MutableStateFlow(EMPTY_CHAPTER)
-  override val bookPosition = MutableStateFlow(0L)
+  override val bookPosition = MutableStateFlow(BookOffset.ZERO)
 
   private var tracks: List<MediaItemTrack> = emptyList()
 
@@ -113,19 +113,21 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
     // Set before the chapter lookup below, which uses the same derivation. This one *does* change
     // every tick — it is the position — so it is written unconditionally, and `StateFlow` already
     // suppresses a re-emission when the value is equal.
-    this.bookPosition.value = tracks.getProgress()
+    val bookPosition = tracks.getProgress()
+    this.bookPosition.value = bookPosition
 
     if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
-      // Falls back to the position derived from saved progress when the exact lookup misses.
-      // getChapterAt matches on trackId *and* a timestamp inside the chapter's span, so it returns
-      // EMPTY_CHAPTER whenever the two disagree — and EMPTY_CHAPTER used to be published, leaving
-      // every consumer stale. That matters beyond display: PlayerExt drives skip-to-next-chapter
-      // and skip-to-previous-chapter off this value, so a stale one skips to the wrong place
-      // (cu-87).
-      val chapter =
-        chapters.getChapterAt(track.id, track.progress)
-          .takeIf { it != EMPTY_CHAPTER }
-          ?: chapters.chapterAtBookProgress(tracks.getProgress())
+      // One lookup, by book position. This was two: `getChapterAt(track.id, track.progress)`
+      // first, falling back to `chapterAtBookProgress` when it returned EMPTY_CHAPTER — the
+      // fallback added by cu-87 because publishing EMPTY_CHAPTER left every consumer stale, and
+      // that matters beyond display since `PlayerExt` drives skip-to-next/previous-chapter off it.
+      //
+      // The first lookup was **passing a track offset where `getChapterAt` wants a book one**
+      // (cu-136 — the retype is what surfaced it). So on any multi-track book it matched nothing
+      // and the fallback did all the work; on a single-track book the two frames are the same
+      // number and it happened to work. Fixed, it would be the fallback plus a redundant track-id
+      // filter over the same position, so the two collapse into the one that was always correct.
+      val chapter = chapters.chapterAtBookProgress(bookPosition)
       if (this.chapter.value != chapter) {
         this.chapter.value = chapter
         listener?.onChapterChange(chapter)

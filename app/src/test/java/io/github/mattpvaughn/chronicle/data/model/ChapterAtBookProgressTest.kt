@@ -26,8 +26,8 @@ class ChapterAtBookProgressTest {
     id = "4$index",
     index = index,
     discNumber = 1,
-    bookStartTimeOffset = start,
-    bookEndTimeOffset = end,
+    bookStartTimeOffset = BookOffset(start),
+    bookEndTimeOffset = BookOffset(end),
     trackId = trackId,
     bookId = "1001",
   )
@@ -41,28 +41,28 @@ class ChapterAtBookProgressTest {
 
   @Test
   fun `a position in the first chapter finds it`() {
-    assertEquals("One", chapters.chapterAtBookProgress(500L).title)
+    assertEquals("One", chapters.chapterAtBookProgress(BookOffset(500L)).title)
   }
 
   @Test
   fun `a position in a middle chapter finds it`() {
-    assertEquals("Two", chapters.chapterAtBookProgress(1_500L).title)
+    assertEquals("Two", chapters.chapterAtBookProgress(BookOffset(1_500L)).title)
   }
 
   @Test
   fun `a position in the last chapter finds it`() {
-    assertEquals("Three", chapters.chapterAtBookProgress(4_000L).title)
+    assertEquals("Three", chapters.chapterAtBookProgress(BookOffset(4_000L)).title)
   }
 
   @Test
   fun `a position at the very start finds the first chapter`() {
-    assertEquals("One", chapters.chapterAtBookProgress(0L).title)
+    assertEquals("One", chapters.chapterAtBookProgress(BookOffset(0L)).title)
   }
 
   /** Exactly on a boundary belongs to the chapter that is starting, not the one that ended. */
   @Test
   fun `a position on a chapter boundary belongs to the later chapter`() {
-    assertEquals("Two", chapters.chapterAtBookProgress(1_000L).title)
+    assertEquals("Two", chapters.chapterAtBookProgress(BookOffset(1_000L)).title)
   }
 
   /**
@@ -71,7 +71,7 @@ class ChapterAtBookProgressTest {
    */
   @Test
   fun `a position past the end reports the last chapter`() {
-    assertEquals("Three", chapters.chapterAtBookProgress(99_000L).title)
+    assertEquals("Three", chapters.chapterAtBookProgress(BookOffset(99_000L)).title)
   }
 
   /** The list arrives from the DB and the network in no guaranteed order. */
@@ -79,12 +79,12 @@ class ChapterAtBookProgressTest {
   fun `list order does not matter`() {
     val shuffled = listOf(chapters[2], chapters[0], chapters[1])
 
-    assertEquals("Two", shuffled.chapterAtBookProgress(1_500L).title)
+    assertEquals("Two", shuffled.chapterAtBookProgress(BookOffset(1_500L)).title)
   }
 
   @Test
   fun `an empty chapter list yields the empty chapter`() {
-    assertEquals(EMPTY_CHAPTER, emptyList<Chapter>().chapterAtBookProgress(1_000L))
+    assertEquals(EMPTY_CHAPTER, emptyList<Chapter>().chapterAtBookProgress(BookOffset(1_000L)))
   }
 
   /**
@@ -109,7 +109,7 @@ class ChapterAtBookProgressTest {
         chapter("Chapter 21", index = 21L, start = 29_184_600L, end = 31_300_300L),
       )
 
-    val resolved = realBook.chapterAtBookProgress(28_359_976L)
+    val resolved = realBook.chapterAtBookProgress(BookOffset(28_359_976L))
 
     assertEquals(
       "offsets are absolute; subtracting durations picks a far earlier chapter",

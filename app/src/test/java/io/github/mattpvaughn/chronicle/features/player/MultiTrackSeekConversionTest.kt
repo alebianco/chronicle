@@ -1,5 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.player
 
+import io.github.mattpvaughn.chronicle.data.model.TrackIndex
+import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -27,8 +29,8 @@ class MultiTrackSeekConversionTest {
   fun `the first chapter converts to the first track at zero`() {
     val target = chapterSeekTarget(chapters[0], tracks)
 
-    assertEquals(0, target?.trackIndex)
-    assertEquals(0L, target?.inTrackOffsetMillis)
+    assertEquals(TrackIndex(0), target?.trackIndex)
+    assertEquals(TrackOffset(0L), target?.inTrackOffset)
   }
 
   /**
@@ -39,8 +41,8 @@ class MultiTrackSeekConversionTest {
   fun `a chapter starting mid-track keeps its in-track offset`() {
     val target = chapterSeekTarget(chapters[1], tracks)
 
-    assertEquals(0, target?.trackIndex)
-    assertEquals(300_000L, target?.inTrackOffsetMillis)
+    assertEquals(TrackIndex(0), target?.trackIndex)
+    assertEquals(300_000L, target?.inTrackOffset?.millis)
   }
 
   /**
@@ -52,11 +54,11 @@ class MultiTrackSeekConversionTest {
   fun `a chapter starting on a track boundary converts to offset zero of that track`() {
     val target = chapterSeekTarget(chapters[2], tracks)
 
-    assertEquals(1, target?.trackIndex)
+    assertEquals(TrackIndex(1), target?.trackIndex)
     assertEquals(
       "the book offset is 600000; unconverted it would overshoot into track 2",
       0L,
-      target?.inTrackOffsetMillis,
+      target?.inTrackOffset?.millis,
     )
   }
 
@@ -65,8 +67,8 @@ class MultiTrackSeekConversionTest {
   fun `a chapter in the middle of a later track converts to a track-relative offset`() {
     val target = chapterSeekTarget(chapters[3], tracks)
 
-    assertEquals(1, target?.trackIndex)
-    assertEquals(300_000L, target?.inTrackOffsetMillis)
+    assertEquals(TrackIndex(1), target?.trackIndex)
+    assertEquals(300_000L, target?.inTrackOffset?.millis)
   }
 
   /** The last chapter, to cover the final track. */
@@ -74,8 +76,8 @@ class MultiTrackSeekConversionTest {
   fun `the last chapter converts into the last track`() {
     val target = chapterSeekTarget(chapters[5], tracks)
 
-    assertEquals(2, target?.trackIndex)
-    assertEquals(300_000L, target?.inTrackOffsetMillis)
+    assertEquals(TrackIndex(2), target?.trackIndex)
+    assertEquals(300_000L, target?.inTrackOffset?.millis)
   }
 
   /**
@@ -89,12 +91,12 @@ class MultiTrackSeekConversionTest {
 
     chapters.forEach { chapter ->
       val target = requireNotNull(chapterSeekTarget(chapter, tracks)) { "no target for $chapter" }
-      val trackStart = ordered.take(target.trackIndex).sumOf { it.duration }
+      val trackStart = ordered.take(target.trackIndex.value).sumOf { it.duration }
 
       assertEquals(
         "chapter ${chapter.title} must round-trip",
-        chapter.bookStartTimeOffset,
-        trackStart + target.inTrackOffsetMillis,
+        chapter.bookStartTimeOffset.millis,
+        trackStart + target.inTrackOffset.millis,
       )
     }
   }

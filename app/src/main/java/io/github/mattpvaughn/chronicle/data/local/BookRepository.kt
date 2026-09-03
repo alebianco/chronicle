@@ -524,7 +524,7 @@ class BookRepository
             local = audiobook,
             forceNetwork = forceNetwork,
           ).copy(
-            progress = tracks.getProgress(),
+            progress = tracks.getProgress().millis,
             duration = tracks.getDuration(),
             chapters = chapters,
           )

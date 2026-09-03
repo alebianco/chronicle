@@ -28,7 +28,7 @@ class MultiTrackChapterTest {
   /** The book-frame lookup is the one that takes a book position. */
   @Test
   fun `the book-frame lookup finds the chapter containing a book position`() {
-    assertEquals("Chapter 3", chapters.chapterAtBookProgress(MID_BOOK_POSITION).title)
+    assertEquals("Chapter 3", chapters.chapterAtBookProgress(BookOffset(MID_BOOK_POSITION)).title)
   }
 
   /**
@@ -44,37 +44,37 @@ class MultiTrackChapterTest {
     assertEquals(
       "if this ever returns Chapter 3, the frames have been unified and this test should go",
       "Chapter 1",
-      chapters.chapterAtBookProgress(MID_TRACK_OFFSET).title,
+      chapters.chapterAtBookProgress(BookOffset(MID_TRACK_OFFSET)).title,
     )
   }
 
   /** Chapter boundaries that fall exactly on a track boundary are the off-by-one case. */
   @Test
   fun `a position exactly on a track boundary resolves to the later chapter`() {
-    assertEquals("Chapter 3", chapters.chapterAtBookProgress(600_000L).title)
-    assertEquals("Chapter 5", chapters.chapterAtBookProgress(1_200_000L).title)
+    assertEquals("Chapter 3", chapters.chapterAtBookProgress(BookOffset(600_000L)).title)
+    assertEquals("Chapter 5", chapters.chapterAtBookProgress(BookOffset(1_200_000L)).title)
   }
 
   /** And boundaries strictly inside a track must resolve on the half-open rule. */
   @Test
   fun `a position exactly on a chapter boundary inside a track resolves to the later chapter`() {
-    assertEquals("Chapter 2", chapters.chapterAtBookProgress(300_000L).title)
-    assertEquals("Chapter 4", chapters.chapterAtBookProgress(900_000L).title)
+    assertEquals("Chapter 2", chapters.chapterAtBookProgress(BookOffset(300_000L)).title)
+    assertEquals("Chapter 4", chapters.chapterAtBookProgress(BookOffset(900_000L)).title)
   }
 
   @Test
   fun `the first and last instants of the book resolve`() {
-    assertEquals("Chapter 1", chapters.chapterAtBookProgress(0L).title)
+    assertEquals("Chapter 1", chapters.chapterAtBookProgress(BookOffset(0L)).title)
     assertEquals(
       "Chapter 6",
-      chapters.chapterAtBookProgress(MultiTrackBook.BOOK_DURATION - 1).title,
+      chapters.chapterAtBookProgress(BookOffset(MultiTrackBook.BOOK_DURATION - 1)).title,
     )
   }
 
   /** Past the end clamps to the last chapter rather than returning EMPTY_CHAPTER. */
   @Test
   fun `a position past the end clamps to the last chapter`() {
-    assertEquals("Chapter 6", chapters.chapterAtBookProgress(MultiTrackBook.BOOK_DURATION).title)
+    assertEquals("Chapter 6", chapters.chapterAtBookProgress(BookOffset(MultiTrackBook.BOOK_DURATION)).title)
   }
 
   /**
@@ -85,7 +85,7 @@ class MultiTrackChapterTest {
    */
   @Test
   fun `the track-scoped lookup also expects a book offset`() {
-    val found = chapters.getChapterAt(trackId = "2002", timeStamp = MID_BOOK_POSITION)
+    val found = chapters.getChapterAt(trackId = "2002", bookPosition = MultiTrackBook.MID_BOOK_OFFSET)
 
     assertEquals("Chapter 3", found.title)
   }
@@ -93,7 +93,7 @@ class MultiTrackChapterTest {
   /** And the same call with an in-track offset finds nothing, because no chapter covers it. */
   @Test
   fun `the track-scoped lookup finds nothing when given an in-track offset`() {
-    val found = chapters.getChapterAt(trackId = "2002", timeStamp = MID_TRACK_OFFSET)
+    val found = chapters.getChapterAt(trackId = "2002", bookPosition = BookOffset(MID_TRACK_OFFSET))
 
     assertEquals(EMPTY_CHAPTER, found)
   }

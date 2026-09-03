@@ -123,7 +123,7 @@ class BookProgressDerivationTest {
         MediaItemTrack(id = "3", parentKey = "1001", index = 3, duration = 3_000L),
       )
 
-    assertEquals(1_000L + 750L, tracks.getProgress())
+    assertEquals(1_000L + 750L, tracks.getProgress().millis)
   }
 
   /**

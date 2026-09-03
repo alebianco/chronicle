@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.util
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -188,7 +189,7 @@ class DistinctByTest {
       title = "Chapter $index",
       index = index.toLong(),
       discNumber = 1,
-      bookStartTimeOffset = index * 1000L,
-      bookEndTimeOffset = (index + 1) * 1000L,
+      bookStartTimeOffset = BookOffset(index * 1000L),
+      bookEndTimeOffset = BookOffset((index + 1) * 1000L),
     )
 }

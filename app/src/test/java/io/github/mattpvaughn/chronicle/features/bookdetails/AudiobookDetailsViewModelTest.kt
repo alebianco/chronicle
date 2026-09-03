@@ -5,6 +5,7 @@ import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -215,7 +216,7 @@ class AudiobookDetailsViewModelTest {
     every { mediaServiceConnection.isConnected } returns MutableLiveData(true)
     val viewModel = viewModel()
 
-    viewModel.jumpToChapter(offset = 5_000L, trackId = "2001")
+    viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001")
 
     assertTrue(
       "a jump discards the current position, so it must be confirmed",
@@ -230,7 +231,7 @@ class AudiobookDetailsViewModelTest {
     every { mediaServiceConnection.isConnected } returns MutableLiveData(false)
     val viewModel = viewModel()
 
-    viewModel.jumpToChapter(offset = 5_000L, trackId = "2001", hasUserConfirmation = true)
+    viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001", hasUserConfirmation = true)
 
     verify { mediaServiceConnection.connect(any()) }
   }

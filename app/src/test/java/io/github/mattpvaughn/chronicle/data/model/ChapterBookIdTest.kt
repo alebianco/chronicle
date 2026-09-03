@@ -63,7 +63,7 @@ class ChapterBookIdTest {
   fun `a fallback chapter takes its book from the track's parent`() {
     val track = MediaItemTrack(id = "2001", parentKey = "1001", title = "Track 1", duration = 1_000L)
 
-    assertEquals("1001", track.asChapter(0L).bookId)
+    assertEquals("1001", track.asChapter(BookOffset.ZERO).bookId)
   }
 
   @Test
