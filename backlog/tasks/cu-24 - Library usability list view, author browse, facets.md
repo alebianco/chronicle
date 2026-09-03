@@ -1,8 +1,9 @@
 ---
 id: cu-24
 title: "Library usability: list view, author browse, facets"
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-13'
 labels: [R2, comfort]
 dependencies: []

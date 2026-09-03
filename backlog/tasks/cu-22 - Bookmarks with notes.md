@@ -1,8 +1,9 @@
 ---
 id: cu-22
 title: Bookmarks with notes
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-13'
 labels:
   - R2
