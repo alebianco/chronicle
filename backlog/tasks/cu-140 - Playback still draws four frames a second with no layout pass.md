@@ -66,6 +66,34 @@ frame smoothness only.
 5/5 paused). It leaves the previous dump file behind on failure, so a stale file reads as success —
 assert the file exists, never just that the command was quiet.
 
+## Measuring this: two traps found the hard way
+
+**`framestats` column counts differ per Android version.** The A33 (API 36) emits a **24-column**
+`PROFILEDATA` header; the Phh-Treble GSI (API 32) emits **22**. Parsing one device's rows with the
+other's hardcoded indices yields negative durations and values like `9223372036854775807`, which
+reads convincingly as a broken clock and is really a parsing bug. **Always read the `Flags,...`
+header row and map fields by name.** Parsed correctly the GSI is fine: vsync→SwapBuffers p50
+28.17 ms / p90 33.15 ms, traversal→draw p50 0.69 ms.
+
+**`Long.MAX_VALUE` in `FrameCompleted` and `GpuCompleted` is normal**, not corruption — those are
+populated asynchronously after the frame is handed off, so the newest rows in the buffer carry a
+"not yet known" sentinel (8 of 120 rows in a sample here). Filter those two fields rather than
+discarding the row.
+
+**A p90 of 4950 ms means the window included app startup.** It is not a stuck or sentinel value: a
+first frame legitimately costs seconds, and `dumpsys gfxinfo` averages over whatever is in its
+buffer. `reset` **after** the app has settled, then measure — otherwise startup dominates and the
+steady-state figure is unobtainable. This is what made the earlier tablet numbers hard to trust.
+
+Both devices agree on the finding once measured this way, which is why it is worth trusting:
+
+| state | frames / 20 s | main thread |
+|---|---|---|
+| A33 (API 36) foreground | ~61 | 42 j/10 s |
+| A33 backgrounded | 4 | 3 j/10 s |
+| GSI (API 32) foreground | 63 | 127 j/10 s |
+| GSI backgrounded | **0** | **11 j/10 s** |
+
 ## Acceptance Criteria
 
 - [ ] The trigger for the ~3 draws/second identified **from a trace**, naming the view and the call
