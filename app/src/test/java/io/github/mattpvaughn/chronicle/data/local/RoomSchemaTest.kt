@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.test.core.app.ApplicationProvider
+import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import org.junit.Assert.assertEquals
@@ -141,6 +142,56 @@ class RoomSchemaTest {
         "an upgrade that loses progress loses the user's place",
         1_234_567L,
         cursor.getLong(0),
+      )
+    }
+    db.close()
+  }
+
+  /**
+   * The v9 -> v10 migration adds the per-book speed override (cu-20).
+   *
+   * Two things must hold: the pre-existing row survives, and its new column reads
+   * [Audiobook.NO_SPEED_OVERRIDE] — an upgrade that defaulted it to a *speed* would silently make
+   * every book in the library override the global preference at that value.
+   */
+  @Test
+  fun `the book database survives being opened after migrating from v9`() {
+    val db =
+      migrated(
+        klass = BookDatabase::class.java,
+        oldVersion = 9,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook` (`id` TEXT NOT NULL, " +
+            "`source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, " +
+            "`author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, " +
+            "`genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, " +
+            "`addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+            "`lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, " +
+            "`isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, " +
+            "`favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, " +
+            "`leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, " +
+            "`chapters` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        seedSql =
+          "INSERT INTO Audiobook (id, source, title, titleSort, author, thumb, parentId, " +
+            "genre, summary, year, addedAt, updatedAt, lastViewedAt, duration, isCached, " +
+            "progress, favorited, viewedLeafCount, leafCount, viewCount, chapters) " +
+            "VALUES ('1001', 1, 'Dune', 'Dune', 'Frank Herbert', '', '0', '', '', 1965, 0, 0, " +
+            "1700000000000, 3600000, 1, 1234567, 0, 0, 3, 0, '')",
+        migrations = BOOK_MIGRATIONS,
+      )
+
+    db.query("SELECT progress, playbackSpeed FROM Audiobook", emptyArray()).use { cursor ->
+      assertTrue("the pre-existing row must survive the upgrade", cursor.moveToFirst())
+      assertEquals(
+        "an upgrade that loses progress loses the user's place",
+        1_234_567L,
+        cursor.getLong(0),
+      )
+      assertEquals(
+        "an upgraded book must follow the global speed, not override it",
+        Audiobook.NO_SPEED_OVERRIDE,
+        cursor.getFloat(1),
+        0f,
       )
     }
     db.close()

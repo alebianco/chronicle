@@ -104,6 +104,19 @@ val BOOK_MIGRATION_8_9 =
   }
 
 /**
+ * Adds the per-book playback-speed override (cu-20).
+ *
+ * `DEFAULT 0` is [Audiobook.NO_SPEED_OVERRIDE] — an existing row keeps following the global
+ * preference, which is the behaviour before this column existed.
+ */
+val BOOK_MIGRATION_9_10 =
+  object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL("ALTER TABLE Audiobook ADD COLUMN playbackSpeed REAL NOT NULL DEFAULT 0")
+    }
+  }
+
+/**
  * Every migration, in order, as one list.
  *
  * Named rather than inlined into the builder so a test can open a real database file at an older
@@ -120,9 +133,10 @@ val BOOK_MIGRATIONS =
     BOOK_MIGRATION_6_7,
     BOOK_MIGRATION_7_8,
     BOOK_MIGRATION_8_9,
+    BOOK_MIGRATION_9_10,
   )
 
-@Database(entities = [Audiobook::class], version = 9, exportSchema = true)
+@Database(entities = [Audiobook::class], version = 10, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract val bookDao: BookDao
 }
@@ -276,6 +290,18 @@ interface BookDao {
 
   @Query("SELECT COUNT(*) FROM Audiobook")
   suspend fun getBookCount(): Int
+
+  /**
+   * Sets this book's speed override, or clears it with [Audiobook.NO_SPEED_OVERRIDE] (cu-20).
+   *
+   * `bookId` is `String` deliberately: SQLite compares across storage classes, so a numeric bind
+   * against a TEXT id column matches no row, silently and with no error (cu-71).
+   */
+  @Query("UPDATE Audiobook SET playbackSpeed = :speed WHERE id = :bookId")
+  suspend fun updatePlaybackSpeed(
+    bookId: String,
+    speed: Float,
+  )
 
   @Query("DELETE FROM Audiobook WHERE id IN (:booksToRemove)")
   fun removeAll(booksToRemove: List<String>): Int

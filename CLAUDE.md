@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **823 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **845 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -109,7 +109,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Four separate Room databases** (`BookDatabase` v9, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
+- **Four separate Room databases** (`BookDatabase` v10, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
 - **Listening position is owned by the *tracks*, never the book** (decision-16, cu-90). Plex stores
   no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a cache of a derivation.
   `merge` carries the local value and **never** adopts `network.progress`; only `syncAudiobook`,
@@ -118,6 +118,35 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   counting a timestamp as "started" made a book marked-as-read report itself half finished, because
   `markTracksInBookAsWatched` stamps every track. **Completion is a separate explicit fact**
   (`viewCount`), not inferred from position.
+- **A local-only column must be named in *both* arms of `Audiobook.merge`** (cu-20). A library
+  refresh merges a network copy without loading tracks, and a field the server knows nothing about
+  is always the default on that copy — so an arm that omits it wipes the local value on every
+  refresh. `progress` documents this (decision-16) and `playbackSpeed` repeats it. `merge` has two
+  branches and only one runs for a given pair, so a fix applied to one arm and missed in the other
+  looks correct in a test that happens to take the fixed path; `PerBookSpeedTest` exercises both
+  and was verified by sabotaging one arm.
+- **Per-book playback speed is a column with a sentinel, resolved in one place** (cu-20).
+  `Audiobook.playbackSpeed` is `NO_SPEED_OVERRIDE` (`0f`) when the book follows the global
+  preference, and `effectiveSpeed(global)` is the **only** reader — `MIN_VALID_SPEED` is pinned
+  equal to the slider's floor by a test, because if it drifted below, a legitimately chosen speed
+  would read as "no override". `MediaPlayerService.invalidatePlaybackParams()` is the single writer
+  of `PlaybackParameters` and resolves it there; it collects `currentlyPlaying.book` mapped to
+  `id to playbackSpeed` and `distinctUntilChanged`, because `ProgressUpdater` republishes the book
+  **once a second** during playback (cu-110's shape). Note the DB write alone does not propagate:
+  `ProgressUpdater`'s tick is gated on `isPlaying`, so a change made **while paused** needs
+  `CurrentlyPlaying.updateSpeedOverride` to reach the player at all.
+- **A `Slider` throws for a value off its step grid.** `setValue` requires an exact multiple of
+  `stepSize` above `valueFrom`, so any value coming from outside the UI — a settings import
+  validates keys, not values (cu-77) — must be snapped first (`SpeedChooserState.snapToStep`). And
+  **a `Chip`'s `android:tag` must not be a string resource** when it is parsed as data: the speed
+  presets keyed on `@string/playback_speed_1_0x`, so a locale rendering it "1,0x" matched no branch
+  and every preset silently became 1.0x.
+- **A `ModalBottomSheet`'s `wrap_content` content can measure to zero in landscape** (cu-142, open).
+  The speed popover renders only its title bar there — the `ConstraintLayout` measures 0 high, and
+  a zero-bounds view is **absent from a `uiautomator` dump entirely**, so the tree looks like the
+  controls were never inflated. Screenshot, don't dump, when a sheet looks wrong; and check the
+  other orientation before assuming a change caused it (this one predates cu-20 and reproduces on
+  the base branch).
 - **A downloaded track's URI needs its `file://` scheme** (cu-83). `"/path/x.mp3".toUri()` gives
   `scheme = null` and ExoPlayer will not treat it as a local file — it surfaces as an
   unsupported-format error on downloaded books only. Use `Uri.fromFile`, never `"file://" + path`,

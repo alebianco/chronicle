@@ -45,6 +45,7 @@ import io.github.mattpvaughn.chronicle.data.model.toMediaItem
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_ACTION
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
@@ -54,6 +55,8 @@ import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.PackageValidator
 import io.github.mattpvaughn.chronicle.util.ServiceUtils
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -121,6 +124,9 @@ class MediaPlayerService :
 
   @Inject
   lateinit var plexLoginRepo: IPlexLoginRepo
+
+  @Inject
+  lateinit var currentlyPlaying: CurrentlyPlaying
 
   companion object {
     /** Strings used by plex to indicate playback state */
@@ -268,9 +274,28 @@ class MediaPlayerService :
     )
 
     invalidatePlaybackParams()
+    observeBookSpeedOverride()
     progressUpdater.startRegularProgressUpdates()
 
     plexConfig.connectionState.observeForever(serverChangedListener)
+  }
+
+  /**
+   * Re-applies playback params when the book changes or its speed override does (cu-20).
+   *
+   * Maps to just the two fields that matter and `distinctUntilChanged`s before acting.
+   * [CurrentlyPlaying.book] re-emits whenever the `Audiobook` value differs, and `ProgressUpdater`
+   * writes progress **once a second** during playback — so collecting the book itself would call
+   * `setPlaybackParameters` at tick rate for a value that had not changed, which is the exact
+   * shape cu-110 was about.
+   */
+  private fun observeBookSpeedOverride() {
+    serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+      currentlyPlaying.book
+        .map { it.id to it.playbackSpeed }
+        .distinctUntilChanged()
+        .collect { invalidatePlaybackParams() }
+    }
   }
 
   private fun updateAudioAttrs(exoPlayer: ExoPlayer) {
@@ -390,11 +415,23 @@ class MediaPlayerService :
     }
   }
 
+  /**
+   * Applies speed and skip-silence to the active player.
+   *
+   * The single writer of [PlaybackParameters], which is why the per-book speed override is
+   * resolved here (cu-20) rather than at the load path: this already runs on service start, on a
+   * player switch and on a pref change, so one resolution covers every case. The book comes from
+   * [currentlyPlaying] because the load path publishes it *after* `player.prepare()` — reading the
+   * book at load time would give the outgoing one.
+   */
   private fun invalidatePlaybackParams() {
+    val book = currentlyPlaying.book.value
+    val speed = book.effectiveSpeed(prefsRepo.playbackSpeed)
     Timber.i(
-      "Playback params: speed = ${prefsRepo.playbackSpeed}, skip silence = ${prefsRepo.skipSilence}",
+      "Playback params: speed = $speed (book override = ${book.hasSpeedOverride}), " +
+        "skip silence = ${prefsRepo.skipSilence}",
     )
-    currentPlayer?.setPlaybackParameters(PlaybackParameters(prefsRepo.playbackSpeed, 1.0f))
+    currentPlayer?.setPlaybackParameters(PlaybackParameters(speed, 1.0f))
     (currentPlayer as? ExoPlayer)?.skipSilenceEnabled = prefsRepo.skipSilence
   }
 

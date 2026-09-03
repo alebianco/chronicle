@@ -187,6 +187,8 @@
     <string name="playback_speed_1_5x">1.5x</string>
     <string name="playback_speed_2_0x">2.0x</string>
     <string name="playback_speed_max">3.0x</string>
+    <string name="playback_speed_this_book_only">Just for this book</string>
+    <string name="playback_skip_silence">Skip silence</string>
 
     <!-- Sleep timer-->
     <string name="sleep_timer">Sleep timer</string>

@@ -51,8 +51,40 @@ data class Audiobook(
   val viewCount: Long = 0L,
   /** Chapter metadata corresponding to m4b chapter metadata in the m4b files */
   val chapters: List<Chapter> = emptyList(),
+  /**
+   * This book's own playback speed, or [NO_SPEED_OVERRIDE] to follow the global preference.
+   *
+   * A sentinel rather than a nullable column: every other local-only field on this entity is
+   * non-null, and `0f` sits outside the valid speed range, so it cannot be confused with a real
+   * speed. Read it through [effectiveSpeed] — the only place the sentinel is interpreted.
+   */
+  val playbackSpeed: Float = NO_SPEED_OVERRIDE,
 ) {
+  /**
+   * The speed this book should play at: its own override when it has one, otherwise [globalSpeed].
+   */
+  fun effectiveSpeed(globalSpeed: Float): Float = if (hasSpeedOverride) playbackSpeed else globalSpeed
+
+  /** Whether this book overrides the global speed preference. */
+  val hasSpeedOverride: Boolean
+    get() = playbackSpeed >= MIN_VALID_SPEED
+
   companion object {
+    /**
+     * [playbackSpeed] value meaning "no override — use the global preference".
+     *
+     * Zero is not a playable speed, so it is unambiguous as a sentinel.
+     */
+    const val NO_SPEED_OVERRIDE = 0f
+
+    /**
+     * The smallest value [playbackSpeed] may hold and still mean a speed.
+     *
+     * Kept here rather than referencing `CurrentlyPlayingViewModel.PLAYBACK_SPEED_MIN` so the data
+     * layer does not depend on a feature package. `PerBookSpeedTest` pins the two equal.
+     */
+    const val MIN_VALID_SPEED = 0.5f
+
     fun from(dir: PlexDirectory) =
       Audiobook(
         id = dir.ratingKey,
@@ -86,7 +118,9 @@ data class Audiobook(
      * [lastViewedAt] from the local copy is preferred.
      *
      * Always retain fields from local copy: [duration], [isCached], [favorited], [chapters],
-     * [source]. [chapters] and [duration] are retained because they can be calculated only when
+     * [source], [playbackSpeed]. [playbackSpeed] is a local-only override the server knows nothing
+     * about, so `network.playbackSpeed` is always the [NO_SPEED_OVERRIDE] default — adopting it
+     * would silently drop the user's per-book speed on every library refresh. [chapters] and [duration] are retained because they can be calculated only when
      * all child [MediaItemTrack]s are loaded; [duration], [source] and [isCached] because they are
      * local values that do not exist on the server.
      *
@@ -114,6 +148,7 @@ data class Audiobook(
           favorited = local.favorited,
           chapters = local.chapters,
           source = local.source,
+          playbackSpeed = local.playbackSpeed,
         )
       } else {
         network.copy(
@@ -124,6 +159,7 @@ data class Audiobook(
           lastViewedAt = local.lastViewedAt,
           favorited = local.favorited,
           chapters = local.chapters,
+          playbackSpeed = local.playbackSpeed,
         )
       }
     }

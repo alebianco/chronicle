@@ -36,6 +36,22 @@ interface CurrentlyPlaying {
     book: Audiobook,
     tracks: List<MediaItemTrack>,
   )
+
+  /**
+   * Republishes the current book with a new per-book speed override (cu-20).
+   *
+   * Narrow on purpose. The override is written to the DB by the popover, and `ProgressUpdater`
+   * would eventually re-read the book and republish it — but its tick is gated on `isPlaying`, so
+   * a change made **while paused** would not reach the player until playback resumed. Coupling a
+   * setting's propagation to a progress tick is incidental anyway; this makes it explicit.
+   *
+   * A no-op when [bookId] is not the book currently loaded, so a stale popover cannot overwrite
+   * the state of a book that has since changed.
+   */
+  fun updateSpeedOverride(
+    bookId: String,
+    speed: Float,
+  )
 }
 
 interface OnChapterChangeListener {
@@ -67,6 +83,20 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
 
   override fun setOnChapterChangeListener(listener: OnChapterChangeListener) {
     this.listener = listener
+  }
+
+  override fun updateSpeedOverride(
+    bookId: String,
+    speed: Float,
+  ) {
+    val current = book.value
+    if (current.id != bookId) {
+      Timber.i("Ignoring speed override for $bookId; ${current.id} is loaded")
+      return
+    }
+    if (current.playbackSpeed != speed) {
+      book.value = current.copy(playbackSpeed = speed)
+    }
   }
 
   override fun update(

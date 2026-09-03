@@ -141,6 +141,15 @@ interface IBookRepository {
   /** Sets the book's [Audiobook.progress] to 0 in the DB and the server */
   suspend fun setWatched(bookId: String)
 
+  /**
+   * Sets a per-book playback-speed override, or clears it with [Audiobook.NO_SPEED_OVERRIDE]
+   * so the book follows the global preference again (cu-20).
+   */
+  suspend fun updatePlaybackSpeed(
+    bookId: String,
+    speed: Float,
+  )
+
   suspend fun setUnwatched(bookId: String)
 
   /** Loads an [Audiobook] in from the network */
@@ -404,6 +413,15 @@ class BookRepository
     // comes first, so a failure leaves the local DB untouched and the two sides still agree — but
     // swallowing it told the caller the change had been made, and the caller shows a success
     // message. Since cu-98 the caller reports the real outcome, which only works if it is told.
+    override suspend fun updatePlaybackSpeed(
+      bookId: String,
+      speed: Float,
+    ) {
+      withContext(dispatchers.io) {
+        bookDao.updatePlaybackSpeed(bookId, speed)
+      }
+    }
+
     override suspend fun setWatched(bookId: String) {
       withContext(dispatchers.io) {
         plexMediaService.watched(bookId)
