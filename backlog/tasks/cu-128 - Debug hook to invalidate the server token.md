@@ -1,9 +1,10 @@
 ---
-id: DRAFT-128
+id: cu-128
 title: Debug hook to invalidate the server token
-status: Draft
+status: Done
 assignee: []
 created_date: '2026-09-03'
+updated_date: '2026-09-03'
 labels: [R1, testing, agentic, debug-hooks]
 dependencies: []
 priority: medium
@@ -88,17 +89,67 @@ invalid request, and a persisted invalid token would fight the startup refresh o
 
 ## Acceptance Criteria
 
-- [ ] A debug intent puts an invalid-but-non-empty server token into the live repository
-- [ ] The next authenticated request 401s, `PlexTokenAuthenticator` re-fetches from
+- [x] A debug intent puts an invalid-but-non-empty server token into the live repository
+- [x] The next authenticated request 401s, `PlexTokenAuthenticator` re-fetches from
       `/api/v2/resources`, retries once, and succeeds — with **no** user-visible message
-- [ ] Exactly one refresh and one retry; no loop against plex.tv
+- [x] Exactly one refresh and one retry; no loop against plex.tv
 - [ ] The same hook exercises the download path (`OkHttpDownloader`) mid-download
-- [ ] Debug source set only, with a no-op twin in `app/src/release/` so it cannot reach a release
+- [x] Debug source set only, with a no-op twin in `app/src/release/` so it cannot reach a release
       build (and the release variant still compiles — `verify.sh`'s last stage)
-- [ ] cu-73's two token-rotation items verified with it against the live server
+- [x] cu-73's two token-rotation items verified with it against the live server
 
 ## Related
 
 - [[cu-73]] — the two items this unblocks
 - [[cu-10]] — the re-auth design under test
 - [[cu-16]] — the mock-mode/debug-hook machinery this extends
+
+
+## Implementation Notes
+
+`--ez invalidate_server_token true` replaces the **live repository's** server access token with a
+wrong-but-non-empty constant. Debug source set only, with a no-op twin in `release/`; the
+`DebugHooksContract` member was added first, and deleting the release twin was checked to confirm
+it still fails the release compile.
+
+Both design constraints from the draft held up: it writes through the repository (a prefs-file edit
+is defeated by the `SharedPreferences` memory cache) and runs from `MainActivity`, i.e. **after**
+`setupNetwork`'s refresh, which would otherwise repair the token before it was used. Not persisted,
+deliberately.
+
+### The finding that made this harder than expected: Plex does not check tokens on the LAN
+
+The first live run failed to produce a 401 at all. The bogus token was demonstrably sent — five
+requests to real library endpoints carried `invalid-token-for-debug-hook` — and the server answered
+**`200`** to every one.
+
+Confirmed independently of the app, from the tablet:
+
+```
+LAN     https://192-168-1-54.<hash>.plex.direct:32400/library/sections   bogus token -> 200
+WAN     https://87-17-202-231.<hash>.plex.direct:32400/library/sections  bogus token -> 401
+plex.tv https://plex.tv/api/v2/resources                                 bogus token -> 400
+```
+
+**Plex exempts LAN clients from server-token validation.** So cu-10's 401 path is *unreachable on
+the LAN by design* — not because of anything in Chronicle. Any future attempt to exercise it must
+force a non-LAN tier, which is worth knowing before someone spends another session concluding the
+authenticator is broken.
+
+### Verified end to end, over the WAN tier
+
+Private DNS switched off so the router's search-domain hijack pushes the app to the WAN tier
+(session 3's problem, used deliberately as a tool), then the hook fired and a book was opened:
+
+```
+ConnectionChooser: Chose DIRECT connection: https://87-17-202-231.….plex.direct
+PlexTokenAuthenticator: Refreshed the server token after a 401; retrying once
+PlexTokenAuthenticator: Refreshed the server token after a 401; retrying once
+```
+
+All 7 requests ended `200`, the real token (`gtvBeo…`) was back in storage afterwards, and **no
+message appeared on screen** — the invisibility cu-10 requires. Private DNS was restored and the
+tablet is back on the LAN tier.
+
+**Left open:** the mid-download variant (`OkHttpDownloader`). The hook makes it reachable, but it
+needs a download in flight over the WAN tier, which is a separate run.

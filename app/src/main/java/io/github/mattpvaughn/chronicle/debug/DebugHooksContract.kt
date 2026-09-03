@@ -42,6 +42,21 @@ interface DebugHooksContract {
   fun onFailSyncIntent(intent: Intent?)
 
   /**
+   * Replaces the stored **server** access token with a wrong-but-non-empty value, so cu-10's
+   * 401 → refresh → retry path can be exercised against a real server.
+   *
+   * That path cannot be reached any other way. A rotation performed server-side does **not** get
+   * there: Plex keeps honouring the superseded token, and `ChronicleApplication.setupNetwork`
+   * re-fetches `/api/v2/resources` on every launch and adopts the new one *before* any
+   * authenticated request — measured, zero 401s (cu-73). Editing the prefs file does not work
+   * either, because `SharedPreferences` caches in memory.
+   *
+   * Called from `MainActivity`, i.e. **after** `setupNetwork`, or the startup refresh would repair
+   * the token before it was ever used.
+   */
+  fun onInvalidateServerTokenIntent(intent: Intent?)
+
+  /**
    * Wraps the [ProgressApi] the progress worker reports through.
    *
    * Exists so `--ez fail_sync true` works against a **real** Plex server, not only in mock mode

@@ -27,6 +27,8 @@ object DebugHooks : DebugHooksContract {
 
   override fun onFailSyncIntent(intent: Intent?) = Unit
 
+  override fun onInvalidateServerTokenIntent(intent: Intent?) = Unit
+
   /** Returns the api unchanged: no wrapper, and no failure injection, in a release build. */
   override fun wrapProgressApi(api: ProgressApi): ProgressApi = api
 

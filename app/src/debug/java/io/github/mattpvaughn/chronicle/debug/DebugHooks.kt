@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.lifecycle.LifecycleOwner
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
+import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
@@ -36,6 +37,14 @@ object DebugHooks : DebugHooksContract {
   private const val EXTRA_FAIL_SYNC = "fail_sync"
   private const val KEY_FAIL_SYNC = "fail_sync"
   private const val EXTRA_SHOW_PLAYER = "show_player"
+  private const val EXTRA_INVALIDATE_SERVER_TOKEN = "invalidate_server_token"
+
+  /**
+   * The bogus token. Non-empty on purpose: `SharedPreferencesPlexPrefsRepo.server`'s getter
+   * returns `null` when the access token is empty, which the app reads as "no server chosen" —
+   * so blanking it would skip the 401 path entirely and test nothing.
+   */
+  private const val INVALID_SERVER_TOKEN = "invalid-token-for-debug-hook"
 
   /** Applied at Application start, before any network setup. */
   override fun onApplicationCreate(application: ChronicleApplication) {
@@ -148,6 +157,46 @@ object DebugHooks : DebugHooksContract {
       .putBoolean(KEY_FAIL_SYNC, fail)
       .commit()
     Timber.i("Progress-report failure injection is now $fail (persisted)")
+  }
+
+  /**
+   * Replaces the stored server access token with a wrong one:
+   *
+   * ```
+   * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \
+   *   --ez invalidate_server_token true
+   * ```
+   *
+   * The next authenticated request then 401s, and [PlexTokenAuthenticator] should re-fetch the
+   * real token from `/api/v2/resources`, retry once, and succeed — invisibly.
+   *
+   * **This is the only way to reach that path.** Rotating the token server-side does not: Plex
+   * keeps honouring the superseded one, and `setupNetwork` adopts the new one on the next launch
+   * before any authenticated request, so no 401 ever happens (measured in cu-73). Editing the
+   * prefs file does not either — `SharedPreferences` caches in memory, so a running app never
+   * re-reads it.
+   *
+   * Writes through the **repository**, not the file, for that reason. Applied from `MainActivity`,
+   * so it lands *after* `setupNetwork`'s refresh rather than being repaired by it.
+   *
+   * Not persisted, unlike `fail_sync`: the point is one invalid request. A persisted bad token
+   * would be overwritten by the startup refresh on every launch anyway, so persisting it would
+   * only make the hook look unreliable.
+   */
+  override fun onInvalidateServerTokenIntent(intent: Intent?) {
+    if (intent == null || !intent.getBooleanExtra(EXTRA_INVALIDATE_SERVER_TOKEN, false)) {
+      return
+    }
+    val plexPrefs = Injector.get().plexPrefs()
+    val server = plexPrefs.server
+    if (server == null) {
+      Timber.w("invalidate_server_token: no server is configured; nothing to invalidate")
+      return
+    }
+    plexPrefs.server = server.copy(accessToken = INVALID_SERVER_TOKEN)
+    // Presence, never the value — logging a real token is what TokenLoggingTest exists to stop,
+    // and the replacement is a constant, so there is nothing useful to print either way.
+    Timber.i("invalidate_server_token: server access token replaced with a bogus value")
   }
 
   /**
