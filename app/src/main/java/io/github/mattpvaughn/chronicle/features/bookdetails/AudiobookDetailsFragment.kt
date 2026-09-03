@@ -139,6 +139,12 @@ class AudiobookDetailsFragment : Fragment() {
       binding.cachingTracksSpinner.isEnabled = statusKnown
     }
     viewModel.cacheIconDrawable.observe(viewLifecycleOwner) { binding.download.setImageResource(it) }
+    // Immediately beside the icon it labels, so the two cannot drift apart again (cu-149). The
+    // layout's static `android:contentDescription` is gone: it said "Download" for a book that was
+    // already downloaded, which is what a screen reader announced.
+    viewModel.cacheContentDescription.observe(viewLifecycleOwner) {
+      binding.download.contentDescription = getString(it)
+    }
     viewModel.cacheIconTint.observe(viewLifecycleOwner) { tint ->
       binding.download.imageTintList = ColorStateList.valueOf(tint)
     }

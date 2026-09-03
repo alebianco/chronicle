@@ -82,6 +82,13 @@
     <string name="no_tracks_found">No tracks found</string>
     <string name="download">Download</string>
     <string name="downloading_book">Downloading book</string>
+    <!--
+      The download control's spoken label, one per cache state (cu-149). The icon already swaps;
+      these are what a screen reader announces, and they must say what a tap will *do* — a fully
+      downloaded book announcing "Download" is one control with two meanings and one label.
+    -->
+    <string name="download_remove">Remove download</string>
+    <string name="download_cancel">Cancel download</string>
     <string name="failed_to_connect_to_server">Can\'t connect to server</string>
     <string name="prompt_mark_as_played">Mark as played?</string>
     <string name="prompt_mark_as_unplayed">Mark as unplayed?</string>

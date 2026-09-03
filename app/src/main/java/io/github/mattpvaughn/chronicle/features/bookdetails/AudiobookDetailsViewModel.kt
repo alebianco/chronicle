@@ -143,6 +143,27 @@ class AudiobookDetailsViewModel(
       }
     }
 
+  /**
+   * What the download control announces, one label per state (cu-149).
+   *
+   * Derived from `cacheStatus` **immediately beside the icon it labels**, so the two cannot
+   * diverge: the label used to be a static `android:contentDescription="@string/download"` in the
+   * layout while the icon swapped in Kotlin, so a screen reader said "Download" for a book that was
+   * already downloaded — one control with two meanings and one label.
+   *
+   * Each string says what a *tap does*, which is what `onCacheButtonClick` actually branches on:
+   * download it, remove the download, or cancel one in flight. `CacheLabelPairingTest` pins the two
+   * `when` blocks to the same states so a new one cannot be added to the icon alone.
+   */
+  val cacheContentDescription: LiveData<Int> =
+    cacheStatus.map { status ->
+      return@map when (status) {
+        CACHING -> R.string.download_cancel
+        NOT_CACHED -> R.string.download
+        CACHED -> R.string.download_remove
+      }
+    }
+
   private val activeBook = currentlyPlaying.book.asLiveData(viewModelScope.coroutineContext)
 
   /** Whether the book in the current view is also the same on in the [MediaController] */

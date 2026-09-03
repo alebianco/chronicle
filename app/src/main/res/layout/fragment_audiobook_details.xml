@@ -84,12 +84,19 @@ xmlns:tools="http://schemas.android.com/tools"
                         android:layout_height="@dimen/list_icon_size"
                         android:contentDescription="@string/downloading_book" />
 
+                    <!--
+                      No `android:contentDescription` here on purpose (cu-149): this control has
+                      three meanings — download, remove download, cancel — and a static label
+                      announced "Download" for a book that was already downloaded. The fragment
+                      sets it from `cacheContentDescription`, beside the icon it labels.
+                      `tools:` only, so the layout preview still shows something.
+                    -->
                     <ImageView
                         android:id="@+id/download"
                         android:layout_width="@dimen/list_icon_size"
                         android:layout_height="@dimen/list_icon_size"
-                        android:contentDescription="@string/download"
-                        android:enabled="false" />
+                        android:enabled="false"
+                        tools:contentDescription="@string/download" />
 
                 </FrameLayout>
 
