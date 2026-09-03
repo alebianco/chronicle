@@ -7,6 +7,17 @@ title: "R0 — Foundation"
 
 "Don't build on sand." Toolchain truth + the agentic verification loop: stable Room, honest CI + verify.sh, KAPT→KSP, SDK/Media3 bumps, quick-win cherry-picks, donation links, CLAUDE.md.
 
+## Archived 2026-09-03
+
+Its 18 Done tasks were moved to `backlog/completed/` (`backlog task complete`), which cleared them
+from the Kanban board. That has a side effect worth knowing: a milestone's completion count is
+derived from **task files**, so once they move the milestone reports **0/0** and appears under
+*Active* — reading as an empty, available milestone rather than a finished one. Archiving it is the
+fix, and is why the count below is recorded here by hand.
+
+The tasks themselves are not lost: `backlog task cu-<n>` still resolves and `grep -r` across
+`backlog/` still finds them. Only `backlog search` skips `completed/`.
+
 ## Closed 2026-08-31 — 15/15 tasks Done
 
 | | Before | After |

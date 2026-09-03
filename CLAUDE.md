@@ -247,6 +247,21 @@ Tasks are markdown files in **`backlog/tasks/`** (Backlog.md format: `task-<id> 
 **Docs map** (everything non-code is under `backlog/` — see `backlog/README.md`):
 - `backlog/tasks/` — the work (one file per task). `backlog/drafts/` — uncommitted ideas awaiting owner
   triage.
+  **Closing out a release.** When every task in a milestone is Done, retire it in this order —
+  `backlog task complete <id>` for each task (moves it to `backlog/completed/`, off the Kanban
+  board), then `backlog milestone archive m-<n>` (moves it to `backlog/archive/milestones/`).
+  Order matters and so does the second step: a milestone's completion count is derived from **task
+  files**, so once they move it reports **0/0** and sits under *Active*, reading as an empty
+  milestone available for reuse rather than a finished one. Record the real count in the milestone
+  file before archiving, since the CLI can no longer compute it.
+  Completed tasks stay inside `backlog/` and in git — `backlog task cu-<n>` still resolves and
+  `grep -r` still finds them, which is how the gotchas above cite tasks. The one cost is that
+  **`backlog search` does not index `completed/`**.
+  **A colon in a `title:` must be quoted** (`title: "Toolchain bump: SDK 36"`). An unquoted one
+  breaks YAML parsing and the task becomes invisible to *every* CLI operation — `backlog task
+  <id>` reports "not found" while the file sits in place. Nine files had this, four of them
+  decision records `backlog doctor` was reporting as unreadable.
+
   **Deferred work is not a draft.** A draft is an *idea nobody has committed to*; work that was
   started, scoped and then postponed is a **task** with `status: To Do`. The difference matters
   mechanically: `backlog board` and `backlog task list` show tasks, while drafts surface only in
