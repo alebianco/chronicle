@@ -1,10 +1,11 @@
 ---
-id: DRAFT-121
-title: A second device does not adopt the server position
-status: Draft
+id: cu-121
+title: Position adoption verified working, not a bug
+status: Done
 assignee: []
 created_date: '2026-09-02'
-labels: [R1, sync, bug, trust]
+updated_date: '2026-09-03'
+labels: [R1, sync, verified-not-a-bug]
 dependencies: []
 priority: high
 milestone: m-1
@@ -12,8 +13,31 @@ milestone: m-1
 
 ## Description
 
-> **⚠️ RETRACTED IN PART, 2026-09-03 — the original measurement was flawed. Do not act on this
-> without re-testing.**
+> **⚠️ FULLY RETRACTED, 2026-09-03. There is no bug. Adoption works in both directions, verified
+> on two real devices.** This file is kept for the method lesson, not the defect.
+>
+> **The re-test, once the phone was logged back in and its stale certificate cleared:**
+>
+> | step | tablet | phone |
+> |---|---|---|
+> | before | `286557` (newer ts) | `14768` |
+> | phone opens the book | — | **`284551`** — matches the server's `viewOffset` exactly |
+> | on screen | — | **`04:44/11:11:47`** |
+>
+> `Integrating network track` **fired** — the network-wins branch of `merge`, the very line whose
+> absence originally looked like proof of a bug. It was absent before because the phone's local row
+> was genuinely newer, so taking the `else` branch was correct.
+>
+> **The converse also holds.** With the phone then played to `318426` (newer than the tablet's
+> `286557`), re-opening the book left it at `318426` — local progress is not clobbered by a stale
+> server value.
+>
+> So both halves of the cu-14 round trip are correct, and the two cu-73 items that depend on them
+> are verified rather than blocked.
+>
+> ---
+>
+> **Original retraction note (the measurement error), kept because the lesson recurs:**
 >
 > The claim "the phone's stored position stayed at 189 ms" was read with
 > `sqlite3` against a **copy of the main database file only**, without its `-wal`. Room runs in WAL
@@ -148,3 +172,39 @@ were not evidence of anything. **Tap the book in the UI** (or otherwise reach
 - [[cu-73]] — found here; four convergence items depend on this working
 - [[cu-14]] — the sync-drift work this is the round trip for
 - [[cu-90]] — position ownership; decision-16 is the governing rule
+
+
+## A follow-on observation, not yet explained
+
+While testing the [[cu-90]] convergence items on the same rig, a **second, different** behaviour
+turned up and is recorded here rather than filed as a defect, because it is not yet understood.
+
+Setup: the tablet's track 3 (`151447`) progress was set directly in the database and then played
+via `--el play_book`, so it reported `time=37773` for that track. The server answered **`200`** —
+but with:
+
+```json
+{"MediaContainer":{"size":0,"playbackState":"ignore"}}
+```
+
+no `viewOffset` echoed. On the phone, `/children` then returned **no `viewOffset`, `lastViewedAt`
+or `viewCount`** for `151447` at all, and none for the book `151444` either. Re-fetching a minute
+later gave the same, so it is not a write-settling race, and `merge` correctly did nothing.
+
+**What was ruled out:** `playQueueItemId=-1` is *not* the discriminator — the accepted reports from
+session 4 sent the same placeholder, and 28 of them echoed a `viewOffset`. A `playQueues` call was
+made in both cases.
+
+**The likeliest remaining explanation**, untested: the test setup is artificial. Progress was
+written straight into Room and playback started with `play_book`, so Plex may be declining to
+attribute a report it has no corresponding session for. If so this is an artefact of how the
+fixture was built, not something a real listener would hit — which is exactly why it is **not**
+being filed as a bug on that evidence.
+
+**How to settle it:** repeat the cu-90 setup by *actually listening* on the tablet into a later
+track through the UI, with no direct database editing, and see whether the report is accepted.
+That is a five-minute check with both devices to hand and would either close the two cu-90 items or
+produce a real, well-founded defect report.
+
+The first-track round trip — which used ordinary playback — works in both directions and is
+verified above; nothing here casts doubt on that.

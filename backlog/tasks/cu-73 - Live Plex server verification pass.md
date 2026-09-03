@@ -713,7 +713,15 @@ so the two remaining items below need neither mock mode nor a `pm clear`. Use th
       `lastViewedAt = 1788336422878` (13 digits, millis) for a book whose server value was 10-digit
       seconds — the conversion working end to end, not just in a unit test.
 
-- [ ] **Local progress is not clobbered by a stale server value.** The converse of the above:
+- [x] **Local progress is not clobbered by a stale server value.** — **VERIFIED 2026-09-03.**
+      With the phone played to `318426` — ahead of the tablet's `286557`, and with a newer
+      timestamp — force-stopping and re-opening the book left it at **`318426`**. The older server
+      value did not pull it backwards.
+
+      This is the half a naive adoption fix would have broken, which is why it was worth measuring
+      separately rather than assuming it followed from the first.
+
+      *Original text:* The converse of the above:
       listen on this device with no other client active, refresh, and confirm the position
       does not jump backwards.
 
@@ -772,6 +780,18 @@ into "the symptom is gone".
       storage. I set the pref directly rather than driving the settings UI, so the worker itself
       never ran — that interaction remains unaudited, as the original item noted.
 - [ ] **Two devices converge on one position** ([[cu-90]]). Listen on A into a *later* track, then
+      **Attempted 2026-09-03, inconclusive — the test setup was artificial, not the app.** The
+      tablet's later-track progress was written straight into Room and played via `play_book`, and
+      the server answered its report `200` with `{"playbackState":"ignore"}` and no echoed
+      `viewOffset`; the phone then received no `viewOffset` for that track at all, so `merge`
+      correctly did nothing. Ruled out: `playQueueItemId=-1` is not the discriminator (accepted
+      reports in session 4 sent the same placeholder). See [[cu-121]] for the full trail.
+
+      **To settle it:** redo this by *actually listening* on device A into a later track through
+      the UI, with no direct database editing. Five minutes with both devices to hand.
+      Note the first-track round trip is verified working in both directions, so this is about
+      the later-track case only.
+
       open the book on B which last touched an *earlier* track. B must not drag the position
       backwards. Then reload book info repeatedly on one device: the position must not move.
 - [ ] **A deliberate seek backwards survives a sync** ([[cu-90]]). Seek back a chapter, wait for a
