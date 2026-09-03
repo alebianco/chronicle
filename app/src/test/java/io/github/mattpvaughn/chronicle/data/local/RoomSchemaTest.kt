@@ -91,6 +91,48 @@ class RoomSchemaTest {
     db.close()
   }
 
+  /** The fifth database (cu-22). Same shape as the four above; there is no reason to omit it. */
+  @Test
+  fun `the bookmark database opens and validates`() {
+    val db =
+      Room.inMemoryDatabaseBuilder(
+        ApplicationProvider.getApplicationContext(),
+        BookmarkDatabase::class.java,
+      ).allowMainThreadQueries().build()
+
+    assertNotNull(db.bookmarkDao)
+    db.query("SELECT COUNT(*) FROM Bookmark", emptyArray()).close()
+    db.close()
+  }
+
+  /**
+   * The `BookOffset` type converter must round-trip through a real column.
+   *
+   * `OffsetConverters` stores a plain INTEGER, so this cannot fail as arithmetic — but a
+   * `@TypeConverters` annotation missing from the database class makes Room refuse to build, and
+   * this is the check that would say so rather than a crash on first use.
+   */
+  @Test
+  fun `the bookmark database stores a book offset`() {
+    val db =
+      Room.inMemoryDatabaseBuilder(
+        ApplicationProvider.getApplicationContext(),
+        BookmarkDatabase::class.java,
+      ).allowMainThreadQueries().build()
+
+    // execSQL, not query: `query` prepares a statement and returns a cursor without stepping it,
+    // so an INSERT written that way never runs — and the read below then finds no row, which looks
+    // like a converter fault rather than a test bug.
+    db.openHelper.writableDatabase.execSQL(
+      "INSERT INTO Bookmark (id, bookId, position, note, createdAt) VALUES ('a', '1', 90000, '', 0)",
+    )
+    db.query("SELECT position FROM Bookmark WHERE id = 'a'", emptyArray()).use { cursor ->
+      assertTrue(cursor.moveToFirst())
+      assertEquals(90_000L, cursor.getLong(0))
+    }
+    db.close()
+  }
+
   /**
    * The check that actually reproduces the crash an earlier commit would have shipped.
    *

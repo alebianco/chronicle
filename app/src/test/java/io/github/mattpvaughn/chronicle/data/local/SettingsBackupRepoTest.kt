@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
+import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -32,6 +34,7 @@ class SettingsBackupRepoTest {
   private lateinit var prefs: SharedPreferences
   private lateinit var repo: SettingsBackupRepo
   private lateinit var backupFile: File
+  private lateinit var bookmarks: FakeBookmarkRepository
 
   @Before
   fun setUp() {
@@ -39,13 +42,60 @@ class SettingsBackupRepoTest {
     prefs = context.getSharedPreferences("SettingsBackupRepoTest", Context.MODE_PRIVATE)
     prefs.edit().clear().commit()
     backupFile = File.createTempFile("chronicle-backup", ".json")
+    bookmarks = FakeBookmarkRepository()
     repo =
       SettingsBackupRepo(
         sharedPreferences = prefs,
         contentResolver = context.contentResolver,
         moshi = Moshi.Builder().build(),
         dispatchers = TestDispatcherProvider(),
+        bookmarkRepository = bookmarks,
       )
+  }
+
+  /**
+   * An in-memory [IBookmarkRepository] with the DAO's REPLACE-on-id semantics.
+   *
+   * Written out rather than mocked because the *semantics* are the thing under test: a restore is
+   * idempotent only because the id is the key, and a mock returning canned values would assert
+   * nothing about that.
+   */
+  private class FakeBookmarkRepository : IBookmarkRepository {
+    val stored = linkedMapOf<String, Bookmark>()
+
+    override fun getBookmarksForBook(bookId: String) = throw UnsupportedOperationException("not needed by these tests")
+
+    override suspend fun getBookmarksForBookAsync(bookId: String) = stored.values.filter { it.bookId == bookId }
+
+    override suspend fun getAllAsync() = stored.values.toList()
+
+    override suspend fun add(
+      bookId: String,
+      position: BookOffset,
+      note: String,
+      createdAt: Long,
+    ): Bookmark {
+      val bookmark =
+        Bookmark(bookId = bookId, position = position, note = note, createdAt = createdAt)
+      stored[bookmark.id] = bookmark
+      return bookmark
+    }
+
+    override suspend fun updateNote(
+      id: String,
+      note: String,
+    ) {
+      stored[id]?.let { stored[id] = it.copy(note = note) }
+    }
+
+    override suspend fun delete(id: String) {
+      stored.remove(id)
+    }
+
+    override suspend fun restore(bookmarks: List<Bookmark>): Int {
+      bookmarks.forEach { stored[it.id] = it }
+      return bookmarks.size
+    }
   }
 
   /** The non-default values used across the round-trip tests, one per stored type. */
@@ -291,5 +341,97 @@ class SettingsBackupRepoTest {
       assertTrue("stale bytes survived the overwrite", !written.contains("xxxx"))
       // And it must still read back cleanly.
       assertTrue(repo.importFrom(backupFile.toUri()) is SettingsBackupRepo.ImportResult.Applied)
+    }
+
+  /**
+   * The whole point of criterion 3: a bookmark written to a file comes back from it.
+   *
+   * Through the real Moshi adapter and a real file, so the JSON shape is exercised rather than
+   * assumed — a field Moshi cannot serialize would pass a pure round-trip test of the mapping
+   * functions and fail here.
+   */
+  @Test
+  fun `a bookmark survives an export and import through a real file`() =
+    runTest {
+      bookmarks.restore(
+        listOf(
+          Bookmark(
+            id = "bm-1",
+            bookId = "1001",
+            position = BookOffset(90_000L),
+            note = "the riddle game",
+            createdAt = 1_700_000_000_000L,
+          ),
+        ),
+      )
+
+      val export = repo.exportTo(backupFile.toUri())
+      assertTrue("export must succeed", export is SettingsBackupRepo.ExportResult.Written)
+
+      bookmarks.stored.clear()
+      val import = repo.importFrom(backupFile.toUri())
+
+      assertTrue(import is SettingsBackupRepo.ImportResult.Applied)
+      assertEquals(1, (import as SettingsBackupRepo.ImportResult.Applied).bookmarks)
+      val restored = bookmarks.stored.getValue("bm-1")
+      assertEquals("1001", restored.bookId)
+      assertEquals(BookOffset(90_000L), restored.position)
+      assertEquals("the riddle game", restored.note)
+      assertEquals(1_700_000_000_000L, restored.createdAt)
+    }
+
+  /**
+   * Importing the same file twice must not duplicate. A restore keyed on anything but the id — a
+   * position, say — would grow the list on every import.
+   */
+  @Test
+  fun `importing the same file twice does not duplicate bookmarks`() =
+    runTest {
+      bookmarks.restore(
+        listOf(Bookmark(id = "bm-1", bookId = "1001", position = BookOffset(1_000L))),
+      )
+      repo.exportTo(backupFile.toUri())
+
+      repo.importFrom(backupFile.toUri())
+      repo.importFrom(backupFile.toUri())
+
+      assertEquals(1, bookmarks.stored.size)
+    }
+
+  /**
+   * A restore must be **additive**. A bookmark made after the export was taken is not in the file,
+   * and deleting it would be unrecoverable — the note is the user's own writing and no server
+   * holds a copy.
+   */
+  @Test
+  fun `importing does not delete bookmarks made since the export`() =
+    runTest {
+      bookmarks.restore(
+        listOf(Bookmark(id = "bm-old", bookId = "1001", position = BookOffset(1_000L))),
+      )
+      repo.exportTo(backupFile.toUri())
+
+      bookmarks.restore(
+        listOf(Bookmark(id = "bm-new", bookId = "1002", position = BookOffset(2_000L))),
+      )
+      repo.importFrom(backupFile.toUri())
+
+      assertEquals(setOf("bm-old", "bm-new"), bookmarks.stored.keys)
+    }
+
+  /**
+   * A file whose export happened before any bookmark existed must not be read as "delete them all".
+   */
+  @Test
+  fun `importing a file with no bookmarks leaves existing ones alone`() =
+    runTest {
+      repo.exportTo(backupFile.toUri())
+      bookmarks.restore(
+        listOf(Bookmark(id = "bm-1", bookId = "1001", position = BookOffset(1_000L))),
+      )
+
+      repo.importFrom(backupFile.toUri())
+
+      assertEquals(setOf("bm-1"), bookmarks.stored.keys)
     }
 }

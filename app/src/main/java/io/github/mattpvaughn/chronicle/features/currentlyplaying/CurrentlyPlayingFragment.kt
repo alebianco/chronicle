@@ -18,6 +18,7 @@ import com.google.android.material.slider.Slider
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
+import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCurrentlyPlayingBinding
@@ -29,6 +30,8 @@ import io.github.mattpvaughn.chronicle.util.formatCoarseDuration
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
+import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarkNote
+import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarks
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
@@ -38,7 +41,10 @@ import javax.inject.Inject
 
 /** Responsible for playback controls and displaying the currently playing media */
 @ExperimentalCoroutinesApi
-class CurrentlyPlayingFragment : Fragment() {
+class CurrentlyPlayingFragment :
+  Fragment(),
+  ModalBottomSheetBookmarkNote.Listener,
+  ModalBottomSheetBookmarks.Listener {
   private lateinit var currentlyPlayingInterface: MainActivity.CurrentlyPlayingInterface
 
   @Inject
@@ -62,6 +68,43 @@ class CurrentlyPlayingFragment : Fragment() {
    */
   private var boundTitle: String? = null
   private var boundThumb: String? = null
+
+  /**
+   * Opens the bookmark list, keeping it fed while it is shown.
+   *
+   * The sheet holds no repository: this observes and pushes, so the subscription belongs to the
+   * Fragment's lifecycle and dies with it.
+   */
+  private fun showBookmarkList() {
+    val sheet = ModalBottomSheetBookmarks()
+    sheet.show(childFragmentManager, ModalBottomSheetBookmarks.TAG)
+    viewModel.bookmarks.observe(viewLifecycleOwner) { bookmarks ->
+      sheet.setBookmarks(bookmarks.orEmpty())
+    }
+  }
+
+  override fun onBookmarkJump(bookmark: Bookmark) {
+    viewModel.jumpToBookmark(bookmark)
+  }
+
+  override fun onBookmarkEdit(bookmark: Bookmark) {
+    ModalBottomSheetBookmarkNote.forBookmark(
+      bookmarkId = bookmark.id,
+      positionMillis = bookmark.position.millis,
+      note = bookmark.note,
+    ).show(childFragmentManager, ModalBottomSheetBookmarkNote.TAG)
+  }
+
+  override fun onNoteSaved(
+    bookmarkId: String,
+    note: String,
+  ) {
+    viewModel.setBookmarkNote(bookmarkId, note)
+  }
+
+  override fun onBookmarkDeleted(bookmarkId: String) {
+    viewModel.deleteBookmark(bookmarkId)
+  }
 
   companion object {
     fun newInstance() = CurrentlyPlayingFragment()
@@ -103,6 +146,17 @@ class CurrentlyPlayingFragment : Fragment() {
       Toast.makeText(context, message, LENGTH_SHORT).show()
     }
 
+    // A new bookmark opens its note sheet straight away, so writing one is part of the same
+    // gesture rather than something to go and find afterwards (cu-22). The note is optional —
+    // dismissing the sheet leaves a perfectly good positional bookmark.
+    viewModel.bookmarkAdded.observeEvent(viewLifecycleOwner) { bookmark ->
+      ModalBottomSheetBookmarkNote.forBookmark(
+        bookmarkId = bookmark.id,
+        positionMillis = bookmark.position.millis,
+        note = bookmark.note,
+      ).show(childFragmentManager, ModalBottomSheetBookmarkNote.TAG)
+    }
+
     // Was 29 binding expressions in fragment_currently_playing.xml.
     binding.skipToPrevious.setOnClickListener { viewModel.skipToPrevious() }
     binding.rewindButton.setOnClickListener { viewModel.skipBackwards() }
@@ -111,6 +165,13 @@ class CurrentlyPlayingFragment : Fragment() {
     binding.skipToNext.setOnClickListener { viewModel.skipToNext() }
     binding.changeSpeedButton.setOnClickListener { viewModel.showPlaybackSpeedChooser() }
     binding.sleepTimerButton.setOnClickListener { viewModel.showSleepTimerOptions() }
+    binding.bookmarkButton.setOnClickListener { viewModel.addBookmark() }
+    // Long-press lists them. A tap is the frequent action (mark this moment) and gets the plain
+    // press; browsing is rarer, so it takes the long one — §3.1 rule 2, one tray icon per job.
+    binding.bookmarkButton.setOnLongClickListener {
+      showBookmarkList()
+      true
+    }
 
     viewModel.hasFailedProgressSync.observe(viewLifecycleOwner) { failed ->
       binding.syncFailedBadge.isVisible = failed == true

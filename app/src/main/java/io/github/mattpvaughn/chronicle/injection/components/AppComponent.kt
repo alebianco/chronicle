@@ -58,6 +58,8 @@ interface AppComponent {
 
   fun bookRepo(): IBookRepository
 
+  fun bookmarkRepo(): IBookmarkRepository
+
   fun chapterRepo(): IChapterRepository
 
   fun bookRepos(): BookRepository

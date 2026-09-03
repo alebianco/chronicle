@@ -191,6 +191,16 @@
     <string name="playback_skip_silence">Skip silence</string>
 
     <!-- Sleep timer-->
+    <string name="bookmark_add">Add bookmark</string>
+    <string name="bookmark_added">Bookmark added at %1$s</string>
+    <string name="bookmark_added_with_note">Add a note</string>
+    <string name="bookmarks_title">Bookmarks</string>
+    <string name="bookmark_note_hint">Note (optional)</string>
+    <string name="bookmark_save">Save</string>
+    <string name="bookmark_delete">Delete bookmark</string>
+    <string name="bookmark_edit_note">Edit note</string>
+    <string name="bookmark_jump">Jump to bookmark</string>
+    <string name="bookmark_none">No bookmarks yet. Tap the bookmark button in the player to mark a moment.</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="sleep_timer_active_title">Sleep timer: %1$s remaining</string>
     <string name="sleep_timer_active_end_of_chapter">Sleep timer: end of chapter</string>

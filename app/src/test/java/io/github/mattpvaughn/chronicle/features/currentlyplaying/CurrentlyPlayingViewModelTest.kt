@@ -10,10 +10,12 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.local.IBookmarkRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
+import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_CHAPTER
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_TRACK
@@ -22,9 +24,12 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
@@ -38,6 +43,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 
 /**
  * Construction and wiring for `CurrentlyPlayingViewModel`, which was at 0% instruction coverage.
@@ -115,6 +121,8 @@ class CurrentlyPlayingViewModelTest {
       every { getTracksForAudiobook(any()) } returns
         MutableLiveData(emptyList<MediaItemTrack>())
     }
+
+  private val bookmarkRepository = mockk<IBookmarkRepository>(relaxed = true)
 
   private val workManager =
     mockk<WorkManager>(relaxed = true) {
@@ -242,6 +250,100 @@ class CurrentlyPlayingViewModelTest {
       assertTrue("a negative chapter progress reaches the slider and the clock", progress!! >= 0L)
     }
 
+  /**
+   * A bookmark records the **book** offset, not the in-track one (cu-22).
+   *
+   * Asserted on the multi-track fixture where the two differ by a whole track: on a single-track
+   * book they are the same number, so a frame mix-up here would be invisible — which is the exact
+   * shape of the six bugs cu-136 made into a type error.
+   */
+  @Test
+  fun `adding a bookmark records the book offset`() =
+    runTest {
+      val added = slot<BookOffset>()
+      coEvery {
+        bookmarkRepository.add(any(), capture(added), any(), any())
+      } answers {
+        Bookmark(bookId = MultiTrackBook.BOOK_ID, position = added.captured)
+      }
+
+      viewModel(midBookCurrentlyPlaying()).addBookmark()
+      advanceUntilIdle()
+
+      assertEquals(
+        "a bookmark points into the book; the in-track offset is a different number here",
+        MultiTrackBook.MID_BOOK_OFFSET,
+        added.captured,
+      )
+    }
+
+  @Test
+  fun `adding a bookmark records the book it belongs to`() =
+    runTest {
+      val bookId = slot<String>()
+      coEvery {
+        bookmarkRepository.add(capture(bookId), any(), any(), any())
+      } answers {
+        Bookmark(bookId = bookId.captured, position = BookOffset.ZERO)
+      }
+
+      viewModel(midBookCurrentlyPlaying()).addBookmark()
+      advanceUntilIdle()
+
+      assertEquals(MultiTrackBook.BOOK_ID, bookId.captured)
+    }
+
+  /** Nothing playing means nowhere to attach a bookmark, so the write must not be attempted. */
+  @Test
+  fun `adding a bookmark with no book playing does nothing`() =
+    runTest {
+      viewModel().addBookmark()
+      advanceUntilIdle()
+
+      coVerify(exactly = 0) { bookmarkRepository.add(any(), any(), any(), any()) }
+    }
+
+  /**
+   * A repository failure is reported, not swallowed: the user pressed a button and is entitled to
+   * know it did nothing.
+   */
+  @Test
+  fun `a failed bookmark write tells the user`() =
+    runTest {
+      coEvery { bookmarkRepository.add(any(), any(), any(), any()) } throws IOException("disk")
+
+      val vm = viewModel(midBookCurrentlyPlaying())
+      vm.addBookmark()
+      advanceUntilIdle()
+
+      assertNotNull(
+        "a silent failure leaves the user believing a bookmark exists",
+        vm.showUserMessage.value,
+      )
+    }
+
+  /** A note is trimmed on the way in, so a stray newline does not become part of it. */
+  @Test
+  fun `saving a note trims it`() =
+    runTest {
+      val note = slot<String>()
+      coEvery { bookmarkRepository.updateNote(any(), capture(note)) } returns Unit
+
+      viewModel().setBookmarkNote("bm-1", "  the riddle game\n")
+      advanceUntilIdle()
+
+      assertEquals("the riddle game", note.captured)
+    }
+
+  @Test
+  fun `deleting a bookmark reaches the repository`() =
+    runTest {
+      viewModel().deleteBookmark("bm-1")
+      advanceUntilIdle()
+
+      coVerify { bookmarkRepository.delete("bm-1") }
+    }
+
   private fun viewModel(playing: CurrentlyPlaying = currentlyPlaying) =
     CurrentlyPlayingViewModel(
       bookRepository = bookRepository,
@@ -252,6 +354,7 @@ class CurrentlyPlayingViewModelTest {
       plexConfig = mockk<PlexConfig>(relaxed = true),
       currentlyPlaying = playing,
       workManager = workManager,
+      bookmarkRepository = bookmarkRepository,
       sharedPrefs = sharedPrefs,
     )
 }

@@ -151,6 +151,14 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
+  fun provideBookmarkDao(): BookmarkDao = getBookmarkDatabase(app.applicationContext).bookmarkDao
+
+  @Provides
+  @Singleton
+  fun provideBookmarkRepo(bookmarkRepository: BookmarkRepository): IBookmarkRepository = bookmarkRepository
+
+  @Provides
+  @Singleton
   fun provideCollectionsDao(): CollectionsDao =
     getCollectionsDatabase(
       app.applicationContext,

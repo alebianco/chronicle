@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One bookmark: its position, and its note when it has one (cu-22). -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/bookmark_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:paddingStart="@dimen/screen_horizontal_padding"
+    android:paddingTop="@dimen/margin_normal"
+    android:paddingEnd="@dimen/screen_horizontal_padding"
+    android:paddingBottom="@dimen/margin_normal">
+
+    <ImageView
+        android:id="@+id/bookmark_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:contentDescription="@string/bookmarks_title"
+        android:src="@drawable/ic_bookmark"
+        app:layout_constraintBottom_toBottomOf="@id/bookmark_position"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/bookmark_position"
+        app:tint="@color/colorAccent" />
+
+    <TextView
+        android:id="@+id/bookmark_position"
+        style="@style/TextAppearance.Body1"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/margin_normal"
+        android:textColor="@color/textPrimary"
+        app:layout_constraintEnd_toStartOf="@id/bookmark_edit"
+        app:layout_constraintStart_toEndOf="@id/bookmark_icon"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="1:02:33" />
+
+    <!--
+      Visibility is Kotlin-driven, so it starts GONE in XML: a view whose default is visible
+      flashes for a frame before the binding runs (cu-58).
+    -->
+    <TextView
+        android:id="@+id/bookmark_note"
+        style="@style/TextAppearance.Body2"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/margin_normal"
+        android:textColor="@color/textSecondary"
+        android:visibility="gone"
+        app:layout_constraintEnd_toStartOf="@id/bookmark_edit"
+        app:layout_constraintStart_toEndOf="@id/bookmark_icon"
+        app:layout_constraintTop_toBottomOf="@id/bookmark_position"
+        tools:text="the riddle game"
+        tools:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/bookmark_edit"
+        android:layout_width="@dimen/list_icon_size"
+        android:layout_height="@dimen/list_icon_size"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:contentDescription="@string/bookmark_edit_note"
+        android:focusable="true"
+        android:padding="6dp"
+        android:src="@drawable/ic_edit"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/icon" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

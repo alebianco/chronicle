@@ -19,10 +19,12 @@ import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
 import io.github.mattpvaughn.chronicle.application.SECONDS_PER_MINUTE
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.local.IBookmarkRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.*
+import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.player.*
@@ -102,6 +104,7 @@ class CurrentlyPlayingViewModel(
   private val plexConfig: PlexConfig,
   private val currentlyPlaying: CurrentlyPlaying,
   private val workManager: WorkManager,
+  private val bookmarkRepository: IBookmarkRepository,
   sharedPrefs: SharedPreferences,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
@@ -116,6 +119,7 @@ class CurrentlyPlayingViewModel(
       private val plexConfig: PlexConfig,
       private val currentlyPlaying: CurrentlyPlaying,
       private val workManager: WorkManager,
+      private val bookmarkRepository: IBookmarkRepository,
       private val sharedPrefs: SharedPreferences,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -129,6 +133,7 @@ class CurrentlyPlayingViewModel(
             plexConfig,
             currentlyPlaying,
             workManager,
+            bookmarkRepository,
             sharedPrefs,
           ) as T
         } else {
@@ -931,6 +936,110 @@ class CurrentlyPlayingViewModel(
         listener = listener,
         shouldShow = true,
       ),
+    )
+  }
+
+  /**
+   * A bookmark that was just created, so the view can offer to add a note (cu-22).
+   *
+   * Carries the record rather than a formatted string: the wording lives in `strings.xml` where a
+   * `Context` is (convention 5), and the position needs formatting through `DurationFormat` — which
+   * `showUserMessage`, being a bare `String`, cannot express without building the sentence here.
+   */
+  private var _bookmarkAdded = MutableLiveData<Event<Bookmark>>()
+  val bookmarkAdded: LiveData<Event<Bookmark>>
+    get() = _bookmarkAdded
+
+  /**
+   * The bookmarks of the book being played.
+   *
+   * `switchMap` on the book's **id**, not the book: `currentlyPlaying.book` republishes on every
+   * progress tick, and re-subscribing a Room query once a second is exactly the per-second waste
+   * cu-110 was about.
+   */
+  val bookmarks: LiveData<List<Bookmark>> =
+    currentlyPlaying.book
+      .map { it.id }
+      .distinctUntilChanged()
+      .asLiveData(viewModelScope.coroutineContext)
+      .switchMap { bookId ->
+        if (bookId.isEmpty() || bookId == NO_AUDIOBOOK_FOUND_ID) {
+          MutableLiveData(emptyList())
+        } else {
+          bookmarkRepository.getBookmarksForBook(bookId)
+        }
+      }
+
+  /**
+   * Marks the current moment.
+   *
+   * The position is the **book** offset `currentlyPlaying` already publishes — deliberately not
+   * derived here from a track progress, which is the mix-up cu-136 made a type error. A bookmark
+   * points into the book, so it is stored in the book frame and converted only when jumping.
+   */
+  fun addBookmark() {
+    val book = currentlyPlaying.book.value
+    if (book.id.isEmpty() || book.id == NO_AUDIOBOOK_FOUND_ID) {
+      Timber.w("Cannot bookmark: no book is playing")
+      return
+    }
+    val position = currentlyPlaying.bookPosition.value
+    // No `unhandledExceptionHandler`: each of these catches its own failure and reports
+    // it, so routing to the global handler would only hide a case already handled — and
+    // it makes these reachable from a unit test, which has no Injector.
+    viewModelScope.launch {
+      try {
+        val bookmark = bookmarkRepository.add(bookId = book.id, position = position)
+        _bookmarkAdded.postEvent(bookmark)
+      } catch (e: Throwable) {
+        // Reported rather than swallowed: the user pressed a button and is entitled to know it
+        // did nothing.
+        Timber.e(e, "Failed to add a bookmark for ${book.id}")
+        _showUserMessage.postEvent("Could not add bookmark")
+      }
+    }
+  }
+
+  /** Saves a note onto a bookmark the user just made, or edited from the list. */
+  fun setBookmarkNote(
+    bookmarkId: String,
+    note: String,
+  ) {
+    viewModelScope.launch {
+      try {
+        bookmarkRepository.updateNote(bookmarkId, note.trim())
+      } catch (e: Throwable) {
+        Timber.e(e, "Failed to save a note on bookmark $bookmarkId")
+      }
+    }
+  }
+
+  /** Removes a bookmark. */
+  fun deleteBookmark(bookmarkId: String) {
+    viewModelScope.launch {
+      try {
+        bookmarkRepository.delete(bookmarkId)
+      } catch (e: Throwable) {
+        Timber.e(e, "Failed to delete bookmark $bookmarkId")
+      }
+    }
+  }
+
+  /**
+   * Jumps to a bookmark.
+   *
+   * Goes through [jumpToChapter], which is the existing single home for "seek to a book offset" —
+   * it converts to the track frame via `inTrackOffsetFor` and drives `pausePlay`. A second seek
+   * path here is exactly how cu-136 found four frame bugs.
+   *
+   * `hasUserConfirmation = true` because picking a specific bookmark *is* the confirmation, and
+   * the prompt that function otherwise shows is worded about losing chapter progress.
+   */
+  fun jumpToBookmark(bookmark: Bookmark) {
+    jumpToChapter(
+      bookStartTimeOffset = bookmark.position,
+      trackId = currentlyPlaying.track.value.id,
+      hasUserConfirmation = true,
     )
   }
 

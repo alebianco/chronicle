@@ -2,6 +2,8 @@ package io.github.mattpvaughn.chronicle.data.local
 
 import com.squareup.moshi.JsonClass
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
+import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import timber.log.Timber
 
 /**
@@ -16,15 +18,96 @@ import timber.log.Timber
 data class SettingsBackup(
   val version: Int = BACKUP_SCHEMA_VERSION,
   val settings: Map<String, String> = emptyMap(),
+  /**
+   * The user's bookmarks (cu-22).
+   *
+   * A top-level array rather than entries in [settings], because a bookmark is a **record**, not a
+   * preference: [settings] is a `Map<String, String>` of preference keys, so a list of per-book
+   * rows could only go in there as JSON encoded inside a string value. That would be unreadable in
+   * the file, which defeats the point of the format (D12 rule 7 — this is meant to be openable in
+   * an editor).
+   *
+   * Defaulted so a v1 file, which has no such field, still parses.
+   */
+  val bookmarks: List<BookmarkBackup> = emptyList(),
 )
+
+/**
+ * One bookmark, as it appears in a backup file (cu-22).
+ *
+ * A separate type from the `Bookmark` entity on purpose: this is a **file format**, and coupling it
+ * to a Room entity means a schema change silently changes what old files mean. The fields are
+ * spelled out here and mapped explicitly, so a rename in the entity is a compile error rather than
+ * a format change nobody noticed.
+ *
+ * `position` is plain millis: the file is hand-editable, and a value class would serialize the same
+ * anyway. It is converted to a `BookOffset` on the way in, where the frame matters (cu-136).
+ */
+@JsonClass(generateAdapter = true)
+data class BookmarkBackup(
+  val id: String,
+  val bookId: String,
+  val positionMillis: Long,
+  val note: String = "",
+  val createdAt: Long = 0L,
+)
+
+/** The entity as it should be written to a file. */
+fun Bookmark.toBackup(): BookmarkBackup =
+  BookmarkBackup(
+    id = id,
+    bookId = bookId,
+    positionMillis = position.millis,
+    note = note,
+    createdAt = createdAt,
+  )
+
+/**
+ * A backup row as an entity, or null if it cannot be trusted.
+ *
+ * Null rather than a default-filled row for a **blank id or bookId**: an id is what makes a restore
+ * idempotent, so a row without one would insert a duplicate on every import, and a bookmark with no
+ * book cannot be shown or jumped to. A negative position is clamped rather than rejected — the note
+ * is the part worth keeping, and the start of the book is a harmless place to point.
+ */
+fun BookmarkBackup.toBookmarkOrNull(): Bookmark? {
+  if (id.isBlank() || bookId.isBlank()) {
+    Timber.w("Ignoring a backup bookmark with no id or bookId")
+    return null
+  }
+  return Bookmark(
+    id = id,
+    bookId = bookId,
+    position = BookOffset(positionMillis.coerceAtLeast(0L)),
+    note = note,
+    createdAt = createdAt,
+  )
+}
+
+/**
+ * The bookmarks from [backup] that should be restored, dropping any that cannot be trusted.
+ *
+ * Also de-duplicates by id, keeping the first: a hand-edited file can repeat one, and letting both
+ * through would make the row that wins depend on insertion order.
+ */
+fun importBookmarks(backup: SettingsBackup): List<Bookmark> =
+  backup.bookmarks
+    .mapNotNull { it.toBookmarkOrNull() }
+    .distinctBy { it.id }
 
 /**
  * Bumped whenever the meaning of an existing key changes.
  *
- * Adding a key does **not** require a bump: unknown keys are ignored on import, so an older app
- * reading a newer file degrades rather than failing.
+ * Adding a *settings key* does **not** require a bump: unknown keys are ignored on import, so an
+ * older app reading a newer file degrades rather than failing.
+ *
+ * **2** since cu-22 added the top-level `bookmarks` array. Strictly the rule above still holds in
+ * the backwards direction — a v1 app has no such field and Moshi drops it. The bump is for the
+ * other direction: this version must be able to tell "a v1 file that had no bookmarks" from "a v2
+ * file whose bookmarks were lost", and [importSettingsOrNull]'s refusal of a *newer* version only
+ * ever means anything if the number moves when the format grows.
  */
-const val BACKUP_SCHEMA_VERSION = 1
+const val BACKUP_SCHEMA_VERSION = 2
 
 /**
  * The settings that may be exported — an **allowlist, deliberately**.

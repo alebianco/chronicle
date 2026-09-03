@@ -30,6 +30,7 @@ class SettingsBackupRepo
     private val contentResolver: ContentResolver,
     moshi: Moshi,
     private val dispatchers: DispatcherProvider,
+    private val bookmarkRepository: IBookmarkRepository,
   ) {
     private val adapter = moshi.adapter(SettingsBackup::class.java).indent("  ")
 
@@ -43,7 +44,12 @@ class SettingsBackupRepo
     suspend fun exportTo(destination: Uri): ExportResult =
       withContext(dispatchers.io) {
         try {
-          val backup = exportSettings(sharedPreferences.all)
+          val backup =
+            exportSettings(sharedPreferences.all).copy(
+              // Bookmarks are the user's own writing and the server holds no copy, so they are the
+              // part of this file that actually cannot be re-derived (cu-22, D8).
+              bookmarks = bookmarkRepository.getAllAsync().map { it.toBackup() },
+            )
           val json = adapter.toJson(backup)
           // "wt" truncates. Without it, overwriting an existing longer file leaves the old
           // tail behind and produces trailing garbage after valid JSON.
@@ -103,7 +109,17 @@ class SettingsBackupRepo
 
         val parsed = parseSettings(allowed)
         applyParsed(parsed)
-        ImportResult.Applied(applied = parsed.size, skipped = allowed.size - parsed.size)
+
+        // Additive and idempotent, keyed on the id in the file: a second import of the same file
+        // overwrites the same rows, and bookmarks made since the export are left alone. Deliberately
+        // *not* a replace-all — a restore that deleted newer notes would be unrecoverable.
+        val restoredBookmarks = bookmarkRepository.restore(importBookmarks(backup))
+
+        ImportResult.Applied(
+          applied = parsed.size,
+          skipped = allowed.size - parsed.size,
+          bookmarks = restoredBookmarks,
+        )
       }
 
     /**
@@ -137,7 +153,13 @@ class SettingsBackupRepo
     /** The outcome of reading a backup. */
     sealed interface ImportResult {
       /** [applied] settings were written; [skipped] were named but unusable. */
-      data class Applied(val applied: Int, val skipped: Int) : ImportResult
+      data class Applied(
+        val applied: Int,
+        val skipped: Int,
+        /** How many bookmarks were restored (cu-22). Reported separately: a file can carry
+         *  bookmarks and no settings, and "0 settings applied" must not read as a failed import. */
+        val bookmarks: Int = 0,
+      ) : ImportResult
 
       /** The file declares a schema this build does not understand. */
       data class WrongVersion(val fileVersion: Int) : ImportResult

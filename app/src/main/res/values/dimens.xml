@@ -31,6 +31,8 @@
 
     <!-- Bottom sheet chooser -->
     <dimen name="bottom_sheet_handle_height">72dp</dimen>
+    <!-- Caps the bookmark sheet so a long list scrolls instead of covering the whole screen. -->
+    <dimen name="bookmark_list_max_height">320dp</dimen>
     <dimen name="bottom_sheet_radius">8dp</dimen>
 
     <!-- Audiobook item -->

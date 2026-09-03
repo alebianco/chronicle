@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The bookmarks of the book being played (cu-22): tap to jump, pencil to edit or delete. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/bookmarks_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/bottom_sheet_handle_height"
+        android:background="@color/colorPrimary">
+
+        <TextView
+            style="@style/TextAppearance.Subtitle.Settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="@dimen/screen_horizontal_padding"
+            android:text="@string/bookmarks_title"
+            android:textColor="@color/textPrimary"
+            android:textSize="16sp" />
+
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/colorPrimaryDark">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/bookmarks_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxHeight="@dimen/bookmark_list_max_height"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+        <!-- Kotlin-driven visibility, so GONE in XML to avoid a one-frame flash (cu-58). -->
+        <TextView
+            android:id="@+id/bookmarks_empty"
+            style="@style/TextAppearance.Body2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/screen_horizontal_padding"
+            android:text="@string/bookmark_none"
+            android:textColor="@color/textSecondary"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+</LinearLayout>

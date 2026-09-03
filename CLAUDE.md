@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **868 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **926 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -109,7 +109,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Four separate Room databases** (`BookDatabase` v10, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
+- **Five separate Room databases** (`BookDatabase` v10, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
 - **Listening position is owned by the *tracks*, never the book** (decision-16, cu-90). Plex stores
   no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a cache of a derivation.
   `merge` carries the local value and **never** adopts `network.progress`; only `syncAudiobook`,
@@ -163,6 +163,23 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   Chapter offsets are *absolute within the book*, not per-track: two separate bugs came from a
   per-track `0L` (cu-13, cu-49), and `getChapterAt` silently resolves nothing when they are wrong.
   Since cu-136 the frame is a **type**, so that mistake no longer compiles — see below.
+- **Bookmarks are a separate database on purpose** (cu-22). `BookmarkDatabase` is keyed by
+  `bookId` and lives outside `BookDatabase` **so the sync path cannot reach it**: `refreshData`
+  merges `Audiobook` rows and calls `bookDao.removeAll` for books the server no longer lists, so a
+  bookmark stored alongside a book would vanish when a Plex rescan briefly drops it — permanently,
+  since no server holds a copy of a note the user wrote. `BookmarkSurvivesSyncTest` runs the real
+  refresh over real databases and asserts the note outlives the catalogue row; moving bookmarks
+  into `BookDatabase` breaks it, which is the point. A library *switch* (`clear()`) leaves them
+  alone too — the user may switch back.
+- **The backup file carries records as well as settings** (cu-22). `SettingsBackup.settings` is a
+  `Map<String, String>` of *preference keys*; bookmarks are a top-level `bookmarks` array, because
+  forcing per-book rows through that map means JSON encoded inside a string value and the file is
+  meant to be openable in an editor (D12 rule 7). `BACKUP_SCHEMA_VERSION` is **2** for that: adding
+  a settings key needs no bump (unknown keys are ignored), but the format growing a field does,
+  or `importSettingsOrNull`'s refusal of a newer version can never distinguish "a v1 file with no
+  bookmarks" from "a v2 file whose bookmarks were lost". Import is **additive and idempotent**,
+  keyed on the id in the file — never a replace-all, which would delete notes made since the
+  export.
 - **All four entity ids are `String`** (cu-71), so a non-numeric backend can be represented (decision-11). Two traps follow. **A DAO parameter bound against an id column must be `String`**: SQLite compares across storage classes, so a numeric bind matches *no row, silently, with no error* — two dead DAO methods had exactly this. And **a numeric-looking id must never be parsed**: `id.toLong()` throws on the very ids the retype exists to allow (it did, in two RecyclerView `getItemId` overrides; they hash now).
 - **A migration is only tested if a *file* is opened through Room.** `verify.sh` was green while a committed migration would have crashed on launch: Room validates entity against schema **on open**, and an in-memory database is created fresh at the current version and never migrated. `RoomSchemaTest` does both — in-memory opens for entity consistency, plus a file created at the old schema and opened at the current one, which is the only check that catches a migration disagreeing with its entity. A migration that dropped every track's `parentKey` — orphaning every book from its tracks — passed all 201 other tests. Every migration there is verified by deliberate sabotage; a check that cannot fail proves nothing.
 - **KSP** — build errors in generated code usually mean an annotation problem upstream; don't loop blindly. KSP errors are
