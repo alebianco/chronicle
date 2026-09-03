@@ -28,7 +28,23 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   release source sets each provide their own `DebugHooks` object: `DebugHooksContract` makes the
   compiler check the shape, but only for the variant being built, so a drifted release twin used to
   pass every debug-only check and break the first release build (cu-70).
-- **Coverage ratchet**: `coverage-ratchet.sh` compares JaCoCo instruction coverage against the committed `coverage-baseline.txt` and fails on a drop of more than 0.05% (a deliberate tolerance for codegen jitter — note it is *not* a high-water mark, so repeated sub-threshold drops accumulate); a rise ratchets the baseline up (commit the change). Baseline is deliberately a plain file in git so every movement is reviewable in a diff. To lower it on purpose: `./coverage-ratchet.sh --update`, and justify it in the commit message.
+- **Coverage ratchet, two gates** (cu-135). `coverage-ratchet.sh` checks JaCoCo instruction
+  coverage twice from one report, and both baselines are plain committed files so every movement
+  is reviewable in a diff (D12 rule 6).
+  - **Aggregate**, against `coverage-baseline.txt`: fails on a drop of more than **0.05%**. That
+    tolerance absorbs codegen jitter, and it *is* a high-water mark — the no-regression branch
+    deliberately does not rewrite the file, so a second consecutive dip is measured against the
+    same high number and fails. Drops cannot accumulate. (An earlier version of this note claimed
+    the opposite and cu-135 was filed to "fix" it; the walk does not exist — the comment in the
+    script was simply describing a 0.01% tolerance the code never had.)
+  - **Per package**, against `coverage-baseline-packages.txt`: fails when any single package drops
+    more than **0.50%**, even while the aggregate rises. The looser tolerance is because a small
+    package moves several tenths of a percent per instruction. This gate exists because coverage
+    here sits *backwards* — `data/model` above 80% next to `features/collections` and
+    `features/home` at 0% — so the average passes while the expensive packages rot. A **new
+    package is seeded and announced, never silently admitted**, and a departed one is pruned.
+  - Both ratchet *up* on a rise (commit the changed file). To lower either on purpose:
+    `./coverage-ratchet.sh --update`, and justify it in the commit message.
 - Release builds: `./test_release_build.sh` (R8/ProGuard smoke test; see CONTRIBUTING.md "Release Builds & ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (Moshi models, Room entities), or dependencies. It asserts against the **dex** that Room/Retrofit/Dagger/Moshi classes survived R8 — these fail at runtime, not build time. Keep rules are deliberately narrow (cu-45): prefer adding one precise rule over widening a blanket `-keep`, which silently exempts code from R8.
 - **Instrumented tests run again, on two Gradle Managed Devices** (cu-54, was quarantined since `c5cfd46`). `./verify.sh --instrumented` adds them as a 7th stage; `./gradlew instrumentedCheckGroupGroupDebugAndroidTest` runs them directly. **API 27** (the minSdk floor, which catches a new API called without a version guard) and **API 35**, both AOSP `arm64-v8a`. Opt-in, not in the default gate: two emulators take minutes where the unit gate takes seconds. The suite is `LoggedInLaunchTest` — three cases against the cu-16 fixture server via `MockPlexMode`, so **no credentials and no live server**. It is deliberately small; it exists to make the Fragment/Activity/media-session layer reachable at all, not to cover it. Four traps it cost to learn, all recorded in cu-54: `MockWebServer.start()` must bind `127.0.0.1` explicitly (an AOSP image cannot resolve `localhost`, and the throw lands on a background thread with an *empty* crash buffer); Espresso needs `hamcrest:2.2` declared for androidTest (`hamcrest-all:1.3` resolves but `org.hamcrest.Matchers` reaches no dex); `testOptions.animationsDisabled = true` is required; and a `BottomNavigationItemView` sits under the system bars, so Espresso's stock `click()` refuses it — tab navigation is *not* covered for that reason.
 
