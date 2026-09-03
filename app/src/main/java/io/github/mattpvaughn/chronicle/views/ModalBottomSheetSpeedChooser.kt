@@ -215,6 +215,11 @@ class ModalBottomSheetSpeedChooser : BottomSheetDialogFragment() {
     return null
   }
 
+  override fun onStart() {
+    super.onStart()
+    expandBottomSheetOnStart()
+  }
+
   override fun onDestroyView() {
     super.onDestroyView()
     prefsListener?.let { prefs.unregisterPrefsListener(it) }

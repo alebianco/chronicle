@@ -68,6 +68,11 @@ class ModalBottomSheetBookmarkNote : BottomSheetDialogFragment() {
     return binding.root
   }
 
+  override fun onStart() {
+    super.onStart()
+    expandBottomSheetOnStart()
+  }
+
   companion object {
     const val TAG = "ModalBottomSheetBookmarkNote"
 

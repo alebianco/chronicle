@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **1061 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1070 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -141,12 +141,20 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   **a `Chip`'s `android:tag` must not be a string resource** when it is parsed as data: the speed
   presets keyed on `@string/playback_speed_1_0x`, so a locale rendering it "1,0x" matched no branch
   and every preset silently became 1.0x.
-- **A `ModalBottomSheet`'s `wrap_content` content can measure to zero in landscape** (cu-142, open).
-  The speed popover renders only its title bar there — the `ConstraintLayout` measures 0 high, and
-  a zero-bounds view is **absent from a `uiautomator` dump entirely**, so the tree looks like the
-  controls were never inflated. Screenshot, don't dump, when a sheet looks wrong; and check the
-  other orientation before assuming a change caused it (this one predates cu-20 and reproduces on
-  the base branch).
+- **A modal bottom sheet opens at its peek height in landscape, hiding everything** (cu-142). The
+  speed popover rendered *only* its title bar there — Material's `BottomSheetDialog` opens
+  collapsed and expects a drag, and for a `wrap_content` sheet that peek settled at 96px, shorter
+  than the sheet's own 108px title bar, with nothing on screen suggesting anything was draggable.
+  Every modal sheet here calls `expandBottomSheetOnStart()` (`views/ExpandedBottomSheet.kt`) for
+  that reason — all three had the bug, only one had it noticed. **The obvious diagnosis was wrong**:
+  the task blamed a `wrap_content` `ConstraintLayout` measuring to zero, but the layout measures
+  356px in both orientations with or without any fix. Probe the measurement before believing a
+  layout explanation. The layout's `NestedScrollView` + `fillViewport` is a *separate* need: fully
+  expanded, a window shorter than the content clipped the last control (60px of 72 at 480px tall).
+  Two reading traps: a zero-bounds view is **absent from a `uiautomator` dump entirely**, so
+  screenshot rather than dump when a sheet looks wrong; and a dump during playback fails with
+  "could not get idle state" while leaving the previous file in place, so `rm` the target first and
+  assert it exists, or a stale read looks like success.
 - **A downloaded track's URI needs its `file://` scheme** (cu-83). `"/path/x.mp3".toUri()` gives
   `scheme = null` and ExoPlayer will not treat it as a local file — it surfaces as an
   unsupported-format error on downloaded books only. Use `Uri.fromFile`, never `"file://" + path`,

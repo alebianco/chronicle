@@ -1,8 +1,9 @@
 ---
 id: cu-142
 title: The speed popover collapses to its title bar in landscape
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-03'
 labels:
   - R2
@@ -48,15 +49,54 @@ a tablet on a stand — for however long this has been shipping.
 
 ## Acceptance Criteria
 
-- [ ] The popover shows the slider, the four presets and both switches in landscape
-- [ ] It still renders correctly in portrait
-- [ ] The sheet scrolls rather than clipping when the window is too short to fit it
-- [ ] A check that would have caught this: the sheet's measured height is asserted greater than the
+- [x] The popover shows the slider, the four presets and both switches in landscape
+- [x] It still renders correctly in portrait
+- [x] The sheet scrolls rather than clipping when the window is too short to fit it
+- [x] A check that would have caught this: the sheet's measured height is asserted greater than the
       handle's, in both orientations
 
-## Notes
+## Implementation Notes
 
-Do not "fix" this by giving the `ConstraintLayout` a fixed height — the content is variable and a
-short landscape window genuinely needs scrolling, which is the point of the third criterion. A
-`NestedScrollView` between the root and the `ConstraintLayout` is the conventional shape for a
-bottom sheet whose content can exceed the window.
+**The diagnosis in the description was wrong, and that mattered.** It attributed the collapse to a
+`wrap_content` `ConstraintLayout` measuring to zero. It does not: the layout measures **356px in
+both orientations, with or without any fix** — I probed it directly. The real cause is Material's
+`BottomSheetDialog`, which in landscape opens at a **peek height** and expects a drag. For this
+sheet that peek settled at 96px, *shorter than its own 108px title bar*, with nothing on screen
+suggesting anything was draggable.
+
+Isolating the two candidate fixes on device settled it: `onStart` expanding the sheet fixes the
+collapse **on its own**, with the layout untouched. So the headline fix is four lines of behaviour,
+not a layout change.
+
+**The scroll view is still needed, for the third criterion.** With `onStart` alone, in a 480px-tall
+landscape window (content needs 534px) the sheet filled the window and **clipped the skip-silence
+switch to 60px of its 72** — reachable nowhere. The `NestedScrollView` + `fillViewport` is what
+makes "fully expanded" safe on a short window, and it is the half a unit test can hold.
+
+**Applied to all three sheets, not one.** `expandBottomSheetOnStart()` is shared, because
+`ModalBottomSheetBookmarks` and `ModalBottomSheetBookmarkNote` have the identical shape and
+therefore the identical latent bug — the speed chooser is just where it was noticed. Fixing one and
+leaving two would have been the smaller diff and the worse outcome.
+
+**A test that could not fail, deleted.** The first `SpeedChooserLayoutTest` asserted the sheet
+measures taller than its handle, in both orientations. It passed **with the fix reverted** — the
+layout was never the problem, so it was measuring something that was always true. It was replaced
+with tests of what is actually checkable headless (scroll container present, `fillViewport` set,
+content taller than the viewport is scrollable), all three of which fail when the scroll view is
+removed. The expand half is covered structurally by `ExpandedBottomSheetTest`, which asserts the
+helper reaches the behaviour and sets `STATE_EXPANDED`/`skipCollapsed` — Robolectric cannot
+reproduce the pixel outcome, so the collapse itself stays device-verified.
+
+**Verification**
+
+- `./verify.sh --format` green, 7 stages. **1070 unit tests** (was 1061), 0 failures.
+- Coverage rose: aggregate 35.60% → **35.91%**; `views` 21.06% → **22.28%**. The per-package gate
+  caught the new uncovered code first, which is what produced `ExpandedBottomSheetTest`.
+- **Sabotage-verified**: removing the `NestedScrollView` fails three `SpeedChooserLayoutTest` cases.
+- **Device-verified on the tablet**, landscape 1920x1128, mock Plex mode:
+  - before: `design_bottom_sheet [480,1032][1440,1128]` — 96px, only the title bar, screenshot shows
+    "CHOOSE PLAYBACK SPEED" and nothing else
+  - after: `[480,594][1440,1128]` — **534px**, with slider, all four presets and both switches
+    carrying real bounds; portrait unchanged at 534px
+
+## Notes

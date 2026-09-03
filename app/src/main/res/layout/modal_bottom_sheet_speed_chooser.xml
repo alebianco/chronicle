@@ -28,129 +28,147 @@ xmlns:app="http://schemas.android.com/apk/res-auto"
 
         </FrameLayout>
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@color/colorPrimaryDark">
+        <!--
+          The scroll view is load-bearing, not decoration (cu-142). Without it the
+          `wrap_content` ConstraintLayout below measured to *zero* height in landscape, so the
+          sheet was exactly the handle's height and every control was unreachable — speed could
+          not be changed at all on a tablet on a stand. A NestedScrollView is the conventional
+              shape for a bottom sheet whose content can exceed a short window, and it also gives the
+              third acceptance criterion for free: the content scrolls rather than clipping.
 
-            <TextView
-                android:id="@+id/speed_min"
-                android:layout_width="wrap_content"
+              `fillViewport` matters: without it the scroll view would size itself to the content and
+              reintroduce the same collapse.
+            -->
+            <androidx.core.widget.NestedScrollView
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="32dp"
-                android:text="@string/playback_speed_min"
-                app:layout_constraintBottom_toBottomOf="@+id/speed_slider"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="@+id/speed_slider" />
+                android:background="@color/colorPrimaryDark"
+                android:fillViewport="true">
 
-            <TextView
-                android:id="@+id/speed_max"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:layout_marginEnd="16dp"
-                android:layout_weight="1"
-                android:text="@string/playback_speed_max"
-                app:layout_constraintBottom_toBottomOf="@+id/speed_slider"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@+id/speed_slider" />
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/speed_presets"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/speed_slider"
-                app:singleSelection="true">
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/speed_1.0"
+                <TextView
+                    android:id="@+id/speed_min"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:tag="1.0"
-                    android:text="@string/playback_speed_1_0x"
-                    app:chipBackgroundColor="@color/chip_same_background_color" />
+                    android:layout_marginStart="16dp"
+                    android:layout_marginTop="32dp"
+                    android:text="@string/playback_speed_min"
+                    app:layout_constraintBottom_toBottomOf="@+id/speed_slider"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="@+id/speed_slider" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/speed_1.2"
+                <TextView
+                    android:id="@+id/speed_max"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:tag="1.2"
-                    android:text="@string/playback_speed_1_2x"
-                    app:chipBackgroundColor="@color/chip_same_background_color" />
+                    android:layout_marginTop="32dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_weight="1"
+                    android:text="@string/playback_speed_max"
+                    app:layout_constraintBottom_toBottomOf="@+id/speed_slider"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="@+id/speed_slider" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/speed_1.5"
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/speed_presets"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:tag="1.5"
-                    android:text="@string/playback_speed_1_5x"
-                    app:chipBackgroundColor="@color/chip_same_background_color" />
+                    android:layout_marginTop="8dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/speed_slider"
+                    app:singleSelection="true">
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/speed_2.0"
-                    android:layout_width="wrap_content"
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/speed_1.0"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:tag="1.0"
+                        android:text="@string/playback_speed_1_0x"
+                        app:chipBackgroundColor="@color/chip_same_background_color" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/speed_1.2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:tag="1.2"
+                        android:text="@string/playback_speed_1_2x"
+                        app:chipBackgroundColor="@color/chip_same_background_color" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/speed_1.5"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:tag="1.5"
+                        android:text="@string/playback_speed_1_5x"
+                        app:chipBackgroundColor="@color/chip_same_background_color" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/speed_2.0"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:tag="2.0"
+                        android:text="@string/playback_speed_2_0x"
+                        app:chipBackgroundColor="@color/chip_same_background_color" />
+
+                </com.google.android.material.chip.ChipGroup>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/per_book_speed_switch"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:tag="2.0"
-                    android:text="@string/playback_speed_2_0x"
-                    app:chipBackgroundColor="@color/chip_same_background_color" />
+                    android:layout_marginStart="@dimen/screen_horizontal_padding"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginEnd="@dimen/screen_horizontal_padding"
+                    android:fontFamily="@font/lato"
+                    android:text="@string/playback_speed_this_book_only"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="16sp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/speed_presets" />
 
-            </com.google.android.material.chip.ChipGroup>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/per_book_speed_switch"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/screen_horizontal_padding"
-                android:layout_marginTop="8dp"
-                android:layout_marginEnd="@dimen/screen_horizontal_padding"
-                android:fontFamily="@font/lato"
-                android:text="@string/playback_speed_this_book_only"
-                android:textColor="@color/textPrimary"
-                android:textSize="16sp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/speed_presets" />
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/skip_silence_switch"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/screen_horizontal_padding"
-                android:layout_marginTop="4dp"
-                android:layout_marginEnd="@dimen/screen_horizontal_padding"
-                android:layout_marginBottom="24dp"
-                android:fontFamily="@font/lato"
-                android:text="@string/playback_skip_silence"
-                android:textColor="@color/textPrimary"
-                android:textSize="16sp"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/per_book_speed_switch" />
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/skip_silence_switch"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/screen_horizontal_padding"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginEnd="@dimen/screen_horizontal_padding"
+                    android:layout_marginBottom="24dp"
+                    android:fontFamily="@font/lato"
+                    android:text="@string/playback_skip_silence"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="16sp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/per_book_speed_switch" />
 
 
-            <com.google.android.material.slider.Slider
-                android:id="@+id/speed_slider"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:stepSize="0.05"
-                app:labelBehavior="visible"
-                app:labelStyle="@style/ProgressSliderTooltip"
-                app:layout_constraintEnd_toStartOf="@id/speed_max"
-                app:layout_constraintStart_toEndOf="@+id/speed_min"
-                app:layout_constraintTop_toTopOf="parent"
-                app:thumbColor="@color/progressTintColor"
-                app:thumbRadius="8dp"
-                app:tickVisible="false"
-                app:trackColorActive="@color/progressTintColor"
-                app:trackColorInactive="@color/progressTrackTintColor"
-                app:trackHeight="3dp" />
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/speed_slider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:stepSize="0.05"
+                    app:labelBehavior="visible"
+                    app:labelStyle="@style/ProgressSliderTooltip"
+                    app:layout_constraintEnd_toStartOf="@id/speed_max"
+                    app:layout_constraintStart_toEndOf="@+id/speed_min"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:thumbColor="@color/progressTintColor"
+                    app:thumbRadius="8dp"
+                    app:tickVisible="false"
+                    app:trackColorActive="@color/progressTintColor"
+                    app:trackColorInactive="@color/progressTrackTintColor"
+                    app:trackHeight="3dp" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </androidx.core.widget.NestedScrollView>
 
     </LinearLayout>

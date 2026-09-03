@@ -76,6 +76,11 @@ class ModalBottomSheetBookmarks : BottomSheetDialogFragment() {
     binding.bookmarksList.isVisible = bookmarks.isNotEmpty()
   }
 
+  override fun onStart() {
+    super.onStart()
+    expandBottomSheetOnStart()
+  }
+
   override fun onDestroyView() {
     super.onDestroyView()
     binding?.bookmarksList?.adapter = null
