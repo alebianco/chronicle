@@ -3,24 +3,30 @@ id: DRAFT-132
 title: Finish the live verification items cu-73 could not complete
 status: Draft
 assignee: []
-labels: [R1, verification, agentic]
+labels: [R2, verification, agentic]
 dependencies: []
 priority: medium
-milestone: m-1
+milestone: m-2
 ---
 
 ## Description
+
+> **Reclassified to R2, 2026-09-03, when R1 was frozen.** None of these is a known defect — each is
+> a *half* of an item whose other half passed, or a check whose method got in the way. Every defect
+> [[cu-73]] actually found is fixed and closed. Holding the R1 freeze open for verification
+> bookkeeping would misrepresent what is unfinished.
+
 
 [[cu-73]] closed at **43 verified / 7 carried**. This holds the remainder so the pass could be
 closed without pretending those seven were done.
 
 None is a known defect. Each is either a *half* of an item whose other half passed, or a check
 whose method — not the app — got in the way. The real failure cu-73 found is separately filed as
-[[DRAFT-131]].
+[[cu-131]], which is fixed.
 
 Two of the seven already have homes and are **not** repeated here: the media-session card
-([[cu-89]], still In Progress) and the mini-player rendering ([[cu-74]], superseded by [[cu-119]]
-and needing only a close-as-duplicate).
+([[cu-89]], still In Progress) and the mini-player rendering ([[cu-74]], **closed 2026-09-03** as a
+duplicate of [[cu-119]]).
 
 ## What is left, and exactly what remains of each
 
@@ -88,11 +94,11 @@ Collected while running the pass, because each cost time:
 - [ ] Item 1 verified with a method that keeps the device reachable
 - [ ] Item 2 verified on a device with mobile data, or explicitly dropped as untestable here
 - [ ] Items 3–6 verified against the live library's multi-chapter books
-- [ ] [[cu-74]] closed as a duplicate of [[cu-119]]
+- [x] [[cu-74]] closed as a duplicate of [[cu-119]]
 - [ ] Anything that fails becomes its own task, as in cu-73
 
 ## Related
 
 - [[cu-73]] — the pass this carries forward
-- [[DRAFT-131]] — the one genuine defect cu-73 found
+- [[cu-131]] — the one genuine defect cu-73 found, **fixed and closed 2026-09-03**
 - [[cu-89]] / [[cu-74]] — the two carried items that already have homes

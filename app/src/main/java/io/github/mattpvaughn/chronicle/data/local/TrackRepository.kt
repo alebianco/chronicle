@@ -54,6 +54,17 @@ interface ITrackRepository {
 
   suspend fun getTracksForAudiobookAsync(bookId: String): List<MediaItemTrack>
 
+  /**
+   * Clears stale progress on tracks *after* [track] in [bookId], so a backwards seek across a
+   * track boundary is not undone by the next re-derivation of the book position (cu-131).
+   *
+   * Returns the number of rows cleared, so a caller can tell whether anything was stale.
+   */
+  suspend fun clearProgressAfter(
+    bookId: String,
+    track: MediaItemTrack,
+  ): Int
+
   /** Update the value of [MediaItemTrack.progress] == [trackProgress] and
    * [MediaItemTrack.lastViewedAt] == [lastViewedAt] for the track where
    * [MediaItemTrack.id] == [trackId]
@@ -331,6 +342,14 @@ class TrackRepository
         trackDao.getTracksForAudiobookAsync(bookId, prefsRepo.offlineMode)
       }
     }
+
+    override suspend fun clearProgressAfter(
+      bookId: String,
+      track: MediaItemTrack,
+    ): Int =
+      withContext(dispatchers.io) {
+        trackDao.clearProgressAfter(bookId, track.discNumber, track.index)
+      }
 
     override suspend fun updateTrackProgress(
       trackProgress: Long,

@@ -131,6 +131,32 @@ interface TrackDao {
     lastViewedAt: Long,
   )
 
+  /**
+   * Clears the progress of every track in [bookId] that comes **after** the given one in playback
+   * order.
+   *
+   * A backwards seek across a track boundary otherwise does not stick: `getActiveTrack` returns
+   * the *furthest* started track regardless of recency, so a stale `progress` left on a later
+   * track wins over the newer position the user just chose, and the next re-derivation of the
+   * book position undoes the seek (cu-131).
+   *
+   * Ordering is `(discNumber, index)`, matching `MediaItemTrack.compareTo` — never the list's own
+   * order, which arrives from the database and the network in no guaranteed sequence.
+   *
+   * `lastViewedAt` is deliberately left alone: it records *when* a track was last listened to,
+   * which is still true, and clearing it would lose ordering information for no benefit.
+   */
+  @Query(
+    "UPDATE MediaItemTrack SET progress = 0 WHERE parentKey = :bookId " +
+      "AND (`discNumber` > :discNumber OR (`discNumber` = :discNumber AND `index` > :index)) " +
+      "AND progress > 0",
+  )
+  fun clearProgressAfter(
+    bookId: String,
+    discNumber: Int,
+    index: Int,
+  ): Int
+
   @Query("DELETE FROM MediaItemTrack")
   fun clear()
 

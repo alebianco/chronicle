@@ -311,6 +311,24 @@ class SimpleProgressUpdater
       tickCounter++
       bookRepository.updateProgress(bookId, currentTime, trackProgress)
       trackRepository.updateTrackProgress(trackProgress, trackId, currentTime)
+
+      // A backwards seek across a track boundary leaves the *old* position on a later track, and
+      // `getActiveTrack` takes the furthest started track regardless of recency — so the next
+      // re-derivation of the book position silently undid the seek (cu-131). Measured: seeking
+      // back three chapters and refreshing moved the position forward 346 s.
+      //
+      // Clearing here rather than in the seek path covers every entry point that can move the
+      // listener backwards — the slider, previous-chapter, media buttons, Android Auto — instead
+      // of whichever one a fix happened to be written against. It costs one `UPDATE` per tick
+      // that matches no rows in the ordinary forward case, since the `progress > 0` predicate
+      // makes it a no-op once the tail is clean.
+      val activeTrack = tracks.firstOrNull { it.id == trackId }
+      if (activeTrack != null) {
+        val cleared = trackRepository.clearProgressAfter(bookId, activeTrack)
+        if (cleared > 0) {
+          Timber.i("Cleared stale progress on $cleared track(s) after ${activeTrack.title}")
+        }
+      }
       bookRepository.updateTrackData(
         bookId,
         bookProgress,

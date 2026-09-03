@@ -3,13 +3,25 @@ id: DRAFT-117
 title: A second cause of main-thread saturation during playback
 status: Draft
 assignee: []
-labels: [R1, performance, bug, trust]
+labels: [R2, performance, bug]
 dependencies: [cu-110]
 priority: high
-milestone: m-1
+milestone: m-2
 ---
 
 ## Description
+
+> **Reclassified to R2, 2026-09-03, when R1 was frozen.** The *trust* half of this — the owner's
+> reported symptom, "the back button and the nav button sometimes don't work when the playback
+> screen is open" — **is fixed and verified**: `uiautomator dump` now succeeds 5/5 and 3/3 while
+> playing, against every attempt failing before, and main-thread CPU fell 277→176 jiffies/10 s.
+> The main thread reaches idle again, which is the mechanism behind unresponsive buttons.
+>
+> What remains is **frame rate** (~90% janky), which is Comfort rather than Trust under the
+> R0–R4 ordering: nothing is lost or wrong, playback and controls work. It also cannot be
+> progressed without a profiler trace, which could not be captured on this GSI — so holding R1
+> open for it would block a freeze on a measurement the environment cannot currently produce.
+
 
 > **Frontmatter correction, 2026-09-03: this was marked `status: Done` while every acceptance
 > criterion is unticked and no fix has shipped.** The mislabelling arrived with `54ca95e` and made
