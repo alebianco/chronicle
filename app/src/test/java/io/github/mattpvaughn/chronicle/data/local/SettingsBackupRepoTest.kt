@@ -219,6 +219,64 @@ class SettingsBackupRepoTest {
       )
     }
 
+  /**
+   * The cu-133 payload, end to end: a *well-formed* string that is not a permitted value.
+   *
+   * Distinct from the malformed case above — `"x"` parses fine as a string, so only a per-key
+   * value allowlist can refuse it. Before that existed it was written straight to preferences and
+   * crashed `AudiobookAdapter` from a property initializer on the next library render, on every
+   * launch.
+   */
+  @Test
+  fun `an out-of-range string value is skipped and reported`() =
+    runTest {
+      backupFile.writeText(
+        """
+        {"version":$BACKUP_SCHEMA_VERSION,"settings":{
+          "key_library_view_style":"x",
+          "key_skip_silence":"true"
+        }}
+        """.trimIndent(),
+      )
+
+      val result = repo.importFrom(backupFile.toUri())
+
+      assertEquals(
+        SettingsBackupRepo.ImportResult.Applied(applied = 1, skipped = 1),
+        result,
+      )
+      assertEquals(true, prefs.getBoolean(PrefsRepo.KEY_SKIP_SILENCE, false))
+      assertEquals(
+        "an unknown view style must never reach preferences",
+        null,
+        prefs.getString(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, null),
+      )
+    }
+
+  /** A permitted value for the same key must still apply, or the guard is too strict. */
+  @Test
+  fun `an in-range string value applies normally`() =
+    runTest {
+      backupFile.writeText(
+        """
+        {"version":$BACKUP_SCHEMA_VERSION,"settings":{
+          "key_library_view_style":"${PrefsRepo.VIEW_STYLE_TEXT_LIST}"
+        }}
+        """.trimIndent(),
+      )
+
+      val result = repo.importFrom(backupFile.toUri())
+
+      assertEquals(
+        SettingsBackupRepo.ImportResult.Applied(applied = 1, skipped = 0),
+        result,
+      )
+      assertEquals(
+        PrefsRepo.VIEW_STYLE_TEXT_LIST,
+        prefs.getString(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, null),
+      )
+    }
+
   @Test
   fun `an export overwriting a longer file leaves no trailing garbage`() =
     runTest {

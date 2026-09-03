@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import com.squareup.moshi.JsonClass
+import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import timber.log.Timber
 
 /**
@@ -140,6 +141,30 @@ internal val BACKUP_SETTING_TYPES: Map<String, SettingType> =
   )
 
 /**
+ * The values a constrained STRING key accepts, keyed the same way as [BACKUP_SETTING_TYPES].
+ *
+ * The cu-17 allowlist gates **keys**; this gates **values** (cu-133). Three of these keys have
+ * setters in `SharedPreferencesPrefsRepo` that throw on an unknown value, and import bypasses
+ * those setters by writing through `putString` — so an out-of-range value reached preferences and
+ * then crashed the app from a *property initializer* on the next render, on every launch, with
+ * the settings screen needed to undo it potentially unreachable.
+ *
+ * Sourced from the same constants the setters check, never a second copy: a divergence here would
+ * reintroduce the bug in the opposite direction, refusing values the app itself sets.
+ *
+ * A STRING key absent from this map is unconstrained and imports as before. That is deliberate —
+ * this is a per-key allowlist, not a blanket distrust of strings — but any key whose setter can
+ * throw must appear here, which `ImportValueValidationTest` enforces.
+ */
+internal val BACKUP_SETTING_VALUES: Map<String, List<String>> =
+  mapOf(
+    PrefsRepo.KEY_LIBRARY_VIEW_STYLE to PrefsRepo.VIEW_STYLES,
+    PrefsRepo.KEY_LIBRARY_MEDIA_TYPE to PrefsRepo.LIBRARY_MEDIA_TYPES,
+    PrefsRepo.KEY_BOOK_SORT_BY to Audiobook.SORT_KEYS,
+    PrefsRepo.KEY_BOOK_COVER_STYLE to PrefsRepo.BOOK_COVER_STYLES,
+  )
+
+/**
  * One parsed setting, ready to write.
  *
  * A sealed type rather than `Any`: the writer has to handle every case, so a new setting type
@@ -188,7 +213,15 @@ internal fun parseSettingOrNull(
           ?.takeIf { it.isFinite() }
           ?.let { ParsedSetting.FloatSetting(it) }
 
-      SettingType.STRING -> ParsedSetting.StringSetting(raw)
+      SettingType.STRING -> {
+        // Unconstrained keys accept anything; constrained ones must name a permitted value.
+        val allowed = BACKUP_SETTING_VALUES[key]
+        if (allowed == null || raw in allowed) {
+          ParsedSetting.StringSetting(raw)
+        } else {
+          null
+        }
+      }
     }
   if (parsed == null) {
     Timber.w("Skipping backup key $key: '$raw' is not a valid $type")

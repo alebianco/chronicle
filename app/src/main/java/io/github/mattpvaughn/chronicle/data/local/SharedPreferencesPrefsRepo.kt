@@ -21,6 +21,8 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_REFRES
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_SHAKE_TO_SNOOZE_ENABLED
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_SKIP_SILENCE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_SYNC_DIR_PATH
+import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.LIBRARY_MEDIA_TYPES
+import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.LIBRARY_MEDIA_TYPE_BOOK
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLES
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -148,8 +150,31 @@ interface PrefsRepo {
         VIEW_STYLE_TEXT_LIST,
       )
 
+    const val LIBRARY_MEDIA_TYPE_BOOK = "book"
+    const val LIBRARY_MEDIA_TYPE_AUTHOR = "author"
+    const val LIBRARY_MEDIA_TYPE_FOLDER = "folder"
+    const val LIBRARY_MEDIA_TYPE_COLLECTION = "collection"
+
+    /**
+     * The values [PrefsRepo.libraryMediaType] accepts.
+     *
+     * Published beside [VIEW_STYLES] because settings *import* has to agree with the setter about
+     * what is valid (cu-133). These lived as a private `viewTypes` list in the implementation, so
+     * the importer could not see them and wrote unvalidated strings straight to prefs.
+     */
+    val LIBRARY_MEDIA_TYPES =
+      listOf(
+        LIBRARY_MEDIA_TYPE_BOOK,
+        LIBRARY_MEDIA_TYPE_AUTHOR,
+        LIBRARY_MEDIA_TYPE_FOLDER,
+        LIBRARY_MEDIA_TYPE_COLLECTION,
+      )
+
     const val BOOK_COVER_STYLE_SQUARE = "Square"
     const val BOOK_COVER_STYLE_RECT = "Rectangular"
+
+    /** The values [PrefsRepo.bookCoverStyle] accepts. See [LIBRARY_MEDIA_TYPES] for why. */
+    val BOOK_COVER_STYLES = listOf(BOOK_COVER_STYLE_SQUARE, BOOK_COVER_STYLE_RECT)
   }
 }
 
@@ -282,17 +307,11 @@ class SharedPreferencesPrefsRepo
       value
       ) = sharedPreferences.edit().putBoolean(KEY_HIDE_PLAYED_AUDIOBOOKS, value).apply()
 
-    private val viewTypeBook = "book"
-    private val viewTypeAuthor = "author"
-    private val viewTypeFolder = "folder"
-    private val viewTypeCollection = "collection"
-    private val viewTypes =
-      listOf(viewTypeBook, viewTypeAuthor, viewTypeFolder, viewTypeCollection)
-    private val defaultLibraryViewType = viewTypeBook
+    private val defaultLibraryViewType = LIBRARY_MEDIA_TYPE_BOOK
     override var libraryMediaType: String
       get() = getString(KEY_LIBRARY_MEDIA_TYPE, defaultLibraryViewType)
       set(value) {
-        if (value !in viewTypes) {
+        if (value !in LIBRARY_MEDIA_TYPES) {
           throw IllegalArgumentException("Unknown view type key: $value")
         }
         sharedPreferences.edit().putString(KEY_LIBRARY_MEDIA_TYPE, value).apply()

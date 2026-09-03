@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionDetailsBinding
@@ -99,11 +100,7 @@ class CollectionDetailsFragment : Fragment() {
     viewModel.viewStyle.observe(viewLifecycleOwner) { style ->
       Timber.i("View style is: $style")
       val isGrid =
-        when (style) {
-          PrefsRepo.VIEW_STYLE_COVER_GRID -> true
-          PrefsRepo.VIEW_STYLE_DETAILS_LIST, PrefsRepo.VIEW_STYLE_TEXT_LIST -> false
-          else -> throw IllegalStateException("Unknown view style")
-        }
+        viewStyleIsGrid(style)
       binding.collectionsGrid.layoutManager =
         if (isGrid) {
           GridLayoutManager(requireContext(), 3)

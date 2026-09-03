@@ -6,9 +6,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_DETAILS_LIST
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_TEXT_LIST
+import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.databinding.GridItemCollectionBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemCollectionTextOnlyBinding
@@ -37,22 +35,23 @@ class CollectionsAdapter(
   private val DETAILS = 3
   var viewStyle: String = initialViewStyle
     set(value) {
-      viewStyleInt =
-        when (value) {
-          VIEW_STYLE_COVER_GRID -> COVER_GRID
-          VIEW_STYLE_TEXT_LIST -> TEXT_ONLY
-          VIEW_STYLE_DETAILS_LIST -> DETAILS
-          else -> throw IllegalStateException("Unknown view style")
-        }
+      viewStyleInt = viewStyleIntFor(value)
       notifyDataSetChanged()
       field = value
     }
-  private var viewStyleInt: Int =
-    when (initialViewStyle) {
-      VIEW_STYLE_COVER_GRID -> COVER_GRID
-      VIEW_STYLE_TEXT_LIST -> TEXT_ONLY
-      VIEW_STYLE_DETAILS_LIST -> DETAILS
-      else -> throw IllegalStateException("Unknown view style")
+  private var viewStyleInt: Int = viewStyleIntFor(initialViewStyle)
+
+  /**
+   * Maps a stored view style to this adapter's internal constant, falling back to the grid.
+   *
+   * See `ViewStyle.kt`: this mapping existed seven times and every copy threw, which turned an
+   * out-of-range preference into a crash on every launch (cu-133).
+   */
+  private fun viewStyleIntFor(style: String): Int =
+    when (ViewStyleKind.of(style)) {
+      ViewStyleKind.CoverGrid -> COVER_GRID
+      ViewStyleKind.TextOnly -> TEXT_ONLY
+      ViewStyleKind.Details -> DETAILS
     }
 
   private var serverConnected: Boolean = false

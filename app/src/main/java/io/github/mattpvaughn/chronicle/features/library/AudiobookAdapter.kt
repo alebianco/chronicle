@@ -10,9 +10,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_DETAILS_LIST
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_TEXT_LIST
+import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.isCompleted
 import io.github.mattpvaughn.chronicle.databinding.GridItemAudiobookBinding
@@ -31,22 +29,25 @@ class AudiobookAdapter(
   private val DETAILS = 3
   var viewStyle: String = initialViewStyle
     set(value) {
-      viewStyleInt =
-        when (value) {
-          VIEW_STYLE_COVER_GRID -> COVER_GRID
-          VIEW_STYLE_TEXT_LIST -> TEXT_ONLY
-          VIEW_STYLE_DETAILS_LIST -> DETAILS
-          else -> throw IllegalStateException("Unknown view style")
-        }
+      viewStyleInt = viewStyleIntFor(value)
       notifyDataSetChanged()
       field = value
     }
-  private var viewStyleInt: Int =
-    when (initialViewStyle) {
-      VIEW_STYLE_COVER_GRID -> COVER_GRID
-      VIEW_STYLE_TEXT_LIST -> TEXT_ONLY
-      VIEW_STYLE_DETAILS_LIST -> DETAILS
-      else -> throw IllegalStateException("Unknown view style")
+  private var viewStyleInt: Int = viewStyleIntFor(initialViewStyle)
+
+  /**
+   * Maps a stored view style to this adapter's internal constant, falling back to the grid.
+   *
+   * See `ViewStyle.kt` for why: this mapping existed **seven times** across the library and
+   * collections screens, and every copy ended in `throw IllegalStateException`. Two were property
+   * initializers, so an out-of-range preference crashed at construction as soon as the list
+   * rendered — on every launch, since the value is persisted (cu-133).
+   */
+  private fun viewStyleIntFor(style: String): Int =
+    when (ViewStyleKind.of(style)) {
+      ViewStyleKind.CoverGrid -> COVER_GRID
+      ViewStyleKind.TextOnly -> TEXT_ONLY
+      ViewStyleKind.Details -> DETAILS
     }
 
   private var serverConnected: Boolean = false
