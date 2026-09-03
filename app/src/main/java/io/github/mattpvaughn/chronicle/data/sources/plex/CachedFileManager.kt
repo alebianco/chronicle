@@ -387,6 +387,12 @@ class CachedFileManager
             // would mark the wrong book as downloaded.
             val bookId = downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
             if (downloadSuccess && bookId != null) {
+              // The *only* owner of this write (cu-138). DownloadNotificationWorker used to
+              // perform it too, from a scope tied to its own cancellation, so the fact had two
+              // owners and one of them usually lost the race — which is how a downloaded book
+              // could report itself uncached until the next cache scan repaired it (cu-85).
+              // This site is the right owner: a @Singleton on an injected scope outliving any
+              // single unit of work, and already the reconciliation authority for cache state.
               externalScope.launch {
                 withContext(dispatchers.io) {
                   Timber.i("Book download success for $bookId (group $groupId)")

@@ -23,6 +23,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import kotlinx.coroutines.*
 import timber.log.Timber
+import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlin.math.min
 
@@ -38,7 +39,6 @@ class DownloadNotificationWorker(
 ) : CoroutineWorker(context, parameters) {
   private val fetch: Fetch = Injector.get().fetch()
   private val notificationManager = NotificationManagerCompat.from(applicationContext)
-  private val bookRepository = Injector.get().bookRepo()
 
   private val cancelAllDesc =
     applicationContext.getString(R.string.download_notification_cancel_all)
@@ -87,32 +87,36 @@ class DownloadNotificationWorker(
 
       notificationManager.cancelAll()
 
-      val workerContext = coroutineContext
-
-      fetch.getDownloads { downloads ->
-        CoroutineScope(workerContext).launch {
-          withContext(Dispatchers.IO) {
-            // Mark successful downloads as cached
-            // Grouped by the book id the request carries in its extras, not by Fetch2's
-            // Int group: downloadGroupId is a hash and cannot be reversed, so the group
-            // alone no longer identifies a book (cu-71). A download enqueued before this
-            // change has no extras and is skipped rather than attributed to a guess.
-            val successfulBookIds =
-              downloads.groupByBookId()
-                .filter { (_, group) -> group.all { it.status == Status.COMPLETED } }
-                .map { it.key }
-            successfulBookIds.forEach { bookId ->
-              Timber.i("Book download success for ($bookId)")
-              bookRepository.updateCachedStatus(bookId, true)
-            }
-
-            // Show notifications for finished/failed downloads, then remove them from Fetch
-            showDownloadsCompleteNotification(downloads)
-          }
-        }
-      }
+      // Awaited, not fire-and-forget. This used to be
+      // `fetch.getDownloads { CoroutineScope(coroutineContext).launch { … } }` followed
+      // immediately by the return below — two independent bugs (cu-138): `getDownloads` is an
+      // async callback that had not necessarily fired yet, and `CoroutineWorker` cancels its
+      // context the moment `doWork` returns, so the launched block raced its own teardown.
+      // The cached-status write that lived here was the visible casualty; the completion
+      // notification was silently at risk too.
+      showDownloadsCompleteNotification(awaitDownloads())
 
       return@withContext Result.success()
+    }
+
+  /**
+   * Fetch2's callback API as a suspend function.
+   *
+   * `Fetch.getDownloads` hands its result to a callback on its own thread. Suspending until it
+   * arrives is what lets `doWork` finish its work *before* returning, rather than launching it
+   * into a context that is about to be cancelled (cu-138).
+   *
+   * Cancellable: if the worker is stopped while waiting, the coroutine resumes with cancellation
+   * rather than leaking a continuation. The file's own header TODO asks for exactly this
+   * ("write extension functions to turn fetch calls into suspend functions").
+   */
+  private suspend fun awaitDownloads(): List<Download> =
+    suspendCancellableCoroutine { continuation ->
+      fetch.getDownloads { downloads ->
+        if (continuation.isActive) {
+          continuation.resume(downloads)
+        }
+      }
     }
 
   /**
