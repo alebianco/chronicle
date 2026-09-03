@@ -27,6 +27,7 @@ import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.FLAG_O
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.REQUEST_CODE_OPEN_APP_TO_CURRENTLY_PLAYING
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_CHAPTER
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -180,12 +181,33 @@ class NotificationBuilder
       )
 
     /**
-     * Builds a notification representing the current playback state as representing by
-     * [CurrentlyPlaying] and the current [MediaSessionCompat]
+     * Builds a notification for the current playback state, **waiting for cover art**.
      *
-     * @return a notification representing the current playback state or null if one already exists
+     * Prefer [buildNotificationWithoutArtwork] anywhere a foreground-service deadline is running:
+     * this one suspends on a network fetch. See that method for why (cu-137).
      */
-    suspend fun buildNotification(sessionToken: MediaSessionCompat.Token): Notification? {
+    suspend fun buildNotification(sessionToken: MediaSessionCompat.Token): Notification =
+      withArtwork(buildNotificationWithoutArtwork(sessionToken), currentlyPlaying.book.value)
+
+    /**
+     * Builds the same notification **without** touching the network.
+     *
+     * `startForeground` has to happen within 5 s of the service starting or Android 12+ throws
+     * `ForegroundServiceDidNotStartInTimeException` — an ANR on older releases. Every call site
+     * used to await [buildNotification], which awaits `getBitmapFromServer`: a Coil request on the
+     * media OkHttp client, carrying a 5 s connect plus 15 s read timeout
+     * (`AppModule.CONNECT_TIMEOUT_SECONDS` / `READ_TIMEOUT_SECONDS`). Cold artwork on a slow or
+     * relayed route could therefore block for up to **20 s** against a 5 s budget, and the comments
+     * above two of those call sites stated the deadline while the code missed it (cu-137).
+     *
+     * Everything a valid notification needs — actions, media style, small icon, titles — is local.
+     * Only the large icon is remote, so it is the only thing deferred: callers post this
+     * immediately, then attach art with a second `notify()` once [buildNotification] resolves.
+     *
+     * A previously-loaded bitmap for the same book is still attached here, since that costs
+     * nothing: the deferral only skips the *fetch*.
+     */
+    fun buildNotificationWithoutArtwork(sessionToken: MediaSessionCompat.Token): Notification {
       if (shouldCreateChannel()) {
         createNowPlayingChannel()
       }
@@ -245,25 +267,47 @@ class NotificationBuilder
           Pair(currentBook.title, currentBook.author)
         }
 
-      // Only load bitmap when the book changes or the bitmap got recycled
-      if (bookTitleBitmapPair?.first != currentBook.id || bookTitleBitmapPair?.second?.isRecycled != false) {
-        val artUri = currentBook.thumb
-        Timber.i("Loading art uri: $artUri")
-        val largeIcon = plexConfig.getBitmapFromServer(artUri)
-        // ^^^ nullable, but null is expected value for book without artwork ^^^
-        bookTitleBitmapPair = Pair(currentBook.id, largeIcon)
-      }
-
       return builder.setContentTitle(titles.first)
         .setContentText(titles.second)
         .setContentIntent(controller.sessionActivity)
         .setDeleteIntent(stopPendingIntent)
         .setOnlyAlertOnce(true)
         .setSmallIcon(smallIcon)
-        .setLargeIcon(bookTitleBitmapPair?.second)
+        // Whatever art is already cached for this book. Null on the first notification for a
+        // book, which withArtwork() then fills in.
+        .setLargeIcon(cachedArtworkFor(currentBook))
         .setStyle(mediaStyle)
         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         .build()
+    }
+
+    /** Art already loaded for [book], or null if none has been fetched yet. */
+    private fun cachedArtworkFor(book: Audiobook): Bitmap? =
+      bookTitleBitmapPair
+        ?.takeIf { it.first == book.id && it.second?.isRecycled != true }
+        ?.second
+
+    /**
+     * Fetches [book]'s cover art if it is not already loaded, and returns [notification] with it
+     * attached.
+     *
+     * Rebuilds rather than mutating, because a `Notification` is not modifiable after `build()`.
+     * The fetch itself is unchanged; what changed is that nothing holding a deadline waits on it.
+     */
+    private suspend fun withArtwork(
+      notification: Notification,
+      book: Audiobook,
+    ): Notification {
+      if (cachedArtworkFor(book) == null) {
+        Timber.i("Loading art uri: ${book.thumb}")
+        // Null is an expected answer, for a book with no artwork — cached as such so a book
+        // without a cover is not re-fetched on every notification.
+        bookTitleBitmapPair = Pair(book.id, plexConfig.getBitmapFromServer(book.thumb))
+      }
+
+      val art = cachedArtworkFor(book) ?: return notification
+
+      return NotificationCompat.Builder(context, notification).setLargeIcon(art).build()
     }
 
     private fun shouldCreateChannel() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !nowPlayingChannelExists()

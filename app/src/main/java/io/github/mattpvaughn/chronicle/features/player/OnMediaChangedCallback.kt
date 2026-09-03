@@ -95,9 +95,12 @@ class OnMediaChangedCallback
     }
 
     private suspend fun updateNotification(state: Int) {
+      // Built without touching the network: this runs on the path that can *promote* the service
+      // to foreground, and awaiting the cover-art fetch first is what could blow the 5 s deadline
+      // (cu-137). The art is attached by postArtwork() after the state machine has run.
       val notification =
         if (mediaController.sessionToken != null) {
-          notificationBuilder.buildNotification(mediaSession.sessionToken)
+          notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken)
         } else {
           null
         }
@@ -141,6 +144,36 @@ class OnMediaChangedCallback
           becomingNoisyReceiver.unregister()
           foregroundServiceController.stopForegroundService(true)
         }
+      }
+
+      // Only the states above that leave a notification standing are worth re-posting with art.
+      // STOPPED just cancelled it, and the else branch never showed one.
+      if (state == STATE_PLAYING || state == STATE_BUFFERING || state == STATE_PAUSED) {
+        postArtwork()
+      }
+    }
+
+    /**
+     * Re-posts the standing notification with its cover art attached.
+     *
+     * The second half of the cu-137 split. Deliberately does *not* call `startForeground` again:
+     * the state machine above has already decided this state's foreground status — PAUSED
+     * releases it on purpose to stay swipe-dismissable — and re-promoting here would undo that.
+     * A plain `notify` updates the picture and nothing else.
+     */
+    private suspend fun postArtwork() {
+      val token = mediaController.sessionToken ?: return
+      val withArt = notificationBuilder.buildNotification(token)
+
+      // POST_NOTIFICATIONS is revocable from API 33, and this call is new (the two above it are
+      // long-standing and baselined). Attaching a cover is cosmetic, so a denial must not take
+      // playback down with it — the notification posted by the state machine stays valid either
+      // way. Caught rather than permission-checked because the check would have to be repeated
+      // and can still race a revocation between check and call.
+      try {
+        notificationManager.notify(NOW_PLAYING_NOTIFICATION, withArt)
+      } catch (e: SecurityException) {
+        Timber.w(e, "Not permitted to post the notification artwork; keeping the plain one")
       }
     }
   }

@@ -205,6 +205,24 @@ class MediaPlayerService :
   private var sessionCustomActions: List<PlaybackStateCompat.CustomAction> = emptyList()
   private val timelineWindow = Timeline.Window()
 
+  /**
+   * Fetches the cover art and re-posts the notification with it attached.
+   *
+   * The second half of the cu-137 split: [NotificationBuilder.buildNotificationWithoutArtwork]
+   * satisfies the foreground deadline, this fills in the picture whenever the network gets round
+   * to it. Re-posting through `startForeground` with the same id updates the existing notification
+   * — the service is already foreground by the time this runs, so this is an update, not a second
+   * promotion, and it needs no notification-manager dependency of its own.
+   *
+   * Failure here is deliberately not fatal: a missing cover is cosmetic, and the notification the
+   * user already has stays valid. `getBitmapFromServer` swallows its own network errors, so this
+   * guards only against the session going away underneath us.
+   */
+  private suspend fun postNotificationWithArtwork() {
+    val token = mediaSession.sessionToken ?: return
+    startForeground(NOW_PLAYING_NOTIFICATION, notificationBuilder.buildNotification(token))
+  }
+
   override fun onCreate() {
     super.onCreate()
 
@@ -233,10 +251,15 @@ class MediaPlayerService :
     mediaController.registerCallback(onMediaChangedCallback)
 
     // startForeground has to be called within 5 seconds of starting the service or the app
-    // will ANR (on Android 9.0 and above, maybe earlier).
+    // will ANR (on Android 9.0 and above, maybe earlier). Built and posted *synchronously* —
+    // the artwork-bearing build awaits a network fetch that can outlast the deadline by 15 s
+    // (cu-137), so the cover is attached by the follow-up below instead.
+    startForeground(
+      NOW_PLAYING_NOTIFICATION,
+      notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken),
+    )
     serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
-      val notification = notificationBuilder.buildNotification(mediaSession.sessionToken)
-      startForeground(NOW_PLAYING_NOTIFICATION, notification)
+      postNotificationWithArtwork()
     }
 
     localBroadcastManager.registerReceiver(
@@ -316,13 +339,11 @@ class MediaPlayerService :
         }
         PrefsRepo.KEY_JUMP_FORWARD_SECONDS, PrefsRepo.KEY_JUMP_BACKWARD_SECONDS -> {
           updateCustomActions()
-          serviceScope.launch {
-            withContext(dispatchers.io) {
-              sessionToken?.let {
-                val notification = notificationBuilder.buildNotification(it)
-                startForeground(NOW_PLAYING_NOTIFICATION, notification)
-              }
-            }
+          sessionToken?.let {
+            startForeground(
+              NOW_PLAYING_NOTIFICATION,
+              notificationBuilder.buildNotificationWithoutArtwork(it),
+            )
           }
         }
       }
@@ -553,9 +574,13 @@ class MediaPlayerService :
     // we should launch with whatever it is we have, assuming the event isn't the notification
     // itself being removed (KEYCODE_MEDIA_STOP)
     if (ke?.keyCode != KEYCODE_MEDIA_STOP) {
+      // Synchronous for the same reason as in onCreate (cu-137).
+      startForeground(
+        NOW_PLAYING_NOTIFICATION,
+        notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken),
+      )
       serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
-        val notification = notificationBuilder.buildNotification(mediaSession.sessionToken)
-        startForeground(NOW_PLAYING_NOTIFICATION, notification)
+        postNotificationWithArtwork()
       }
     }
 

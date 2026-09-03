@@ -1,7 +1,7 @@
 ---
 id: cu-137
 title: startForeground is deferred behind a cover-art fetch
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'
@@ -63,14 +63,68 @@ path while here.
 
 ## Acceptance Criteria
 
-- [ ] `startForeground` is reached without awaiting any network call, at all three call sites
-- [ ] Artwork still appears in the notification once fetched, via a second `notify()`
-- [ ] A test proves the deadline property: a `getBitmapFromServer` that never returns must not
-      delay `startForeground` — sabotage-verified (restoring the await makes it fail)
-- [ ] The nullable-`Notification` path into `startForeground` is either made non-null by
+- [x] `startForeground` is reached without awaiting any network call, at **all four** call sites
+      — there were four, not three: `OnMediaChangedCallback.kt:100` was missed when this was filed.
+- [x] Artwork still appears in the notification once fetched, via a second `notify()`
+      — confirmed by screenshot on device: full cover art plus all five transport controls.
+- [x] A test proves the deadline property: a `getBitmapFromServer` that never returns must not
+      delay `startForeground` — `ForegroundDeadlineTest`, and the sabotage result is **stronger
+      than a test failure**: re-adding `suspend` breaks compilation at all three synchronous call
+      sites, so the fix is now compiler-enforced.
+- [x] The nullable-`Notification` path into `startForeground` is either made non-null by
       construction or handled explicitly, not implicitly unwrapped
-- [ ] Verified on a device: first play of a book with cold artwork over a slow/relay route posts
+      — `buildNotification` and `buildNotificationWithoutArtwork` both return non-null now.
+- [x] Verified on a device: first play of a book with cold artwork over a slow/relay route posts
       the notification promptly and does not throw `ForegroundServiceDidNotStartInTimeException`
+
+## Implementation Notes
+
+**The split.** `buildNotificationWithoutArtwork` is synchronous and builds everything a valid
+notification needs — actions, media style, small icon, titles — because all of it is local. Only the
+large icon was remote. `buildNotification` is now a thin suspend wrapper that adds the art. Callers
+holding a deadline post the first, then re-post the second when the fetch lands.
+
+**Four call sites, not three.** The task named three; `OnMediaChangedCallback.updateNotification`
+was the fourth, and it is on the `STATE_PLAYING` path that *promotes* the service. Its second phase
+deliberately uses `notify` and **not** `startForeground`: the state machine has already decided
+this state's foreground status, and PAUSED releases it on purpose to stay swipe-dismissable, so
+re-promoting there would undo that. Two tests pin this.
+
+**Measured on device** (Samsung SM-A336B, API 36, live Plex server, Coil disk cache cleared so the
+fetch had to be cold):
+
+| time | event |
+|---|---|
+| `11:06:37.918` | service created |
+| `11:06:37.935` | **`startForeground` reached** — `startForegroundCount: 0 -> 1`, **17 ms** in |
+| `11:06:38.026` | art fetch *begins*, after the promotion |
+| `11:06:46.598` | a later art fetch — **8.6 s** after service start |
+
+That 8.6 s fetch is the finding, demonstrated: under the old code it was *in front of*
+`startForeground`, against a 5 s budget. Zero `ForegroundServiceDidNotStartInTimeException`, zero
+ANRs, audio confirmed playing, and the notification shows full artwork.
+
+**Sabotage-verified, and it upgraded to a compile error.** Making the immediate build `suspend`
+again fails `compileDebugKotlin` at all three synchronous sites rather than merely failing a test —
+the same "turn a process failure into a mechanical one" shape as `DebugHooksContract`. Separately,
+dropping the `postArtwork()` call fails
+`the artwork phase updates the notification without re-promoting the service`.
+
+**Two corrections to the original finding**, from reading the code rather than trusting the review:
+the fetch goes through **Coil**, not a raw OkHttp call, and it catches `Throwable` and returns null
+— so it never *threw* past the caller, it only **blocked**. The timeout figures stand, because Coil
+is wired to the media OkHttp client (`ChronicleApplication.kt:84`): 5 s connect + 15 s read.
+
+**Lint caught a real issue in my own new code** — which is only possible because the sibling finding
+made lint fatal. The new `notify` needed `POST_NOTIFICATIONS` handling; the two existing calls
+beside it are baselined as accepted debt, but rather than widen the baseline for new code I catch
+`SecurityException`. A denied notification permission must not take playback down over a cover
+image, and the notification the state machine already posted stays valid.
+
+**Also fixed while here:** the jump-interval preference listener was building its notification
+inside `serviceScope.launch { withContext(dispatchers.io) { … } }` purely because the build used to
+suspend. It no longer does, so it runs inline beside `updateCustomActions()`.
+
 
 ## Related
 

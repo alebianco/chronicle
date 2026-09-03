@@ -68,6 +68,10 @@ class NotificationStateMachineTest {
 
   @Before
   fun stubNotificationBuilder() {
+    // Both halves of the cu-137 split return the same instance, so these assertions stay about
+    // the state machine rather than about which build ran. The deadline property itself —
+    // that the foreground path never awaits the artwork — is pinned in ForegroundDeadlineTest.
+    every { notificationBuilder.buildNotificationWithoutArtwork(any()) } returns notification
     coEvery { notificationBuilder.buildNotification(any()) } returns notification
   }
 
@@ -120,6 +124,34 @@ class NotificationStateMachineTest {
     verify { becomingNoisyReceiver.unregister() }
     verify { notificationManager.notify(NOW_PLAYING_NOTIFICATION, notification) }
     verify { foregroundServiceController.stopForegroundService(false) }
+  }
+
+  /**
+   * The cu-137 second phase: the artwork build runs *after* the state machine, and re-posts
+   * through `notify` only.
+   *
+   * It must not call `startForeground` again — PAUSED deliberately releases the foreground state
+   * to stay swipe-dismissable, and re-promoting would undo that. So a paused notification gets
+   * exactly one `startForeground` (from the state machine) and two `notify` calls: the immediate
+   * one and the one carrying art.
+   */
+  @Test
+  fun `the artwork phase updates the notification without re-promoting the service`() {
+    onState(STATE_PAUSED)
+
+    verify(exactly = 2) { notificationManager.notify(NOW_PLAYING_NOTIFICATION, notification) }
+    verify(exactly = 1) {
+      foregroundServiceController.startForeground(NOW_PLAYING_NOTIFICATION, notification)
+    }
+    verify { foregroundServiceController.stopForegroundService(false) }
+  }
+
+  /** A stopped notification was just cancelled, so nothing should re-post art over it. */
+  @Test
+  fun `the artwork phase does not resurrect a cancelled notification`() {
+    onState(STATE_STOPPED)
+
+    verify(exactly = 0) { notificationManager.notify(any(), any<Notification>()) }
   }
 
   /** Stopping tears everything down — notification cancelled, service stopped. */
