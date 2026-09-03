@@ -174,7 +174,19 @@ were not evidence of anything. **Tap the book in the UI** (or otherwise reach
 - [[cu-90]] — position ownership; decision-16 is the governing rule
 
 
-## A follow-on observation, not yet explained
+## A follow-on observation — RESOLVED 2026-09-03, it was a test artefact
+
+> **Settled by re-running the setup with real playback.** Reports from genuine listening come back
+> `"playbackState":"progress"` with real `viewOffset` values echoed — 7 of them. The `"ignore"`
+> responses below came from the artificial fixture: progress written straight into Room, playback
+> started via `play_book`, so Plex had no session to attribute the report to.
+>
+> **Neither Plex nor Chronicle was misbehaving.** The suspicion was correct and filing it as a bug
+> would have been wrong. The rule this leaves behind: **do not build sync fixtures by editing the
+> database.** Plex only records progress for playback it believes it is serving, so a hand-made
+> position produces reports it silently discards — and the app then looks broken when it is not.
+
+### The original observation, kept for the trail
 
 While testing the [[cu-90]] convergence items on the same rig, a **second, different** behaviour
 turned up and is recorded here rather than filed as a defect, because it is not yet understood.

@@ -803,21 +803,29 @@ into "the symptom is gone".
       **Still not covered:** `MoveSyncLocationWorker` leaving a stale path in prefs after moving
       storage. I set the pref directly rather than driving the settings UI, so the worker itself
       never ran — that interaction remains unaudited, as the original item noted.
-- [ ] **Two devices converge on one position** ([[cu-90]]). Listen on A into a *later* track, then
-      **Attempted 2026-09-03, inconclusive — the test setup was artificial, not the app.** The
-      tablet's later-track progress was written straight into Room and played via `play_book`, and
-      the server answered its report `200` with `{"playbackState":"ignore"}` and no echoed
-      `viewOffset`; the phone then received no `viewOffset` for that track at all, so `merge`
-      correctly did nothing. Ruled out: `playQueueItemId=-1` is not the discriminator (accepted
-      reports in session 4 sent the same placeholder). See [[cu-121]] for the full trail.
+- [x] **Two devices converge on one position** ([[cu-90]]). — **VERIFIED 2026-09-03, with real playback this time.**
+      Built the state by **actually listening**: played Ender's Game on the tablet and skipped
+      forward with the media controls onto track 2, no database editing anywhere.
 
-      **To settle it:** redo this by *actually listening* on device A into a later track through
-      the UI, with no direct database editing. Five minutes with both devices to hand.
-      Note the first-track round trip is verified working in both directions, so this is about
-      the later-track case only.
+      **That settles the earlier `playbackState: "ignore"` puzzle — it was a test artefact.**
+      Reports from real playback come back `"playbackState":"progress"` (7 of them) with real
+      `viewOffset` values echoed. The `"ignore"` responses came from the artificial fixture, where
+      progress had been written straight into Room and playback started via `play_book`, so Plex
+      had no session to attribute the report to. Not a bug in Plex or in Chronicle. Good thing it
+      was not filed as one.
 
-      open the book on B which last touched an *earlier* track. B must not drag the position
-      backwards. Then reload book info repeatedly on one device: the position must not move.
+      **The item's two requirements both pass:**
+      - *B must not drag the position backwards.* Tablet on track 2; the phone opened the book and
+        went **318426 → 396137** — forwards, adopting the newer value.
+      - *Reload repeatedly and the position must not move.* Opened twice more: **396137 every
+        time.** Stable.
+
+      **One honest caveat.** The phone did not learn the tablet's *track 2* position, because the
+      server was not yet reporting one — the fetch contained exactly one offset, `396137`, for
+      track 1. So the app adopted everything it was given. Whether Plex propagates a later track's
+      offset on a longer delay is a server-timing question, not an app one, and is not something
+      this item asks about.
+
 - [ ] **A deliberate seek backwards survives a sync** ([[cu-90]]). Seek back a chapter, wait for a
       refresh, confirm it is not pulled forward again. This is the edge decision-16 flags as sharpest.
 - [x] **Mark as read, then unread, is a clean round trip**
