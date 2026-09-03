@@ -11,9 +11,10 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_BOOK_S
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_HIDE_PLAYED_AUDIOBOOKS
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_IS_LIBRARY_SORT_DESCENDING
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_LIBRARY_VIEW_STYLE
-import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_TITLE
 import io.github.mattpvaughn.chronicle.data.model.Collection
+import io.github.mattpvaughn.chronicle.features.search.SearchController
+import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.util.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
@@ -141,13 +142,14 @@ class CollectionsViewModel(
   val messageForUser: LiveData<Event<String>>
     get() = _messageForUser
 
-  private var _searchResults = MutableLiveData<List<Audiobook>>()
-  val searchResults: LiveData<List<Audiobook>>
-    get() = _searchResults
+  /** Typo-tolerant grouped search, shared with the library and home screens (cu-25). */
+  private val searchController = SearchController(bookRepository, viewModelScope)
 
-  private var _isQueryEmpty = MutableLiveData<Boolean>(false)
+  val searchRows: LiveData<List<SearchRow>>
+    get() = searchController.rows
+
   val isQueryEmpty: LiveData<Boolean>
-    get() = _isQueryEmpty
+    get() = searchController.isQueryEmpty
 
   private var _bottomChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
   val bottomChooserState: LiveData<BottomSheetChooser.BottomChooserState>
@@ -155,20 +157,12 @@ class CollectionsViewModel(
 
   fun setSearchActive(isSearchActive: Boolean) {
     _isSearchActive.postValue(isSearchActive)
+    searchController.setSearchActive(isSearchActive)
   }
 
-  /** Searches for books which match the provided text */
+  /** Searches for books which match the provided text, typo-tolerantly and grouped (cu-25). */
   fun search(query: String) {
-    _isQueryEmpty.postValue(query.isEmpty())
-    if (query.isEmpty()) {
-      _searchResults.postValue(emptyList())
-    } else {
-      bookRepository.search(query).observeOnce(
-        Observer {
-          _searchResults.postValue(it)
-        },
-      )
-    }
+    searchController.search(query)
   }
 
   private val serverConnectionObserver =

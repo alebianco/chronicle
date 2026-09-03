@@ -94,6 +94,18 @@ interface IBookRepository {
   suspend fun searchAsync(query: String): List<Audiobook>
 
   /**
+   * Typo-tolerant search, grouped by the field each book matched (cu-25).
+   *
+   * Separate from [search] rather than replacing it: that one is a plain substring filter and is
+   * what Android Auto's voice search wants — a flat list of books, no headings. This one backs the
+   * on-screen search, and additionally covers narrator and series.
+   *
+   * Matching happens **in memory** over the library, because narrator is stored comma-joined and a
+   * typo cannot be expressed in SQL at all; see `BookSearch.kt` for why that stays affordable.
+   */
+  suspend fun searchGrouped(query: String): GroupedSearchResults
+
+  /**
    * Return the [Audiobook] which has been listened to the most recently. Specifically, look for
    * the [Audiobook.lastViewedAt] field which is largest among all [Audiobook]s in the local DB
    */
@@ -379,6 +391,14 @@ class BookRepository
     override suspend fun searchAsync(query: String): List<Audiobook> {
       return withContext(dispatchers.io) {
         bookDao.searchAsync("%$query%", prefsRepo.offlineMode)
+      }
+    }
+
+    override suspend fun searchGrouped(query: String): GroupedSearchResults {
+      return withContext(dispatchers.io) {
+        // getAllBooksAsync already applies offlineMode, so an offline search sees only cached
+        // books — the contract every other read path here honours.
+        bookDao.getAllBooksAsync(prefsRepo.offlineMode).groupedSearch(query)
       }
     }
 

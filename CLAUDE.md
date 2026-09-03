@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **962 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1008 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -332,12 +332,33 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   track now has its own `track-<id>-chapters.json`. A chapter spanning a track boundary
   legitimately appears on **both** tracks, so a count above the distinct-chapter count is correct.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
+- **Search is local, not `/hubs/search`** (cu-25). `BookSearch.kt` scans the synced library in
+  memory over four fields (title, author, narrator, series). The endpoint the task named cannot be
+  the foundation: its results **omit `Style`/`Mood`**, so it cannot answer a narrator or series
+  query at all; it is unavailable in offline mode, which every other read path honours; its
+  `sectionId` only *re-orders* rather than filtering to a library; and `limit` defaults to **3 per
+  hub**. It does spell-check server-side and is built for type-ahead, so it is still worth adding
+  as a *complement* for books not yet synced — after cu-143, which may remove the need. Two traps
+  in the matching itself: it is **Damerau**-Levenshtein because plain Levenshtein charges 2 for a
+  transposition (the commonest typo), and the cheap prefilter counts **characters, not bigrams** —
+  a transposition rewrites every adjacent pair, so a bigram prefilter silently discards the very
+  matches the fuzziness exists for. Fuzzy matching is floored at 4 characters; below that only
+  prefix/substring match, or the first keystroke answers the whole library.
 - **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
   Both are **detail-only** (cu-24): `/library/metadata/{id}` carries them, the library listing
   `/library/sections/{id}/all` does **not** — verified against fixtures captured from a real Plex
-  1.43.3 server. So a narrator/series index cannot be built from a refresh; it fills in as books are
-  synced (`syncAudiobook` already fetches the detail), and `FacetList.unknownCount` exists so the UI
-  is obliged to say how partial it is. `merge` needs a **third** rule for fields like these — the
+  1.43.3 server, and there is no `includeFields`/`includeTags` that would add them. So today the
+  index fills in as books are synced (`syncAudiobook` already fetches the detail), and
+  `FacetList.unknownCount` exists so the UI is obliged to say how partial it is.
+  **But "an index cannot be built from a refresh" is false** — that was inferred from the listing
+  gap without checking whether another endpoint could enumerate the tags. Two routes exist
+  (researched in cu-25, filed as **cu-143**): the *filter enumeration* route, where
+  `/all?includeMeta=1&includeAdvanced=1&X-Plex-Container-Size=0` returns only filter metadata
+  naming the `style`/`mood` filter keys, `/library/sections/{id}/style?type=9` lists the distinct
+  values, and `/all?type=9&style={key}` lists each value's books — `3 + N + M` requests, verified
+  in python-plexapi's source; and the *multi-id* route, `/library/metadata/{id1},{id2},...`
+  ("Get one or more metadata items" in the API spec), which is spec-verified but not yet
+  live-tested. Don't re-derive this. `merge` needs a **third** rule for fields like these — the
   network value when it has one, the local value when it does not: preferring the network blanks a
   narrator on every refresh, preferring the local one makes a re-tagged book uncorrectable.
   `Audiobook.seriesIndex` is parsed from `titleSort`, **not** Plex's `index`, which is the album

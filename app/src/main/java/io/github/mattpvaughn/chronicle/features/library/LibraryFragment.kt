@@ -31,7 +31,7 @@ import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
-import io.github.mattpvaughn.chronicle.features.search.bindSearchRecyclerView
+import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.views.checkRadioButtonWithTag
@@ -42,7 +42,6 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
-/** TODO: refactor search to reuse code from Library + Home fragments */
 class LibraryFragment : Fragment() {
   companion object {
     fun newInstance() = LibraryFragment()
@@ -66,6 +65,14 @@ class LibraryFragment : Fragment() {
 
   var adapter: AudiobookAdapter? = null
 
+  /**
+   * The grouped search results (cu-25).
+   *
+   * Created per view rather than held across one, because it is handed to the RecyclerView in
+   * [onCreateView] and must not outlive it.
+   */
+  private lateinit var searchAdapter: GroupedSearchAdapter
+
   override fun onCreateView(
     inflater: LayoutInflater,
     container: ViewGroup?,
@@ -73,6 +80,7 @@ class LibraryFragment : Fragment() {
   ): View? {
     Timber.i("Lib frag view create")
     val binding = FragmentLibraryBinding.inflate(inflater, container, false)
+    searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) })
 
     // Was compound visibility expressions in fragment_library.xml. XML combined
     // several LiveData sources implicitly; in Kotlin each source has to re-run
@@ -88,19 +96,19 @@ class LibraryFragment : Fragment() {
     viewModel.isOffline.observe(viewLifecycleOwner) { refreshEmptyStates() }
 
     fun refreshSearchStates() {
-      val results = viewModel.searchResults.value.orEmpty()
+      val rows = viewModel.searchRows.value.orEmpty()
       val active = viewModel.isSearchActive.value == true
       val queryEmpty = viewModel.isQueryEmpty.value == true
       binding.searchResultsList.isVisible = active
-      binding.noSearchResultsMessage.isVisible = results.isEmpty() && active && !queryEmpty
-      bindSearchRecyclerView(binding.searchResultsList, results)
+      binding.noSearchResultsMessage.isVisible = rows.isEmpty() && active && !queryEmpty
+      searchAdapter.submitList(rows)
     }
-    viewModel.searchResults.observe(viewLifecycleOwner) { refreshSearchStates() }
+    viewModel.searchRows.observe(viewLifecycleOwner) { refreshSearchStates() }
     viewModel.isSearchActive.observe(viewLifecycleOwner) { refreshSearchStates() }
     viewModel.isQueryEmpty.observe(viewLifecycleOwner) { refreshSearchStates() }
 
     plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
-      bindSearchRecyclerView(binding.searchResultsList, connected == true)
+      searchAdapter.setServerConnected(connected == true)
     }
 
     viewModel.bottomChooserState.observe(viewLifecycleOwner) { state ->
@@ -198,14 +206,7 @@ class LibraryFragment : Fragment() {
         }
       adapter!!.viewStyle = style
     }
-    binding.searchResultsList.adapter =
-      AudiobookSearchAdapter(
-        object : AudiobookClick {
-          override fun onClick(audiobook: Audiobook) {
-            openAudiobookDetails(audiobook)
-          }
-        },
-      )
+    binding.searchResultsList.adapter = searchAdapter
 
     binding.swipeToRefresh.setOnRefreshListener {
       viewModel.refreshData()

@@ -26,9 +26,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionsBinding
-import io.github.mattpvaughn.chronicle.features.library.AudiobookSearchAdapter
-import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
-import io.github.mattpvaughn.chronicle.features.search.bindSearchRecyclerView
+import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import kotlinx.coroutines.Dispatchers
@@ -154,25 +152,19 @@ class CollectionsFragment : Fragment() {
         }
       adapter!!.viewStyle = style
     }
-    binding.searchResultsList.adapter =
-      AudiobookSearchAdapter(
-        object : LibraryFragment.AudiobookClick {
-          override fun onClick(audiobook: Audiobook) {
-            openAudiobookDetails(audiobook)
-          }
-        },
-      )
+    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) })
+    binding.searchResultsList.adapter = searchAdapter
 
     // Was the `searchBookList`/`serverConnectedSearch` binding adapters on search_results_list.
-    // These must stay below the adapter assignment above: bindSearchRecyclerView casts
-    // recyclerView.adapter, and observe() delivers an already-set value synchronously.
-    viewModel.searchResults.observe(viewLifecycleOwner) { results ->
-      bindSearchRecyclerView(binding.searchResultsList, results)
+    // These must stay below the adapter assignment above, since observe() delivers an
+    // already-set value synchronously.
+    viewModel.searchRows.observe(viewLifecycleOwner) { rows ->
+      searchAdapter.submitList(rows)
       updateSearchVisibility(binding)
     }
 
     plexConfig.isConnected.observe(viewLifecycleOwner) { isConnected ->
-      bindSearchRecyclerView(binding.searchResultsList, isConnected)
+      searchAdapter.setServerConnected(isConnected)
     }
 
     viewModel.isSearchActive.observe(viewLifecycleOwner) { updateSearchVisibility(binding) }
@@ -268,7 +260,7 @@ class CollectionsFragment : Fragment() {
   private fun updateSearchVisibility(binding: FragmentCollectionsBinding) {
     val isSearchActive = viewModel.isSearchActive.value ?: false
     val isQueryEmpty = viewModel.isQueryEmpty.value ?: false
-    val hasNoResults = viewModel.searchResults.value.isNullOrEmpty()
+    val hasNoResults = viewModel.searchRows.value.isNullOrEmpty()
 
     binding.searchResultsList.isVisible = isSearchActive
     binding.noSearchResultsMessage.isVisible = hasNoResults && isSearchActive && !isQueryEmpty

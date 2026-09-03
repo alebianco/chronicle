@@ -27,6 +27,8 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.CACHED
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.NOT_CACHED
+import io.github.mattpvaughn.chronicle.features.search.SearchController
+import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.util.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserListener
@@ -188,13 +190,19 @@ class LibraryViewModel(
   val messageForUser: LiveData<Event<String>>
     get() = _messageForUser
 
-  private var _searchResults = MutableLiveData<List<Audiobook>>()
-  val searchResults: LiveData<List<Audiobook>>
-    get() = _searchResults
+  /**
+   * Typo-tolerant grouped search (cu-25).
+   *
+   * The four fields this used to hold by hand live in the controller now, shared with the home and
+   * collections screens — they each had their own copy of the same logic.
+   */
+  private val searchController = SearchController(bookRepository, viewModelScope)
 
-  private var _isQueryEmpty = MutableLiveData<Boolean>(false)
+  val searchRows: LiveData<List<SearchRow>>
+    get() = searchController.rows
+
   val isQueryEmpty: LiveData<Boolean>
-    get() = _isQueryEmpty
+    get() = searchController.isQueryEmpty
 
   private var _bottomChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
   val bottomChooserState: LiveData<BottomSheetChooser.BottomChooserState>
@@ -216,20 +224,12 @@ class LibraryViewModel(
 
   fun setSearchActive(isSearchActive: Boolean) {
     _isSearchActive.postValue(isSearchActive)
+    searchController.setSearchActive(isSearchActive)
   }
 
-  /** Searches for books which match the provided text */
+  /** Searches for books which match the provided text, typo-tolerantly and grouped (cu-25). */
   fun search(query: String) {
-    _isQueryEmpty.postValue(query.isEmpty())
-    if (query.isEmpty()) {
-      _searchResults.postValue(emptyList())
-    } else {
-      bookRepository.search(query).observeOnce(
-        Observer {
-          _searchResults.postValue(it)
-        },
-      )
-    }
+    searchController.search(query)
   }
 
   private val serverConnectionObserver =

@@ -175,6 +175,16 @@
         <item quantity="one">%1$d book has no narrator or series yet. These are read from the server when a book is opened.</item>
         <item quantity="other">%1$d books have no narrator or series yet. These are read from the server when a book is opened.</item>
     </plurals>
+    <!-- Grouped search headings (cu-25). The count is part of the heading, following the counted
+         filter chips in RESEARCH_FINDINGS 3.1 — a heading that says how many it found reads as a
+         result, where a bare heading reads as a category. -->
+    <string name="search_group_title">Books</string>
+    <string name="search_group_author">Authors</string>
+    <string name="search_group_narrator">Narrators</string>
+    <string name="search_group_series">Series</string>
+    <string name="search_matched_narrator">Narrated by %1$s</string>
+    <string name="search_matched_series">%1$s series</string>
+
     <plurals name="facet_book_count">
         <item quantity="one">%1$d book</item>
         <item quantity="other">%1$d books</item>

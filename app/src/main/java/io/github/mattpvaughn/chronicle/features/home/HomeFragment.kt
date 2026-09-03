@@ -21,9 +21,9 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentHomeBinding
 import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
-import io.github.mattpvaughn.chronicle.features.library.AudiobookSearchAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
 import io.github.mattpvaughn.chronicle.features.library.bindRecyclerView
+import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import javax.inject.Inject
@@ -101,22 +101,15 @@ class HomeFragment : Fragment() {
     binding.onDeckRecyclerview.itemAnimator?.changeDuration = 0
     binding.downloadedRecyclerview.adapter = makeAudiobookAdapter(openDetails)
     binding.downloadedRecyclerview.itemAnimator?.changeDuration = 0
-    val searchAdapter =
-      AudiobookSearchAdapter(
-        object : AudiobookClick {
-          override fun onClick(audiobook: Audiobook) {
-            openAudiobookDetails(audiobook)
-          }
-        },
-      )
+    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) })
     binding.searchResultsList.adapter = searchAdapter
 
     // Was `searchBookList="@{viewModel.searchResults}"` on the list. Missed when cu-58 converted
     // this screen off DataBinding — the adapter was set and never given any data, so search
     // returned nothing however well the query worked. Same omission as the choose-user list; both
     // were found on the owner's device during cu-73.
-    viewModel.searchResults.observe(viewLifecycleOwner) { results ->
-      searchAdapter.submitList(results)
+    viewModel.searchRows.observe(viewLifecycleOwner) { rows ->
+      searchAdapter.submitList(rows)
     }
 
     // The old layout carried *three* bindings on this list and the cu-58 conversion dropped all

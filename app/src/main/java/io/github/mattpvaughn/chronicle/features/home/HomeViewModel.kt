@@ -15,11 +15,12 @@ import io.github.mattpvaughn.chronicle.features.library.LibraryViewModel
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.features.search.SearchController
+import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.booksKey
 import io.github.mattpvaughn.chronicle.util.distinctBy
-import io.github.mattpvaughn.chronicle.util.observeOnce
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -128,9 +129,14 @@ class HomeViewModel(
   val isSearchActive: LiveData<Boolean>
     get() = _isSearchActive
 
-  private var _searchResults = MutableLiveData<List<Audiobook>>()
-  val searchResults: LiveData<List<Audiobook>>
-    get() = _searchResults
+  /** Typo-tolerant grouped search, shared with the library and collections screens (cu-25). */
+  private val searchController = SearchController(bookRepository, viewModelScope)
+
+  val searchRows: LiveData<List<SearchRow>>
+    get() = searchController.rows
+
+  val isQueryEmpty: LiveData<Boolean>
+    get() = searchController.isQueryEmpty
 
   private val offlineModeListener =
     SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -210,21 +216,16 @@ class HomeViewModel(
 
   fun setSearchActive(isSearchActive: Boolean) {
     _isSearchActive.postValue(isSearchActive)
+    searchController.setSearchActive(isSearchActive)
   }
 
   fun disableOfflineMode() {
     prefsRepo.offlineMode = false
   }
 
-  /** Searches for books which match the provided text */
+  /** Searches for books which match the provided text, typo-tolerantly and grouped (cu-25). */
   fun search(query: String) {
-    if (query.isEmpty()) {
-      _searchResults.postValue(emptyList())
-    } else {
-      bookRepository.search(query).observeOnce {
-        _searchResults.postValue(it)
-      }
-    }
+    searchController.search(query)
   }
 
   /**
