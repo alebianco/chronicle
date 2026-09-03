@@ -77,6 +77,10 @@ class MainActivity : AppCompatActivity() {
   /** Held so the standing revocation notice can be dismissed when the account recovers. */
   private var signedOutSnackbar: Snackbar? = null
 
+  /** What the mini player currently shows, so a per-tick re-emission can be skipped (cu-117). */
+  private var boundBookTitle: String? = null
+  private var boundBookThumb: String? = null
+
   @Inject
   lateinit var plexPrefsRepo: PlexPrefsRepo
 
@@ -147,12 +151,26 @@ class MainActivity : AppCompatActivity() {
         if (loggedIn == true) View.VISIBLE else View.INVISIBLE
     }
     viewModel.currentChapterTitle.observe(this) { binding.chapterTitle.text = it }
+    // Bind only when the *displayed* fields change. `audiobook` is Room-backed and
+    // `ProgressUpdater` writes `Audiobook.progress` once a second during playback, so this emits
+    // at tick rate with a book whose title and artwork are identical — and `bindImageRounded` does
+    // a Dagger lookup, a `Uri` parse and a Coil load on every call. Measured: main-thread CPU went
+    // from **1 jiffy / 10 s** paused to **285 playing**, and backgrounding the app (same playback,
+    // same ticks, no views) dropped it to **15** — so the cost was rendering, not the data layer
+    // (cu-117, same shape as cu-110).
     viewModel.audiobook.observe(this) { book ->
-      binding.bookTitle.text = book?.title.orEmpty()
-      binding.currentlyPlayingThumb.contentDescription = book?.title.orEmpty()
+      val title = book?.title.orEmpty()
+      val thumb = book?.thumb
+      if (title == boundBookTitle && thumb == boundBookThumb) {
+        return@observe
+      }
+      boundBookTitle = title
+      boundBookThumb = thumb
+      binding.bookTitle.text = title
+      binding.currentlyPlayingThumb.contentDescription = title
       bindImageRounded(
         binding.currentlyPlayingThumb,
-        book?.thumb,
+        thumb,
         plexConfig.isConnected.value == true,
       )
     }

@@ -52,14 +52,14 @@ argued.
 
 ## Acceptance Criteria
 
-- [ ] The cause identified by measurement, not inspection — name the thread and the work
+- [x] The cause identified by measurement, not inspection — name the thread and the work
 - [ ] Janky frames materially below 88% during playback with Home visible, figure recorded
 - [ ] Main-thread CPU during playback within a small multiple of the paused figure (currently
       615 jiffies/5s vs **0**)
-- [ ] `uiautomator dump` succeeds *while playing*, which is the criterion cu-110 claimed and this
+- [x] `uiautomator dump` succeeds *while playing*, which is the criterion cu-110 claimed and this
       still blocks
-- [ ] `printDebug`'s per-second main-thread log removed or moved behind a debug flag
-- [ ] No behaviour regression: position still survives a process kill (cu-9), and the mini player
+- [x] `printDebug`'s per-second main-thread log removed or moved behind a debug flag
+- [x] No behaviour regression: position still survives a process kill (cu-9), and the mini player
       still updates its chapter title and progress
 - [ ] Re-measured on the owner's tablet with a 100+ chapter book, since the figures above come
       from a 3-chapter fixture and are not directly comparable to the original report
@@ -96,3 +96,54 @@ Two structural guards worth their weight, neither filed yet:
 2. **Retire the hand-rolled combinators** ([[cu-52]]'s StateFlow migration deletes the family, and
    `combine` + `distinctUntilChanged` is one line each). That converts "remember to dedupe" into
    the default.
+
+
+## Implementation Notes — partial fix, measured
+
+**Two guards added, both verified to work, and neither is the dominant cost.** Recording that
+plainly because the number did not move the way a fix "should".
+
+### What was measured, on the 107-track live fixture
+
+| state | main-thread CPU |
+|---|---|
+| paused | **1** jiffy / 10 s |
+| playing, app **backgrounded** | **15** |
+| playing, foreground, before | **277–287** |
+| playing, foreground, after | **176** |
+
+Backgrounding was the decisive measurement: same playback, same 1 Hz ticks, no views — 15 jiffies.
+**So the cost is rendering, not the data layer**, exactly the shape CLAUDE.md records for cu-110.
+
+### The guards
+
+1. `CurrentlyPlayingSingleton.update` no longer republishes `book`/`track` or rebuilds the chapter
+   list on an unchanged tick, and no longer logs one line per second.
+2. `MainActivity`'s mini-player observer no longer re-runs `bindImageRounded` (a Dagger lookup, a
+   `Uri` parse and a Coil load) when title and artwork are unchanged.
+
+**A trap worth recording:** the first attempt compared `tracks != tracks` and guarded *nothing*,
+because `ProgressUpdater` writes the playing track's progress to Room every second — so the list
+re-read a second later is genuinely different. The comparison has to ignore the field that is
+*meant* to change; it now compares `(id, duration)` pairs. The logs proved the difference: 12
+per-second lines before, 0 after.
+
+### What improved, and what did not
+
+**Improved, and this is the criterion that matters most:** `uiautomator dump` **succeeds while
+playing** — 5/5 and then 3/3 consecutive attempts, against "could not get idle state" every time
+before. The main thread now reaches idle, which is the mechanism behind the owner's original
+report of unresponsive Back and nav buttons. Main-thread CPU also fell ~38% (277 → 176).
+
+**Not achieved:** janky frames are still ~90%. And per-thread sampling shows why the remaining cost
+is not obviously app-level — ExoPlayer 263 jiffies/10 s, RenderThread 214, MediaCodec 132, four
+`arch_disk_io` threads ~460 combined. The main thread's 176 sits *among* genuine audio decoding on
+an 8-core device (≈17% of one core).
+
+### Honest next step
+
+The remaining jank needs a real profile, and `am profile start` could not be made to write a trace
+on this GSI (SELinux denies `/sdcard`, and both `/data/local/tmp` and the app's files dir produced
+0-byte traces). Without one, further changes would be guesswork of exactly the kind cu-110's own
+gotcha warns against — *"four rounds of inspection produced plausible wrong answers here"*. Better
+to stop at a measured, verified improvement than to keep changing code on a hypothesis.

@@ -55,6 +55,12 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
   override val bookPosition = MutableStateFlow(0L)
 
   private var tracks: List<MediaItemTrack> = emptyList()
+
+  /**
+   * The tracks' identity and timing, which is all the chapter list depends on — deliberately
+   * *not* their progress, which changes every second and would defeat the comparison.
+   */
+  private var trackShape: List<Pair<String, Long>> = emptyList()
   private var chapters: List<Chapter> = emptyList()
 
   private var listener: OnChapterChangeListener? = null
@@ -68,19 +74,45 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
     book: Audiobook,
     tracks: List<MediaItemTrack>,
   ) {
-    this.book.value = book
-    this.track.value = track
+    // Assign only on change. `ProgressUpdater` calls this **once a second** during playback, and a
+    // `StateFlow` write fans out to every collector even when the value is identical — which is
+    // most ticks, since the book and the track change rarely and only the position moves. cu-110
+    // fixed this shape one layer up (per-tick Room invalidation); this is the same fix here.
+    //
+    // Measured on the 107-track fixture before the guard: 277 main-thread jiffies / 10 s against
+    // **1** while paused, 100% janky frames, and `uiautomator dump` failing with "could not get
+    // idle state" — the saturation switching entirely with playback state.
+    if (this.book.value != book) {
+      this.book.value = book
+    }
+    if (this.track.value != track) {
+      this.track.value = track
+    }
 
+    // The chapter list depends on the tracks' *identity and timing*, never on their progress —
+    // but `ProgressUpdater` writes the playing track's progress to Room every second, so the list
+    // re-read on the next tick is a genuinely different value. Comparing the lists therefore says
+    // "changed" every tick and guards nothing; the comparison has to ignore the field that is
+    // *meant* to change.
+    //
+    // `asChapterList()` walks every track (107 in the live fixture), so doing it per tick is pure
+    // waste.
+    val trackShape = tracks.map { it.id to it.duration }
+    val shapeChanged = this.trackShape != trackShape
     this.tracks = tracks
+    if (shapeChanged || (this.chapters.isEmpty() && book.chapters.isNotEmpty())) {
+      this.trackShape = trackShape
+      this.chapters =
+        if (book.chapters.isNotEmpty()) {
+          book.chapters
+        } else {
+          tracks.asChapterList()
+        }
+    }
 
-    this.chapters =
-      if (book.chapters.isNotEmpty()) {
-        book.chapters
-      } else {
-        tracks.asChapterList()
-      }
-
-    // Set before the chapter lookup below, which uses the same derivation.
+    // Set before the chapter lookup below, which uses the same derivation. This one *does* change
+    // every tick — it is the position — so it is written unconditionally, and `StateFlow` already
+    // suppresses a re-emission when the value is equal.
     this.bookPosition.value = tracks.getProgress()
 
     if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
@@ -100,10 +132,19 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
       }
     }
 
-    printDebug()
+    printDebug(shapeChanged)
   }
 
-  private fun printDebug() {
+  /**
+   * Logs only when something actually changed.
+   *
+   * This used to run every tick, putting a `Timber.i` — string interpolation and a logcat write —
+   * on the main thread once a second for the whole of playback, for a line that repeats itself.
+   */
+  private fun printDebug(changed: Boolean) {
+    if (!changed) {
+      return
+    }
     Timber.i(
       "Currently Playing: track=${track.value.title}, index=${track.value.index}/${tracks.size}",
     )
