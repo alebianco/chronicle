@@ -1,7 +1,7 @@
 ---
 id: cu-138
 title: Download-completion work races the worker's own cancellation
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'
