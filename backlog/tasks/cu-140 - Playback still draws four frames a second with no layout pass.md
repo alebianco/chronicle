@@ -117,32 +117,33 @@ Both devices agree on the finding once measured this way, which is why it is wor
       cluster. **Three did not; all three are recorded below with their numbers.**
 
 
-## Session 2 (2026-09-04) — the premise is wrong, and the trace says why
+## Session 2 (2026-09-04) — profile, and a correction to this session's own first reading
 
-**The task's title and its whole framing do not survive measurement.** It is not playback, and it is
-not the player sheet. The app draws ~4 frames/second **in every foreground state**, and stops
-completely when backgrounded.
+### Correction, recorded because it nearly became the conclusion
 
-Measured on the tablet, real ANTARES session, Ender's Game (107 tracks), 15 s windows:
+An earlier pass in this session measured ~57 frames/15 s on **every** screen including paused, and
+concluded the task's premise was wrong — that it was neither playback nor the player sheet. **That
+was a measurement error.** The media session stayed alive between readings, so every "paused" and
+"library grid" figure was taken with playback still driving updates. Re-measured with the session
+genuinely stopped:
 
 | state | frames / 15 s |
 |---|---|
-| playing, player sheet open | 57 |
-| **paused**, player sheet open | **56** |
-| **paused**, sheet collapsed | **59** |
-| **paused**, library grid, never opened the player | **57** |
+| **stopped**, library grid | **0** |
+| **stopped**, settings | **0** |
+| playing, library grid | **31** (≈2/s) |
+| playing, player sheet | **38–57** |
+| paused, player sheet | **32** |
 | backgrounded | **0** |
 
-Pausing changes nothing. Collapsing the sheet changes nothing. Leaving the player entirely changes
-nothing. The previous session recorded 30 frames for the library grid and 1 frame/20 s for paused,
-and called the player sheet "the outlier" at 54–55 — **this session measures ~57 everywhere**, so
-either the device state differs or those two figures were taken differently. The one number that
-reproduces exactly is the player-sheet figure (57 vs 54–55).
+Which **confirms the original framing**: playback is the driver and the player sheet is the outlier,
+exactly as the previous session recorded. The lesson is the one this cluster keeps relearning —
+`dumpsys gfxinfo reset` clears the counter but not the *state*, so a screen-to-screen comparison has
+to re-establish playback state each time or it compares nothing.
 
-Since it is uniform across screens and dies on background, the remaining candidates are a
-foreground-wide source — a `Choreographer` callback registered once at Activity level, the
-1 Hz `ProgressUpdater` tick reaching a always-present view (the mini player is in `activity_main`,
-not the sheet), or something in the window rather than the fragment.
+One genuinely new fact: **pausing does not stop the draws** (32/15 s), while stopping does. So
+something re-renders on a paused session, which `ProgressUpdater`'s `isPlaying` gate should prevent.
+That is a narrower and more tractable question than the one this task started with.
 
 ### What the sampled profile actually shows
 
@@ -190,11 +191,21 @@ now unguarded `setText`), all by measurement.
 
 ### Where to look next
 
-The uniformity across screens is the clue nobody has followed. Something foreground-wide re-measures
-~6 times a second. `activity_main.xml`'s mini player and its `ConstraintLayout` handle are present
-on **every** screen and were never suspected, because the task was framed as a player-sheet problem.
-Bisecting *that* layout, or dumping `Choreographer`'s callback queue, is the next step — not more
-work inside `fragment_currently_playing.xml`.
+Two live leads, both narrower than the "uniform across screens" theory this session briefly held
+and then disproved:
+
+1. **A paused session still draws 32 frames/15 s.** `ProgressUpdater`'s tick is gated on
+   `isPlaying`, so on a paused session it should be silent — something else re-renders. Finding that
+   writer is a smaller question than the original one, and it would explain part of the playing
+   figure too.
+2. **`ContentLoadingProgressBar`, not a plain `ProgressBar`.** `grid_item_audiobook.xml` and
+   `list_item_audiobook_with_details.xml` both use it, and it schedules `postDelayed` callbacks
+   internally to enforce minimum show/hide delays. Seven are on screen on a library grid. The
+   previous session eliminated the *sheet's* spinners by dump (0 nodes) — these are different views
+   and were never tested. The 31 frames/s on the library grid is the measurement to attack it with.
+
+The `performMeasure` finding below stands: the frames that do happen are doing real measure work,
+not spinning on an empty animation callback.
 
 ## Related
 
