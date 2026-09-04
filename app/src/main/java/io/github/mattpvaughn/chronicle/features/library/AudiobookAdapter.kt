@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.model.isCompleted
 import io.github.mattpvaughn.chronicle.databinding.GridItemAudiobookBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookTextOnlyBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookWithDetailsBinding
+import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.CoverUrlBuilder
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 
@@ -123,8 +124,8 @@ class AudiobookAdapter(
       )
       binding.gridItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
       binding.gridItemRoot.setOnLongClickListener { audiobookClick.onLongClick(audiobook) }
-      binding.title.text = audiobook.title
-      binding.author.text = audiobook.author
+      binding.title.setTextIfChanged(audiobook.title)
+      binding.author.setTextIfChanged(audiobook.author)
       binding.bookCoverImg.contentDescription = audiobook.title
       bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected, coverUrl)
       bindProgressIndicators(binding.notPlayedDogEar, binding.bookProgress, audiobook)
@@ -152,9 +153,9 @@ class AudiobookAdapter(
       // Was binding expressions in list_item_audiobook_text_only.xml.
       binding.textOnlyItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
       binding.textOnlyItemRoot.setOnLongClickListener { audiobookClick.onLongClick(audiobook) }
-      binding.title.text = audiobook.title
-      binding.author.text = audiobook.author
-      binding.bookProgress.text = formatProgress(audiobook)
+      binding.title.setTextIfChanged(audiobook.title)
+      binding.author.setTextIfChanged(audiobook.author)
+      binding.bookProgress.setTextIfChanged(formatProgress(audiobook))
     }
 
     companion object {
@@ -223,9 +224,9 @@ class DetailsStyleViewHolder(
     setSquareAspectRatio(binding.detailsItemRoot, isSquare)
     binding.detailsItemRoot.setOnClickListener { audiobookClick.onClick(audiobook) }
     binding.detailsItemRoot.setOnLongClickListener { audiobookClick.onLongClick(audiobook) }
-    binding.title.text = audiobook.title
-    binding.author.text = audiobook.author
-    binding.bookProgressString.text = formatProgress(audiobook)
+    binding.title.setTextIfChanged(audiobook.title)
+    binding.author.setTextIfChanged(audiobook.author)
+    binding.bookProgressString.setTextIfChanged(formatProgress(audiobook))
     binding.bookCoverImg.contentDescription = audiobook.title
     bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected, coverUrl)
     bindProgressIndicators(binding.notPlayedDogEar, binding.bookProgress, audiobook)

@@ -116,6 +116,86 @@ Both devices agree on the finding once measured this way, which is why it is wor
 - [x] If a change does not help, the notes say so with the numbers — the standing rule for this
       cluster. **Three did not; all three are recorded below with their numbers.**
 
+
+## Session 2 (2026-09-04) — the premise is wrong, and the trace says why
+
+**The task's title and its whole framing do not survive measurement.** It is not playback, and it is
+not the player sheet. The app draws ~4 frames/second **in every foreground state**, and stops
+completely when backgrounded.
+
+Measured on the tablet, real ANTARES session, Ender's Game (107 tracks), 15 s windows:
+
+| state | frames / 15 s |
+|---|---|
+| playing, player sheet open | 57 |
+| **paused**, player sheet open | **56** |
+| **paused**, sheet collapsed | **59** |
+| **paused**, library grid, never opened the player | **57** |
+| backgrounded | **0** |
+
+Pausing changes nothing. Collapsing the sheet changes nothing. Leaving the player entirely changes
+nothing. The previous session recorded 30 frames for the library grid and 1 frame/20 s for paused,
+and called the player sheet "the outlier" at 54–55 — **this session measures ~57 everywhere**, so
+either the device state differs or those two figures were taken differently. The one number that
+reproduces exactly is the player-sheet figure (57 vs 54–55).
+
+Since it is uniform across screens and dies on background, the remaining candidates are a
+foreground-wide source — a `Choreographer` callback registered once at Activity level, the
+1 Hz `ProgressUpdater` tick reaching a always-present view (the mini player is in `activity_main`,
+not the sheet), or something in the window rather than the fragment.
+
+### What the sampled profile actually shows
+
+`am profile start --sampling 1000`, 15 s, 28,839 main-thread samples. **Inclusive** cost:
+
+| share of main thread | phase |
+|---|---|
+| 68.7% | `Choreographer.doFrame` |
+| 62.2% | `ViewRootImpl.performTraversals` |
+| **41.8%** | **`performMeasure`** |
+| 20.1% | `LiveData.dispatchingValue` |
+| 9.6% | `performLayout` |
+| 8.8% | `performDraw` |
+
+**This contradicts the recorded diagnosis of "an empty Choreographer `animation` callback that only
+re-arms the next vsync".** `framestats` puts `AnimationStart → PerformTraversalsStart` at **0.006 ms**
+— the animation phase is genuinely empty, which is what the previous session saw — but the frame is
+not cheap: `intended → completed` is 33–131 ms, and the work is **measure**. The empty animation
+callback is a symptom of the frame being scheduled, not the cost of it.
+
+`ConstraintLayout.updateHierarchy` enters **100 times in 15 s** (~6-7/s), each paired 1:1 with
+`setChildrenConstraints` — a full constraint-graph rebuild, the cu-110 pattern. `requestLayout` is
+called 68 times from `TextView.setText`, which is what dirties the graph.
+
+### A fourth hypothesis eliminated by measurement
+
+`TextView.setText` calls `requestLayout()`, so guarding the unguarded sets looked like the answer.
+Eight sites in `AudiobookAdapter` (title, author, progress — the title and author **cannot change**
+between the per-second rebinds cu-110 describes) and two in `CurrentlyPlayingFragment`
+(`changeSpeedButton`, `sleepTimerCountdown`, the latter ticking once a second by design when a timer
+is set) now use `setTextIfChanged`.
+
+| | frames / 15 s | `AudiobookAdapter.bind` samples | `updateHierarchy` entries | measure |
+|---|---|---|---|---|
+| before | 57 | 23 | 100 | 41.8% |
+| after | 58, 58, 60 | **10** | **103** | **42.0%** |
+
+**The guards work and the frame count does not move.** Rebinding halved; `updateHierarchy` and the
+measure share did not budge. So the adapter was never the driver, and neither were the two fragment
+sites. **Kept anyway** — they remove real per-second work and are the cu-110 rule applied correctly —
+but recorded here as *not the fix*, per this cluster's standing rule.
+
+That makes **four** eliminated candidates (buffering spinners, the Slider, its label animator, and
+now unguarded `setText`), all by measurement.
+
+### Where to look next
+
+The uniformity across screens is the clue nobody has followed. Something foreground-wide re-measures
+~6 times a second. `activity_main.xml`'s mini player and its `ConstraintLayout` handle are present
+on **every** screen and were never suspected, because the task was framed as a player-sheet problem.
+Bisecting *that* layout, or dumping `Choreographer`'s callback queue, is the next step — not more
+work inside `fragment_currently_playing.xml`.
+
 ## Related
 
 - [[cu-117]] — the guards that removed the layout half; this is the draw half

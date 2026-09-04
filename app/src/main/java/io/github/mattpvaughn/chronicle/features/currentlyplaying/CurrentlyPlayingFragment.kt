@@ -205,7 +205,7 @@ class CurrentlyPlayingFragment :
         if (loading == true) View.INVISIBLE else View.VISIBLE
     }
     viewModel.playbackSpeedString.observe(viewLifecycleOwner) {
-      binding.changeSpeedButton.text = it
+      binding.changeSpeedButton.setTextIfChanged(it)
     }
     viewModel.isSleepTimerActive.observe(viewLifecycleOwner) { active ->
       binding.sleepTimerButton.imageTintList =
@@ -218,7 +218,7 @@ class CurrentlyPlayingFragment :
       binding.sleepTimerCountdown.isVisible = active == true
     }
     viewModel.sleepTimerTimeRemainingString.observe(viewLifecycleOwner) {
-      binding.sleepTimerCountdown.text = it
+      binding.sleepTimerCountdown.setTextIfChanged(it)
     }
 
     /**
