@@ -2,7 +2,7 @@
 id: cu-33
 title: Complete backend interface carve
 status: In Review
-assignee: ['@claude']
+assignee: []
 created_date: '2026-07-13'
 labels:
   - R2
