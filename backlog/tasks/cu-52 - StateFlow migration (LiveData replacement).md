@@ -1,7 +1,7 @@
 ---
 id: cu-52
 title: StateFlow migration (LiveData replacement)
-status: In Progress
+status: In Review
 assignee: []
 created_date: '2026-07-13'
 labels: [R2, architecture, trust]
@@ -56,6 +56,99 @@ Do it **after** cu-33 if the two collide, since cu-33 changes the same repositor
 Unlike cu-58, nothing is blocked by LiveData and it is not deprecated. Upstream's own note ("may not
 be worth it if LiveData works well") stands on its own terms — the postValue race record is what
 overrides it.
+
+## Implementation Notes (2026-09-04)
+
+**The owner chose the full migration over the proposed split.** The plan below argued for doing the
+`postValue` correctness half alone; that was declined, and the whole framework migration was done in
+one branch. The plan is kept underneath for the record, because its *measurements* were right even
+though its recommendation was not taken.
+
+### What changed
+
+`LiveData` is gone from the app. Every state holder is a `MutableStateFlow`, every DAO returns
+`Flow`, and `postValue` does not appear in any of the three source sets. The `util/` combinators it
+was built on (`DoubleLiveData` and friends, the three `PreferenceLiveData` classes, `observeOnce`)
+are deleted — nothing referenced them any more.
+
+The Room fork named in the plan was resolved by **changing the DAO return types**, not by
+`.asFlow()` bridges. Fifteen DAO methods return `Flow` now, so the app never ran both frameworks and
+convention 3's "don't mix ad hoc" was never violated mid-flight — the tree simply stayed red between
+the data layer and the last fragment.
+
+New shared machinery, all in `util/`:
+
+- `FlowCombinators.kt` — `combineDistinct` (2/3/4-arity) and `combineDistinctAsync`, replacing the
+  hand-rolled `MediatorLiveData` subclasses. The `distinctUntilChanged` is mandatory rather than
+  optional: it *is* the cu-110 fix. `STOP_TIMEOUT_MILLIS` lives here so every screen makes the same
+  `WhileSubscribed` trade.
+- `FlowCollect.kt` — `collectWhileStarted` / `collectEventsWhileStarted`, wrapping
+  `repeatOnLifecycle(STARTED)`. A helper rather than 121 hand-written blocks because the plausible
+  wrong forms are subtly broken: `launchWhenStarted` buffers instead of cancelling, and a bare
+  `launch` never stops.
+- `PreferenceFlow.kt` — `booleanFlow`/`stringFlow`/`floatFlow` over `callbackFlow`.
+- `FlowTestExt.kt` (test) — `keepCollected`, `settledValue`, `settledValues`.
+
+### Three bugs this found, none of which a unit test had caught
+
+1. **A latent precedence bug** in `AudiobookDetailsViewModel.isBookInViewPlaying`:
+   `isBookActive ?: false && currState?.isPlaying ?: false` parses as `isBookActive ?: (false && …)`,
+   so a non-null `isBookActive` short-circuited and the playback state was never consulted. Non-null
+   `Flow` sources make the intended expression the only one that compiles.
+2. **`PlexLoginRepo.loginEvent` had no value until its first post**, so `loginEvent.value` was null
+   for anything reading in the same main-loop pass as construction — `MediaPlayerService` and
+   `MainActivity` both do `.value?.let`, which silently did nothing in that window.
+3. **The library screen rendered "No books found" over a full library** — found on the tablet, fixed,
+   and now guarded by `CollectorCachesItsValueTest`. See below; this is the one that matters.
+
+### The one that got through, and the guard for it
+
+`LibraryFragment` caches several sources in locals and combines them in one `refreshEmptyStates()`.
+The converted collectors discarded their emission — `collectWhileStarted(viewModel.books) {
+refreshEmptyStates() }` — so `latestBooks` stayed `emptyList()` for the life of the screen. It
+compiles, all 1301 tests passed, and Home was unaffected because it reads `.value` rather than
+caching.
+
+`CollectorCachesItsValueTest` fails the build on a `latest*` local that no collector assigns. It is a
+*source* guard for the same reason `FirstFrameFlashTest` is one: nothing that inspects a laid-out
+view can tell "the flow has not emitted" from "the emission was thrown away", and the ViewModel is
+correct in both cases. Sabotage-verified by reintroducing the exact line.
+
+### Two things worth knowing before touching this again
+
+- **`stateIn`'s sharing policy is a real choice, not boilerplate.** `AudiobookDetailsViewModel.audiobook`
+  must be `Eagerly`: five click handlers read `.value` *without* collecting, and under
+  `WhileSubscribed` the offline guard read the `null` seed and let an uncached book reach the player
+  with no server. A test pins it, sabotage-verified.
+- **Testing a `WhileSubscribed` flow needs a subscriber *and* a drained dispatcher**, and
+  subscribing to two of them one at a time does not work — `advanceUntilIdle` lets the first settle,
+  and the second one's `distinctUntilChanged` then suppresses its own emission, leaving it on the
+  seed. `settledValues` subscribes together for that reason. This cost several wrong diagnoses.
+
+### Coverage
+
+Aggregate 38.73% → **39.52%**, every package up, no baseline lowered. `util` initially *fell*
+(45.11% → 30.46%) because ~200 lines of dead combinator stayed behind — the per-package ratchet
+caught exactly what it exists to catch, and deleting the dead code was the honest fix rather than
+lowering the baseline. It reads 52.13% now.
+
+### Device verification (tablet, real household server, 196 books)
+
+All four tabs, playback, and a background/restore cycle. Playback ran across a chapter boundary with
+the slider, "Ch 40 of 107", the chapter title and "7h 5m left in book 37%" all staying consistent;
+backgrounding and restoring re-subscribed every collector and caught up correctly, with the player
+sheet and the mini player both showing live state. Frame counts are **0 rendered while paused** and
+~73 per 20 s while playing, identical whether the player sheet is open or collapsed — so the app
+draws nothing when idle and the remaining jank figure is the 1 Hz tick measured against a 60 fps
+budget, matching cu-140's recorded numbers. Unchanged by this work.
+
+### Follow-ups
+
+None. Nothing was deferred and no part of the scope was left out.
+
+---
+
+## Original plan (2026-09-04), kept for the record
 
 ## Implementation Plan (2026-09-04)
 
@@ -112,11 +205,22 @@ sites and is where step 1 starts.
 ## Acceptance Criteria
 
 - [x] Decision recorded: migrate (owner, 2026-09-01)
-- [ ] Pilot one feature end to end before any rollout — `features/home` is the smallest with a real
-      `postValue` (`HomeViewModel.kt:94, 137, 147, 150`)
-- [ ] No `postValue` remains in a migrated file; a read-modify-write uses `update {}`
-- [ ] A guard test fails the build on a new `postValue` in migrated packages, in the style of
-      `InternalApiUsageTest` — otherwise the sites creep back
-- [ ] CLAUDE.md convention 3 updated to match (it currently mandates LiveData and forbids mixing)
-- [ ] Phased rollout: remaining 28 LiveData files, 73 `MutableLiveData` declarations, 35 `observe`
-      sites
+- [x] Pilot one feature end to end before any rollout — `features/home` was the pilot, in
+      `61193ae`, before the rest followed
+- [x] No `postValue` remains **anywhere**; `PostValueUsageTest` is a blanket ban across all three
+      source sets, not the allowlist it started as
+- [x] A guard test fails the build on a new `postValue`, in the style of `InternalApiUsageTest` —
+      sabotage-verified by reintroducing one
+- [x] CLAUDE.md convention 3 updated to match: it now mandates `StateFlow`, documents the collect
+      helpers, the `stateIn` sharing choice, and what a test needs before reading a flow
+- [x] Phased rollout completed — every `LiveData` is gone from the app, not just the recorded 28
+      files (the measured figures were 39 files, 83 declarations, 121 `observe` sites)
+
+**Retired rather than met:** *"a read-modify-write uses `update {}`"*. The criterion named
+`SettingsViewModel`'s `postValue(it.copy(shouldShow = …))` as a lost-update race and called it the
+strongest single argument for StateFlow. It is now `_bottomChooserState.value =
+_bottomChooserState.value.copy(…)`, a plain assignment, because **every writer of that field is a
+click handler on the main thread** — there is no concurrent writer to lose an update to, and
+`update {}` would imply one exists. The race the criterion was written against was the *deferral*
+(`postValue` reading a stale `.value` a pass later), and that is what the conversion removed.
+`update {}` remains the right tool the moment a second writer appears off the main thread.
