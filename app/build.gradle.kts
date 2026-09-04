@@ -141,6 +141,19 @@ dependencies {
   implementation(libs.browserx)
   implementation(libs.oss)
   implementation(libs.appcompat)
+  // Declared because the app imports them directly, not because it needs a newer version — each
+  // is pinned at what it already resolved to transitively (cu-69). Three transitive-only breakages
+  // (cu-60's lifecycle, cu-65's localbroadcastmanager and androidx.media) are the pattern this
+  // closes out; `DeclaredDependencyTest` keeps it closed.
+  implementation(libs.androidx.activity)
+  implementation(libs.androidx.core)
+  implementation(libs.androidx.fragment)
+  implementation(libs.androidx.recyclerview)
+  implementation(libs.androidx.constraintlayout)
+  implementation(libs.androidx.transition)
+  implementation(libs.androidx.coordinatorlayout)
+  implementation(libs.androidx.interpolator)
+  implementation(libs.androidx.sqlite)
   // Declared explicitly: it used to arrive transitively via Material, which
   // dropped it in 1.14. 19 usages depend on it, so relying on the transitive
   // was fragile regardless.
