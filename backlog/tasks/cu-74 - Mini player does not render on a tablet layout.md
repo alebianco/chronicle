@@ -1,7 +1,7 @@
 ---
 id: cu-74
 title: Mini player does not render on a tablet layout
-status: Done
+status: In Review
 assignee: []
 created_date: '2026-08-31'
 updated_date: '2026-09-03'
@@ -180,3 +180,12 @@ it no longer depends on the book having *changed*. Verified on device against th
 
 No large-screen work remains from this task. If adaptive layout issues surface later they belong
 with [[cu-28]], as this task's own text anticipated.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Mini player on a tablet layout — **four criteria unchecked**, all of them visual.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

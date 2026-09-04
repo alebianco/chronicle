@@ -1,7 +1,7 @@
 ---
 id: cu-95
 title: Player view shows no buffering indicator, only play/pause
-status: Done
+status: In Review
 labels: [R2, comfort, ui]
 dependencies: []
 priority: medium
@@ -64,3 +64,13 @@ detecting a stall needs a different signal and is worth its own task if it turns
 Worth doing alongside a look at whether `isPlaying` should distinguish "playing" from "playing but
 starved" at all — Media3 reports both as STATE_PLAYING once started, so a stall mid-book may show as
 normal playback. That is a separate question from the initial buffer and should not block this.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+What a **buffering state looks like** and how it differs from paused and from loading. Its own
+criterion says "confirmed on the owner's device" — that confirmation is the open question.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

@@ -1,7 +1,7 @@
 ---
 id: cu-105
 title: Scrolled content shows above the collapsing toolbar
-status: Done
+status: In Review
 assignee: [claude]
 created_date: '2026-09-02'
 labels: [R2, ui, bug]
@@ -204,3 +204,13 @@ rendering problem as cu-74). So the structural fix is verified by bounds, but **
 not verified anywhere**, and bounds are exactly what misled me the first time.
 
 Needs one look on the owner's phone at a partial scroll — the state in the original screenshot.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Scroll behaviour under the collapsing toolbar. Verified by screenshot at the time, but it is a
+**feel** judgement across screens and orientations.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

@@ -1,7 +1,7 @@
 ---
 id: cu-148
 title: Config surface for the metadata parsing rules
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-03'
@@ -121,3 +121,14 @@ uncovered code is all pre-existing (`MediaItemTrack$Companion`, `AudiobookKt`,
 **Follow-up: cu-151** — the settings screen that runs `explain()` against a real title before
 saving. tvnamer's open #216 is a user unable to tell whether their pattern or the tool was wrong,
 so this is the half that makes the file usable rather than a trap.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Defines **`series-index-rules.json`, a file you are meant to author**, and it has five unchecked
+criteria. The format is the thing to approve; the tester that would let you see a rule's effect
+is cu-151, still open.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

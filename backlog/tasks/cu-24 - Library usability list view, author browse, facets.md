@@ -1,7 +1,7 @@
 ---
 id: cu-24
 title: "Library usability: list view, author browse, facets"
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
@@ -115,3 +115,13 @@ On the tablet in mock Plex mode (Audnexus-style tags added to the three album-de
 - **Narrator** tab: **four** narrators from three books — Dune's two each got their own row.
 - **Series** tab: Dune, Middle-earth, Mistborn, with the `Series:` prefix stripped.
 - Tapping "Middle-earth" opened a screen titled for it, listing The Hobbit.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+A large **UI surface**: list view, author browse, and the facet screens for narrator and series.
+Also `FacetList.unknownCount`'s wording, which has to be honest about a partial index.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

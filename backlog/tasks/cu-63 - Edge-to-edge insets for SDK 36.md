@@ -1,7 +1,7 @@
 ---
 id: cu-63
 title: Edge-to-edge insets for SDK 36
-status: Done
+status: In Review
 assignee: [claude]
 created_date: '2026-08-30'
 labels: [R2, ui]
@@ -91,3 +91,13 @@ surfaces anyway.
 - [ ] Verified on Android 15 and Android 16 emulators, portrait and landscape — **partially**: Android 15
       portrait only. No Android 16 image available; landscape unchecked (see above).
 - [x] Screenshots compared against the pre-cu-6 baseline
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Edge-to-edge insets across every screen. Its own criterion is unchecked: **verified portrait
+only on Android 15, no Android 16 image, landscape never checked.**
+
+The code is complete and the verify loop is green; what is outstanding is approval.

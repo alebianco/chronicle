@@ -1,7 +1,7 @@
 ---
 id: cu-147
 title: Make the series index patterns configurable data
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-03'
@@ -91,3 +91,13 @@ after any scripted multi-line deletion.
   loaded at startup, and a settings screen that can run `explain()` against a real title before
   saving. Deliberately separate, because the mechanism is useful to test and reason about on its
   own, and the file format touches the backup allowlist (cu-22/cu-77) and D12 rule 7.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+The **user-facing rule format** — `BEFORE`/`AFTER`/`REPLACE` and the JSON shape you would
+actually write by hand. Worth your eye before it becomes a format we must keep compatible.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

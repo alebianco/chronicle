@@ -1,7 +1,7 @@
 ---
 id: cu-22
 title: Bookmarks with notes
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
@@ -117,3 +117,14 @@ On the tablet in mock Plex mode, portrait:
 One false alarm worth recording: the first save appeared to fail. It was the harness — the sheet
 moves up when the keyboard opens, so a tap coordinate taken from a dump *before* the keyboard
 appeared missed the button. A diagnostic log proved the listener resolved and fired correctly.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Bookmark **UI flow** — how you add one, what the note editor looks like, how you jump back —
+plus the choice that import is additive rather than replacing. Survival across sync is
+automated; the interaction is not.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

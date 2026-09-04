@@ -1,7 +1,7 @@
 ---
 id: cu-20
 title: Per-book speed memory + speed/effects popover
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
@@ -109,3 +109,13 @@ On the tablet in mock Plex mode (fixture books, no credentials), portrait:
 
 The speed lands 47 ms after the book publishes (`33.041` -> `33.088` in logcat), which is as early
 as it can be: the book is not known before then.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+The speed popover's **layout and preset values** are a UI choice, and the per-book-versus-global
+behaviour is a product one — a book keeping its own speed forever may or may not be what you want.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

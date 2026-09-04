@@ -1,7 +1,7 @@
 ---
 id: cu-142
 title: The speed popover collapses to its title bar in landscape
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-03'
@@ -100,3 +100,14 @@ reproduce the pixel outcome, so the collapse itself stays device-verified.
     carrying real bounds; portrait unchanged at 534px
 
 ## Notes
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+The speed popover in landscape. The fix is on-device verified, but it changed **how every modal
+sheet opens** (`expandBottomSheetOnStart` on all three) — worth confirming the other two read
+right to you.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

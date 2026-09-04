@@ -1,7 +1,7 @@
 ---
 id: cu-145
 title: Show narrator and series on a book
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-03'
@@ -98,3 +98,13 @@ text, applying cu-149's lesson from the same session: a control's label must say
 
 **Scope kept as filed**: the library grid, home shelves and player are untouched — carrying extra
 metadata lines there is a density decision for cu-26/cu-27, per RESEARCH_FINDINGS §3.1.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+**Book-detail layout**: where narrator and series sit, that an unknown value hides its row
+rather than showing a blank, and that the series line is tappable.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

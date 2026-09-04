@@ -1,7 +1,7 @@
 ---
 id: cu-18
 title: Continue Listening home shelf
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
@@ -105,3 +105,14 @@ library listing, and the track fixture yields no books.
 - `resumeOnClick` reads `viewModel`, a `lateinit` set in `onCreate`, from a property initialized at
   *construction*. It is safe because the read sits inside the lambda body and happens at click
   time — but only incidentally, so that is now stated where someone might hoist it.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Shelf **ordering and contents** are a product choice: which books appear, how many, and
+that `lastViewedAt` is the right sort key. A test proves the code sorts; only you can say the
+shelf shows the right thing.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

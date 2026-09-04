@@ -69,3 +69,13 @@ instrumented one. Nothing that exercises the models can notice it coming back. S
   before this they could not have been written that way.
 - One of them asserts two different cached directories give two different results for the same
   track, which was impossible while the model read a single global.
+
+## The one unchecked criterion (2026-09-04)
+
+`addTypeConverter` was not adopted: `CollectionIdConverter` builds its own `Moshi.Builder().build()`
+instead. That removed the `Injector` service lookup the task existed to kill, which is the actual
+goal, but it is not the constructor-injected converter the criterion describes. Left unchecked
+rather than ticked so it is not mistaken for done.
+
+Stays **Done**: no user-visible surface, and the `InternalApiUsageTest` guard covers the property
+that mattered.

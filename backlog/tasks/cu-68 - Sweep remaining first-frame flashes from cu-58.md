@@ -1,7 +1,7 @@
 ---
 id: cu-68
 title: Sweep the remaining first-frame flashes from cu-58
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-08-31'
@@ -85,3 +85,14 @@ views under the guard.
   render once populated, so nothing was hidden permanently.
 - The mini player specifically was checked to *reappear* when playback starts, since it is the view
   a wrong default would most visibly break.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+34 views were given XML defaults to stop first-frame flashes. The **screenshot comparison
+against the baseline is unchecked** — a flash is by definition something you see, not something
+`FirstFrameFlashTest` can render.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

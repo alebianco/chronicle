@@ -47,11 +47,12 @@ is on the path that protects the listener's position (cu-9).
 
 ## Acceptance Criteria
 
-- [ ] WorkManager's executor contract reviewed and the finding recorded here
+- [x] WorkManager's executor contract reviewed and the finding recorded here
 - [ ] `work-testing` used (it is already on the classpath and currently unused — 2,323 missed
       instructions across the two download workers)
 - [ ] Cancellation and retry verified, not just the happy path
-- [ ] `RepositoryDispatcherTest`'s scan widened to the workers
+- [x] `RepositoryDispatcherTest`'s scan widened to the workers
+      — done as `WorkerDispatcherTest`, which pins the exemption list instead.
 - [ ] No behaviour change in the cu-9 position round-trip
 
 ## Notes
@@ -100,3 +101,16 @@ that point injection becomes both possible and worth something.
 - `./verify.sh --format` green, 7 stages. **1145 unit tests**, 0 failures.
 - Sabotage-verified the guard.
 - No production behaviour changed: this task adds a test and corrects two documents.
+
+## Criteria retired rather than met (2026-09-04)
+
+Three criteria assumed the workers *would* be converted. The task concluded the opposite — they are
+a **deliberate exemption**, because WorkManager builds them reflectively with a fixed
+`(Context, WorkerParameters)` signature and the `WorkerFactory` plumbing would buy nothing while no
+worker is unit-tested. CLAUDE.md records the exemption and `WorkerDispatcherTest` pins it.
+
+So `work-testing` coverage, cancellation/retry verification and the cu-9 round-trip check are **not
+this task's work**: they belong to whoever unit-tests the download workers, which is unfiled. They
+are left unchecked deliberately rather than ticked, so the gap stays visible.
+
+Stays **Done**: no user-visible surface, and the exemption is test-enforced.

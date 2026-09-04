@@ -1,7 +1,7 @@
 ---
 id: cu-143
 title: Seed the narrator and series index at refresh time
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-03'
@@ -152,3 +152,15 @@ Filed as **cu-150** rather than left as unticked boxes on a Done task.
 - Route B (multi-id) as a cheaper path, once it can be tried against a real server.
 - `FacetList.unknownCount` should now reach zero for a fully-tagged library; worth confirming on
   the real library, and it is the number that sizes what cu-37's enrichment half would still add.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Narrator and series now fill in for the whole library at refresh. **Three criteria are
+unchecked** — cu-150 has since established `unknownCount` cannot reach zero (30 and 58 books are
+untagged on the server), so that criterion needs your call on whether it is retired or pursued
+via cu-37.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

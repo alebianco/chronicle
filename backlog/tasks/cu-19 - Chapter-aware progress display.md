@@ -1,7 +1,7 @@
 ---
 id: cu-19
 title: Chapter-aware progress display
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
@@ -120,3 +120,14 @@ The library shelves also print raw `h:mm:ss/h:mm:ss` (`AudiobookAdapter.formatPr
 criterion says *"anywhere in the player"*, and widening it to every surface would turn this into a
 UI sweep. Left as a decision rather than an omission; the formatters are there when a shelf task
 wants them.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+The **wording** of every duration in the player (`6h 12m`, `32:10`, the percentage) is a
+design decision taken from RESEARCH_FINDINGS §3.1. Tests pin that no raw `h:mm:ss/h:mm:ss`
+survives; they cannot say the replacement reads well.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

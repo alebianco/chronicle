@@ -1,7 +1,7 @@
 ---
 id: cu-104
 title: Reduce the per-second cost of the progress loop
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-01'
@@ -148,3 +148,15 @@ start from a fresh profile rather than from these criteria.
 The rate is not arbitrary — a book being played for hours must not lose more than a second or two
 of position if the process dies. Any change here trades that guarantee against cost, so the
 crash-recovery criteria above are the binding ones.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+**Six criteria unchecked**, including the wired-versus-Bluetooth runs on the A33 under load and
+the allocation/GC/underrun baseline. The per-tick DB reads were genuinely reduced and cu-140's
+profile has since re-measured the area, but the on-device evidence this task asked for was never
+gathered.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

@@ -1,7 +1,7 @@
 ---
 id: cu-146
 title: Parse the series index from real-world titleSort formats
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-03'
@@ -125,3 +125,13 @@ shares these via `assets.srcDir("src/test/resources")`, so no second copy.
 - **cu-37** (R4) stays the fallback for books whose tagging never recorded a position at all — but
   it is now genuinely a fallback rather than a workaround for our own regex.
 - cu-145 (display) and cu-143 (index seeding) both benefit directly and need no change here.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Parsing is automated, but two **product decisions** ride on it: `Book 0` reads as *unknown* so a
+prequel sorts last, and a novella keeps a decimal position. Both change how your series sort.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

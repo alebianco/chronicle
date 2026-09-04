@@ -1,7 +1,7 @@
 ---
 id: cu-25
 title: Fuzzy grouped search via /hubs/search
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
@@ -105,3 +105,14 @@ matches.
   browse and search today, never on the detail screen, grid or player.
 - `/hubs/search` as a complement for un-synced books is *not* filed: it needs cu-143 first, which
   may make it unnecessary.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+**Search behaviour you feel rather than measure**: the fuzziness threshold (4 characters), the
+tier weights that order results, and the grouping with per-group counts. Tests pin the ranking
+I chose; whether it *feels* right when you type is yours.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

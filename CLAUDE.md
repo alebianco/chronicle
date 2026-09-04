@@ -486,6 +486,9 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 2. Tests added/extended for touched repositories, ViewModels, sync/download/chapter logic (D6). Fixture-backed where network is involved (cu-16 fixture pattern).
 3. **Self-review pass done** (principle 2): diff re-read for correctness, silent failures, dead code, simpler alternatives; error paths log with context and never swallow.
 4. Docs synced in the same PR: relevant `backlog/docs/reference/` file if architecture/behavior changed; the task file's status/criteria updated; this file if any statement here became false.
+   **The correct closing status is `In Review`, not `Done`, whenever the work changed a screen or
+   made a product choice** — see the status rule under Workflow below. `Done` is for work a machine
+   proved right.
 5. Attribution trailer if code was ported (principle 4).
 6. Commit messages: **[Scoped Commits](https://scopedcommits.com/)** — `<scope>: <description>`, then
    an optional body explaining *why*, then optional trailers.
@@ -512,7 +515,27 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Workflow (file over app — D13)
 
-Tasks are markdown files in **`backlog/tasks/`** (Backlog.md format: `task-<id> - <Title>.md`, frontmatter `status`/`labels`/`dependencies`/`priority`/`milestone`, body `## Description` + `## Acceptance Criteria` checkboxes; **`milestone: m-<n>` mirrors the `R<n>` label — set both, they are one fact stored twice**). Statuses: `To Do → In Progress → In Review → Done`. The optional [Backlog.md CLI](https://github.com/MrLesk/Backlog.md) (`brew install backlog-md`; `backlog board`, `backlog task list -s "To Do"`) is a convenience — **editing the files directly is always valid and canonical.**
+Tasks are markdown files in **`backlog/tasks/`** (Backlog.md format: `task-<id> - <Title>.md`, frontmatter `status`/`labels`/`dependencies`/`priority`/`milestone`, body `## Description` + `## Acceptance Criteria` checkboxes; **`milestone: m-<n>` mirrors the `R<n>` label — set both, they are one fact stored twice**). Statuses: `To Do → In Progress → In Review → Done`.
+
+**`In Review` means "waiting for the owner", and it is not optional** (owner rule, 2026-09-04).
+An agent may close a task straight to `Done` only when the proof is *automated* — a test, a build
+gate, a measurement a script reproduces. A task must be left `In Review` when the remaining question
+needs a human to look:
+
+- it **changed a screen** — layout, wording, an icon, what a state looks like;
+- it made a **product or design choice** the owner might want differently — a sort order, a default,
+  a threshold tuned by ear, a set of presets, a user-facing file format;
+- it has an **acceptance criterion that is a visual or on-device check** which was not performed.
+  Leave the box unchecked *and* the status `In Review`; do not tick it on the strength of a test
+  that cannot see what the criterion asks about.
+
+A bug fix with a failing-then-passing test and no visible design decision goes to `Done` — that is
+the majority of debt, guard and correctness work, and routing it through review wastes the owner's
+attention. The question is not "feature or bug", it is **"can a machine prove this was right?"**
+
+When moving a task to `In Review`, say in the task file *what specifically needs the owner's eye* —
+"the shelf's sort order", not "please review". A criterion that turned out to be wrong rather than
+unmet is **retired with its reasoning**, never silently ticked. The optional [Backlog.md CLI](https://github.com/MrLesk/Backlog.md) (`brew install backlog-md`; `backlog board`, `backlog task list -s "To Do"`) is a convenience — **editing the files directly is always valid and canonical.**
 
 **Task lifecycle for agents:**
 1. **Pick**: lowest-id task in the earliest active release (label `R0` → `R4`) that is `To Do`, unblocked (all `dependencies` Done), unassigned. The owner can override by naming a task.

@@ -1,7 +1,7 @@
 ---
 id: cu-21
 title: Sleep-timer package
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
@@ -130,3 +130,14 @@ On the tablet in mock Plex mode (fixture books, no credentials):
 Not covered: surviving a process death. The service outlives a pause (only `onStop` tears it down),
 so in-memory state is enough for the criterion as written; persisting a timer across a restart
 would be separate work and is not claimed.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Sleep-timer **durations offered, the end-of-chapter option and the re-arm-on-resume behaviour**
+are product choices. The logic is well covered; whether the defaults suit how you use it is not
+something a test can answer.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

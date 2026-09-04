@@ -1,7 +1,7 @@
 ---
 id: cu-88
 title: Skip silence is too aggressive to listen through
-status: Done
+status: In Review
 labels: [R2, playback, bug]
 dependencies: []
 priority: medium
@@ -150,3 +150,15 @@ fail here and prompt a re-read, rather than silently comparing against a moved t
   chapter boundaries as well as mid-sentence pauses.
 - `skipSilence` still defaults to `false`, so nobody is affected unless they enable it. Worth
   reconsidering the default only once the tuning is confirmed good.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+The **silence-skipping thresholds were tuned by ear** — a listening-feel judgement. The task's
+own first criterion is "a decision is recorded (tune) with its reasoning", and the reasoning is
+mine. Whether narration now skips too much or too little is only answerable by listening to a
+book you know.
+
+The code is complete and the verify loop is green; what is outstanding is approval.

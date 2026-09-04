@@ -1,7 +1,7 @@
 ---
 id: cu-99
 title: Android Auto browse tree keyed on localized strings
-status: Done
+status: In Review
 assignee: [claude]
 created_date: '2026-09-01'
 labels: [R2, bug, comfort]
@@ -56,3 +56,13 @@ here — it is a different mechanism (int resource ids, not strings, so no local
 with the extraction of that 808-line method. Left for the settings work.
 
 Verified by sabotage: giving a category an English-label id fails 3 tests.
+
+## Why this is In Review, not Done
+
+Moved back on the owner's instruction (2026-09-04): a task that changed a screen or made a
+product choice needs the owner's approval, whereas a bug fix with an automated proof does not.
+
+Android Auto browse tree. One criterion unchecked: **browsing after a device language change was
+never verified**, and Auto is a surface I cannot see.
+
+The code is complete and the verify loop is green; what is outstanding is approval.
