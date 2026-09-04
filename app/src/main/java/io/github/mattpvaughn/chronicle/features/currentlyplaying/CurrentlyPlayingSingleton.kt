@@ -29,12 +29,30 @@ interface CurrentlyPlaying {
    */
   val bookPosition: StateFlow<BookOffset>
 
+  /**
+   * The current book's chapters, resolved table-first (cu-82).
+   *
+   * Read this rather than `book.value.chapters`: the book's column is the **legacy** source and is
+   * empty for any book synced since cu-49 wrote the table instead. Ten call sites in `PlayerExt`
+   * and `CurrentlyPlayingViewModel` read the column directly and got an empty list for exactly
+   * those books, which is chapter skip silently doing nothing.
+   */
+  val chapters: List<Chapter>
+
   fun setOnChapterChangeListener(listener: OnChapterChangeListener)
 
+  /**
+   * @param chaptersFromTable the book's rows from `ChapterDatabase`, the preferred chapter source
+   *   (cu-82). Passed **in** rather than read here: this runs once a second during playback, so a
+   *   DAO on this class would put a blocking read on every tick — the shape cu-110 removed. All
+   *   three callers already run in IO context. Defaults to empty, which falls back to the legacy
+   *   `Audiobook.chapters` column exactly as before.
+   */
   fun update(
     track: MediaItemTrack,
     book: Audiobook,
     tracks: List<MediaItemTrack>,
+    chaptersFromTable: List<Chapter> = emptyList(),
   )
 
   /**
@@ -77,7 +95,8 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
    * *not* their progress, which changes every second and would defeat the comparison.
    */
   private var trackShape: List<Pair<String, Long>> = emptyList()
-  private var chapters: List<Chapter> = emptyList()
+  override var chapters: List<Chapter> = emptyList()
+    private set
 
   private var listener: OnChapterChangeListener? = null
 
@@ -103,6 +122,7 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
     track: MediaItemTrack,
     book: Audiobook,
     tracks: List<MediaItemTrack>,
+    chaptersFromTable: List<Chapter>,
   ) {
     // Assign only on change. `ProgressUpdater` calls this **once a second** during playback, and a
     // `StateFlow` write fans out to every collector even when the value is identical — which is
@@ -130,14 +150,14 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
     val trackShape = tracks.map { it.id to it.duration }
     val shapeChanged = this.trackShape != trackShape
     this.tracks = tracks
-    if (shapeChanged || (this.chapters.isEmpty() && book.chapters.isNotEmpty())) {
+    // The second clause re-resolves once chapter data first becomes available for a book that had
+    // none — now from either source, since the table can fill in after the backfill reaches this
+    // book while the column stays empty (cu-82).
+    val haveNewChapterData =
+      this.chapters.isEmpty() && (chaptersFromTable.isNotEmpty() || book.chapters.isNotEmpty())
+    if (shapeChanged || haveNewChapterData) {
       this.trackShape = trackShape
-      this.chapters =
-        if (book.chapters.isNotEmpty()) {
-          book.chapters
-        } else {
-          tracks.asChapterList()
-        }
+      this.chapters = resolveChapters(chaptersFromTable, book.chapters, tracks)
     }
 
     // Set before the chapter lookup below, which uses the same derivation. This one *does* change

@@ -59,3 +59,21 @@ fun resolveChapters(
     fromBook.isNotEmpty() -> fromBook
     else -> tracks.asChapterList()
   }
+
+/**
+ * [resolveChapters] over the nullable values a `LiveData` combine hands out (cu-82).
+ *
+ * The three ViewModels that combine a book with its tracks share this exact shape. A null source
+ * has simply not emitted yet, so it is treated as "nothing from that level" — the resolution then
+ * falls through to the next one, and re-runs when the source arrives.
+ */
+fun resolveChaptersFromCache(
+  fromTable: List<Chapter>?,
+  book: Audiobook?,
+  tracksAsChapters: List<Chapter>?,
+): List<Chapter> =
+  when {
+    !fromTable.isNullOrEmpty() -> fromTable
+    book?.chapters?.isNotEmpty() == true -> book.chapters
+    else -> tracksAsChapters ?: emptyList()
+  }

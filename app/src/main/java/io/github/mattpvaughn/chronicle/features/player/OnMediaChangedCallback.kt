@@ -64,6 +64,9 @@ class OnMediaChangedCallback
                 book = newBook,
                 track = newTrack,
                 tracks = newTracks,
+                // Table first (cu-82). Read here rather than in the singleton, which is also
+                // driven once a second by `ProgressUpdater` and must not gain a per-tick DB read.
+                chaptersFromTable = bookRepo.getChaptersForBook(newBookId),
               )
             }
             updateNotification(state.state)

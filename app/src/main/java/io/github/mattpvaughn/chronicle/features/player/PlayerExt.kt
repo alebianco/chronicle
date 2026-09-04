@@ -68,12 +68,12 @@ fun Player.skipToNext(
 ) {
   Timber.i("Player.skipToNext called")
   val currentChapterIndex =
-    currentlyPlaying.book.value.chapters.indexOf(
+    currentlyPlaying.chapters.indexOf(
       currentlyPlaying.chapter.value,
     )
   val nextChapterIndex = currentChapterIndex + 1
-  if (nextChapterIndex < currentlyPlaying.book.value.chapters.size) {
-    val nextChapter = currentlyPlaying.book.value.chapters[nextChapterIndex]
+  if (nextChapterIndex < currentlyPlaying.chapters.size) {
+    val nextChapter = currentlyPlaying.chapters[nextChapterIndex]
     Timber.d(
       "NEXT CHAPTER: index=$nextChapterIndex id=${nextChapter.id} trackId=${nextChapter.trackId} offset=${nextChapter.bookStartTimeOffset} title=${nextChapter.title}",
     )
@@ -107,7 +107,7 @@ fun Player.skipToPrevious(
 ) {
   Timber.i("Player.skipToPrevious called")
   val currentChapterIndex =
-    currentlyPlaying.book.value.chapters.indexOf(
+    currentlyPlaying.chapters.indexOf(
       currentlyPlaying.chapter.value,
     )
   // Both operands must be book-absolute. This used to subtract a book-absolute chapter start from
@@ -134,7 +134,7 @@ fun Player.skipToPrevious(
       currentChapterIndex
     }
   if (previousChapterIndex < 0) previousChapterIndex = 0
-  val previousChapter = currentlyPlaying.book.value.chapters[previousChapterIndex]
+  val previousChapter = currentlyPlaying.chapters[previousChapterIndex]
   Timber.d(
     "PREVIOUS CHAPTER: index=$previousChapterIndex id=${previousChapter.id} trackId=${previousChapter.trackId} offset=${previousChapter.bookStartTimeOffset} title=${previousChapter.title}",
   )

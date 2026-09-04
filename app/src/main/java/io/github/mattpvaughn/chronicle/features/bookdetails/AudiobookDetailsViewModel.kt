@@ -27,6 +27,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.TripleLiveData
 import io.github.mattpvaughn.chronicle.util.mapAsync
 import io.github.mattpvaughn.chronicle.util.postEvent
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
@@ -90,17 +91,17 @@ class AudiobookDetailsViewModel(
       it.asChapterList()
     }
 
-  val chapters: DoubleLiveData<Audiobook?, List<Chapter>, List<Chapter>> =
-    DoubleLiveData(
+  /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
+  private val chaptersFromTable: LiveData<List<Chapter>> =
+    bookRepository.getChaptersForBookLive(inputAudiobook.id)
+
+  val chapters: TripleLiveData<List<Chapter>, Audiobook?, List<Chapter>, List<Chapter>> =
+    TripleLiveData(
+      chaptersFromTable,
       audiobook,
       tracksAsChaptersCache,
-    ) { _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
-      Timber.i("Chapter data updated! ")
-      if (_audiobook?.chapters?.isNotEmpty() == true) {
-        _audiobook.chapters
-      } else {
-        _tracksAsChapters ?: emptyList()
-      }
+    ) { _fromTable: List<Chapter>?, _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
+      resolveChaptersFromCache(_fromTable, _audiobook, _tracksAsChapters)
     }
 
   private var _messageForUser = MutableLiveData<Event<FormattableString>>()

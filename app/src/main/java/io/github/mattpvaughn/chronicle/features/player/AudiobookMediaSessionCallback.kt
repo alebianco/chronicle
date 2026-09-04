@@ -452,6 +452,9 @@ class AudiobookMediaSessionCallback
           book = book,
           tracks = tracks,
           track = startingTrack,
+          // Table first (cu-82). This is the playback-start path, so the book is changing and the
+          // one read is not on the per-second tick.
+          chaptersFromTable = bookRepository.getChaptersForBook(book.id),
         )
 
         mediaSession.setQueueTitle(book.title)

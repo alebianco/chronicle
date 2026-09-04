@@ -188,17 +188,23 @@ class CurrentlyPlayingViewModel(
       it.asChapterList()
     }
 
-  val chapters: DoubleLiveData<Audiobook?, List<Chapter>, List<Chapter>> =
-    DoubleLiveData(
+  /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
+  private val chaptersFromTable: LiveData<List<Chapter>> =
+    audiobookId.switchMap { id ->
+      if (id == EMPTY_AUDIOBOOK.id) {
+        MutableLiveData(emptyList())
+      } else {
+        bookRepository.getChaptersForBookLive(id)
+      }
+    }
+
+  val chapters: TripleLiveData<List<Chapter>, Audiobook?, List<Chapter>, List<Chapter>> =
+    TripleLiveData(
+      chaptersFromTable,
       audiobook,
       tracksAsChaptersCache,
-    ) { _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
-      if (_audiobook?.chapters?.isNotEmpty() == true) {
-        // We would really prefer this because it doesn't have to be computed
-        _audiobook.chapters
-      } else {
-        _tracksAsChapters ?: emptyList()
-      }
+    ) { _fromTable: List<Chapter>?, _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
+      resolveChaptersFromCache(_fromTable, _audiobook, _tracksAsChapters)
     }
 
   val speed =
@@ -633,7 +639,7 @@ class CurrentlyPlayingViewModel(
         // Predict where the service will land and hold the slider there. The chapter buttons
         // showed the same snap-back as the slider: the readout moved to the new chapter, reverted
         // for a tick, then moved again once the seek completed (cu-93).
-        val chapters = currentlyPlaying.book.value.chapters
+        val chapters = currentlyPlaying.chapters
         val here = chapters.indexOf(currentlyPlaying.chapter.value)
         val target =
           if (forward) {
@@ -660,14 +666,14 @@ class CurrentlyPlayingViewModel(
         }
       } else {
         val currentChapterIndex =
-          currentlyPlaying.book.value.chapters.indexOf(
+          currentlyPlaying.chapters.indexOf(
             currentlyPlaying.chapter.value,
           )
         var skipToChapterIndex: Int
         if (forward) {
           skipToChapterIndex = currentChapterIndex + 1
-          if (skipToChapterIndex < currentlyPlaying.book.value.chapters.size) {
-            val skipToChapter = currentlyPlaying.book.value.chapters[skipToChapterIndex]
+          if (skipToChapterIndex < currentlyPlaying.chapters.size) {
+            val skipToChapter = currentlyPlaying.chapters[skipToChapterIndex]
             jumpToChapter(
               skipToChapter.bookStartTimeOffset,
               currentlyPlaying.track.value.id,
@@ -686,7 +692,7 @@ class CurrentlyPlayingViewModel(
         } else {
           skipToChapterIndex = currentChapterIndex - 1
           if (skipToChapterIndex < 0) skipToChapterIndex = 0
-          val skipToChapter = currentlyPlaying.book.value.chapters[skipToChapterIndex]
+          val skipToChapter = currentlyPlaying.chapters[skipToChapterIndex]
           jumpToChapter(
             skipToChapter.bookStartTimeOffset,
             currentlyPlaying.track.value.id,

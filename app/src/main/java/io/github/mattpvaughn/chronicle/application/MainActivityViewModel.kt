@@ -20,6 +20,7 @@ import io.github.mattpvaughn.chronicle.features.player.id
 import io.github.mattpvaughn.chronicle.features.player.isPlaying
 import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.TripleLiveData
 import io.github.mattpvaughn.chronicle.util.mapAsync
 import io.github.mattpvaughn.chronicle.util.postEvent
 import kotlinx.coroutines.launch
@@ -135,17 +136,23 @@ class MainActivityViewModel(
       it.asChapterList()
     }
 
-  val chapters: DoubleLiveData<Audiobook, List<Chapter>, List<Chapter>> =
-    DoubleLiveData(
+  /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
+  private val chaptersFromTable =
+    audiobookId.switchMap { id ->
+      if (id != NO_AUDIOBOOK_FOUND_ID) {
+        bookRepository.getChaptersForBookLive(id)
+      } else {
+        MutableLiveData(emptyList())
+      }
+    }
+
+  val chapters: TripleLiveData<List<Chapter>, Audiobook, List<Chapter>, List<Chapter>> =
+    TripleLiveData(
+      chaptersFromTable,
       audiobook,
       tracksAsChaptersCache,
-    ) { _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
-      if (_audiobook?.chapters?.isNotEmpty() == true) {
-        // We would really prefer this because it doesn't have to be computed
-        _audiobook.chapters
-      } else {
-        _tracksAsChapters ?: emptyList()
-      }
+    ) { _fromTable: List<Chapter>?, _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
+      resolveChaptersFromCache(_fromTable, _audiobook, _tracksAsChapters)
     }
 
   val currentChapterTitle =

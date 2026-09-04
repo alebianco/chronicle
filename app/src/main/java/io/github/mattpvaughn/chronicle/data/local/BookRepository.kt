@@ -178,6 +178,23 @@ interface IBookRepository {
    * (cu-158). Idempotent; safe to call on every launch.
    */
   suspend fun backfillChapterTable(): Int
+
+  /**
+   * The book's chapters from `ChapterDatabase`, the preferred source since cu-82.
+   *
+   * Empty for a book the cu-158 backfill has not reached yet, which is why callers resolve through
+   * `resolveChapters` rather than using this alone.
+   */
+  suspend fun getChaptersForBook(bookId: String): List<Chapter>
+
+  /**
+   * The book's chapters from `ChapterDatabase`, observed (cu-82).
+   *
+   * The reactive twin of [getChaptersForBook], for the ViewModels that combine chapters with the
+   * book and its tracks. Emits an empty list for a book the backfill has not reached, so callers
+   * still resolve through `resolveChapters`.
+   */
+  fun getChaptersForBookLive(bookId: String): LiveData<List<Chapter>>
 }
 
 @Singleton
@@ -280,6 +297,11 @@ class BookRepository
      * A book that fails is logged and skipped, leaving it exactly as it is today — with a column
      * and no rows — rather than aborting the pass for every book after it.
      */
+    override fun getChaptersForBookLive(bookId: String): LiveData<List<Chapter>> = chapterDao.getChaptersForBookLive(bookId)
+
+    override suspend fun getChaptersForBook(bookId: String): List<Chapter> =
+      withContext(dispatchers.io) { chapterDao.getChaptersForBook(bookId) }
+
     override suspend fun backfillChapterTable(): Int =
       withContext(dispatchers.io) {
         // Cheap gate first. `bookDao.getAudiobooks()` is a `SELECT *` that deserializes every

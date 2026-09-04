@@ -232,6 +232,12 @@ class SimpleProgressUpdater
       val bookProgress = tracks.getTrackStartTime(track) + progress
       val bookDuration = tracks.getDuration()
 
+      // `chaptersFromTable` is deliberately **not** passed here (cu-82). This runs once a second
+      // for the whole of playback, and a DAO read per tick is the exact cost cu-110 removed. The
+      // singleton only rebuilds its chapter list when the track shape changes or when it has none,
+      // and `OnMediaChangedCallback` — which fires on the book actually changing — supplies the
+      // rows. `CurrentlyPlayingChapterSourceOrderingTest` pins that a later tick cannot downgrade
+      // an already-resolved list back to the legacy column.
       currentlyPlaying.update(
         book = book ?: EMPTY_AUDIOBOOK,
         track = tracks.getActiveTrack(),
