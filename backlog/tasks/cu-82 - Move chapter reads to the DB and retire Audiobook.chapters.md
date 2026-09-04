@@ -101,8 +101,30 @@ Removing the fallback there shows no chapters and destroys the data to recover t
 once a released build has run the backfill — a release boundary, and an owner decision. cu-159
 carries the migration, the converter removal and the now-dead backfill machinery.
 
-**Closed to `Done`**: no screen changed and no product choice was made. The chapter-skip fix is a
-correctness bug with a failing-then-passing test, and every claim above is reproducible headless.
+**Device check afterwards, and it sharpens the case** (`book_db`/`chapter_db` on the tablet,
+2026-09-04):
+
+| | |
+|---|---|
+| Books with an **empty** `chapters` column | **196 of 196** |
+| Books with a populated column | **0** |
+| Books with chapter-table rows | 1, and it is mock id `1001`, not a real book |
+
+So `currentlyPlaying.book.value.chapters` returned empty for **every book on this server** — the
+chapter-skip defect was library-wide, not an edge case. It is also why nobody noticed: with both
+sources empty, cu-13's `asChapterList()` fallback supplies one chapter per track, and for a book
+like *Ender's Game* (107 tracks, one chapter each) the player looks entirely correct — the
+notification reads "Chapter 13" and the numbers line up.
+
+**What could not be checked on-device, and is left unticked above:** an end-to-end chapter skip on a
+book with *real embedded chapters*. No book on this server has any — neither storage carries them —
+so the fixed path cannot be exercised here yet, and the media-key route does not reach
+`skipToNext` on this LineageOS build (`media dispatch` is absent). The unit tests cover the
+resolution and the exposure; the on-device confirmation waits for a book with real chapter data.
+
+**Closed to `Done`**: no screen, no wording, no product choice. The chapter-skip fix is a
+correctness bug with failing-then-passing tests and three sabotage checks. The one unverified item
+is called out above rather than ticked.
 
 Coverage rose 37.75 → 37.96 aggregate, with `application`, `data/local`, `features/bookdetails`,
 `features/currentlyplaying`, `features/player` and `util` all up and none down.
