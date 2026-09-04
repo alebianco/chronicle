@@ -56,13 +56,13 @@
 
     <ImageView
         android:id="@+id/bookmark_edit"
-        android:layout_width="@dimen/list_icon_size"
-        android:layout_height="@dimen/list_icon_size"
+        android:layout_width="@dimen/min_touch_target"
+        android:layout_height="@dimen/min_touch_target"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:clickable="true"
         android:contentDescription="@string/bookmark_edit_note"
         android:focusable="true"
-        android:padding="6dp"
+        android:padding="@dimen/touch_target_padding"
         android:src="@drawable/ic_edit"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

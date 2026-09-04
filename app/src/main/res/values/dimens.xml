@@ -10,6 +10,15 @@
 
     <!-- RecyclerView list item defaults -->
     <dimen name="list_icon_size">32dp</dimen>
+
+    <!--
+      The minimum comfortable tap area (cu-47). Android's accessibility guidance puts this at 48dp;
+      the player's six secondary controls measured 32dp on the tablet. A control reaches it by
+      being this size with `touch_target_padding` around a `list_icon_size` icon, so the icon looks
+      unchanged and only the tappable box grows.
+    -->
+    <dimen name="min_touch_target">48dp</dimen>
+    <dimen name="touch_target_padding">8dp</dimen>
     <dimen name="list_item_height">56dp</dimen>
     <dimen name="keyline_x_offset">64dp</dimen>
 
