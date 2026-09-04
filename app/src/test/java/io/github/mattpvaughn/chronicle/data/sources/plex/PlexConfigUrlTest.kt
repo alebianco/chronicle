@@ -29,44 +29,27 @@ class PlexConfigUrlTest {
   }
 
   /**
-   * **Characterisation, not endorsement.** When *both* sides carry a slash the branch strips the
-   * path's and then adds one back — `"$url/" + path.substring(1)` — so the result is `//`, which
-   * is precisely the case the KDoc claims to account for. Left alone here: cu-33 is a DI carve, and
-   * quietly changing how every Plex URL is built is not something to smuggle into one. Filed as
-   * cu-160; this test is what will fail loudly when that fix lands, which is the point of writing
-   * it down now.
+   * The case the function exists for, and the one it used to get wrong (cu-160).
+   *
+   * It stripped the path's leading slash and then added one back, so `//` came out — not cosmetic
+   * to Plex, which matches a path rather than normalising it. Unreachable from live data (every
+   * `/api/v2/resources` uri arrives without a trailing slash), fixed anyway because `url` is a
+   * public `var`.
    */
   @Test
-  fun `a trailing slash and a rooted path currently double the slash`() {
+  fun `a trailing slash and a rooted path do not double the slash`() {
     assertEquals(
-      "https://server:32400//library/sections",
+      "https://server:32400/library/sections",
       config("https://server:32400/").toServerString("/library/sections"),
     )
   }
 
-  @Test
-  fun `a bare base and a relative path gain the separating slash`() {
-    assertEquals(
-      "https://server:32400/library/sections",
-      config("https://server:32400").toServerString("library/sections"),
-    )
-  }
-
-  @Test
-  fun `a trailing slash and a relative path join unchanged`() {
-    assertEquals(
-      "https://server:32400/library/sections",
-      config("https://server:32400/").toServerString("library/sections"),
-    )
-  }
-
   /**
-   * Three of the four combinations agree; the fourth is the doubled slash above. Asserting the
-   * count rather than "they all match" keeps this honest about today's behaviour while still
-   * failing if a *second* combination ever diverges.
+   * All four combinations agree. A Plex path is matched, not normalised, so `//` and `/` are
+   * different paths and only one of them exists on the server.
    */
   @Test
-  fun `only the both-slashes case diverges from the others`() {
+  fun `all four slash combinations produce the same url`() {
     val results =
       listOf(
         config("https://server:32400").toServerString("/library/sections"),
@@ -75,6 +58,15 @@ class PlexConfigUrlTest {
         config("https://server:32400/").toServerString("library/sections"),
       )
 
-    assertEquals(setOf("https://server:32400/library/sections", "https://server:32400//library/sections"), results.toSet())
+    assertEquals(setOf("https://server:32400/library/sections"), results.toSet())
+  }
+
+  /** Several trailing or leading slashes still collapse to one, for the same reason. */
+  @Test
+  fun `repeated slashes on either side collapse to one`() {
+    assertEquals(
+      "https://server:32400/library/sections",
+      config("https://server:32400///").toServerString("///library/sections"),
+    )
   }
 }

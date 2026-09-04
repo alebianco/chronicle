@@ -71,18 +71,22 @@ class PlexConfig
 
     val sessionIdentifier = Random.nextInt(until = 10000).toString()
 
-    /** Prepends the current server url to [relativePath], accounting for trailing/leading `/`s */
-    fun toServerString(relativePath: String): String {
-      val baseEndsWith = url.endsWith('/')
-      val pathStartsWith = relativePath.startsWith('/')
-      return if (baseEndsWith && pathStartsWith) {
-        "$url/${relativePath.substring(1)}"
-      } else if (!baseEndsWith && !pathStartsWith) {
-        "$url/$relativePath"
-      } else {
-        "$url$relativePath"
-      }
-    }
+    /**
+     * Prepends the current server url to [relativePath] with exactly one `/` between them.
+     *
+     * The both-slashes branch used to emit **two** (cu-160): it stripped the path's leading slash
+     * and then added one back, `"$url/" + path.substring(1)`, which is precisely the case this
+     * function exists to normalise. A doubled slash is not cosmetic to Plex — a path is matched,
+     * not normalised — so a request on such a url would 404.
+     *
+     * It was **unreachable from live data**, verified against the real server rather than by
+     * reading: every `uri` in `/api/v2/resources` and the url `ConnectionChooser` selects from them
+     * come without a trailing slash, and the only other writer is `PLACEHOLDER_URL`. It is fixed
+     * rather than deleted because [url] is a public `var` — nothing writes a trailing slash today,
+     * but the type allows one, and a silently broken path is a poor failure mode for a hole that
+     * costs one line to close.
+     */
+    fun toServerString(relativePath: String): String = "${url.trimEnd('/')}/${relativePath.trimStart('/')}"
 
     val plexMediaInterceptor = PlexInterceptor(plexPrefsRepo, this, isLoginService = false)
     val plexLoginInterceptor = PlexInterceptor(plexPrefsRepo, this, isLoginService = true)
