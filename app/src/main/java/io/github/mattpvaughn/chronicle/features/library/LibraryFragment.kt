@@ -99,13 +99,19 @@ class LibraryFragment : Fragment() {
       binding.noBooksMessage.isVisible = books.isEmpty() && !offline
       binding.swipeToRefresh.isVisible = books.isNotEmpty()
     }
-    viewLifecycleOwner.collectWhileStarted(viewModel.books) { refreshEmptyStates() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.isOffline) { refreshEmptyStates() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.books) {
+      latestBooks = it
+      refreshEmptyStates()
+    }
+    viewLifecycleOwner.collectWhileStarted(viewModel.isOffline) {
+      latestOffline = it
+      refreshEmptyStates()
+    }
 
     fun refreshSearchStates() {
-      val rows = viewModel.searchRows.value.orEmpty()
-      val active = viewModel.isSearchActive.value == true
-      val queryEmpty = viewModel.isQueryEmpty.value == true
+      val rows = viewModel.searchRows.value
+      val active = viewModel.isSearchActive.value
+      val queryEmpty = viewModel.isQueryEmpty.value
       binding.searchResultsList.isVisible = active
       binding.noSearchResultsMessage.isVisible = rows.isEmpty() && active && !queryEmpty
       searchAdapter.submitList(rows)
@@ -115,7 +121,7 @@ class LibraryFragment : Fragment() {
     viewLifecycleOwner.collectWhileStarted(viewModel.isQueryEmpty) { refreshSearchStates() }
 
     viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
-      searchAdapter.setServerConnected(connected == true)
+      searchAdapter.setServerConnected(connected)
     }
 
     viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->

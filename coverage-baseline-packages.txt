@@ -12,7 +12,7 @@ io/github/mattpvaughn/chronicle/features/collections 0.00
 io/github/mattpvaughn/chronicle/features/currentlyplaying 25.57
 io/github/mattpvaughn/chronicle/features/download 14.72
 io/github/mattpvaughn/chronicle/features/home 18.40
-io/github/mattpvaughn/chronicle/features/library 2.34
+io/github/mattpvaughn/chronicle/features/library 2.35
 io/github/mattpvaughn/chronicle/features/login 15.06
 io/github/mattpvaughn/chronicle/features/player 35.59
 io/github/mattpvaughn/chronicle/features/search 83.68
