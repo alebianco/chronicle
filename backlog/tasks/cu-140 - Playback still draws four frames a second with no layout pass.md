@@ -141,3 +141,80 @@ tablet went offline. Do that before theorising.
 
 **Incidental, possibly related:** `NotificationBuilder` logs *"Building notification!
 state=STATE_PLAYING"* five times within 400 ms at playback start (see cu-50).
+
+
+## Profile, 2026-09-04 — the cause, named by sampling
+
+`am profile start --sampling 1000` for 15 s on the tablet, real ANTARES session, **Ender's Game
+(id 151444, 107 tracks)** playing. 172,948 samples, 4,646 methods. This is the run cu-117 could not
+complete.
+
+**The main thread is 37.7% of all samples in the process** (65,286 of 172,948) — more than
+ExoPlayer's own playback thread (12.5%) and all four disk-IO threads combined (27.9%).
+
+### It is layout and draw, not data work
+
+| samples | % of main | method |
+|---|---|---|
+| 1816 | 2.8% | `View.measure` |
+| 1316 | 2.0% | `View.updateDisplayListIfDirty` |
+| 948 | 1.5% | `ViewGroup.dispatchDraw` |
+| 944 | 1.4% | `ViewGroup.drawChild` / `View.draw` |
+| 916 | 1.4% | `View.layout` |
+| 910 | 1.4% | `ViewGroup.measureChildWithMargins` |
+| 898 | 1.4% | `ConstraintLayout …verticalSolvingPass` |
+| 450 | 0.7% | `View.requestLayout` |
+
+Every top entry is the measure/layout/draw pipeline. `verticalSolvingPass` says a
+`ConstraintLayout` graph is being re-solved, and `requestLayout` at 450 samples says something is
+explicitly invalidating it rather than the frames being merely redrawn.
+
+### What triggers it — our own code is only ~1.5% of the main thread but causes the rest
+
+| samples | site |
+|---|---|
+| 246 | `LifecycleExt …onChanged` |
+| 210 | `DoubleLiveData.publish` |
+| 142 | **`MediaItemTrack.compareTo`** |
+| 114 + 96 | `DoubleLiveData` lambdas |
+| 84 + 82 | `Chapter.compareTo` / `Chapter.equals` |
+| 74 | `…getDuration` |
+| 52 | `CurrentlyPlayingViewModel.progressPercentageString$lambda$19` |
+| 50 + 50 | `getProgress` / **`getActiveTrack`** |
+
+Also present: `LiveData.setValue` (406), `dispatchingValue` (398), `considerNotify` (396).
+
+The chain is `ProgressUpdater`'s once-a-second write → Room per-table invalidation →
+`DoubleLiveData.publish` → observers → `requestLayout` → a full measure/solve/draw pass. cu-110
+fixed four instances of this shape; this profile says the *publish* side is still firing and the
+draw side is what it costs now.
+
+### A concrete, separable finding: `getActiveTrack()` re-sorts on every call
+
+```kotlin
+fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
+  val inPlaybackOrder = sorted()      // 107 tracks, once per call
+  return inPlaybackOrder.lastOrNull { it.hasProgress() } ?: inPlaybackOrder.first()
+}
+```
+
+`getProgress()` does the same (`MediaItemTrack.kt:226`). With 107 tracks and a publish every
+second, that is the 142 samples in `compareTo` — and it is why the cost **scales with track count**,
+which is what made the phone's 28-track measurement understate this by 5.6×
+(42 → 234 jiffies/10 s, cu-117).
+
+Note `TrackIndex` means "index into the **sorted** list" (cu-136), so the sort cannot simply be
+dropped — the order is load-bearing. Sorting once per track-list change rather than per read is the
+fix.
+
+### Where to start
+
+1. `getActiveTrack`/`getProgress` sorting per call — smallest, measurable on its own, and explains
+   the track-count scaling.
+2. Then the publish side: what still re-publishes at tick rate and reaches a `ConstraintLayout`.
+   `progressPercentageString` appears in the profile and cu-94 already touched that area.
+3. Re-measure **on the tablet with Ender's Game**, against the 234 j/10 s baseline above. A
+   single-track fixture will report this fixed when it is not — that mistake has now been made
+   three times here (cu-110, cu-115, cu-117).
+
+Raw trace not committed (2.9 MB); reproduce with the command above.
