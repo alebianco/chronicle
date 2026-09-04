@@ -2,8 +2,12 @@ package io.github.mattpvaughn.chronicle.data.local
 
 import androidx.lifecycle.LiveData
 import io.github.mattpvaughn.chronicle.data.model.*
+import io.github.mattpvaughn.chronicle.data.sources.IngestionPlan
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
+import io.github.mattpvaughn.chronicle.data.sources.SourceCapabilities
+import io.github.mattpvaughn.chronicle.data.sources.planIngestion
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.TagAssociation
 import io.github.mattpvaughn.chronicle.data.sources.plex.TagFilter
@@ -29,6 +33,24 @@ interface IBookRepository {
 
   /** Refreshes the data in the local database with elements from the network */
   suspend fun refreshData()
+
+  /**
+   * Merges a caller-supplied library into the local database, for one source (cu-80).
+   *
+   * The backend-neutral half of [refreshData]: a `MediaSource` fetches, this persists.
+   * `SourceManager.refreshBooks` could not be written without it — the repositories owned their own
+   * Plex sync and accepted no list, which its own `check` said in as many words.
+   *
+   * [capabilities] gates what the source may claim: one that cannot supply narrator or series does
+   * not pay for a tag-seeding pass with nothing to read.
+   *
+   * Returns the number of books removed, for logging and tests.
+   */
+  suspend fun ingest(
+    books: List<Audiobook>,
+    sourceId: Long,
+    capabilities: SourceCapabilities,
+  ): Int
 
   /** Returns the number of books in the repository */
   suspend fun getBookCount(): Int
@@ -226,6 +248,34 @@ class BookRepository
       }
     }
 
+    override suspend fun ingest(
+      books: List<Audiobook>,
+      sourceId: Long,
+      capabilities: SourceCapabilities,
+    ): Int {
+      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
+      // A source that reports neither field cannot answer the tag endpoints, and asking would cost
+      // `1 + N` requests to learn nothing. The books keep whatever they already have — blanking a
+      // narrator because *this* source cannot supply one is the cu-24/cu-143 mistake.
+      val seeded =
+        if (capabilities.hasNarrator || capabilities.hasSeries) {
+          books.withSeededTags(readTagAssociations(books.map { it.id }))
+        } else {
+          books
+        }
+      return writeIngestion(planIngestion(seeded, localBooks, sourceId))
+    }
+
+    /** The I/O half: [planIngestion] decides what changes, this applies it. Returns rows removed. */
+    private suspend fun writeIngestion(plan: IngestionPlan): Int =
+      withContext(dispatchers.io) {
+        val removed = bookDao.removeAll(plan.toRemove)
+        Timber.i("Removed $removed items from DB")
+        Timber.i("Loaded books: ${plan.toUpsert.size}")
+        bookDao.insertAll(plan.toUpsert)
+        removed
+      }
+
     @Throws(Throwable::class)
     override suspend fun refreshData() {
       if (prefsRepo.offlineMode) {
@@ -266,21 +316,11 @@ class BookRepository
       // not answer them must still get a working refresh, not a failed one.
       val seededBooks = mergedBooks.withSeededTags(readTagAssociations(mergedBooks.map { it.id }))
 
-      // remove books which have been deleted from server
-      val networkIds = networkBooks.map { it.id }
-      val removedFromNetwork =
-        localBooks.filter { localBook ->
-          !networkIds.contains(localBook.id)
-        }
-
-      Timber.i("Removed from network: ${removedFromNetwork.map { it.title }}")
-      withContext(dispatchers.io) {
-        val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
-        Timber.i("Removed $removed items from DB")
-
-        Timber.i("Loaded books: ${seededBooks.size}")
-        bookDao.insertAll(seededBooks)
-      }
+      // Persisting is `writeIngestion`'s job. This block was written out **twice**, here and in
+      // `refreshDataPaginated`, which is the cu-20 shape exactly: a rule fixed in one copy and
+      // missed in the other looks correct in every test that takes the fixed path. cu-156 already
+      // had to add tag seeding to both.
+      writeIngestion(planIngestion(seededBooks, localBooks, PlexMediaSource.MEDIA_SOURCE_ID_PLEX))
     }
 
     @Throws(Throwable::class)
@@ -408,21 +448,11 @@ class BookRepository
       // field, and best-effort so an optional index cannot fail a refresh.
       val seededBooks = mergedBooks.withSeededTags(readTagAssociations(mergedBooks.map { it.id }))
 
-      // remove books which have been deleted from server
-      val networkIds = networkBooks.map { it.id }
-      val removedFromNetwork =
-        localBooks.filter { localBook ->
-          !networkIds.contains(localBook.id)
-        }
-
-      Timber.i("Removed from network: ${removedFromNetwork.map { it.title }}")
-      withContext(dispatchers.io) {
-        val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
-        Timber.i("Removed $removed items from DB")
-
-        Timber.i("Loaded books: ${seededBooks.size}")
-        bookDao.insertAll(seededBooks)
-      }
+      // Persisting is `writeIngestion`'s job. This block was written out **twice**, here and in
+      // `refreshDataPaginated`, which is the cu-20 shape exactly: a rule fixed in one copy and
+      // missed in the other looks correct in every test that takes the fixed path. cu-156 already
+      // had to add tag seeding to both.
+      writeIngestion(planIngestion(seededBooks, localBooks, PlexMediaSource.MEDIA_SOURCE_ID_PLEX))
     }
 
     override suspend fun clear() {

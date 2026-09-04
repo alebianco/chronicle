@@ -104,7 +104,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1240 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1295 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -113,7 +113,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - `application/ChronicleApplication.kt`, `application/MainActivity.kt` — entry points + DI root
 - `injection/` — Dagger components/modules/scopes
 - `data/local/` — Room DBs, DAOs · `data/sources/plex/` — Plex API (`PlexService.kt`), login/config, `CachedFileManager.kt`
-- `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — multi-backend scaffolding, **declared but not yet load-bearing**. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made `SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`. Don't call it; don't delete it (**cu-80** resurrects it properly — cu-33 did the service-locator half and handed this half over, since a capability flag cannot be verified while there is no second source to render against).
+- `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — multi-backend scaffolding. **The ingestion seam is real since cu-80**: `SourceManager.refreshBooks` ingests per source through `IBookRepository.ingest`, and `planIngestion` (`data/sources/IngestionPlan.kt`) decides what a refresh writes and deletes. Still not *registered* — `sources` is empty in production, so it is a no-op until cu-33.1 adds one. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made `SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`. The fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`.
 - `features/` — Fragment + ViewModel + adapters per feature (27 files import `data.sources.plex.*` directly — known debt, now task **cu-80**; dominated by `PlexConfig` at 17, a connection-state holder rather than a fetch API)
 - `navigation/Navigator.kt` — centralized navigation · `views/BindingAdapters.kt` — reusable bindings
 
@@ -215,6 +215,17 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   Chapter offsets are *absolute within the book*, not per-track: two separate bugs came from a
   per-track `0L` (cu-13, cu-49), and `getChapterAt` silently resolves nothing when they are wrong.
   Since cu-136 the frame is a **type**, so that mistake no longer compiles — see below.
+- **A refresh may only delete books belonging to the source doing the refreshing** (cu-80).
+  `planIngestion` scopes removal by `Audiobook.source`; the Plex-only path deleted every local row
+  absent from its fetch, which is safe with exactly one source and a **library-wipe with two** —
+  taking listening progress no server holds a copy of. An **empty fetch removes nothing** either: a
+  source answering `Ok(emptyList())` is a failed refresh, not an emptied library, and a *failed*
+  fetch never reaches ingestion at all. All three are sabotage-verified. `refreshData` and
+  `refreshDataPaginated` share that one path — the tail was written out twice before, and cu-156 had
+  already had to add tag seeding to both copies.
+  **Every real book carries `source = 0`** (`MEDIA_SOURCE_ID_PLEX`) — 196 of 196 rows on the
+  household server. Three test fixtures used `1L`, which nothing checked until source-scoped removal
+  made them fail: the cu-24 fixture trap in a new field.
 - **Bookmarks are a separate database on purpose** (cu-22). `BookmarkDatabase` is keyed by
   `bookId` and lives outside `BookDatabase` **so the sync path cannot reach it**: `refreshData`
   merges `Audiobook` rows and calls `bookDao.removeAll` for books the server no longer lists, so a

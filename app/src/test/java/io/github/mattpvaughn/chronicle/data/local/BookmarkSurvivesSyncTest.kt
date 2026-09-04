@@ -7,6 +7,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
@@ -99,7 +100,7 @@ class BookmarkSurvivesSyncTest {
   @Test
   fun `a bookmark survives an ordinary refresh`() =
     runTest {
-      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = 1L, title = "The Hobbit")))
+      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX, title = "The Hobbit")))
       bookmarks.add(bookId = "1001", position = BookOffset(90_000L), note = "the riddle game")
       serverHas(PlexDirectory(ratingKey = "1001", title = "The Hobbit"))
 
@@ -120,7 +121,7 @@ class BookmarkSurvivesSyncTest {
   @Test
   fun `a bookmark survives its book being deleted by a refresh`() =
     runTest {
-      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = 1L, title = "The Hobbit")))
+      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX, title = "The Hobbit")))
       bookmarks.add(bookId = "1001", position = BookOffset(90_000L), note = "the riddle game")
       // The server no longer lists it.
       serverHas(PlexDirectory(ratingKey = "1002", title = "Dune"))
@@ -166,7 +167,7 @@ class BookmarkSurvivesSyncTest {
   @Test
   fun `clearing the catalogue does not clear bookmarks`() =
     runTest {
-      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = 1L, title = "The Hobbit")))
+      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX, title = "The Hobbit")))
       bookmarks.add(bookId = "1001", position = BookOffset(90_000L), note = "the riddle game")
 
       bookRepository().clear()

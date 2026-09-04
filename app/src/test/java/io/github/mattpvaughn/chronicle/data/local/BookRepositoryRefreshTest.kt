@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.data.local
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
@@ -104,7 +105,11 @@ class BookRepositoryRefreshTest {
     isCached: Boolean = false,
   ) = Audiobook(
     id = id,
-    source = 1L,
+    // MEDIA_SOURCE_ID_PLEX, not an arbitrary 1L (cu-80). Every real book carries 0 — verified
+    // against the household server's 196 rows — and a fixture with a different source is invisible
+    // to the source-scoped removal a refresh now performs, so these tests silently stopped
+    // exercising deletion at all. The cu-24 fixture trap in a new field.
+    source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX,
     title = title,
     progress = progress,
     lastViewedAt = lastViewedAt,

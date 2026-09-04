@@ -5,6 +5,7 @@ import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.TrackOffset
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 
 /**
  * A book made of **several** track files, with chapters that cross track boundaries (cu-115).
@@ -132,7 +133,11 @@ object MultiTrackBook {
   fun book(): Audiobook =
     Audiobook(
       id = BOOK_ID,
-      source = 1L,
+      // MEDIA_SOURCE_ID_PLEX, not an arbitrary 1L (cu-80). Every real book carries 0 — verified
+      // against the household server's 196 rows — and a fixture with a different source is invisible
+      // to the source-scoped removal a refresh now performs, so these tests silently stopped
+      // exercising deletion at all. The cu-24 fixture trap in a new field.
+      source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX,
       title = "The Long Book",
       titleSort = "Long Book, The",
       author = "A Narrator",
