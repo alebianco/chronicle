@@ -4,9 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.text.format.DateUtils
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Observer
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -25,6 +22,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.settledValue
+import io.github.mattpvaughn.chronicle.util.settledValues
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -34,6 +33,7 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -115,21 +115,21 @@ class CurrentlyPlayingViewModelTest {
 
   private val bookRepository =
     mockk<IBookRepository>(relaxed = true) {
-      every { getAudiobook(any()) } returns MutableLiveData(book)
+      every { getAudiobook(any()) } returns MutableStateFlow(book)
     }
 
   private val trackRepository =
     mockk<ITrackRepository>(relaxed = true) {
       every { getTracksForAudiobook(any()) } returns
-        MutableLiveData(emptyList<MediaItemTrack>())
+        MutableStateFlow(emptyList<MediaItemTrack>())
     }
 
   private val bookmarkRepository = mockk<IBookmarkRepository>(relaxed = true)
 
   private val workManager =
     mockk<WorkManager>(relaxed = true) {
-      every { getWorkInfosByTagLiveData(any()) } returns
-        MutableLiveData(emptyList<WorkInfo>())
+      every { getWorkInfosByTagFlow(any()) } returns
+        MutableStateFlow(emptyList<WorkInfo>())
     }
 
   private val sharedPrefs =
@@ -171,24 +171,17 @@ class CurrentlyPlayingViewModelTest {
   }
 
   /**
-   * Reads a `LiveData` produced by `asLiveData(...)`, after letting the flow actually run.
+   * Reads a `StateFlow` after letting it actually run.
    *
-   * Two things are needed and each fails silently on its own. `asLiveData` does not collect its
-   * flow until something observes it, so `.value` is `null` before `observeForever`. And
+   * Two things are needed and each fails silently on its own. A `stateIn(WhileSubscribed)` does
+   * not collect its upstream until something subscribes, so `.value` is the seed until then. And
    * `MainDispatcherRule` installs a `StandardTestDispatcher`, which *queues* work rather than
    * running it — so the `combine` never produces a value until the scheduler is advanced.
    *
-   * Getting either wrong yields `null`, which is indistinguishable from "the arithmetic is broken"
-   * unless you look. Worth the helper.
+   * Getting either wrong yields the seed, which is indistinguishable from "the arithmetic is
+   * broken" unless you look. A local alias for [settledValue], which does both.
    */
-  private fun <T> TestScope.observedValue(live: LiveData<T>): T? {
-    var seen: T? = null
-    val observer = Observer<T> { seen = it }
-    live.observeForever(observer)
-    advanceUntilIdle()
-    live.removeObserver(observer)
-    return seen
-  }
+  private fun <T> TestScope.observedValue(flow: StateFlow<T>): T = settledValue(flow)
 
   /**
    * Chapter-relative progress, on a multi-track book (cu-115 / cu-73 fourth sweep).
@@ -220,10 +213,12 @@ class CurrentlyPlayingViewModelTest {
     runTest(mainDispatcherRule.testDispatcher) {
       val viewModel = viewModel(midBookCurrentlyPlaying())
 
-      assertEquals(
-        observedValue(viewModel.chapterProgress),
-        observedValue(viewModel.chapterProgressForSlider),
-      )
+      // Both subscribed together: see `settledValues` for why doing them one at a time makes
+      // whichever is second read its `stateIn` seed.
+      val (readout, slider) =
+        settledValues(viewModel.chapterProgress, viewModel.chapterProgressForSlider)
+
+      assertEquals(readout, slider)
     }
 
   /**

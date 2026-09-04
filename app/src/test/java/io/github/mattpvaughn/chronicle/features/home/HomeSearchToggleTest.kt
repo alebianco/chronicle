@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.home
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -11,6 +10,7 @@ import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -46,13 +46,13 @@ class HomeSearchToggleTest {
     HomeViewModel(
       plexConfig =
         mockk<PlexConfig>(relaxed = true) {
-          every { isConnected } returns MutableLiveData(true)
+          every { isConnected } returns MutableStateFlow(true)
         },
       bookRepository =
         mockk<IBookRepository>(relaxed = true) {
-          every { getRecentlyListened() } returns MutableLiveData(emptyList())
-          every { getRecentlyAdded() } returns MutableLiveData(emptyList())
-          every { getCachedAudiobooks() } returns MutableLiveData(emptyList())
+          every { getRecentlyListened() } returns MutableStateFlow(emptyList())
+          every { getRecentlyAdded() } returns MutableStateFlow(emptyList())
+          every { getCachedAudiobooks() } returns MutableStateFlow(emptyList())
         },
       librarySyncRepository = mockk<LibrarySyncRepository>(relaxed = true),
       prefsRepo =

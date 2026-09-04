@@ -2,9 +2,9 @@ package io.github.mattpvaughn.chronicle.features.bookdetails
 
 import android.content.Context
 import android.os.Bundle
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -18,10 +18,13 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.keepCollected
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -54,32 +57,33 @@ class AudiobookDetailsPlaybackTest {
 
   private val mediaServiceConnection =
     mockk<MediaServiceConnection>(relaxed = true) {
-      every { isConnected } returns MutableLiveData(true)
-      every { nowPlaying } returns MutableLiveData(null)
+      every { isConnected } returns MutableStateFlow(true)
+      every { nowPlaying } returns MutableStateFlow(mockk<MediaMetadataCompat>(relaxed = true))
       every { this@mockk.transportControls } returns this@AudiobookDetailsPlaybackTest.transportControls
     }
 
   private val bookRepository =
     mockk<IBookRepository>(relaxed = true) {
-      every { getAudiobook("1001") } returns MutableLiveData(book)
+      every { getAudiobook("1001") } returns MutableStateFlow(book)
     }
 
   private val trackRepository =
     mockk<ITrackRepository>(relaxed = true) {
       every { getTracksForAudiobook("1001") } returns
-        MutableLiveData(emptyList<MediaItemTrack>())
+        MutableStateFlow(emptyList<MediaItemTrack>())
     }
 
   /** cu-59 behaviour 1: play reaches the player with *this* book's id. */
   @Test
-  fun `pressing play starts this book by id`() {
-    val viewModel = viewModel()
-    viewModel.audiobook.observeForever { }
+  fun `pressing play starts this book by id`() =
+    runTest {
+      val viewModel = viewModel()
+      keepCollected(viewModel.audiobook)
 
-    viewModel.pausePlayButtonClicked()
+      viewModel.pausePlayButtonClicked()
 
-    verify { transportControls.playFromMediaId(eq("1001"), any()) }
-  }
+      verify { transportControls.playFromMediaId(eq("1001"), any()) }
+    }
 
   /**
    * cu-59 behaviour 2: a confirmed jump carries the requested offset and track to the player.
@@ -88,28 +92,30 @@ class AudiobookDetailsPlaybackTest {
    * the book from its saved position instead, which reads as "the jump did nothing".
    */
   @Test
-  fun `a confirmed jump plays from the requested position`() {
-    val viewModel = viewModel()
-    viewModel.audiobook.observeForever { }
+  fun `a confirmed jump plays from the requested position`() =
+    runTest {
+      val viewModel = viewModel()
+      keepCollected(viewModel.audiobook)
 
-    viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001", hasUserConfirmation = true)
+      viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001", hasUserConfirmation = true)
 
-    val extras = slot<Bundle>()
-    verify { transportControls.playFromMediaId(eq("1001"), capture(extras)) }
-    assertEquals(5_000L, extras.captured.getLong(KEY_START_TIME_TRACK_OFFSET))
-    assertEquals("2001", extras.captured.getString(KEY_SEEK_TO_TRACK_WITH_ID))
-  }
+      val extras = slot<Bundle>()
+      verify { transportControls.playFromMediaId(eq("1001"), capture(extras)) }
+      assertEquals(5_000L, extras.captured.getLong(KEY_START_TIME_TRACK_OFFSET))
+      assertEquals("2001", extras.captured.getString(KEY_SEEK_TO_TRACK_WITH_ID))
+    }
 
   /** An unconfirmed jump must not reach the player at all. */
   @Test
-  fun `an unconfirmed jump does not play`() {
-    val viewModel = viewModel()
-    viewModel.audiobook.observeForever { }
+  fun `an unconfirmed jump does not play`() =
+    runTest {
+      val viewModel = viewModel()
+      keepCollected(viewModel.audiobook)
 
-    viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001")
+      viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001")
 
-    verify(exactly = 0) { transportControls.playFromMediaId(any(), any()) }
-  }
+      verify(exactly = 0) { transportControls.playFromMediaId(any(), any()) }
+    }
 
   private fun viewModel() =
     AudiobookDetailsViewModel(
@@ -117,13 +123,13 @@ class AudiobookDetailsPlaybackTest {
       trackRepository = trackRepository,
       cachedFileManager =
         mockk<ICachedFileManager>(relaxed = true) {
-          every { activeBookDownloads } returns MutableLiveData(emptySet())
+          every { activeBookDownloads } returns MutableStateFlow(emptySet())
         },
       inputAudiobook = book,
       mediaServiceConnection = mediaServiceConnection,
       plexConfig =
         mockk<PlexConfig>(relaxed = true) {
-          every { isConnected } returns MutableLiveData(true)
+          every { isConnected } returns MutableStateFlow(true)
         },
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),

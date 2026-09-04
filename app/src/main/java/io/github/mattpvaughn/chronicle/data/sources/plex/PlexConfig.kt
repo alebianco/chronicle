@@ -46,10 +46,16 @@ class PlexConfig
      * Scope for the derived [isConnected] only.
      *
      * `PlexConfig` is a `@Singleton` and lives for the process, so this never needs cancelling —
-     * `SupervisorJob` so a failure in one derivation cannot take the scope down, and `Main.immediate`
-     * because the sole consumer is UI state that is read synchronously.
+     * `SupervisorJob` so a failure in one derivation cannot take the scope down.
+     *
+     * `Unconfined`, deliberately **not** `Main.immediate`: the derivation is a pure `map` over a
+     * `StateFlow` with no view work in it, so it needs no particular thread, and it must stay
+     * readable synchronously right after a write. `Main.immediate` is also evaluated when this
+     * object is constructed, which made every unit test that builds a `PlexConfig` fail with
+     * "Dispatchers.Main was accessed when the platform dispatcher was absent" unless it installed
+     * a `MainDispatcherRule` it had no other need for.
      */
-    private val configScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val configScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     private val connectionSet = mutableSetOf<Connection>()
 

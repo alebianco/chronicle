@@ -1,7 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.login
 
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
@@ -11,6 +9,8 @@ import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -32,13 +32,10 @@ import java.io.IOException
  */
 class LibraryPickerEmptyReasonTest {
   @get:Rule
-  val instantTaskExecutorRule = InstantTaskExecutorRule()
-
-  @get:Rule
   val mainDispatcherRule = MainDispatcherRule()
 
-  private val connectionState = MutableLiveData(PlexConfig.ConnectionState.CONNECTING)
-  private val isConnected = MutableLiveData(false)
+  private val connectionState = MutableStateFlow(PlexConfig.ConnectionState.CONNECTING)
+  private val isConnected = MutableStateFlow(false)
 
   private val plexConfig =
     mockk<PlexConfig>(relaxed = true) {
@@ -68,8 +65,12 @@ class LibraryPickerEmptyReasonTest {
   fun `a connection failure is reported as cannot connect, not as an empty library`() =
     runTest {
       val vm = viewModel(serviceReturning(emptyList()))
+      // The ViewModel's init collector is *scheduled* on the test dispatcher, not run, so the
+      // state change below needs draining before its effect can be read (cu-52).
+      advanceUntilIdle()
 
       connectionState.value = PlexConfig.ConnectionState.CONNECTION_FAILED
+      advanceUntilIdle()
 
       assertEquals(
         "a TLS or network failure must not read as 'this server has no libraries'",
@@ -103,8 +104,10 @@ class LibraryPickerEmptyReasonTest {
     runTest {
       // The one case where the original message was true.
       val vm = viewModel(serviceReturning(emptyList()))
-      // DoubleLiveData only computes while observed; without this `loadingStatus` stays null.
-      vm.loadingStatus.observeForever {}
+      // `loadingStatus` is `stateIn(WhileSubscribed)`, so it computes only while collected —
+      // without a collector it would sit on its seed. Same reason the LiveData version needed an
+      // `observeForever`; `backgroundScope` unsubscribes when the test ends.
+      backgroundScope.launch { vm.loadingStatus.collect {} }
 
       connectionState.value = PlexConfig.ConnectionState.CONNECTED
       isConnected.value = true

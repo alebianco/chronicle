@@ -1,8 +1,8 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
 import android.content.Context
+import android.support.v4.media.MediaMetadataCompat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -14,10 +14,14 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.keepCollected
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -41,30 +45,38 @@ class AudiobookDetailsViewModelTest {
   val mainDispatcherRule = MainDispatcherRule()
 
   private val book = Audiobook(id = "1001", source = 1L, title = "Dune")
-  private val tracksLiveData = MutableLiveData<List<MediaItemTrack>>(emptyList())
+  private val tracksFlow = MutableStateFlow<List<MediaItemTrack>>(emptyList())
 
   private val bookRepository =
     mockk<IBookRepository>(relaxed = true) {
-      every { getAudiobook("1001") } returns MutableLiveData(book)
+      every { getAudiobook("1001") } returns MutableStateFlow(book)
     }
 
   private val trackRepository =
     mockk<ITrackRepository>(relaxed = true) {
-      every { getTracksForAudiobook("1001") } returns tracksLiveData
+      every { getTracksForAudiobook("1001") } returns tracksFlow
     }
 
   private val plexConfig =
     mockk<PlexConfig>(relaxed = true) {
-      every { isConnected } returns MutableLiveData(true)
+      every { isConnected } returns MutableStateFlow(true)
     }
 
   /**
    * `nowPlaying` must be stubbed explicitly: a relaxed mock returns a plain Object for it, and
    * `updateProgressIfChangingBook` casts it to MediaMetadataCompat.
+   *
+   * A mock rather than the real `NOTHING_PLAYING`: that constant is built by
+   * `MediaMetadataCompat.Builder`, which is an Android framework class stubbed to throw in a JVM
+   * unit test, so merely referencing it fails the whole class with ExceptionInInitializerError.
    */
   private val mediaServiceConnection =
     mockk<MediaServiceConnection>(relaxed = true) {
-      every { nowPlaying } returns MutableLiveData(null)
+      every { nowPlaying } returns MutableStateFlow(mockk<MediaMetadataCompat>(relaxed = true))
+      // `isConnected` needs a real flow too: a relaxed mock hands back a mocked StateFlow whose
+      // `value` is a plain Object, and the production read is now a direct Boolean rather than the
+      // null-tolerant `== true` the LiveData version used.
+      every { isConnected } returns MutableStateFlow(false)
     }
 
   @Test
@@ -81,47 +93,55 @@ class AudiobookDetailsViewModelTest {
    * NoWhenBranchMatchedException.
    */
   @Test
-  fun `caching while disconnected tells the user instead of starting a download`() {
-    every { plexConfig.isConnected } returns MutableLiveData(false)
-    val cachedFileManager = cacheManager()
-    val viewModel = viewModel(cachedFileManager = cachedFileManager)
-    viewModel.cacheStatus.observeForever { }
+  fun `caching while disconnected tells the user instead of starting a download`() =
+    runTest {
+      every { plexConfig.isConnected } returns MutableStateFlow(false)
+      val cachedFileManager = cacheManager()
+      val viewModel = viewModel(cachedFileManager = cachedFileManager)
+      keepCollected(viewModel.cacheStatus)
 
-    viewModel.onCacheButtonClick()
+      viewModel.onCacheButtonClick()
 
-    verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
-  }
+      verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
+    }
 
   /** Connected, and the book is not yet downloaded: the download must actually start. */
   @Test
-  fun `caching while connected starts the download`() {
-    every { plexConfig.isConnected } returns MutableLiveData(true)
-    val cachedFileManager = cacheManager()
-    val viewModel = viewModel(cachedFileManager = cachedFileManager)
-    viewModel.cacheStatus.observeForever { }
+  fun `caching while connected starts the download`() =
+    runTest {
+      every { plexConfig.isConnected } returns MutableStateFlow(true)
+      val cachedFileManager = cacheManager()
+      val viewModel = viewModel(cachedFileManager = cachedFileManager)
+      keepCollected(viewModel.cacheStatus)
 
-    viewModel.onCacheButtonClick()
+      viewModel.onCacheButtonClick()
 
-    verify { cachedFileManager.downloadTracks("1001", "Dune") }
-  }
+      verify { cachedFileManager.downloadTracks("1001", "Dune") }
+    }
 
   /** Pressing play with no server and no download must not silently do nothing. */
   @Test
-  fun `playing an undownloaded book while disconnected does not reach the player`() {
-    every { plexConfig.isConnected } returns MutableLiveData(false)
+  fun `playing an undownloaded book while disconnected does not reach the player`() =
+    runTest {
+      every { plexConfig.isConnected } returns MutableStateFlow(false)
 
-    viewModel().pausePlayButtonClicked()
+      val viewModel = viewModel()
+      // `audiobook` is `stateIn(Eagerly)`, but the eager collector is *scheduled* on the test
+      // dispatcher rather than run — without this the guard reads the `null` seed and lets an
+      // uncached book through with no server.
+      advanceUntilIdle()
+      viewModel.pausePlayButtonClicked()
 
-    verify(exactly = 0) { mediaServiceConnection.connect(any()) }
-  }
+      verify(exactly = 0) { mediaServiceConnection.connect(any()) }
+    }
 
   /** A cached book stays playable with no server — the offline case the app exists to support. */
   @Test
   fun `playing a downloaded book while disconnected still reaches the player`() {
-    every { plexConfig.isConnected } returns MutableLiveData(false)
+    every { plexConfig.isConnected } returns MutableStateFlow(false)
     every { bookRepository.getAudiobook("1001") } returns
-      MutableLiveData(book.copy(isCached = true))
-    every { mediaServiceConnection.isConnected } returns MutableLiveData(false)
+      MutableStateFlow(book.copy(isCached = true))
+    every { mediaServiceConnection.isConnected } returns MutableStateFlow(false)
 
     viewModel().pausePlayButtonClicked()
 
@@ -131,7 +151,7 @@ class AudiobookDetailsViewModelTest {
   /** Already connected: no reconnect, the action runs directly. */
   @Test
   fun `playing while already connected does not reconnect`() {
-    every { mediaServiceConnection.isConnected } returns MutableLiveData(true)
+    every { mediaServiceConnection.isConnected } returns MutableStateFlow(true)
     every { mediaServiceConnection.transportControls } returns null
 
     viewModel().pausePlayButtonClicked()
@@ -142,7 +162,7 @@ class AudiobookDetailsViewModelTest {
   /** A force sync with no server must report that, not attempt a fetch. */
   @Test
   fun `force syncing while disconnected does not touch the repository`() {
-    every { plexConfig.isConnected } returns MutableLiveData(false)
+    every { plexConfig.isConnected } returns MutableStateFlow(false)
 
     viewModel().forceSyncBook(hasUserConfirmation = true)
 
@@ -155,35 +175,37 @@ class AudiobookDetailsViewModelTest {
    * requires, not stubbed directly — the derivation is part of what is under test.
    */
   @Test
-  fun `pressing cache while a download is running cancels it`() {
-    val cachedFileManager =
-      mockk<ICachedFileManager>(relaxed = true) {
-        every { activeBookDownloads } returns MutableLiveData(setOf("1001"))
-      }
-    val viewModel = viewModel(cachedFileManager = cachedFileManager)
-    viewModel.cacheStatus.observeForever { }
+  fun `pressing cache while a download is running cancels it`() =
+    runTest {
+      val cachedFileManager =
+        mockk<ICachedFileManager>(relaxed = true) {
+          every { activeBookDownloads } returns MutableStateFlow(setOf("1001"))
+        }
+      val viewModel = viewModel(cachedFileManager = cachedFileManager)
+      keepCollected(viewModel.cacheStatus)
 
-    viewModel.onCacheButtonClick()
+      viewModel.onCacheButtonClick()
 
-    verify(exactly = 1) { cachedFileManager.cancelGroup("1001") }
-    verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
-  }
+      verify(exactly = 1) { cachedFileManager.cancelGroup("1001") }
+      verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
+    }
 
   /** A download for a *different* book must not make this one look like it is caching. */
   @Test
-  fun `another book downloading does not cancel this one`() {
-    val cachedFileManager =
-      mockk<ICachedFileManager>(relaxed = true) {
-        every { activeBookDownloads } returns MutableLiveData(setOf("9999"))
-      }
-    val viewModel = viewModel(cachedFileManager = cachedFileManager)
-    viewModel.cacheStatus.observeForever { }
+  fun `another book downloading does not cancel this one`() =
+    runTest {
+      val cachedFileManager =
+        mockk<ICachedFileManager>(relaxed = true) {
+          every { activeBookDownloads } returns MutableStateFlow(setOf("9999"))
+        }
+      val viewModel = viewModel(cachedFileManager = cachedFileManager)
+      keepCollected(viewModel.cacheStatus)
 
-    viewModel.onCacheButtonClick()
+      viewModel.onCacheButtonClick()
 
-    verify(exactly = 0) { cachedFileManager.cancelGroup(any()) }
-    verify { cachedFileManager.downloadTracks("1001", "Dune") }
-  }
+      verify(exactly = 0) { cachedFileManager.cancelGroup(any()) }
+      verify { cachedFileManager.downloadTracks("1001", "Dune") }
+    }
 
   /**
    * cu-59 behaviour 4: pressing cache on an already-downloaded book starts no download and asks
@@ -191,22 +213,23 @@ class AudiobookDetailsViewModelTest {
    * single tap.
    */
   @Test
-  fun `pressing cache on a downloaded book prompts instead of downloading`() {
-    every { bookRepository.getAudiobook("1001") } returns
-      MutableLiveData(book.copy(isCached = true))
-    val cachedFileManager = cacheManager()
-    val viewModel = viewModel(cachedFileManager = cachedFileManager)
-    viewModel.cacheStatus.observeForever { }
+  fun `pressing cache on a downloaded book prompts instead of downloading`() =
+    runTest {
+      every { bookRepository.getAudiobook("1001") } returns
+        MutableStateFlow(book.copy(isCached = true))
+      val cachedFileManager = cacheManager()
+      val viewModel = viewModel(cachedFileManager = cachedFileManager)
+      keepCollected(viewModel.cacheStatus)
 
-    viewModel.onCacheButtonClick()
+      viewModel.onCacheButtonClick()
 
-    verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
-    coVerify(exactly = 0) { cachedFileManager.deleteCachedBook(any()) }
-    assertTrue(
-      "deleting a download must be confirmed, not done on one tap",
-      viewModel.bottomChooserState.value?.shouldShow == true,
-    )
-  }
+      verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
+      coVerify(exactly = 0) { cachedFileManager.deleteCachedBook(any()) }
+      assertTrue(
+        "deleting a download must be confirmed, not done on one tap",
+        viewModel.bottomChooserState.value?.shouldShow == true,
+      )
+    }
 
   /**
    * cu-59 behaviour 2: jump-to-chapter warns before clearing progress. Without confirmation it must
@@ -214,7 +237,7 @@ class AudiobookDetailsViewModelTest {
    */
   @Test
   fun `jumping to a chapter asks before clearing progress`() {
-    every { mediaServiceConnection.isConnected } returns MutableLiveData(true)
+    every { mediaServiceConnection.isConnected } returns MutableStateFlow(true)
     val viewModel = viewModel()
 
     viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001")
@@ -229,7 +252,7 @@ class AudiobookDetailsViewModelTest {
   /** With confirmation it proceeds, connecting first when the service is not up. */
   @Test
   fun `a confirmed jump connects and plays`() {
-    every { mediaServiceConnection.isConnected } returns MutableLiveData(false)
+    every { mediaServiceConnection.isConnected } returns MutableStateFlow(false)
     val viewModel = viewModel()
 
     viewModel.jumpToChapter(bookStartTimeOffset = BookOffset(5_000L), trackId = "2001", hasUserConfirmation = true)
@@ -256,7 +279,7 @@ class AudiobookDetailsViewModelTest {
 
   private fun cacheManager() =
     mockk<ICachedFileManager>(relaxed = true) {
-      every { activeBookDownloads } returns MutableLiveData(emptySet())
+      every { activeBookDownloads } returns MutableStateFlow(emptySet())
     }
 
   private fun viewModel(cachedFileManager: ICachedFileManager = cacheManager()) =

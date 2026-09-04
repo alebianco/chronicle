@@ -91,10 +91,21 @@ class AudiobookDetailsViewModel(
       }
     }
 
+  /**
+   * `Eagerly`, not `WhileSubscribed` — five click handlers read `audiobook.value` synchronously.
+   *
+   * `pausePlayButtonClicked`, `onCacheButtonClick`, `toggleWatched` and `forceSync` all branch on
+   * this without collecting it, and under `WhileSubscribed` a screen whose button is pressed
+   * before anything subscribes reads the `null` seed. `pausePlayButtonClicked`'s offline guard
+   * (`audiobook.value?.isCached == false`) then evaluates false and lets an uncached book reach
+   * the player with no server — the exact case `playing an undownloaded book while disconnected
+   * does not reach the player` pins. The `LiveData` this replaces was a Room query, hot from the
+   * moment the screen observed it, so the distinction did not arise (cu-52).
+   */
   val audiobook: StateFlow<Audiobook?> =
     bookRepository
       .getAudiobook(inputAudiobook.id)
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+      .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
   val tracks: StateFlow<List<MediaItemTrack>> =
     trackRepository
@@ -151,8 +162,9 @@ class AudiobookDetailsViewModel(
       .map { status ->
         when (status) {
           CACHING -> R.color.icon // Doesn't matter, we show a spinner over it
+          NOT_CACHED -> R.color.icon
           CACHED -> R.color.iconActive
-          NOT_CACHED, null -> R.color.icon
+          null -> R.color.icon
         }
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.color.icon)
 
@@ -160,9 +172,11 @@ class AudiobookDetailsViewModel(
     cacheStatus
       .map { status ->
         when (status) {
+          CACHING -> R.drawable.ic_cloud_download_white // Doesn't matter, spinner covers it
+          NOT_CACHED -> R.drawable.ic_cloud_download_white
           CACHED -> R.drawable.ic_cloud_done_white
-          // Spinner covers it while CACHING; null is "not known yet" and the control is disabled.
-          CACHING, NOT_CACHED, null -> R.drawable.ic_cloud_download_white
+          // Not known yet; the control is disabled, so this is only what it renders behind that.
+          null -> R.drawable.ic_cloud_download_white
         }
       }.stateIn(
         viewModelScope,
@@ -187,8 +201,9 @@ class AudiobookDetailsViewModel(
       .map { status ->
         when (status) {
           CACHING -> R.string.download_cancel
+          NOT_CACHED -> R.string.download
           CACHED -> R.string.download_remove
-          NOT_CACHED, null -> R.string.download
+          null -> R.string.download
         }
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.string.download)
 

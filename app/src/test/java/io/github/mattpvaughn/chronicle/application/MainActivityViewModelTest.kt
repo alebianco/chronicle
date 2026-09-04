@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.application
 import android.os.SystemClock
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.EXPANDED
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.HIDDEN
@@ -16,6 +15,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.settledValue
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
 import io.mockk.every
@@ -23,6 +23,9 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -63,17 +66,17 @@ class MainActivityViewModelTest {
   private val loginRepo =
     mockk<IPlexLoginRepo>(relaxed = true) {
       every { loginEvent } returns
-        MutableLiveData(Event(IPlexLoginRepo.LoginState.LOGGED_IN_FULLY))
+        MutableStateFlow(Event(IPlexLoginRepo.LoginState.LOGGED_IN_FULLY))
     }
 
   private val trackRepository =
     mockk<ITrackRepository>(relaxed = true) {
-      every { getTracksForAudiobook(any()) } returns MutableLiveData(emptyList())
+      every { getTracksForAudiobook(any()) } returns MutableStateFlow(emptyList())
     }
 
   private val collectionsRepository =
     mockk<CollectionsRepository>(relaxed = true) {
-      every { hasCollections() } returns MutableLiveData(false)
+      every { hasCollections() } returns MutableStateFlow(false)
     }
 
   private val mediaServiceConnection = mockk<MediaServiceConnection>(relaxed = true)
@@ -240,7 +243,7 @@ class MainActivityViewModelTest {
   /** Play/pause must wait for the service rather than dropping the press. */
   @Test
   fun `pressing play while disconnected connects first`() {
-    every { mediaServiceConnection.isConnected } returns MutableLiveData(false)
+    every { mediaServiceConnection.isConnected } returns MutableStateFlow(false)
 
     viewModel().pausePlayButtonClicked()
 
@@ -251,9 +254,9 @@ class MainActivityViewModelTest {
   fun `pressing play while connected does not reconnect`() {
     // A real PlaybackStateCompat: it is a plain builder with no device dependency, and a relaxed
     // mock returns a bare Object that `pausePlay` cannot cast.
-    every { mediaServiceConnection.isConnected } returns MutableLiveData(true)
+    every { mediaServiceConnection.isConnected } returns MutableStateFlow(true)
     every { mediaServiceConnection.playbackState } returns
-      MutableLiveData(
+      MutableStateFlow(
         PlaybackStateCompat.Builder()
           .setState(PlaybackStateCompat.STATE_PAUSED, 0L, 1.0f)
           .build(),
@@ -274,14 +277,14 @@ class MainActivityViewModelTest {
    * than faking the controller here.
    */
   @Test
-  fun `the chapter title reads as idle when there are no tracks`() {
-    every { trackRepository.getTracksForAudiobook(any()) } returns MutableLiveData(emptyList())
+  fun `the chapter title reads as idle when there are no tracks`() =
+    runTest {
+      every { trackRepository.getTracksForAudiobook(any()) } returns MutableStateFlow(emptyList())
 
-    val viewModel = viewModel()
-    viewModel.currentChapterTitle.observeForever { }
+      val viewModel = viewModel()
 
-    assertEquals("No track playing", viewModel.currentChapterTitle.value)
-  }
+      assertEquals("No track playing", settledValue(viewModel.currentChapterTitle))
+    }
 
   /**
    * The sheet state must be readable **immediately** after it is written (cu-73).
@@ -351,61 +354,72 @@ class MainActivityViewModelTest {
    * already-finished book it was never reachable at all (cu-119).
    */
   @Test
-  fun `a book reaching its end does not hide the player`() {
-    val playbackState =
-      MutableLiveData(
-        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build(),
+  fun `a book reaching its end does not hide the player`() =
+    runTest {
+      val playbackState =
+        MutableStateFlow(
+          PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build(),
+        )
+      every { mediaServiceConnection.playbackState } returns playbackState
+      val viewModel = viewModel()
+      // The init collector is *scheduled* on the test dispatcher, not run — every state change below
+      // needs draining before the sheet state can be read (cu-52).
+      advanceUntilIdle()
+
+      // Playing: the sheet is revealed.
+      assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+
+      // The book runs out.
+      playbackState.value =
+        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_STOPPED, 0L, 1.0f).build()
+      advanceUntilIdle()
+
+      assertEquals(
+        "a finished book must stay reachable; hiding here is a one-way door",
+        COLLAPSED,
+        viewModel.currentlyPlayingLayoutState.value,
       )
-    every { mediaServiceConnection.playbackState } returns playbackState
-    val viewModel = viewModel()
-
-    // Playing: the sheet is revealed.
-    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
-
-    // The book runs out.
-    playbackState.value =
-      PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_STOPPED, 0L, 1.0f).build()
-
-    assertEquals(
-      "a finished book must stay reachable; hiding here is a one-way door",
-      COLLAPSED,
-      viewModel.currentlyPlayingLayoutState.value,
-    )
-  }
+    }
 
   /** `STATE_NONE` still hides it: that means there is genuinely nothing to play. */
   @Test
-  fun `no playback at all hides the player`() {
-    val playbackState =
-      MutableLiveData(
-        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build(),
-      )
-    every { mediaServiceConnection.playbackState } returns playbackState
-    val viewModel = viewModel()
-    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+  fun `no playback at all hides the player`() =
+    runTest {
+      val playbackState =
+        MutableStateFlow(
+          PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build(),
+        )
+      every { mediaServiceConnection.playbackState } returns playbackState
+      val viewModel = viewModel()
+      advanceUntilIdle()
+      assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
 
-    playbackState.value =
-      PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0L, 1.0f).build()
+      playbackState.value =
+        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0L, 1.0f).build()
+      advanceUntilIdle()
 
-    assertEquals(HIDDEN, viewModel.currentlyPlayingLayoutState.value)
-  }
+      assertEquals(HIDDEN, viewModel.currentlyPlayingLayoutState.value)
+    }
 
   /** Recovery from the hidden state, which is the half that made it a trap. */
   @Test
-  fun `playback resuming after nothing was playing reveals the player again`() {
-    val playbackState =
-      MutableLiveData(
-        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0L, 1.0f).build(),
-      )
-    every { mediaServiceConnection.playbackState } returns playbackState
-    val viewModel = viewModel()
-    assertEquals(HIDDEN, viewModel.currentlyPlayingLayoutState.value)
+  fun `playback resuming after nothing was playing reveals the player again`() =
+    runTest {
+      val playbackState =
+        MutableStateFlow(
+          PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0L, 1.0f).build(),
+        )
+      every { mediaServiceConnection.playbackState } returns playbackState
+      val viewModel = viewModel()
+      advanceUntilIdle()
+      assertEquals(HIDDEN, viewModel.currentlyPlayingLayoutState.value)
 
-    playbackState.value =
-      PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build()
+      playbackState.value =
+        PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f).build()
+      advanceUntilIdle()
 
-    assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
-  }
+      assertEquals(COLLAPSED, viewModel.currentlyPlayingLayoutState.value)
+    }
 
   /**
    * Onboarding must be distinguishable from being in the app.
@@ -415,38 +429,38 @@ class MainActivityViewModelTest {
    * configured while holding no library at all (cu-124).
    */
   @Test
-  fun `a partial login state counts as onboarding`() {
-    for (state in listOf(
-      IPlexLoginRepo.LoginState.LOGGED_IN_NO_USER_CHOSEN,
-      IPlexLoginRepo.LoginState.LOGGED_IN_NO_SERVER_CHOSEN,
-      IPlexLoginRepo.LoginState.LOGGED_IN_NO_LIBRARY_CHOSEN,
-    )) {
-      every { loginRepo.loginEvent } returns MutableLiveData(Event(state))
-      val vm = viewModel()
-      vm.isOnboarding.observeForever {}
+  fun `a partial login state counts as onboarding`() =
+    runTest {
+      for (state in listOf(
+        IPlexLoginRepo.LoginState.LOGGED_IN_NO_USER_CHOSEN,
+        IPlexLoginRepo.LoginState.LOGGED_IN_NO_SERVER_CHOSEN,
+        IPlexLoginRepo.LoginState.LOGGED_IN_NO_LIBRARY_CHOSEN,
+      )) {
+        every { loginRepo.loginEvent } returns MutableStateFlow(Event(state))
+        val vm = viewModel()
 
-      assertEquals("$state must count as onboarding", true, vm.isOnboarding.value)
+        assertEquals("$state must count as onboarding", true, settledValue(vm.isOnboarding))
+      }
     }
-  }
 
   @Test
-  fun `a complete login is not onboarding`() {
-    every { loginRepo.loginEvent } returns
-      MutableLiveData(Event(IPlexLoginRepo.LoginState.LOGGED_IN_FULLY))
-    val vm = viewModel()
-    vm.isOnboarding.observeForever {}
+  fun `a complete login is not onboarding`() =
+    runTest {
+      every { loginRepo.loginEvent } returns
+        MutableStateFlow(Event(IPlexLoginRepo.LoginState.LOGGED_IN_FULLY))
+      val vm = viewModel()
 
-    assertEquals(false, vm.isOnboarding.value)
-  }
+      assertEquals(false, settledValue(vm.isOnboarding))
+    }
 
   @Test
-  fun `being logged out is not onboarding`() {
-    // Not signed in at all is the login screen's business, not a half-finished setup.
-    every { loginRepo.loginEvent } returns
-      MutableLiveData(Event(IPlexLoginRepo.LoginState.NOT_LOGGED_IN))
-    val vm = viewModel()
-    vm.isOnboarding.observeForever {}
+  fun `being logged out is not onboarding`() =
+    runTest {
+      // Not signed in at all is the login screen's business, not a half-finished setup.
+      every { loginRepo.loginEvent } returns
+        MutableStateFlow(Event(IPlexLoginRepo.LoginState.NOT_LOGGED_IN))
+      val vm = viewModel()
 
-    assertEquals(false, vm.isOnboarding.value)
-  }
+      assertEquals(false, settledValue(vm.isOnboarding))
+    }
 }

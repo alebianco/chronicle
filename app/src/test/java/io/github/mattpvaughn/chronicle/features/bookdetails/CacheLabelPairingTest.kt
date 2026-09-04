@@ -30,7 +30,17 @@ class CacheLabelPairingTest {
     file.readText()
   }
 
-  /** The `when` branch labels inside the named `LiveData`'s initialiser. */
+  /**
+   * The `when` branch labels inside the named flow's initialiser, excluding `null`.
+   *
+   * `cacheStatus` is nullable — null means "not known yet", not a fourth cache state (cu-92) — so
+   * every one of these `when`s carries a `null ->` branch that is not a state to pair on. It is
+   * dropped here rather than in the assertions so all three tests agree on what a *state* is.
+   *
+   * Note the branch labels must stay one per line. A combined `CACHING, NOT_CACHED ->` matches
+   * nothing here, which would make this guard silently see fewer states and pass while the icon
+   * and the label had genuinely diverged — the failure mode it exists to catch.
+   */
   private fun branchesOf(propertyName: String): Set<String> {
     val start = viewModelSource.indexOf("val $propertyName")
     assertTrue("$propertyName not found — was it renamed?", start >= 0)
@@ -40,6 +50,7 @@ class CacheLabelPairingTest {
     return Regex("""^\s*(\w+)\s*->""", RegexOption.MULTILINE)
       .findAll(body)
       .map { it.groupValues[1] }
+      .filterNot { it == "null" }
       .toSet()
   }
 
@@ -72,8 +83,12 @@ class CacheLabelPairingTest {
   fun `each state announces a distinct action`() {
     val start = viewModelSource.indexOf("val cacheContentDescription")
     val body = viewModelSource.substring(start, viewModelSource.indexOf("\n\n", start))
+    // Same exclusion as `branchesOf`: the `null ->` branch is "not known yet", not a state.
     val strings =
-      Regex("""->\s*(R\.string\.\w+)""").findAll(body).map { it.groupValues[1] }.toList()
+      body
+        .lines()
+        .filterNot { it.trimStart().startsWith("null ->") }
+        .mapNotNull { Regex("""->\s*(R\.string\.\w+)""").find(it)?.groupValues?.get(1) }
 
     assertEquals("expected one string per state", 3, strings.size)
     assertEquals("the three states must announce three different things", 3, strings.toSet().size)

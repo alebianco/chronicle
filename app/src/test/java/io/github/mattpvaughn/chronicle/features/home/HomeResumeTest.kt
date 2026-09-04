@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.features.home
 import android.os.Bundle
 import android.support.v4.media.session.MediaControllerCompat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
@@ -19,6 +18,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -114,7 +114,7 @@ class HomeResumeTest {
     val onConnected = slot<() -> Unit>()
     val connection =
       mockk<MediaServiceConnection>(relaxed = true) {
-        every { isConnected } returns MutableLiveData(false)
+        every { isConnected } returns MutableStateFlow(false)
         every { transportControls } returns this@HomeResumeTest.transportControls
         every { connect(capture(onConnected)) } returns Unit
       }
@@ -132,19 +132,19 @@ class HomeResumeTest {
     connected: Boolean = true,
     connection: MediaServiceConnection =
       mockk(relaxed = true) {
-        every { isConnected } returns MutableLiveData(true)
+        every { isConnected } returns MutableStateFlow(true)
         every { transportControls } returns this@HomeResumeTest.transportControls
       },
   ) = HomeViewModel(
     plexConfig =
       mockk<PlexConfig>(relaxed = true) {
-        every { isConnected } returns MutableLiveData(connected)
+        every { isConnected } returns MutableStateFlow(connected)
       },
     bookRepository =
       mockk<IBookRepository>(relaxed = true) {
-        every { getRecentlyListened() } returns MutableLiveData(listOf(book))
-        every { getRecentlyAdded() } returns MutableLiveData(emptyList())
-        every { getCachedAudiobooks() } returns MutableLiveData(emptyList())
+        every { getRecentlyListened() } returns MutableStateFlow(listOf(book))
+        every { getRecentlyAdded() } returns MutableStateFlow(emptyList())
+        every { getCachedAudiobooks() } returns MutableStateFlow(emptyList())
       },
     librarySyncRepository = mockk<LibrarySyncRepository>(relaxed = true),
     prefsRepo =

@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.login
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.OAuthResponse
 import io.github.mattpvaughn.chronicle.util.Event
@@ -12,6 +11,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -42,7 +42,7 @@ class LoginViewModelTest {
 
   private fun repo(): IPlexLoginRepo =
     mockk<IPlexLoginRepo>(relaxed = true) {
-      every { loginEvent } returns MutableLiveData(Event(IPlexLoginRepo.LoginState.NOT_LOGGED_IN))
+      every { loginEvent } returns MutableStateFlow(Event(IPlexLoginRepo.LoginState.NOT_LOGGED_IN))
     }
 
   private fun viewModel(
