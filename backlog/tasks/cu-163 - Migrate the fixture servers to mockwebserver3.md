@@ -1,7 +1,7 @@
 ---
 id: cu-163
 title: Migrate the fixture servers to mockwebserver3
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-04'
 labels:
@@ -45,12 +45,49 @@ a red suite.
 
 ## Acceptance Criteria
 
-- [ ] All four files on `mockwebserver3`; no `okhttp3.mockwebserver` import remains
-- [ ] `PlexFixtureContractTest` passes unchanged — it pins that both routers key on the **id**
-      (cu-18), and it exists because the routing is duplicated and both copies once had the same
-      defect
-- [ ] Mock mode still works on a device: `--ez mock_plex true`, then a library and a playback check
-      (`plex-session.sh mock`, and `real` afterwards)
+- [x] All four files on `mockwebserver3`; no `okhttp3.mockwebserver` import remains
+- [x] `PlexFixtureContractTest` passes unchanged
+- [x] Mock mode verified on the device, including the switch back to the real session
+
+## Implementation Notes (2026-09-05)
+
+**Four API changes, not one.** The task anticipated the `MockResponse` rewrite; three others came
+with it and only surfaced by compiling:
+
+| v1 | v3 |
+|---|---|
+| `MockResponse().setResponseCode(n).setBody(s)` | `MockResponse(code = n, body = s)`, or `MockResponse.Builder()…build()` where headers are set |
+| `RecordedRequest.path` | `RecordedRequest.target` |
+| `MockWebServer.shutdown()` | `close()` — it is `Closeable` now |
+| `com.squareup.okhttp3:mockwebserver` | `:mockwebserver3` (same version ref) |
+
+The simple two-part responses read better as constructor calls; only the ones that set headers need
+the builder. That is why the diff is a mix of both rather than uniformly one style.
+
+### Verified where it actually runs
+
+`MockPlexServer` is the one that mattered — it serves the *app* on a device, so a mistake there
+shows up as "mock mode is broken" rather than as a red suite. On the tablet, via
+`plex-session.sh mock`:
+
+- every route resolved, **zero** "missing fixture" lines — `/identity`, `libraries.json`,
+  `albums.json`, both tag-index filters (`filter-style`, `albums-style-301`), chapters, cover art
+  and `/playQueues`
+- a pull-to-refresh replaced the stale catalogue with the 3-book fixture library, so the whole sync
+  path ran through the rewritten dispatcher
+- `--el play_book 1001` reached `state=3` (PLAYING) with the audio request served, exercising
+  `audioResponse`
+- `plex-session.sh real` restored the household session and the app reconnected to ANTARES over its
+  `plex.direct` LAN address
+
+The 206/range branch of `audioResponse` was **not** exercised on device — ExoPlayer requested no
+range for this fixture — so it rests on `FakePlexServer`'s unit coverage, which passes. Same
+position cu-64 recorded: seeks remain unexercised end to end.
+
+### Closed to Done
+
+No product surface and no visual change: this is test and debug infrastructure, and every criterion
+was proved by a test or a log.
 
 ## Related
 

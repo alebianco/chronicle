@@ -1,9 +1,9 @@
 package io.github.mattpvaughn.chronicle.testing
 
-import okhttp3.mockwebserver.Dispatcher
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import okhttp3.mockwebserver.RecordedRequest
+import mockwebserver3.Dispatcher
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import org.junit.rules.ExternalResource
 
 /**
@@ -40,7 +40,7 @@ class FakePlexServer : ExternalResource() {
     server.dispatcher =
       object : Dispatcher() {
         override fun dispatch(request: RecordedRequest): MockResponse {
-          val path = request.path.orEmpty()
+          val path = request.target
           requested += path
           overrides.entries.firstOrNull { path.startsWith(it.key) }?.let { return it.value }
           if (path.startsWith("/library/parts/")) {
@@ -53,7 +53,7 @@ class FakePlexServer : ExternalResource() {
   }
 
   override fun after() {
-    server.shutdown()
+    server.close()
   }
 
   /**
@@ -72,12 +72,12 @@ class FakePlexServer : ExternalResource() {
     pathPrefix: String,
     code: Int = 500,
   ) {
-    stub(pathPrefix, MockResponse().setResponseCode(code))
+    stub(pathPrefix, MockResponse(code = code))
   }
 
   /** Convenience for an expired-token response — the case cu-10 has to handle. */
   fun stubUnauthorized(pathPrefix: String) {
-    stub(pathPrefix, MockResponse().setResponseCode(401))
+    stub(pathPrefix, MockResponse(code = 401))
   }
 
   /** The album fixture for a known book id, the track fixture otherwise. See [routeFor]. */
@@ -118,9 +118,11 @@ class FakePlexServer : ExternalResource() {
       "{\"MediaContainer\":{\"size\":" + kept.size +
         ",\"identifier\":\"com.plexapp.plugins.library\",\"Metadata\":[" +
         kept.joinToString(",") + "]}}"
-    return MockResponse().setResponseCode(200)
+    return MockResponse.Builder()
+      .code(200)
       .setHeader("Content-Type", "application/json")
-      .setBody(json)
+      .body(json)
+      .build()
   }
 
   /** Splits a JSON array body into its top-level objects by brace depth. */
@@ -201,8 +203,8 @@ class FakePlexServer : ExternalResource() {
       path.contains("/pins") -> json("oauth-pin-granted.json")
       path.contains("/identity") -> json("identity.json")
       // Progress reporting and scrobbles return an empty 200 from a real server.
-      path.startsWith("/:/") -> MockResponse().setResponseCode(200).setBody("")
-      else -> MockResponse().setResponseCode(404).setBody("""{"error":"no fixture for $path"}""")
+      path.startsWith("/:/") -> MockResponse(code = 200, body = "")
+      else -> MockResponse(code = 404, body = """{"error":"no fixture for $path"}""")
     }
 
   /**
@@ -216,20 +218,22 @@ class FakePlexServer : ExternalResource() {
     val bytes = fixtureBytes("track.wav")
     val range = parseRange(rangeHeader, bytes.size)
     return if (range == null) {
-      MockResponse()
-        .setResponseCode(200)
+      MockResponse.Builder()
+        .code(200)
         .setHeader("Content-Type", "audio/wav")
         .setHeader("Accept-Ranges", "bytes")
-        .setBody(okio.Buffer().write(bytes))
+        .body(okio.Buffer().write(bytes))
+        .build()
     } else {
       val (start, endInclusive) = range
       val slice = bytes.copyOfRange(start, endInclusive + 1)
-      MockResponse()
-        .setResponseCode(206)
+      MockResponse.Builder()
+        .code(206)
         .setHeader("Content-Type", "audio/wav")
         .setHeader("Accept-Ranges", "bytes")
         .setHeader("Content-Range", "bytes $start-$endInclusive/${bytes.size}")
-        .setBody(okio.Buffer().write(slice))
+        .body(okio.Buffer().write(slice))
+        .build()
     }
   }
 
@@ -247,10 +251,11 @@ class FakePlexServer : ExternalResource() {
   }
 
   private fun json(fixture: String): MockResponse =
-    MockResponse()
-      .setResponseCode(200)
+    MockResponse.Builder()
+      .code(200)
       .setHeader("Content-Type", "application/json")
-      .setBody(fixture(fixture))
+      .body(fixture(fixture))
+      .build()
 
   companion object {
     /** The book ids in `albums.json`; each has an `album-<id>.json` detail fixture. */

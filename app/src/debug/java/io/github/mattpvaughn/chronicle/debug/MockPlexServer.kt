@@ -1,10 +1,10 @@
 package io.github.mattpvaughn.chronicle.debug
 
 import android.content.Context
-import okhttp3.mockwebserver.Dispatcher
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import okhttp3.mockwebserver.RecordedRequest
+import mockwebserver3.Dispatcher
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import timber.log.Timber
 import java.net.InetAddress
 import kotlin.concurrent.thread
@@ -42,7 +42,7 @@ class MockPlexServer(private val context: Context) {
     server.dispatcher =
       object : Dispatcher() {
         override fun dispatch(request: RecordedRequest): MockResponse {
-          val path = request.path.orEmpty()
+          val path = request.target
           // Log before any early return. This line used to sit below the photo
           // and audio branches, so those requests were served but never logged —
           // which made playback look like it was never fetching audio and cost a
@@ -61,25 +61,26 @@ class MockPlexServer(private val context: Context) {
           }
           if (failProgressReports && path.startsWith("/:/timeline")) {
             Timber.i("MockPlexServer: -> 401 (failProgressReports)")
-            return MockResponse().setResponseCode(401)
+            return MockResponse(code = 401)
           }
           val fixture = fixtureFor(path)
           Timber.i("MockPlexServer: -> ${fixture ?: "(empty 200)"}")
           if (fixture == null) {
-            return MockResponse().setResponseCode(200).setBody("")
+            return MockResponse(code = 200, body = "")
           }
           return try {
             val body =
               context.assets.open("plex-fixtures/$fixture")
                 .bufferedReader()
                 .use { it.readText() }
-            MockResponse()
-              .setResponseCode(200)
+            MockResponse.Builder()
+              .code(200)
               .setHeader("Content-Type", "application/json")
-              .setBody(body)
+              .body(body)
+              .build()
           } catch (e: Exception) {
             Timber.e(e, "MockPlexServer: missing fixture $fixture")
-            MockResponse().setResponseCode(404)
+            MockResponse(code = 404)
           }
         }
       }
@@ -111,7 +112,7 @@ class MockPlexServer(private val context: Context) {
     Timber.i("MockPlexServer listening on $baseUrl")
   }
 
-  fun shutdown() = server.shutdown()
+  fun shutdown() = server.close()
 
   /**
    * Serves the generated tone, honouring a single-range `Range` header.
@@ -125,26 +126,28 @@ class MockPlexServer(private val context: Context) {
       val bytes = context.assets.open("plex-fixtures/track.wav").use { it.readBytes() }
       val range = parseRange(rangeHeader, bytes.size)
       if (range == null) {
-        MockResponse()
-          .setResponseCode(200)
+        MockResponse.Builder()
+          .code(200)
           .setHeader("Content-Type", "audio/wav")
           .setHeader("Accept-Ranges", "bytes")
           .setHeader("Content-Length", bytes.size.toString())
-          .setBody(okio.Buffer().write(bytes))
+          .body(okio.Buffer().write(bytes))
+          .build()
       } else {
         val (start, endInclusive) = range
         val slice = bytes.copyOfRange(start, endInclusive + 1)
-        MockResponse()
-          .setResponseCode(206)
+        MockResponse.Builder()
+          .code(206)
           .setHeader("Content-Type", "audio/wav")
           .setHeader("Accept-Ranges", "bytes")
           .setHeader("Content-Range", "bytes $start-$endInclusive/${bytes.size}")
           .setHeader("Content-Length", slice.size.toString())
-          .setBody(okio.Buffer().write(slice))
+          .body(okio.Buffer().write(slice))
+          .build()
       }
     } catch (e: Exception) {
       Timber.e(e, "MockPlexServer: missing track.wav")
-      MockResponse().setResponseCode(404)
+      MockResponse(code = 404)
     }
 
   /** Parses `bytes=start-[end]`; returns null for absent or unusable headers. */
@@ -163,13 +166,14 @@ class MockPlexServer(private val context: Context) {
   private fun imageResponse(): MockResponse =
     try {
       val bytes = context.assets.open("plex-fixtures/cover.png").use { it.readBytes() }
-      MockResponse()
-        .setResponseCode(200)
+      MockResponse.Builder()
+        .code(200)
         .setHeader("Content-Type", "image/png")
-        .setBody(okio.Buffer().write(bytes))
+        .body(okio.Buffer().write(bytes))
+        .build()
     } catch (e: Exception) {
       Timber.e(e, "MockPlexServer: missing cover.png")
-      MockResponse().setResponseCode(404)
+      MockResponse(code = 404)
     }
 
   /**

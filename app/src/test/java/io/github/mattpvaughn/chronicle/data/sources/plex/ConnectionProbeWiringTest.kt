@@ -8,7 +8,7 @@ import io.github.mattpvaughn.chronicle.testing.FakePlexServer
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import okhttp3.mockwebserver.MockResponse
+import mockwebserver3.MockResponse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -161,7 +161,7 @@ class ConnectionProbeWiringTest {
     runTest {
       // /identity is a liveness check. A 200 with nothing useful in it still means the server
       // answered, and Moshi must not turn that into a failure.
-      plex.stub("/identity", MockResponse().setResponseCode(200).setBody("{}"))
+      plex.stub("/identity", MockResponse(code = 200, body = "{}"))
 
       assertTrue(probe(connection("")))
     }

@@ -84,7 +84,10 @@ swiperefresh = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayo
 seismic = { group = "com.squareup", name = "seismic", version.ref = "seismic" }
 okhttp3 = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp3" }
 okhttp3-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
-okhttp3-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp3" }
+# mockwebserver3, not the legacy `mockwebserver` artifact: the old package still ships at 5.4.0 but
+# only as a compatibility shim (its jar contains a literal `DeprecationBridgeKt`), so depending on
+# it is depending on something whose name says it is transitional (cu-163).
+okhttp3-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "okhttp3" }
 browserx = { group = "androidx.browser", name = "browser", version.ref = "browserx" }
 oss = { group = "com.google.android.gms", name = "play-services-oss-licenses", version.ref = "oss" }
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }

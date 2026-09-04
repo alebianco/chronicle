@@ -3,9 +3,9 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
+import mockwebserver3.MockResponse
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.mockwebserver.MockResponse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -81,7 +81,7 @@ class ReauthWiringTest {
     plex.stubUnauthorized("/library/sections")
     val c = client(refreshes) { serverWith("fresh-token") }
 
-    plex.stub("/library/sections", MockResponse().setResponseCode(401))
+    plex.stub("/library/sections", MockResponse(code = 401))
     val response = get(c)
     response.close()
 
@@ -96,7 +96,7 @@ class ReauthWiringTest {
   fun `the refreshed token is sent on the retry, not the stale one`() {
     prefs.server = serverWith("stale-token")
     val refreshes = AtomicInteger()
-    plex.stub("/library/sections", MockResponse().setResponseCode(401))
+    plex.stub("/library/sections", MockResponse(code = 401))
     val c = client(refreshes) { serverWith("fresh-token") }
 
     get(c).close()
@@ -111,7 +111,7 @@ class ReauthWiringTest {
     // what stops a loop. A permanent 401 must therefore produce exactly one refresh.
     prefs.server = serverWith("stale-token")
     val refreshes = AtomicInteger()
-    plex.stub("/library/sections", MockResponse().setResponseCode(401))
+    plex.stub("/library/sections", MockResponse(code = 401))
     val c = client(refreshes) { serverWith("fresh-token") }
 
     val response = get(c)
@@ -161,7 +161,7 @@ class ReauthWiringTest {
   fun `a refresh that cannot produce a server does not retry`() {
     prefs.server = serverWith("stale-token")
     val refreshes = AtomicInteger()
-    plex.stub("/library/sections", MockResponse().setResponseCode(401))
+    plex.stub("/library/sections", MockResponse(code = 401))
     val c = client(refreshes) { null }
 
     val response = get(c)
@@ -184,7 +184,7 @@ class ReauthWiringTest {
     prefs.server = serverWith("stale-token")
     val refreshes = AtomicInteger()
     val authState = AccountAuthState()
-    plex.stub("/library/sections", MockResponse().setResponseCode(401))
+    plex.stub("/library/sections", MockResponse(code = 401))
     val c =
       OkHttpClient.Builder()
         .addInterceptor { chain ->
