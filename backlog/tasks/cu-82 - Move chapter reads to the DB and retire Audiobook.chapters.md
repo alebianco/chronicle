@@ -1,7 +1,7 @@
 ---
 id: cu-82
 title: Move chapter reads to the DB and retire Audiobook.chapters
-status: To Do
+status: Done
 labels: [R2, architecture]
 dependencies: [cu-49, cu-158]
 priority: medium
@@ -46,12 +46,63 @@ before the drop regardless, or an upgrading user loses every chapter they had.
 
 ## Acceptance Criteria
 
-- [ ] All four read sites take chapters from `ChapterDao`, with the `asChapterList()` fallback
+- [x] All four read sites take chapters from `ChapterDao`, with the `asChapterList()` fallback
       preserved for books with no chapter data
-- [ ] A book synced by an earlier version (rows absent, `Audiobook.chapters` populated) still shows
+- [x] A book synced by an earlier version (rows absent, `Audiobook.chapters` populated) still shows
       its chapters — the upgrade regression this task exists to avoid, covered by a test
-- [ ] Chapter highlight and jump-to-chapter still work across a track boundary
-- [ ] Only then: `Audiobook.chapters` removed, with a `BookDatabase` migration and a file-backed
-      test verified to bite
-- [ ] `ChapterListConverter` and its tests removed with the column, or a written reason to keep them
-- [ ] Verify loop green
+      (`ChapterUpgradeReadTest`, over real databases, sabotage-verified)
+- [x] Chapter highlight and jump-to-chapter still work across a track boundary — the chapter-skip
+      path was in fact **broken** for freshly synced books and is fixed here; see the notes
+- [ ] ~~Only then: `Audiobook.chapters` removed, with a `BookDatabase` migration and a file-backed
+      test verified to bite~~ → **[[cu-159]]**, gated on a released build having run the backfill
+- [ ] ~~`ChapterListConverter` and its tests removed with the column~~ → **[[cu-159]]**
+- [x] Verify loop green (7 stages)
+
+## Implementation Notes
+
+**The table is now load-bearing; the column survives as a fallback.** Every read resolves
+table → legacy column → `asChapterList()` through one shared function
+(`resolveChapters` / `resolveChaptersFromCache` in `data/model/ChapterAssembly.kt`), rather than
+the precedence being copied into each `LiveData` graph. The three `DoubleLiveData` combinators
+became `TripleLiveData` over a DAO-backed source; `BookRepository` grew `getChaptersForBook` and
+`getChaptersForBookLive` and already owned `chapterDao`, so no new dependency reached the ViewModels.
+
+**The scope note in this task was itself wrong, in the direction that mattered.** It said the four
+`DoubleLiveData` sites were the work and that `CurrentlyPlayingViewModel`/`PlayerExt` followed
+transitively. They do not. Those ten sites read `currentlyPlaying.book.value.chapters` — the
+**legacy column**, not the singleton's resolved list, which was `private`. Since cu-49 writes
+chapters to the table, that column is empty for any freshly synced book, so `indexOf` returned
+`-1` and **chapter skip silently did nothing**. That is a live user-facing bug this task found
+rather than a refactor: the resolved list is exposed on `CurrentlyPlaying` now and all ten read it.
+Re-count references before trusting a stated count — it was 28/11 in the task, 43/19 on the branch.
+
+**Rows are passed into `CurrentlyPlayingSingleton.update`, never read inside it.** That method runs
+**once a second** from `ProgressUpdater`, so a DAO on the singleton would put a blocking read on
+every playback tick — the exact shape cu-110 removed. `OnMediaChangedCallback` and
+`AudiobookMediaSessionCallback` (both already in IO context, both already holding the repository)
+supply the rows when the book actually changes; the per-tick caller passes none.
+
+That interleaving is load-bearing, so it is pinned: a tick arriving without rows must not
+**downgrade** an already-resolved list back to the stale column. Both sources are usually identical,
+so nothing else would have caught it.
+
+**Three sabotages, each failing exactly one test:**
+
+| sabotage | fails with |
+|---|---|
+| resolve table-only, no fallback | `a pre-cu-49 book must still show its chapters expected:<[Chapter 1..3]> but was:<[]>` |
+| resolve on every tick | `expected:<from [table]> but was:<from [column]>` |
+| expose the column, not the resolved list | `the resolved list must carry the table's rows` |
+
+**The column is deliberately not dropped**, and the two criteria asking for it are moved to
+**cu-159** rather than ticked. `ChronicleApplication.backfillChapterTable()` is *launched, not
+awaited*, so on the first launch after an upgrade the table is still filling while the UI reads.
+Removing the fallback there shows no chapters and destroys the data to recover them. It is safe only
+once a released build has run the backfill — a release boundary, and an owner decision. cu-159
+carries the migration, the converter removal and the now-dead backfill machinery.
+
+**Closed to `Done`**: no screen changed and no product choice was made. The chapter-skip fix is a
+correctness bug with a failing-then-passing test, and every claim above is reproducible headless.
+
+Coverage rose 37.75 → 37.96 aggregate, with `application`, `data/local`, `features/bookdetails`,
+`features/currentlyplaying`, `features/player` and `util` all up and none down.

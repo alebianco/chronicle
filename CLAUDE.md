@@ -186,11 +186,22 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   null for a missing or unreadable directory, and coalescing that to an empty list un-cached whole
   libraries. `cachedMediaDir` also returns the *stored* path even when unmounted, so an absent SD
   card reads as unavailable rather than silently resolving to a different, readable directory.
-- **Chapters are stored twice, on purpose, for now** (cu-49). They are written to `ChapterDatabase`
-  *and* still serialized into `Audiobook.chapters`, because `syncAudiobook` is the only writer and
-  runs per book on demand — so the table is empty for any library synced by an earlier version, and
-  a read switched straight to the DAO would show no chapters until each book re-syncs. The four
-  read sites still read the book column. Finishing the move is cu-82; until then, **write to both**.
+- **Chapters are read table-first, and the column is now only a fallback** (cu-49, cu-82). They are
+  written to `ChapterDatabase` *and* still serialized into `Audiobook.chapters`, so **keep writing
+  to both** until cu-159 drops the column. Every read goes through `resolveChapters` /
+  `resolveChaptersFromCache` (`data/model/ChapterAssembly.kt`): table → column → `asChapterList()`.
+  The middle level is not redundant — `ChronicleApplication.backfillChapterTable()` (cu-158) is
+  **launched, not awaited**, so on the first launch after an upgrade the table is still filling
+  while the UI reads. Dropping the column before a released build has run the backfill shows no
+  chapters and destroys the data to recover them; that gate is cu-159.
+  **Read `currentlyPlaying.chapters`, never `currentlyPlaying.book.value.chapters`** — the book's
+  column is the legacy source and is **empty for any book synced since cu-49**, so ten call sites in
+  `PlayerExt` and `CurrentlyPlayingViewModel` were resolving `indexOf` to `-1` and chapter skip
+  silently did nothing. The singleton's resolved list is public for that reason.
+  **Rows are passed *into* `CurrentlyPlayingSingleton.update`, never read inside it**: it runs once
+  a second from `ProgressUpdater`, so a DAO there is a blocking read per tick (cu-110). The callers
+  that fire on the book *changing* supply them; the per-tick caller passes none, and a test pins
+  that a tick without rows cannot downgrade an already-resolved list back to the stale column.
   Chapter offsets are *absolute within the book*, not per-track: two separate bugs came from a
   per-track `0L` (cu-13, cu-49), and `getChapterAt` silently resolves nothing when they are wrong.
   Since cu-136 the frame is a **type**, so that mistake no longer compiles — see below.
