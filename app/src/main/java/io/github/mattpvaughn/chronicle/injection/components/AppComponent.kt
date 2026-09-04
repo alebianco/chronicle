@@ -82,6 +82,9 @@ interface AppComponent {
 
   fun plexMediaService(): PlexMediaService
 
+  /** The Plex session handshake and the token that authorizes it (cu-33). */
+  fun playbackSession(): PlaybackSession
+
   fun cachedFileManager(): ICachedFileManager
 
   fun currentlyPlaying(): CurrentlyPlaying

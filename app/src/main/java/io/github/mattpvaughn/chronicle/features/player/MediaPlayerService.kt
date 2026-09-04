@@ -33,7 +33,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
@@ -55,6 +54,7 @@ import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.PackageValidator
 import io.github.mattpvaughn.chronicle.util.ServiceUtils
 import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
@@ -112,6 +112,9 @@ class MediaPlayerService :
 
   @Inject
   lateinit var dispatchers: DispatcherProvider
+
+  @Inject
+  lateinit var exceptionHandler: CoroutineExceptionHandler
 
   @Inject
   lateinit var trackListManager: TrackListStateManager
@@ -256,7 +259,7 @@ class MediaPlayerService :
 
     prefsRepo.registerPrefsListener(prefsListener)
 
-    serviceScope.launch(Injector.get().unhandledExceptionHandler()) { mediaSource.load() }
+    serviceScope.launch(exceptionHandler) { mediaSource.load() }
 
     mediaSession.setPlaybackState(PlaybackStateCompat.Builder().build())
     mediaSession.setCallback(mediaSessionCallback)
@@ -274,7 +277,7 @@ class MediaPlayerService :
       NOW_PLAYING_NOTIFICATION,
       notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken),
     )
-    serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+    serviceScope.launch(exceptionHandler) {
       postNotificationWithArtwork()
     }
 
@@ -300,7 +303,7 @@ class MediaPlayerService :
    * shape cu-110 was about.
    */
   private fun observeBookSpeedOverride() {
-    serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+    serviceScope.launch(exceptionHandler) {
       currentlyPlaying.book
         .map { it.id to it.playbackSpeed }
         .distinctUntilChanged()
@@ -634,7 +637,7 @@ class MediaPlayerService :
         NOW_PLAYING_NOTIFICATION,
         notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken),
       )
-      serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+      serviceScope.launch(exceptionHandler) {
         postNotificationWithArtwork()
       }
     }
@@ -657,7 +660,7 @@ class MediaPlayerService :
     }
 
     result.detach()
-    serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+    serviceScope.launch(exceptionHandler) {
       withContext(dispatchers.io) {
         // Categories are matched by their stable id, never by the localized label (cu-99).
         when (AutoBrowseCategory.fromId(parentId)) {
@@ -705,7 +708,7 @@ class MediaPlayerService :
     result: Result<MutableList<MediaBrowserCompat.MediaItem>>,
   ) {
     Timber.i("Searching! Query = $query")
-    serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+    serviceScope.launch(exceptionHandler) {
       val books = bookRepository.searchAsync(query)
       result.sendResult(books.map { it.toMediaItem(plexConfig) }.toMutableList())
     }
@@ -821,7 +824,7 @@ class MediaPlayerService :
         newPosition: Player.PositionInfo,
         reason: Int,
       ) {
-        serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+        serviceScope.launch(exceptionHandler) {
           if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
             Timber.i("Playing next track")
             // Update track progress
@@ -858,7 +861,7 @@ class MediaPlayerService :
           return
         }
         Timber.i("Player STATE ENDED")
-        serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+        serviceScope.launch(exceptionHandler) {
           withContext(dispatchers.io) {
             // get track through tracklistmanager b/c metadata will be empty
             val activeTrack = trackListManager.trackList.getActiveTrack()

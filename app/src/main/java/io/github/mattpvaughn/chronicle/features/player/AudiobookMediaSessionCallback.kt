@@ -18,15 +18,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.github.michaelbull.result.getError
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.*
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlaybackSession
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
-import io.github.mattpvaughn.chronicle.data.sources.plex.getMediaItemUri
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
@@ -38,6 +37,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineExceptionHandler
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -63,6 +63,8 @@ class AudiobookMediaSessionCallback
     private val progressUpdater: ProgressUpdater,
     defaultPlayer: ExoPlayer,
     private val dispatchers: DispatcherProvider,
+    private val exceptionHandler: CoroutineExceptionHandler,
+    private val playbackSession: PlaybackSession,
   ) : MediaSessionCompat.Callback() {
     // Default to ExoPlayer to prevent having a nullable field
     var currentPlayer: Player = defaultPlayer
@@ -97,7 +99,7 @@ class AudiobookMediaSessionCallback
     ) {
       if (query.isNullOrEmpty()) {
         // take most recently played book, start that
-        serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+        serviceScope.launch(exceptionHandler) {
           val mostRecentlyPlayed = bookRepository.getMostRecentlyPlayed()
           val bookToPlay =
             if (mostRecentlyPlayed == EMPTY_AUDIOBOOK) {
@@ -113,7 +115,7 @@ class AudiobookMediaSessionCallback
         }
         return
       }
-      serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+      serviceScope.launch(exceptionHandler) {
         val matchingBooks = bookRepository.searchAsync(query)
         if (matchingBooks.isNotEmpty()) {
           val result = matchingBooks.first().id
@@ -430,13 +432,7 @@ class AudiobookMediaSessionCallback
         // Refresh auth token in [dataSourceFactory] in case the server has changed without
         // the service being recreated
         dataSourceFactory.setDefaultRequestProperties(
-          mapOf(
-            "X-Plex-Token" to (
-              plexPrefsRepo.server?.accessToken
-                ?: plexPrefsRepo.user?.authToken
-                ?: plexPrefsRepo.accountAuthToken
-            ),
-          ),
+          mapOf("X-Plex-Token" to playbackSession.authToken),
         )
         val factory = DefaultDataSource.Factory(appContext, dataSourceFactory)
         when (player) {
@@ -466,20 +462,7 @@ class AudiobookMediaSessionCallback
         )
 
         // Inform plex server that audio playback session has started
-        val serverId = plexPrefsRepo.server?.serverId
-        if (serverId == null) {
-          Timber.w(
-            "Unknown server id. Cannot start active session. Media playback may not be saved",
-          )
-        } else {
-          try {
-            Injector.get().plexMediaService().startMediaSession(
-              getMediaItemUri(serverId, bookId),
-            )
-          } catch (e: Throwable) {
-            Timber.e(e, "Failed to start media session")
-          }
-        }
+        playbackSession.start(bookId)
       }
     }
 
@@ -574,7 +557,7 @@ class AudiobookMediaSessionCallback
             // Only run these resume methods once after reconnecting
             clearResumeObserver()
 
-            serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+            serviceScope.launch(exceptionHandler) {
               val mostRecentBook = bookRepository.getMostRecentlyPlayed()
               if (mostRecentBook == EMPTY_AUDIOBOOK) {
                 return@launch

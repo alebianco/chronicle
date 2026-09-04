@@ -12,7 +12,6 @@ import androidx.work.*
 import com.tonyodev.fetch2.*
 import com.tonyodev.fetch2core.DownloadBlock
 import io.github.mattpvaughn.chronicle.BuildConfig
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -95,9 +94,8 @@ class CachedFileManager
     private val applicationContext: Context,
     private val dispatchers: DispatcherProvider,
     private val externalScope: CoroutineScope,
+    private val externalFileDirs: List<@JvmSuppressWildcards File>,
   ) : ICachedFileManager {
-    private val externalFileDirs = Injector.get().externalDeviceDirs()
-
     private val downloadListener =
       object : BroadcastReceiver() {
         override fun onReceive(
@@ -106,13 +104,12 @@ class CachedFileManager
         ) {
           when (intent?.action) {
             DownloadNotificationWorker.ACTION_CANCEL_ALL_DOWNLOADS ->
-              Injector.get().fetch()
-                .cancelAll()
+              fetch.cancelAll()
             DownloadNotificationWorker.ACTION_CANCEL_BOOK_DOWNLOAD -> {
               val bookId = intent.getStringExtra(DownloadNotificationWorker.KEY_BOOK_ID)
               if (!bookId.isNullOrEmpty()) {
                 Timber.i("Cancelling book: $bookId")
-                Injector.get().fetch().cancelGroup(downloadGroupId(bookId))
+                fetch.cancelGroup(downloadGroupId(bookId))
               }
             }
           }

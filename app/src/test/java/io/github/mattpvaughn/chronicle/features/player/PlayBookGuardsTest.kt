@@ -11,6 +11,7 @@ import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -200,6 +201,8 @@ class PlayBookGuardsTest {
       progressUpdater = mockk(relaxed = true),
       defaultPlayer = mockk(relaxed = true),
       dispatchers = TestDispatcherProvider(),
+      exceptionHandler = testExceptionHandler(),
+      playbackSession = mockk(relaxed = true),
     )
   }
 }

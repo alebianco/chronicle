@@ -23,6 +23,7 @@ import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.sources.plex.APP_NAME
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlaybackSession
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_BACK_BUFFER_DURATION_MILLIS
@@ -141,7 +142,10 @@ class ServiceModule(private val service: MediaPlayerService) {
 
   @Provides
   @ServiceScope
-  fun plexDataSourceFactory(plexPrefs: PlexPrefsRepo): DefaultHttpDataSource.Factory {
+  fun plexDataSourceFactory(
+    plexPrefs: PlexPrefsRepo,
+    playbackSession: PlaybackSession,
+  ): DefaultHttpDataSource.Factory {
     val dataSourceFactory = DefaultHttpDataSource.Factory()
     dataSourceFactory.setUserAgent(Util.getUserAgent(service, APP_NAME))
 
@@ -156,10 +160,7 @@ class ServiceModule(private val service: MediaPlayerService) {
         "X-Plex-Platform-Version" to Build.VERSION.RELEASE,
         "X-Plex-Device" to Build.MODEL,
         "X-Plex-Device-Name" to Build.MODEL,
-        "X-Plex-Token" to (
-          plexPrefs.server?.accessToken ?: plexPrefs.user?.authToken
-            ?: plexPrefs.accountAuthToken
-        ),
+        "X-Plex-Token" to playbackSession.authToken,
       ),
     )
 

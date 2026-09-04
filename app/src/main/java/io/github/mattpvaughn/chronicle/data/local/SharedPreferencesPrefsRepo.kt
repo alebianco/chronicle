@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.local
 
+import android.content.Context
 import android.content.SharedPreferences
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_ALLOW_AUTO
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_AUTO_RESTART_SLEEP_TIMER
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_AUTO_REWIND_ENABLED
@@ -194,8 +194,11 @@ interface PrefsRepo {
  */
 class SharedPreferencesPrefsRepo
   @Inject
-  constructor(private val sharedPreferences: SharedPreferences) :
-  PrefsRepo {
+  constructor(
+    private val sharedPreferences: SharedPreferences,
+    private val externalDeviceDirs: List<@JvmSuppressWildcards File>,
+    private val appContext: Context,
+  ) : PrefsRepo {
     /**
      * The directory downloads live in.
      *
@@ -219,8 +222,7 @@ class SharedPreferencesPrefsRepo
         // First run: pick a default and persist it, so ordering is consulted exactly once.
         // filesDir as the last resort: always present, unlike any external volume.
         val deviceStorage =
-          Injector.get().externalDeviceDirs().firstOrNull()
-            ?: Injector.get().applicationContext().filesDir
+          externalDeviceDirs.firstOrNull() ?: appContext.filesDir
         sharedPreferences.edit()
           .putString(KEY_SYNC_DIR_PATH, deviceStorage.absolutePath)
           .apply()

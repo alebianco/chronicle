@@ -6,7 +6,6 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.*
 import androidx.core.app.NotificationManagerCompat
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
@@ -16,6 +15,7 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayin
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.OnChapterChangeListener
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineExceptionHandler
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -36,6 +36,7 @@ class OnMediaChangedCallback
     private val trackRepo: ITrackRepository,
     private val bookRepo: IBookRepository,
     private val dispatchers: DispatcherProvider,
+    private val exceptionHandler: CoroutineExceptionHandler,
   ) : MediaControllerCompat.Callback(), OnChapterChangeListener {
     init {
       currentlyPlaying.setOnChapterChangeListener(this)
@@ -46,7 +47,7 @@ class OnMediaChangedCallback
     override fun onMetadataChanged(metadata: MediaMetadataCompat?) {
       Timber.i("METADATA CHANGE")
       mediaController.playbackState?.let { state ->
-        serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+        serviceScope.launch(exceptionHandler) {
           withContext(dispatchers.io) {
             val trackId = metadata?.id ?: TRACK_NOT_FOUND
             if (trackId == TRACK_NOT_FOUND) {
@@ -80,7 +81,7 @@ class OnMediaChangedCallback
       if (state == null) {
         return
       }
-      serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+      serviceScope.launch(exceptionHandler) {
         updateNotification(state.state)
       }
     }
@@ -93,7 +94,7 @@ class OnMediaChangedCallback
       publishChapterAsSessionMetadata(chapter)
 
       mediaController.playbackState?.let { state ->
-        serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
+        serviceScope.launch(exceptionHandler) {
           updateNotification(state.state)
         }
       }

@@ -18,6 +18,7 @@ import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_TRACK
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -255,6 +256,7 @@ class NotificationStateMachineTest {
         trackRepo = mockk(relaxed = true),
         bookRepo = mockk(relaxed = true),
         dispatchers = TestDispatcherProvider(),
+        exceptionHandler = testExceptionHandler(),
       )
     return callback
   }

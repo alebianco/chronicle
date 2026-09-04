@@ -4,7 +4,6 @@ import androidx.lifecycle.LiveData
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
@@ -413,7 +412,7 @@ class TrackRepository
         try {
           val networkTracks =
             plexMediaService.retrieveAllTracksInLibrary(
-              Injector.get().plexPrefs().library!!.id,
+              plexPrefs.library!!.id,
             ).plexMediaContainer.asTrackList()
           val mergedTracks = mergeNetworkTracks(networkTracks, localTracks)
           trackDao.insertAll(mergedTracks)

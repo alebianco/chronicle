@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.LiveData
@@ -10,7 +11,6 @@ import coil3.toBitmap
 import com.tonyodev.fetch2.Request
 import com.tonyodev.fetch2core.Extras
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionResult.Failure
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionResult.Success
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState.*
@@ -37,6 +37,7 @@ class PlexConfig
   constructor(
     private val plexPrefsRepo: PlexPrefsRepo,
     private val connectionChooser: ConnectionChooser,
+    private val appContext: Context,
   ) {
     private val connectionSet = mutableSetOf<Connection>()
 
@@ -96,7 +97,6 @@ class PlexConfig
       }
 
       // Retrieve cached album art from the image cache if available
-      val appContext = Injector.get().applicationContext()
       val imageSize = appContext.resources.getDimension(R.dimen.audiobook_image_width).toInt()
       val uri =
         if (thumb.startsWith("http")) {
@@ -155,7 +155,6 @@ class PlexConfig
     }
 
     fun makeThumbUri(part: String): Uri {
-      val appContext = Injector.get().applicationContext()
       val imageSize = appContext.resources.getDimension(R.dimen.audiobook_image_width).toInt()
       val plexThumbPart = "photo/:/transcode?width=$imageSize&height=$imageSize&url=$part"
       val uri = Uri.parse(toServerString(plexThumbPart))
