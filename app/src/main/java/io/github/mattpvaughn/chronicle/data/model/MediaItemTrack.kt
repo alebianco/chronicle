@@ -294,8 +294,32 @@ fun List<MediaItemTrack>.getProgressPercentage(): Int {
  */
 fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
   check(this.isNotEmpty()) { "Cannot get active track of empty list!" }
-  val inPlaybackOrder = sorted()
-  return inPlaybackOrder.lastOrNull { it.hasProgress() } ?: inPlaybackOrder.first()
+  // One pass rather than `sorted()`, because finding one extreme of an ordering does not need the
+  // whole ordering (cu-140). This runs on the main thread once a second while playing —
+  // `ProgressUpdater` republishes the book at tick rate — and a sampled profile of a 107-track
+  // book put 142 samples in `compareTo` here. It is also why the cost scaled with track count,
+  // which is how a 28-track measurement understated the main-thread total by 5.6× (cu-117).
+  //
+  // The *ordering* is unchanged and still load-bearing: `TrackIndex` means "index into the sorted
+  // list" (cu-136), and `getProgress` below documents a real bug that came from trusting the
+  // list's own order.
+  //
+  // Ties are the subtle part. The key is (disc, index) and neither is unique by construction, so
+  // two tracks can compare equal. A stable `sorted()` keeps them in input order and `lastOrNull`
+  // then answers the **last** of them — whereas `maxWithOrNull` would answer the *first*, since it
+  // only replaces its candidate on a strictly greater comparison. Hence `>=` below. A tie test
+  // caught exactly that difference in a `maxWithOrNull` version of this.
+  var latestStarted: MediaItemTrack? = null
+  var earliest: MediaItemTrack? = null
+  for (track in this) {
+    if (earliest == null || track < earliest) {
+      earliest = track
+    }
+    if (track.hasProgress() && (latestStarted == null || track >= latestStarted)) {
+      latestStarted = track
+    }
+  }
+  return latestStarted ?: earliest!!
 }
 
 /**

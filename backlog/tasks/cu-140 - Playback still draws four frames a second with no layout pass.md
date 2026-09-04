@@ -218,3 +218,41 @@ fix.
    three times here (cu-110, cu-115, cu-117).
 
 Raw trace not committed (2.9 MB); reproduce with the command above.
+
+
+## First change: `getActiveTrack` no longer sorts — measured, and it is *not* the fix
+
+Replaced `sorted()` with a single pass (`MediaItemTrack.getActiveTrack`). Measured on the tablet
+with Ender's Game, same conditions as the baseline:
+
+| | main thread |
+|---|---|
+| before | **234** j/10 s |
+| after | **220, 221, 223** j/10 s (steady state) |
+
+**~5%.** Real, and worth keeping — it removes an O(n log n) per publish that scaled with track
+count — but it is *not* the cause and it does not move either open criterion. The profile already
+said so and the measurement agrees: `compareTo` was 142 of 65,286 main-thread samples, **0.2%**.
+Recorded here because the temptation with a named finding is to assume fixing it fixes the problem.
+
+A first attempt used `maxWithOrNull`, which was **wrong on ties**: `compareTo` is `(disc, index)`
+and neither is unique, and where a stable `sorted().lastOrNull` answers the *last* tied track,
+`maxWithOrNull` answers the *first* — it replaces its candidate only on a strictly greater
+comparison. `ActiveTrackNoSortTest` caught it and now pins it explicitly, including 200 shuffles of
+a 107-track book.
+
+### So the remaining work is the draw side, and it is all of it
+
+The 37.7% is `View.measure` / `updateDisplayListIfDirty` / `dispatchDraw` /
+`ConstraintLayout.verticalSolvingPass`, driven by `requestLayout` (450 samples). Next steps in
+order:
+
+1. Find what calls `requestLayout` during playback. `LiveData.setValue` (406) → `dispatchingValue`
+   (398) → `considerNotify` (396) is the path in; the question is which observer writes to a view
+   property that invalidates a `ConstraintLayout` graph rather than just repainting.
+2. `progressPercentageString$lambda$19` is in the profile (52 samples) and cu-94 already worked in
+   that area — a text change on a `ConstraintLayout`-managed `TextView` forces a re-solve if the
+   width is `wrap_content`, which is the classic version of this.
+3. cu-110's rule applies: guard on *visibility* and on *value changed*. The sheet being collapsed
+   should mean no work at all, and cu-19 showed the `isShown` guard has to probe a view that exists
+   in every orientation.
