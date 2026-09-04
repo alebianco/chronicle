@@ -8,7 +8,6 @@ import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.data.model.Chapter
-import okhttp3.internal.toHexString
 import timber.log.Timber
 
 fun bindChapterList(
@@ -37,7 +36,10 @@ fun bindTintResource(
         PorterDuff.Mode.SRC_IN,
       )
     } catch (rnf: NotFoundException) {
-      Timber.e("Could not bind tint with res: 0x${colorRes.toHexString()}")
+      // `toString(16)`, not OkHttp's `internal.toHexString`, which this used to import — reaching
+      // into another library's internal package for a hex conversion broke on the OkHttp 5
+      // upgrade and had no reason to exist (cu-66).
+      Timber.e("Could not bind tint with res: 0x${colorRes.toString(16)}")
     }
   }
 }
