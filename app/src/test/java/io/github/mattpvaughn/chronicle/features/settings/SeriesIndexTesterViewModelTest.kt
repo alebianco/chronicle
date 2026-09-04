@@ -7,9 +7,11 @@ import io.github.mattpvaughn.chronicle.data.model.PatternOrder
 import io.github.mattpvaughn.chronicle.data.model.SeriesIndexPattern
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.github.mattpvaughn.chronicle.util.keepCollected
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -38,7 +40,7 @@ class SeriesIndexTesterViewModelTest {
     titleSort: String,
   ) = Audiobook(id = id, source = 0L, title = "T$id", titleSort = titleSort)
 
-  private fun viewModel(books: List<Audiobook> = emptyList()): SeriesIndexTesterViewModel {
+  private fun TestScope.viewModel(books: List<Audiobook> = emptyList()): SeriesIndexTesterViewModel {
     val repo =
       mockk<IBookRepository>(relaxed = true) {
         coEvery { getAllBooksAsync() } returns books
@@ -47,11 +49,12 @@ class SeriesIndexTesterViewModelTest {
     // hop in `loadLibrary` as well as the main-thread work that follows it.
     val dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher.scheduler)
     return SeriesIndexTesterViewModel(repo, dispatchers, testExceptionHandler()).also {
-      // `winningRule` and `parsedPosition` are `map`s, and a LiveData transformation does not
-      // compute without an observer — `.value` reads null however many times the source changed.
-      // The Fragment observes them; a test has to as well or it asserts against nothing.
-      it.winningRule.observeForever {}
-      it.parsedPosition.observeForever {}
+      // `winningRule` and `parsedPosition` are `stateIn(WhileSubscribed)`, so they compute only
+      // while collected — `.value` reads the seed however many times the source changed. The
+      // Fragment collects them; a test has to as well or it asserts against nothing. (Same need as
+      // the `observeForever` this replaced, when they were cold LiveData transformations.)
+      keepCollected(it.winningRule)
+      keepCollected(it.parsedPosition)
     }
   }
 
@@ -74,8 +77,11 @@ class SeriesIndexTesterViewModelTest {
       val vm = viewModel()
 
       vm.onTitleSortChanged("Mistborn, Book 2 - The Well of Ascension")
+      // The derived flows are collected, but the collector is scheduled — without this the
+      // `winningRule` read below sees the seed rather than the emission just produced.
+      advanceUntilIdle()
 
-      val succeeded = vm.attempts.value!!.filter { it.succeeded }
+      val succeeded = vm.attempts.value.filter { it.succeeded }
       assertTrue("expected more than one rule to succeed here", succeeded.size > 1)
       assertEquals(succeeded.first().patternName, vm.winningRule.value!!.patternName)
       assertEquals("2", vm.parsedPosition.value)
@@ -87,8 +93,9 @@ class SeriesIndexTesterViewModelTest {
       val vm = viewModel()
 
       vm.onTitleSortChanged("A Standalone Novel")
+      advanceUntilIdle()
 
-      val attempts = vm.attempts.value!!
+      val attempts = vm.attempts.value
       assertTrue("expected the built-in rules to be reported", attempts.isNotEmpty())
       assertTrue(
         "every rule must carry a reason when none of them succeeded",
@@ -112,8 +119,9 @@ class SeriesIndexTesterViewModelTest {
       val vm = viewModel()
 
       vm.onTitleSortChanged("Mistborn, Book 2")
+      advanceUntilIdle()
 
-      val broken = vm.attempts.value!!.single { it.patternName == "broken" }
+      val broken = vm.attempts.value.single { it.patternName == "broken" }
       assertEquals(false, broken.matched)
       assertTrue(
         "the reason must say the expression is invalid, not merely that it did not match: " +
@@ -131,8 +139,9 @@ class SeriesIndexTesterViewModelTest {
       val vm = viewModel()
 
       vm.onTitleSortChanged("Some Series #4")
+      advanceUntilIdle()
 
-      val attempts = vm.attempts.value!!
+      val attempts = vm.attempts.value
       assertEquals(true, attempts.single { it.patternName == "mine" }.isUserDefined)
       assertTrue(
         "the built-ins must not be reported as the user's own",
@@ -209,9 +218,49 @@ class SeriesIndexTesterViewModelTest {
       advanceUntilIdle()
 
       vm.onSampleChosen("Mistborn, Book 2 - The Well of Ascension")
+      advanceUntilIdle()
 
       assertEquals("Mistborn, Book 2 - The Well of Ascension", vm.titleSort.value)
       assertEquals("2", vm.parsedPosition.value)
+    }
+
+  /**
+   * Two different unparseable titles both report a verdict.
+   *
+   * The regression this pins appeared only when cu-151 met cu-52's migration: `winningRule` became
+   * a `StateFlow`, which **conflates**, so a second title that also fails emits `null` after a
+   * `null` and the collector never fires — the headline stayed hidden while the rule list beneath
+   * it updated. As a `LiveData` transformation it re-emitted regardless. The screen drives that
+   * headline from `attempts` rather than `winningRule` for that reason, and `titleSort` — which
+   * always changes — is what ultimately drives the redraw. This pins the *reported state* after
+   * each input rather than the emission mechanism, since the mechanism is the screen's business.
+   */
+  @Test
+  fun `a second unparseable title still produces a verdict`() =
+    runTest {
+      val vm = viewModel()
+
+      // A title that parses, then one that does not, then another that does not. The last step is
+      // the one that used to break: `winningRule` goes null -> null, a `StateFlow` conflates that
+      // to nothing, and a screen collecting it alone never learns to redraw.
+      vm.onTitleSortChanged("Mistborn, Book 2")
+      advanceUntilIdle()
+      assertEquals("2", vm.parsedPosition.value)
+
+      vm.onTitleSortChanged("A Standalone Novel")
+      advanceUntilIdle()
+      assertNull("a title with no position must report none", vm.winningRule.value)
+      assertTrue("the rules are still reported", vm.attempts.value.isNotEmpty())
+
+      vm.onTitleSortChanged("Another Standalone Novel")
+      advanceUntilIdle()
+
+      assertNull("the second unparseable title must also report none", vm.winningRule.value)
+      assertTrue(
+        "and it must still carry a full rule list for the screen to render",
+        vm.attempts.value.isNotEmpty(),
+      )
+      assertEquals("Another Standalone Novel", vm.titleSort.value)
     }
 
   /** An empty box reports nothing rather than every rule failing against "". */
@@ -222,6 +271,7 @@ class SeriesIndexTesterViewModelTest {
       vm.onTitleSortChanged("Mistborn, Book 2")
 
       vm.onTitleSortChanged("   ")
+      advanceUntilIdle()
 
       assertEquals(emptyList<Any>(), vm.attempts.value)
       assertNull(vm.parsedPosition.value)

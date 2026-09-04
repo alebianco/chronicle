@@ -1,7 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.settings
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.map
@@ -13,7 +11,13 @@ import io.github.mattpvaughn.chronicle.data.model.PatternAttempt
 import io.github.mattpvaughn.chronicle.data.model.PatternOrder
 import io.github.mattpvaughn.chronicle.data.model.SeriesIndexDiagnostics
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -27,10 +31,9 @@ import javax.inject.Inject
  * [SeriesIndexDiagnostics] and `SeriesIndexPatternSet.explain`; this is the plumbing plus two
  * choices that belong to the screen.
  *
- * **`LiveData`, deliberately, on this branch.** cu-52 replaces `LiveData` with `StateFlow`
- * tree-wide, but it is a separate branch: writing this one screen in `StateFlow` here would be the
- * ad-hoc mixing convention 3 forbids, and would conflict on merge for no gain. cu-52 converts it
- * along with everything else.
+ * Written in `LiveData` on its own branch and converted here, where cu-52's migration met it —
+ * writing one screen in `StateFlow` while the rest of the tree was still `LiveData` would have been
+ * the ad-hoc mixing convention 3 forbids.
  */
 class SeriesIndexTesterViewModel(
   private val bookRepository: IBookRepository,
@@ -53,25 +56,25 @@ class SeriesIndexTesterViewModel(
       }
     }
 
-  private val _titleSort = MutableLiveData("")
+  private val _titleSort = MutableStateFlow("")
 
   /** What the user typed, or the sample they tapped. */
-  val titleSort: LiveData<String>
+  val titleSort: StateFlow<String>
     get() = _titleSort
 
-  private val _attempts = MutableLiveData<List<PatternAttempt>>(emptyList())
+  private val _attempts = MutableStateFlow<List<PatternAttempt>>(emptyList())
 
   /** Every rule's verdict against [titleSort], in the order the rules are actually tried. */
-  val attempts: LiveData<List<PatternAttempt>>
+  val attempts: StateFlow<List<PatternAttempt>>
     get() = _attempts
 
-  private val _summary = MutableLiveData<LibraryParseSummary?>(null)
+  private val _summary = MutableStateFlow<LibraryParseSummary?>(null)
 
   /** How the library parses today. Null until the books have been read. */
-  val summary: LiveData<LibraryParseSummary?>
+  val summary: StateFlow<LibraryParseSummary?>
     get() = _summary
 
-  private val _samples = MutableLiveData<List<String>>(emptyList())
+  private val _samples = MutableStateFlow<List<String>>(emptyList())
 
   /**
    * Real titles from the user's own library that currently parse to **no position**.
@@ -80,7 +83,7 @@ class SeriesIndexTesterViewModel(
    * answers "does my library even need a rule?" from the user's own data rather than from a typed
    * example they had to invent.
    */
-  val samples: LiveData<List<String>>
+  val samples: StateFlow<List<String>>
     get() = _samples
 
   /**
@@ -91,15 +94,20 @@ class SeriesIndexTesterViewModel(
    * only marked "succeeded" would show two winners and leave the user unable to tell which reading
    * the app took — the same class of confusion the tester exists to remove.
    */
-  val winningRule: LiveData<PatternAttempt?> =
-    _attempts.map { attempts -> attempts.firstOrNull { it.succeeded } }
+  val winningRule: StateFlow<PatternAttempt?> =
+    _attempts
+      .map { attempts -> attempts.firstOrNull { it.succeeded } }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
   /**
    * The position the winning rule read, or null when nothing matched.
    *
    * Derived rather than stored, so it cannot disagree with [attempts].
    */
-  val parsedPosition: LiveData<String?> = winningRule.map { it?.capturedIndex }
+  val parsedPosition: StateFlow<String?> =
+    winningRule
+      .map { it?.capturedIndex }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
   /** Whether the user's own rules run before, after, or instead of the built-ins. */
   val ruleOrder: PatternOrder

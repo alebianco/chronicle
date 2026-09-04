@@ -15,6 +15,7 @@ import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.model.PatternOrder
 import io.github.mattpvaughn.chronicle.databinding.FragmentSeriesIndexTesterBinding
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 /**
@@ -69,21 +70,27 @@ class SeriesIndexTesterFragment : Fragment() {
 
     // A tapped sample has to reach the box, and that is the *only* case where the ViewModel drives
     // the input. The guard above stops the resulting text change from looping back.
-    viewModel.titleSort.observe(viewLifecycleOwner) { titleSort ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.titleSort) { titleSort ->
       if (binding.titleSortInput.text?.toString() != titleSort) {
         binding.titleSortInput.setText(titleSort)
         binding.titleSortInput.setSelection(titleSort.length)
       }
     }
 
-    viewModel.attempts.observe(viewLifecycleOwner) { attempts ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.attempts) { attempts ->
       verdictAdapter.submitList(attempts)
       binding.rulesTitle.isVisible = attempts.isNotEmpty()
       binding.ruleVerdicts.isVisible = attempts.isNotEmpty()
     }
 
-    viewModel.winningRule.observe(viewLifecycleOwner) { winner ->
-      val hasInput = !viewModel.titleSort.value.isNullOrBlank()
+    // Driven from `attempts`, **not** from `winningRule`. `winningRule` is a `StateFlow`, so it
+    // conflates: testing two different titles that both fail to parse emits `null` twice, the
+    // second is dropped as an unchanged value, and the headline never appears. As a `LiveData`
+    // transformation it re-emitted regardless, which is why this only broke on the cu-52 merge.
+    // `attempts` carries the rule list and changes whenever the input does.
+    viewLifecycleOwner.collectWhileStarted(viewModel.attempts) {
+      val hasInput = viewModel.titleSort.value.isNotBlank()
+      val winner = viewModel.winningRule.value
       binding.parseResult.isVisible = hasInput
       binding.parseResult.text =
         when {
@@ -98,7 +105,7 @@ class SeriesIndexTesterFragment : Fragment() {
         }
     }
 
-    viewModel.summary.observe(viewLifecycleOwner) { summary ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.summary) { summary ->
       // Worded as an upper bound, never a defect count: a standalone novel legitimately has no
       // series position, so a perfectly tagged library still reports a large number (58 of 196 on
       // the owner's own library).
@@ -114,7 +121,7 @@ class SeriesIndexTesterFragment : Fragment() {
         }.orEmpty()
     }
 
-    viewModel.samples.observe(viewLifecycleOwner) { samples ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.samples) { samples ->
       sampleAdapter.submitList(samples)
       // "Nothing left to fix" is a real state and a reassuring one, so it is said rather than
       // shown as an empty space.
