@@ -1,7 +1,7 @@
 ---
 id: cu-151
 title: A tester for the series index rules
-status: In Progress
+status: In Review
 assignee:
   - claude
 created_date: '2026-09-04'
@@ -31,15 +31,16 @@ it matched, what it captured, and why it was rejected. Nothing new is needed in 
 
 ## Acceptance Criteria
 
-- [ ] A settings screen where a `titleSort` can be entered and the result shown
-- [ ] It names **which rule matched** and the position it read
-- [ ] For each rule that did *not* match, it says why — that is what `explain()`'s
+- [x] A settings screen where a `titleSort` can be entered and the result shown
+- [x] It names **which rule matched** and the position it read — and specifically the rule that
+      *decided*, which is not the same thing: see the notes
+- [x] For each rule that did *not* match, it says why — that is what `explain()`'s
       `rejectedReason` is for
-- [ ] It offers real titles from the user's own library, not only typed input. The most useful set
+- [x] It offers real titles from the user's own library, not only typed input. The most useful set
       is the books that currently parse to **no position**, since those are exactly what a user
       would write a rule to fix
-- [ ] It shows whether a rule came from the file or is built in, and the effective order
-- [ ] Reachable without editing the file first — a user should be able to see how their library
+- [x] It shows whether a rule came from the file or is built in, and the effective order
+- [x] Reachable without editing the file first — a user should be able to see how their library
       parses today before deciding whether they need a rule at all
 - [x] `PreferenceType` has no free-text row (switches, ints, floats and clickables only), so this
       needs either a new row type or a dedicated screen; decide which and record why
@@ -56,6 +57,59 @@ finding series positions" rather than "rule three is malformed".
 Worth pairing with **cu-47** (accessibility), which owns the settings surface generally — a new row
 type introduced here should meet that task's bar rather than need revisiting.
 
+
+## Implementation Notes — screen done, verified on device (2026-09-04)
+
+**Left `In Review` for the wording and the layout**, which are the product choices here: the
+summary sentence, the verdict phrasings, and putting the row under *Appearance* beside the cover
+style rather than in its own section.
+
+### The one design decision the criteria did not anticipate
+
+"Which rule matched" is ambiguous, and getting it wrong would have reproduced the confusion the
+screen exists to remove. **More than one rule routinely succeeds** — `"Mistborn, Book 2 - …"`
+satisfies both `audnexus` and `seanap` — and first-match-wins is the whole disambiguation
+mechanism (cu-146). Marking every success would show two winners and leave the user unable to tell
+which reading the app took.
+
+So the screen names the rule that **decided**, and a rule that matched but lost says *"Also
+matched, but an earlier rule decided first"*. Those are different problems with different fixes:
+reordering versus rewriting. Verified on the tablet — with a comma, `audnexus` decides; without
+one, `seanap` does, and the screen says which each time.
+
+`SeriesIndexPatternSet` now retains its `PatternOrder`. `of()` consumed it and threw it away, so
+the fifth criterion was unanswerable from the set itself.
+
+### What the device pass found in the real library
+
+Tapping `"Hell Divers Series 0 - Into the Storms: A Hell Divers Prequel"` reports **"No rule read a
+position from this title"**, with `seanap` explaining *"captured '0', which is not a positive
+position"*. A rule did match and did extract a number; it was rejected because `0` is the sentinel
+for "unknown" (deliberate, so a prequel numbered zero sorts last). That is the answer a user could
+not otherwise get, and it is tvnamer's #216 in miniature.
+
+The summary reads **"196 of 196 books have a sort title; 138 of those give a series position. The
+other 58 may simply be standalone books."** — the 58/196 figure cu-150 measured, worded as an upper
+bound rather than a defect count, which the notes below insisted on.
+
+### Accessibility (cu-47's bar, met as built)
+
+Each verdict row carries one content description covering rule, origin and verdict, so TalkBack
+reads a sentence rather than three fragments; the verdict is **text**, never colour or an icon; and
+a sample row announces what a tap *does*, since the bare title does not say it is actionable.
+`FirstFrameFlashTest` caught a Kotlin-driven `RecyclerView` with no XML default — which is what it
+is for.
+
+### Tests
+
+9 ViewModel cases plus 6 Robolectric adapter cases. The winner logic and the negative reporting are
+both sabotage-verified. Two notes for anyone extending them: the derived `LiveData` needs an
+observer or `.value` reads null however many times the source changed, and the row layouts use
+`?attr/selectableItemBackground`, which Robolectric's default theme does not define — inflate
+through a `ContextThemeWrapper` on `AppTheme`.
+
+**`LiveData`, deliberately.** cu-52 converts the tree on its own branch; writing one screen in
+`StateFlow` here would be the ad-hoc mixing convention 3 forbids and would conflict on merge.
 
 ## Progress, 2026-09-04 — model layer done, screen parked
 
