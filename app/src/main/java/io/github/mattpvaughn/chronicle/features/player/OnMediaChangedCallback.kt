@@ -145,7 +145,28 @@ class OnMediaChangedCallback
       )
     }
 
+    /**
+     * Skips a rebuild whose result would be identical to the one already showing (cu-157).
+     *
+     * Measured on the tablet: starting a 107-track book produced **29** builds, because
+     * `onPlaybackStateChanged` fires three times per real transition (6 of 9 callbacks were
+     * same-state repeats) and each build is expensive — five actions, a `MediaStyle`, an icon
+     * lookup and an artwork lookup.
+     */
+    private val rebuildTracker = NotificationRebuildTracker()
+
     private suspend fun updateNotification(state: Int) {
+      val key =
+        NotificationContentKey(
+          bookId = currentlyPlaying.book.value.id,
+          trackId = currentlyPlaying.track.value.id,
+          chapterId = currentlyPlaying.chapter.value.id,
+          playbackState = state,
+        )
+      if (!rebuildTracker.shouldRebuild(key)) {
+        return
+      }
+
       // Built without touching the network: this runs on the path that can *promote* the service
       // to foreground, and awaiting the cover-art fetch first is what could blow the 5 s deadline
       // (cu-137). The art is attached by postArtwork() after the state machine has run.
@@ -214,6 +235,14 @@ class OnMediaChangedCallback
      */
     private suspend fun postArtwork() {
       val token = mediaController.sessionToken ?: return
+
+      // Nothing to add: `buildNotificationWithoutArtwork` already attached the cached bitmap, so
+      // rebuilding here would produce the notification that is already showing (cu-157). This is
+      // half of the measured burst — every update built the notification twice.
+      if (notificationBuilder.hasArtworkFor(currentlyPlaying.book.value)) {
+        return
+      }
+
       val withArt = notificationBuilder.buildNotification(token)
 
       // POST_NOTIFICATIONS is revocable from API 33, and this call is new (the two above it are

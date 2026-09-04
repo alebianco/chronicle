@@ -226,6 +226,16 @@ class MediaPlayerService :
    */
   private suspend fun postNotificationWithArtwork() {
     val token = mediaSession.sessionToken ?: return
+
+    // Nothing to add: the synchronous build above already attached the cached bitmap, since
+    // `buildNotificationWithoutArtwork` calls `setLargeIcon(cachedArtworkFor(...))`. Rebuilding to
+    // attach art that is already there is the other half of cu-157's measured burst. The
+    // deadline-bearing builds themselves are never skipped — they are what `startForeground`
+    // requires within 5 s (cu-137).
+    if (notificationBuilder.hasArtworkFor(currentlyPlaying.book.value)) {
+      return
+    }
+
     startForeground(NOW_PLAYING_NOTIFICATION, notificationBuilder.buildNotification(token))
   }
 

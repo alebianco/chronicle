@@ -254,6 +254,17 @@ class NotificationBuilder
         .build()
     }
 
+    /**
+     * Whether [book]'s art is already loaded, so a re-post to attach it would change nothing
+     * (cu-157).
+     *
+     * [buildNotificationWithoutArtwork] already calls `setLargeIcon(cachedArtworkFor(...))`, so
+     * once the bitmap is cached the *first* build carries it and the second one — the whole point
+     * of the cu-137 split — is pure waste: five actions, a `MediaStyle` and an icon lookup rebuilt
+     * to attach a bitmap that is already there. Measured as **half** of a 29-build burst.
+     */
+    fun hasArtworkFor(book: Audiobook): Boolean = cachedArtworkFor(book) != null
+
     /** Art already loaded for [book], or null if none has been fetched yet. */
     private fun cachedArtworkFor(book: Audiobook): Bitmap? =
       bookTitleBitmapPair
