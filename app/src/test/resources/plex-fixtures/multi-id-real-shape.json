@@ -1,0 +1,150 @@
+{
+  "MediaContainer": {
+    "size": 5,
+    "allowSync": true,
+    "identifier": "com.plexapp.plugins.library",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "Metadata": [
+      {
+        "ratingKey": "151171",
+        "key": "/library/metadata/151171/children",
+        "type": "album",
+        "title": "The Wisdom of Crowds",
+        "titleSort": "The Age of Madness, Book 3 - The Wisdom of Crowds",
+        "parentTitle": "Joe Abercrombie",
+        "summary": "From the New York Times bestselling author of A Little Hatred comes a stunning fantasy novel that finds the world in an unstoppable revolution where heroes have nothing left to lose as darkness and destruction overtake everything.Chaos. Fury. Destruction.\nThe Great Change is upon us . . .\nSome say that to change the world you must first burn it down. Now that belief will be tested in the crucible of revolution: the Breakers and Burners have seized the levers of power, the smoke of riots has replaced the smog of industry, and all must submit to the wisdom of crowds.\nWith nothing left to lose, Citizen Brock is determined to become a new hero for the new age, while Citizeness Savine must turn her talents from profit to survival before she can claw her way to redemption. Orso will find that when the world is turned upside down, no one is lower than a monarch. And in the bloody North, Rikke and her fragile Protectorate are running out of allies . . . while Black Calder gathers his forces and plots his vengeance.\nThe banks have fallen, the sun of the Union has been torn down, and in the darkness behind the scenes, the threads of the Weaver's ruthless plan are slowly being drawn together . . . \n\"A master of his craft.\" \u2014Forbes\n\"No one writes with the seismic scope or primal intensity of Joe Abercrombie.\" \u2014Pierce Brown\nFor more from Joe Abercrombie, check out:The Age of MadnessA Little HatredThe Trouble With PeaceThe Wisdom of CrowdsThe First Law TrilogyThe Blade ItselfBefore They Are HangedLast Argument of KingsBest Served ColdThe HeroesRed CountryThe Shattered Sea TrilogyHalf a KingHalf a WorldHalf a War",
+        "year": 2021,
+        "thumb": "/library/metadata/151171/thumb/1779497716",
+        "addedAt": 1752360751,
+        "updatedAt": 1779497716,
+        "Style": [
+          {
+            "id": 480630,
+            "filter": "style=480630",
+            "tag": "Steven Pacey"
+          }
+        ],
+        "Mood": [
+          {
+            "id": 480629,
+            "filter": "mood=480629",
+            "tag": "Series: The Age of Madness"
+          }
+        ]
+      },
+      {
+        "ratingKey": "151314",
+        "key": "/library/metadata/151314/children",
+        "type": "album",
+        "title": "Xenos",
+        "titleSort": "Eisenhorn, Book 1 - Xenos",
+        "parentTitle": "Dan Abnett",
+        "summary": "Book 1 in the Eisenhorn series\n Inquisitor Eisenhorn faces a vast interstellar cabal and the dark power of daemons, all racing to recover an arcane text of abominable power - an ancient tome known as the Necroteuch.\n Listen to It Because:\n The classic novel returns in a brand new edition. Inquisitor Eisenhorn gathers allies to unravel a conspiracy and hunt an alien threat. Relive the adventures of some of Warhammer 40,000's most beloved characters, or experience the beginning of Eisenhorn's remarkable adventures for the first time.\n The Story:\n The Inquisition moves amongst mankind like an avenging shadow, striking down the enemies of humanity with uncompromising ruthlessness. When he finally corners an old foe, Inquisitor Gregor Eisenhorn is drawn into a sinister conspiracy. As events unfold and he gathers allies - and enemies - Eisenhorn faces a vast interstellar cabal and the dark power of daemons, all racing to recover an arcane text of abominable power: an ancient tome known as the Necroteuch.",
+        "year": 2017,
+        "thumb": "/library/metadata/151314/thumb/1775350590",
+        "addedAt": 1752360765,
+        "updatedAt": 1775350590,
+        "Style": [
+          {
+            "id": 479627,
+            "filter": "style=479627",
+            "tag": "Toby Longworth"
+          }
+        ],
+        "Mood": [
+          {
+            "id": 479628,
+            "filter": "mood=479628",
+            "tag": "Series: Eisenhorn"
+          }
+        ]
+      },
+      {
+        "ratingKey": "151053",
+        "key": "/library/metadata/151053/children",
+        "type": "album",
+        "title": "The Future",
+        "parentTitle": "Naomi Alderman",
+        "summary": "The bestselling, award-winning author of The Power delivers a \u201cpage-turning\u201d (Los Angeles Times), \u201cpropulsive\u201d (The Boston Globe), \u201cthrilling\u201d (BookPage, starred review) tour de force where a handful of friends plot a daring heist to save the world from the tech giants whose greed threatens life as we know it.Martha Einkorn never expected to find herself working for a powerful social media mogul hell-bent on controlling everything. Now, she\u2019s surrounded by mega-rich companies designing private weather, predictive analytics, and covert weaponry while spouting technological prophecy. Across the world, in a mall in Singapore, Lai Zhen, an internet-famous survivalist, flees from an assassin. Suddenly, a remarkable piece of software appears on her phone telling her exactly how to escape. Who made it? What do they know about the future that Zhen doesn\u2019t? When Martha and Zhen\u2019s worlds collide, an explosive chain of events is set in motion. While a few billionaires assured of their own safety lead the world to destruction, Martha\u2019s relentless drive and Zhen\u2019s insatiable curiosity could lead to something beautiful\u2014or it could herald the cataclysmic end of civilization. By turns \u201cplayful, incisive, horribly relevant, and surprisingly hopeful\u201d (Lauren Beukes, New York Times bestselling author of The Shining Girls), The Future unfolds at breakneck speed, highlighting how power corrupts the few who have it and what it means to stand up to them. The future is coming. The Future is here.",
+        "year": 2023,
+        "thumb": "/library/metadata/151053/thumb/1788228186",
+        "addedAt": 1752355976,
+        "updatedAt": 1788228186,
+        "Style": [
+          {
+            "id": 480136,
+            "filter": "style=480136",
+            "tag": "Guinevere Turner"
+          },
+          {
+            "id": 480137,
+            "filter": "style=480137",
+            "tag": "Natalie Naudus"
+          },
+          {
+            "id": 480138,
+            "filter": "style=480138",
+            "tag": "Jeremy Bobb"
+          },
+          {
+            "id": 480139,
+            "filter": "style=480139",
+            "tag": "Santino Fontana"
+          },
+          {
+            "id": 480140,
+            "filter": "style=480140",
+            "tag": "Graham Halstead"
+          },
+          {
+            "id": 480141,
+            "filter": "style=480141",
+            "tag": "Lorelei King"
+          },
+          {
+            "id": 480142,
+            "filter": "style=480142",
+            "tag": "Fred Sanders"
+          },
+          {
+            "id": 480143,
+            "filter": "style=480143",
+            "tag": "Naomi Alderman"
+          }
+        ]
+      },
+      {
+        "ratingKey": "151794",
+        "key": "/library/metadata/151794/children",
+        "type": "album",
+        "title": "The Bloody Sun",
+        "titleSort": "Darkover 3 - The Bloody Sun",
+        "parentTitle": "Marion Zimmer Bradley",
+        "summary": "Jeff Kerwin spent the first decade of his life in the Spacemen\u2019s Orphanage in the Terran Trade City on Darkover. Yet he never felt that he belonged. When Jeff is shipped back to Earth at the age of 12, he becomes haunted by dreams of the world surrounding the Terran oasis that had once been his. He is convinced that only on Darkover can he discover his true identity. Now an adult, Jeff finally returns to Darkover as a member of the Terran Spaceforce. Still, he feels out of place. Despite being mistaken for a member of the Comyn aristocracy with his red hair and possession of a powerful matrix jewel, he has no memory of how he acquired such things. If only he could learn the secrets of the Towers, perhaps then he could hope to solve the mystery of his heritage.",
+        "year": 1964,
+        "thumb": "/library/metadata/151794/thumb/1752397057",
+        "addedAt": 1752395175,
+        "updatedAt": 1752397057,
+        "Mood": [
+          {
+            "id": 480672,
+            "filter": "mood=480672",
+            "tag": "Series: Darkover"
+          }
+        ]
+      },
+      {
+        "ratingKey": "155645",
+        "key": "/library/metadata/155645/children",
+        "type": "album",
+        "title": "Career Moves",
+        "parentTitle": "JN Chaney",
+        "summary": "",
+        "year": 2022,
+        "thumb": "/library/metadata/155645/thumb/1786561741",
+        "addedAt": 1786561726,
+        "updatedAt": 1786561741
+      }
+    ]
+  }
+}

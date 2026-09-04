@@ -247,7 +247,7 @@ class BookRepository
       // Best-effort by construction — `readAssociations` swallows its own failures and returns
       // what it managed — because the endpoints are community-documented and a server that does
       // not answer them must still get a working refresh, not a failed one.
-      val seededBooks = mergedBooks.withSeededTags(readTagAssociations())
+      val seededBooks = mergedBooks.withSeededTags(readTagAssociations(mergedBooks.map { it.id }))
 
       // remove books which have been deleted from server
       val networkIds = networkBooks.map { it.id }
@@ -379,6 +379,13 @@ class BookRepository
           }
         }
 
+      // Seed narrator and series here too (cu-156). cu-143 added this to `refreshData` only, but
+      // `LibrarySyncRepository` — the path an actual sync takes — calls *this* method, so the
+      // index never filled in on a real device: 196 of 196 books had an empty `series` on the
+      // household server. Same rules as there: after the merge, never overwriting a non-empty
+      // field, and best-effort so an optional index cannot fail a refresh.
+      val seededBooks = mergedBooks.withSeededTags(readTagAssociations(mergedBooks.map { it.id }))
+
       // remove books which have been deleted from server
       val networkIds = networkBooks.map { it.id }
       val removedFromNetwork =
@@ -391,8 +398,8 @@ class BookRepository
         val removed = bookDao.removeAll(removedFromNetwork.map { it.id })
         Timber.i("Removed $removed items from DB")
 
-        Timber.i("Loaded books: ${mergedBooks.size}")
-        bookDao.insertAll(mergedBooks)
+        Timber.i("Loaded books: ${seededBooks.size}")
+        bookDao.insertAll(seededBooks)
       }
     }
 
@@ -471,10 +478,20 @@ class BookRepository
      * a worse outcome than an index that stays partial, which is the state the app has been in
      * since cu-24 anyway.
      */
-    private suspend fun readTagAssociations(): List<TagAssociation> =
+    private suspend fun readTagAssociations(bookIds: List<String>): List<TagAssociation> =
       try {
-        tagIndexSeeder.readAssociations(TagFilter.STYLE) +
-          tagIndexSeeder.readAssociations(TagFilter.MOOD)
+        // Route B first (cu-156): one multi-id request answers both fields for ~280 books, where
+        // the `1 + N` walk below needs 185 for narrators alone on this library (cu-150 measured
+        // both). Falling back rather than committing to it, because the endpoint is
+        // spec-documented but not guaranteed across Plex versions.
+        val fromIds = tagIndexSeeder.readAssociationsByIds(bookIds)
+        if (fromIds.isNotEmpty()) {
+          fromIds
+        } else {
+          Timber.i("Multi-id tag seeding yielded nothing for ${bookIds.size} books; using the per-tag walk")
+          tagIndexSeeder.readAssociations(TagFilter.STYLE) +
+            tagIndexSeeder.readAssociations(TagFilter.MOOD)
+        }
       } catch (t: Throwable) {
         Timber.i("Could not seed the narrator/series index: $t")
         emptyList()

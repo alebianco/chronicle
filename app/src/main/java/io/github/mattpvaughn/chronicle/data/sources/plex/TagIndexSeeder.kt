@@ -3,6 +3,8 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.narrators
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.seriesName
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -59,7 +61,74 @@ class TagIndexSeeder(
   private val dispatchers: DispatcherProvider,
 ) {
   /**
-   * Reads every value of [filter] and the books carrying each.
+   * Reads narrator **and** series for [bookIds] in a handful of requests (cu-156, "Route B").
+   *
+   * The cheap path. One multi-id metadata request answers both fields for a whole batch of books,
+   * where [readAssociations] needs `1 + N` per field: measured against the household server,
+   * **196 books in one request, 0.196 s** versus 185 requests for narrators alone (cu-150).
+   *
+   * Returns the same [TagAssociation] shape as the `1 + N` walk, so `withSeededTags` and its
+   * never-overwrite rule are untouched and the two routes are interchangeable.
+   *
+   * Failure is **per batch** and never fatal: a library that splits into eight requests should
+   * index the seven that answered. An empty result lets the caller fall back to Route A, since the
+   * endpoint is spec-documented rather than guaranteed across Plex versions.
+   */
+  suspend fun readAssociationsByIds(bookIds: List<String>): List<TagAssociation> {
+    if (bookIds.isEmpty()) return emptyList()
+
+    val narrators = mutableMapOf<String, MutableSet<String>>()
+    val series = mutableMapOf<String, MutableSet<String>>()
+
+    for (batch in batchIdsByUrlLength(bookIds)) {
+      val directories =
+        withContext(dispatchers.io) {
+          try {
+            // `metadata`, not `plexDirectories`: a metadata response carries its items under
+            // "Metadata" while a *filter choices* response carries them under "Directory". Both
+            // deserialize to `PlexDirectory`, so reading the wrong one compiles, returns an empty
+            // list, and silently seeds nothing.
+            plexMediaService.retrieveAlbums(batch.joinToString(separator = ","))
+              .plexMediaContainer.metadata
+          } catch (t: Throwable) {
+            // Ids only: a list of directories is a collection-shaped log (cu-134), and which books
+            // were asked for is the whole diagnostic.
+            Timber.i("Multi-id metadata failed for ${batch.size} books (first ${batch.take(3)}): $t")
+            null
+          }
+        } ?: continue
+
+      for (directory in directories) {
+        val id = directory.ratingKey.takeIf { it.isNotEmpty() } ?: continue
+        directory.narrators().forEach { narrators.getOrPut(id) { mutableSetOf() }.add(it) }
+        directory.seriesName().takeIf { it.isNotEmpty() }
+          ?.let { series.getOrPut(id) { mutableSetOf() }.add(it) }
+      }
+    }
+
+    // Inverted back to value -> books, which is the shape `withSeededTags` consumes. Going through
+    // the same type keeps one merge rule rather than two that must agree.
+    return buildAssociations(TagFilter.STYLE, narrators) + buildAssociations(TagFilter.MOOD, series)
+  }
+
+  private fun buildAssociations(
+    filter: TagFilter,
+    byBook: Map<String, Set<String>>,
+  ): List<TagAssociation> {
+    val booksByValue = mutableMapOf<String, MutableSet<String>>()
+    for ((bookId, values) in byBook) {
+      for (value in values) {
+        booksByValue.getOrPut(value) { mutableSetOf() }.add(bookId)
+      }
+    }
+    return booksByValue.map { (value, ids) -> TagAssociation(filter, value, ids) }
+  }
+
+  /**
+   * Reads every value of [filter] and the books carrying each — the `1 + N` walk ("Route A").
+   *
+   * Kept as the fallback for [readAssociationsByIds], since the multi-id endpoint is
+   * spec-documented rather than guaranteed across Plex versions (cu-156).
    *
    * Failures are **per value**, not fatal: a library with forty narrators should index
    * thirty-nine of them if one listing fails, rather than none. A failure to enumerate at all

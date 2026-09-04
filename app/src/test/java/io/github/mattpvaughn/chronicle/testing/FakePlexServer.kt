@@ -90,6 +90,69 @@ class FakePlexServer : ExternalResource() {
     }
   }
 
+  /**
+   * The multi-id metadata response, filtered to the ids actually asked for (cu-156).
+   *
+   * Filtering matters rather than being pedantry: a router that answers the whole captured
+   * fixture whatever was requested makes Route B look like it *succeeded* for a library it knows
+   * nothing about, so the Route A fallback never fires and a real fallback bug would pass every
+   * test. That is the cu-18/cu-143 mis-routing trap in a third place, and it bit here: cu-143's
+   * refresh tests went red until this filtered.
+   *
+   * Scanned as text rather than with `org.json`, which is an unimplemented stub in a plain JVM
+   * unit test — it throws, the dispatcher never answers, and the failure surfaces as a socket
+   * read timeout rather than as a parse error.
+   */
+  private fun multiIdResponse(path: String): MockResponse {
+    val requestedIds =
+      path.substringAfter("/library/metadata/").substringBefore('?').split(',')
+        .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    val body = fixture("multi-id-real-shape.json")
+    val items = splitTopLevelObjects(body.substringAfter("\"Metadata\"").substringAfter('['))
+    val kept =
+      items.filter { item ->
+        val id = item.substringAfter("\"ratingKey\":").substringAfter('"').substringBefore('"')
+        id in requestedIds
+      }
+    val json =
+      "{\"MediaContainer\":{\"size\":" + kept.size +
+        ",\"identifier\":\"com.plexapp.plugins.library\",\"Metadata\":[" +
+        kept.joinToString(",") + "]}}"
+    return MockResponse().setResponseCode(200)
+      .setHeader("Content-Type", "application/json")
+      .setBody(json)
+  }
+
+  /** Splits a JSON array body into its top-level objects by brace depth. */
+  private fun splitTopLevelObjects(arrayBody: String): List<String> {
+    val out = mutableListOf<String>()
+    var depth = 0
+    var start = -1
+    var inString = false
+    var escaped = false
+    for ((i, c) in arrayBody.withIndex()) {
+      when {
+        escaped -> escaped = false
+        c == '\\' && inString -> escaped = true
+        c == '"' -> inString = !inString
+        inString -> Unit
+        c == '{' -> {
+          if (depth == 0) start = i
+          depth++
+        }
+        c == '}' -> {
+          depth--
+          if (depth == 0 && start >= 0) {
+            out += arrayBody.substring(start, i + 1)
+            start = -1
+          }
+        }
+        c == ']' && depth == 0 -> return out
+      }
+    }
+    return out
+  }
+
   private fun routeFor(path: String): MockResponse =
     when {
       // The tag-filter surface (cu-143). Order matters against the `/all` and bare-section rules
@@ -102,6 +165,13 @@ class FakePlexServer : ExternalResource() {
       path.startsWith("/library/sections") && path.contains("/mood") -> json("filter-mood.json")
       path.startsWith("/library/sections") && path.contains("/all") -> json("albums.json")
       path.startsWith("/library/sections") -> json("libraries.json")
+      // The multi-id metadata route (cu-156). Must precede the single-id rule below: a
+      // comma-joined path would otherwise have its first id parsed out and answer one album, or
+      // fall through to the track fixture — the same class of silent mis-routing that made a
+      // track appear as a phantom book (cu-18) and made the tag seeder read a library list as a
+      // list of narrators (cu-143). The fixture is captured from a real server.
+      path.startsWith("/library/metadata/") && path.substringAfter("/library/metadata/").contains(',') ->
+        multiIdResponse(path)
       // Tracks for an album; must be checked before the bare metadata route.
       path.contains("/children") -> json("tracks.json")
       // `/library/metadata/<id>` serves **two** endpoints with identical query parameters:

@@ -81,6 +81,27 @@ interface PlexMediaService {
     @Query("includeChapters") includeChapters: Int = 1,
   ): PlexMediaContainerWrapper
 
+  /**
+   * Several books' metadata in **one** request (cu-156).
+   *
+   * The spec's "Get one or more metadata items" form. Verified against a real Plex 1.43 server:
+   * 196 ids in a 1371-character path answered 200 in 0.196 s with 449 KB, carrying `Style` and
+   * `Mood` for every book — the same facts Route A's `1 + N` walk derives, at one request instead
+   * of 185 (cu-150 measured it, this captured the fixture).
+   *
+   * **`@Path(encoded = true)` is load-bearing**: Retrofit percent-encodes a path segment by
+   * default, which would turn the separating commas into `%2C` and address a single book whose id
+   * happens to contain commas — a 404, not an error that explains itself. The ids are Plex rating
+   * keys and are matched against a strict charset before they reach here.
+   *
+   * Chapters are **not** requested: this is the catalogue-wide tag pass, and `includeChapters=1`
+   * on 196 books would multiply the response for data the seeder does not read.
+   */
+  @GET("/library/metadata/{albumIds}")
+  suspend fun retrieveAlbums(
+    @Path("albumIds", encoded = true) albumIds: String,
+  ): PlexMediaContainerWrapper
+
   @GET("/library/metadata/{albumId}/children")
   suspend fun retrieveTracksForAlbum(
     @Path("albumId") albumId: String,
