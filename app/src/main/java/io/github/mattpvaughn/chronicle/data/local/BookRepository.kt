@@ -172,6 +172,12 @@ interface IBookRepository {
   suspend fun fetchBookAsync(bookId: String): Audiobook?
 
   suspend fun refreshDataPaginated()
+
+  /**
+   * Copies chapters from `Audiobook.chapters` into `ChapterDatabase` for books that have none
+   * (cu-158). Idempotent; safe to call on every launch.
+   */
+  suspend fun backfillChapterTable(): Int
 }
 
 @Singleton
@@ -261,6 +267,52 @@ class BookRepository
     }
 
     @Throws(Throwable::class)
+    /**
+     * Copies chapters off `Audiobook.chapters` into `ChapterDatabase` for any book with none
+     * (cu-158), so a library synced before cu-49 gets rows without waiting to be re-synced.
+     *
+     * Returns the number of books written, for logging and tests.
+     *
+     * Per book, never global: a book is considered done when *it* has rows, so an interrupted run
+     * resumes where it stopped. A single "backfill done" preference would silently abandon the
+     * remainder. The decisions live in [ChapterBackfill]; this method is the I/O around them.
+     *
+     * A book that fails is logged and skipped, leaving it exactly as it is today — with a column
+     * and no rows — rather than aborting the pass for every book after it.
+     */
+    override suspend fun backfillChapterTable(): Int =
+      withContext(dispatchers.io) {
+        // Cheap gate first. `bookDao.getAudiobooks()` is a `SELECT *` that deserializes every
+        // book's `chapters` column — megabytes on a real library (cu-134) — so reading it on every
+        // launch only to find nothing to do is exactly the cu-110 mistake. Once every book that
+        // has chapters also has rows, the counts agree and this returns without that read.
+        val booksWithRows = chapterDao.countBooksWithChapters()
+        val booksWithChapters = bookDao.countBooksWithChapters()
+        if (booksWithRows >= booksWithChapters) {
+          return@withContext 0
+        }
+
+        var written = 0
+        bookDao.getAudiobooks()
+          .filter { ChapterBackfill.mayNeedBackfill(it) }
+          .forEach { book ->
+            try {
+              val existing = chapterDao.getChaptersForBook(book.id)
+              val rows = ChapterBackfill.rowsFor(book, existing.size)
+              if (rows.isNotEmpty()) {
+                chapterDao.insertAll(rows)
+                written++
+              }
+            } catch (e: Exception) {
+              Timber.e(e, "Chapter backfill failed for book ${book.id}; leaving it unchanged")
+            }
+          }
+        if (written > 0) {
+          Timber.i("Chapter backfill wrote rows for $written book(s)")
+        }
+        written
+      }
+
     override suspend fun refreshDataPaginated() {
       if (prefsRepo.offlineMode) {
         return

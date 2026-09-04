@@ -373,6 +373,7 @@ pitest {
       "io.github.mattpvaughn.chronicle.data.local.RoomSchemaTest",
       "io.github.mattpvaughn.chronicle.data.local.RoomMigrationTest",
       "io.github.mattpvaughn.chronicle.data.local.MigrationSupportTest",
+      "io.github.mattpvaughn.chronicle.data.local.ChapterBackfillSqlTest",
       "io.github.mattpvaughn.chronicle.data.model.TrackSourceUriTest",
       "io.github.mattpvaughn.chronicle.features.player.ProgressUpdaterTest",
       "io.github.mattpvaughn.chronicle.features.library.ProgressIndicatorTest",

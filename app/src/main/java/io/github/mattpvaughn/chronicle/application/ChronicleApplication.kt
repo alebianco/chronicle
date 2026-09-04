@@ -15,6 +15,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.mattpvaughn.chronicle.BuildConfig
+import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.SeriesIndexRulesLoader
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
@@ -65,6 +66,9 @@ open class ChronicleApplication :
 
   @Inject
   lateinit var seriesIndexRulesLoader: SeriesIndexRulesLoader
+
+  @Inject
+  lateinit var bookRepository: IBookRepository
 
   @Inject
   lateinit var unhandledExceptionHandler: CoroutineExceptionHandler
@@ -128,6 +132,8 @@ open class ChronicleApplication :
     // connections against the real plex.tv and clear them.
     DebugHooks.onApplicationCreate(this)
     installSeriesIndexRules()
+
+    backfillChapterTable()
     setupNetwork(plexPrefs)
     updateDownloadedFileState()
     super.onCreate()
@@ -160,6 +166,20 @@ open class ChronicleApplication :
   private fun installSeriesIndexRules() {
     applicationScope.launch {
       seriesIndexRulesLoader.install()
+    }
+  }
+
+  /**
+   * Copies chapters onto `ChapterDatabase` for books synced before cu-49 (cu-158).
+   *
+   * Launched rather than awaited, for the same reason as [installSeriesIndexRules]: nothing reads
+   * the table yet — every read site still goes through `Audiobook.chapters` (cu-82) — so this is
+   * pure preparation and a launch that finishes late costs nothing. It is idempotent per book, so
+   * running on every start is cheaper than tracking whether it has run.
+   */
+  private fun backfillChapterTable() {
+    applicationScope.launch(unhandledExceptionHandler) {
+      bookRepository.backfillChapterTable()
     }
   }
 

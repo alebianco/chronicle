@@ -57,6 +57,18 @@ interface ChapterDao {
   @Query("SELECT * FROM Chapter WHERE bookId = :bookId ORDER BY discNumber, `index`")
   fun getChaptersForBookLive(bookId: String): LiveData<List<Chapter>>
 
+  /**
+   * The number of books that have any chapter rows.
+   *
+   * Exists so the cu-158 backfill can decide whether to run **without** reading the book table:
+   * `BookDao.getAudiobooks()` is a `SELECT *` that deserializes every book's `chapters` column, and
+   * on a real library that is megabytes (cu-134 measured 3.38 MB from one such list). Doing that on
+   * every launch to discover there is nothing to do is the cu-110 mistake — work whose result
+   * cannot change.
+   */
+  @Query("SELECT COUNT(DISTINCT bookId) FROM Chapter")
+  suspend fun countBooksWithChapters(): Int
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   fun insertAll(rows: List<Chapter>)
 

@@ -196,6 +196,17 @@ interface BookDao {
   @Query("SELECT * FROM Audiobook")
   fun getAudiobooks(): List<Audiobook>
 
+  /**
+   * How many books carry a non-empty serialized `chapters` column.
+   *
+   * Counted in SQL so the cu-158 backfill can compare it against
+   * `ChapterDao.countBooksWithChapters()` and skip the full `getAudiobooks()` read when the two
+   * agree. Tested against `''` as well as NULL because the column's converter writes an empty
+   * string for an empty list, not NULL.
+   */
+  @Query("SELECT COUNT(*) FROM Audiobook WHERE chapters IS NOT NULL AND chapters != ''")
+  suspend fun countBooksWithChapters(): Int
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   fun insertAll(rows: List<Audiobook>)
 

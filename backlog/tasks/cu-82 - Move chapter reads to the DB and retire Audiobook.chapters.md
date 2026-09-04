@@ -3,7 +3,7 @@ id: cu-82
 title: Move chapter reads to the DB and retire Audiobook.chapters
 status: To Do
 labels: [R2, architecture]
-dependencies: [cu-49]
+dependencies: [cu-49, cu-158]
 priority: medium
 milestone: m-2
 ---
@@ -22,14 +22,27 @@ reached a safe midpoint: chapters are written to `ChapterDatabase` and *also* st
    re-sync. The read therefore needs to be DAO-first with a fall back to `Audiobook.chapters`,
    giving a three-level chain: table → book column → `asChapterList()` (the no-chapter-data
    fallback fixed in [[cu-13]], which stays).
-2. **All four read sites are `DoubleLiveData` combinators over the book** —
-   `CurrentlyPlayingViewModel`, `AudiobookDetailsViewModel`, `MainActivityViewModel` and
-   `CurrentlyPlayingSingleton`. Each needs its reactive wiring restructured around a DAO-backed
-   `LiveData` (`ChapterDao.getChaptersForBookLive` already exists), not just a changed expression.
+2. **It is not four read sites.** Counted 2026-09-04: **28 references to `Audiobook.chapters`
+   across 11 files.** The four `DoubleLiveData` combinators over the book
+   (`CurrentlyPlayingViewModel`, `AudiobookDetailsViewModel`, `MainActivityViewModel`,
+   `CurrentlyPlayingSingleton`) are the ones needing their reactive wiring restructured around a
+   DAO-backed `LiveData` (`ChapterDao.getChaptersForBookLive` already exists) — but
+   `CurrentlyPlayingViewModel` alone has 7 references, `PlayerExt.kt` has 5 (chapter skip), and
+   there are single uses in `CachedFileManager`, `BookRepository` and `ChapterListAdapter`. Plan
+   against the real number.
 
-Consider a one-off backfill instead of a permanent fallback: on first launch after upgrade, walk
-the books that have `chapters` and no rows, and write them. That turns a three-level chain into a
-two-level one and lets step 7 happen sooner — worth costing against just leaving the fallback.
+   | file | refs |
+   |---|---|
+   | `CurrentlyPlayingViewModel` | 7 |
+   | `PlayerExt` | 5 |
+   | `CurrentlyPlayingSingleton` | 4 |
+   | `AudiobookDetailsViewModel` / `AudiobookDetailsFragment` / `MainActivityViewModel` / `Audiobook` | 2 each |
+   | `CurrentlyPlayingFragment` / `ChapterListAdapter` / `CachedFileManager` / `BookRepository` | 1 each |
+
+**The backfill is now [[cu-158]]**, and it should land first. It converts the permanent three-level
+chain (table → column → `asChapterList()`) into a two-level one, which is what makes dropping the
+column defensible rather than a permanent fallback nobody can ever remove. It also has to happen
+before the drop regardless, or an upgrading user loses every chapter they had.
 
 ## Acceptance Criteria
 
