@@ -91,6 +91,21 @@ Collected while running the pass, because each cost time:
 - **`uiautomator dump` fails while the expanded player is open** but succeeds with the mini player
   or when paused. Pause before dumping, or use `screencap`.
 
+## Deferred, 2026-09-04 — needs a session with a human at the device
+
+Passed over deliberately while working through R2, on the owner's instruction to take only what can
+be **verified automatically**. Nothing here can be: every remaining item is an on-device
+observation, which is why the task exists at all rather than being a set of tests.
+
+- Item 2 is not testable on this hardware in any case — the tablet has no SIM.
+- Items 1 and 3–6 are runnable on the tablet (it is reachable, and the live library has the
+  107-chapter books item 4 needs), but each ends in "look at the screen" or "read the log", so the
+  evidence would be screenshots rather than a gate. Worth doing in a session where the owner is
+  reviewing anyway.
+
+Not a judgement that the items are unimportant — the method notes below are still the reason to
+keep the file.
+
 ## Acceptance Criteria
 
 - [ ] Item 1 verified with a method that keeps the device reachable
