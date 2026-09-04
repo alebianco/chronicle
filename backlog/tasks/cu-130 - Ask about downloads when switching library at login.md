@@ -1,7 +1,7 @@
 ---
-id: DRAFT-130
+id: cu-130
 title: Ask about downloads when switching library at login
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-09-03'
 labels: [R2, ux, downloads]
@@ -9,6 +9,17 @@ dependencies: [cu-126]
 priority: medium
 milestone: m-2
 ---
+
+## Promoted from a draft, 2026-09-05 — the factual half checked
+
+The reclamation claim holds: `CachedFileManager.refreshTrackDownloadedStatus` does delete files for
+`Audiobook`s no longer in the database, and it runs from `ChronicleApplication` on every launch. So
+an orphaned download really is reclaimed, silently, at the next start.
+
+**The open question is a product one and is left for the owner**: should the onboarding picker
+prompt at all? The draft's own first item asks it, and the answer decides whether this is UI work or
+a won't-do. Reaching that screen from a *failed re-auth* is the case that makes "always prompt" feel
+wrong — the user did not choose to switch anything.
 
 ## Description
 

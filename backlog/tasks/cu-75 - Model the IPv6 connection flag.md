@@ -1,7 +1,7 @@
 ---
-id: DRAFT-75
+id: cu-75
 title: Model the IPv6 connection flag
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-08-31'
 labels: [R2, architecture]
@@ -46,6 +46,37 @@ Any one of:
 The likely shape is a *filter*, not a tier: prefer IPv4 within each tier and fall back to
 IPv6, rather than adding `LAN_IPV6`/`DIRECT_IPV6` tiers that would double the enum and
 complicate the budget logic for no measured gain.
+
+## Research, 2026-09-05 — the third trigger checked, and it says stay closed
+
+The draft names three things that would justify picking this up. The cheapest to check is the
+third — *"[[cu-73]]'s live pass reporting IPv6 connections in the real `/resources` response at all;
+if the household's server never advertises one, this stays closed."*
+
+**Checked against the live server. It never advertises one.**
+
+Read out of the app's own response log on a real launch against **ANTARES**, rather than from a
+fixture — the hand-written `resources.json` has `IPv6` absent entirely and `address` null, so it
+could not have answered this (the cu-24 fixture trap):
+
+| | |
+|---|---|
+| connections advertised | 3 |
+| `"IPv6": true` | **0** |
+| `"IPv6": false` | 3 |
+| IPv6-literal addresses | **0** — all three are IPv4 (`192.`, `172.`, `87.`) |
+
+So on the only network this app is judged against (principle 5, the owner's household), the flag is
+constant-false and modelling it would change nothing. The other two triggers remain untested and
+both need a *failing* network, which cannot be manufactured honestly.
+
+**Left `To Do`, not closed.** The evidence is about one server at one point in time; a router or ISP
+change could make it advertise IPv6 tomorrow, and the check above is cheap to repeat. What is
+recorded is that the question was asked and answered *for now* — so the next person does not spend
+the afternoon re-deriving it.
+
+To re-check: launch a debug build against the real server and
+`adb logcat -d | grep -oE '"IPv6":[a-z]+'`. Two lines, no credential handling.
 
 ## Acceptance Criteria
 

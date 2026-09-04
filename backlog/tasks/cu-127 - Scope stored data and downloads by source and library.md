@@ -1,7 +1,7 @@
 ---
-id: DRAFT-127
+id: cu-127
 title: Scope stored data and downloads by source and library
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-09-03'
 labels: [R2, architecture, data, multi-backend]
@@ -9,6 +9,24 @@ dependencies: []
 priority: medium
 milestone: m-2
 ---
+
+## Promoted from a draft, 2026-09-05 — with one correction
+
+Claims re-verified against the tree. Two hold; one has moved:
+
+- ✅ `Audiobook.source` is written as a constant at every site and no `BookDao` query filters on it.
+- ✅ `MediaItemTrack` still has no source field.
+- ⚠️ **"no DAO filters on it" is no longer the whole picture.** [[cu-80]] added
+  `planIngestion` (`data/sources/IngestionPlan.kt`), which scopes *removal* by
+  `Audiobook.source` — a refresh may only delete rows belonging to the source doing the refreshing.
+  So the column has one real reader now, and it is the dangerous one. That does not change this
+  task's question, but it does mean the field is no longer inert and a design that repurposes it
+  has an existing behaviour to preserve.
+
+**Still needs the owner**, which is why it is `To Do` rather than in progress: the draft itself says
+this "probably wants an ADR", the proposal is quoted from a question the owner asked, and picking a
+scoping key (source? library? both?) is a data-model decision with a Room migration behind it.
+Everything an agent could settle without you is above.
 
 ## Description
 
