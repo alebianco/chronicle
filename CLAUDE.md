@@ -51,7 +51,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Project snapshot (truthful as of 2026-08-31 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin **2.2.10**, minSdk 27, target/compileSdk **36** (cu-6). Gradle 9.5.1 + AGP 8.13.2 — note AGP 8.x cannot use Gradle >= 9.6.0, and AGP 9.x absorbs the Kotlin plugin (its own migration).
-- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`; the reflective `KotlinJsonAdapterFactory` was removed in cu-62) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · LiveData + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
+- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`; the reflective `KotlinJsonAdapterFactory` was removed in cu-62) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · **StateFlow** (LiveData removed in cu-52) + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
 - **KSP, not KAPT** (cu-8/cu-58). `kotlin-kapt` is gone; Room and Dagger use `ksp(...)`. Any doc claiming KAPT is wrong.
   Note incremental builds are *slower* than they were under KAPT (+13% on an ordinary edit, +97% when an annotated type
   changes) — this is fixed per-invocation overhead in KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating
@@ -104,7 +104,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1295 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1301 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -121,7 +121,32 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 1. DI via constructor `@Inject`/factories; respect scopes (`@Singleton`, `@ActivityScope`, `@ServiceScope`); never instantiate singletons manually.
 2. UI logic in Fragments/XML; business logic in ViewModels/Repositories; DB never accessed from UI.
-3. LiveData for UI state: private `MutableLiveData`, public immutable `LiveData`. (StateFlow migration is future work — don't mix ad hoc.)
+3. **`StateFlow` for UI state, never `LiveData`** (cu-52): private `MutableStateFlow`, public
+   immutable `StateFlow`. Collect in the UI with `collectWhileStarted(flow) { … }` (or
+   `collectEventsWhileStarted` for a one-shot `Event`) on `viewLifecycleOwner` in a Fragment, on
+   the Activity itself in an Activity — never a bare `lifecycleScope.launch`, which keeps
+   collecting while backgrounded, and never the deprecated `launchWhenStarted`, which buffers
+   instead of cancelling. **`postValue` is banned outright and `PostValueUsageTest` fails the build
+   on one**: it defers to the next main-loop pass and coalesces, so a read-after-write sees a stale
+   value — the shape of three cu-73 device races and of the `connect()` crash
+   `MediaServiceConnection.connectIfIdle` documents. A `MutableStateFlow` assignment is thread-safe
+   *and* immediate, which is why even an off-main-thread publish (a `SharedPreferences` listener, a
+   `BroadcastReceiver` callback) needs no deferral.
+   - **`stateIn`'s sharing policy is a real choice.** `WhileSubscribed(STOP_TIMEOUT_MILLIS)` is the
+     default — it survives a rotation without re-running the query, and drops the Room subscription
+     when the screen goes. Use **`Eagerly`** when a click handler reads `.value` *without*
+     collecting: `AudiobookDetailsViewModel.audiobook` has five such readers, and under
+     `WhileSubscribed` its offline guard read the `null` seed and let an uncached book reach the
+     player with no server. A test pins that choice.
+   - **Combine with `combineDistinct`** (`util/FlowCombinators.kt`), not a bare `combine`: the
+     `distinctUntilChanged` is not an optimisation, it is the cu-110 fix. For a list, key it with
+     `distinctUntilChangedBy { it.booksKey() }`.
+   - **Testing needs a subscriber *and* a drained dispatcher.** A `WhileSubscribed` flow computes
+     only while collected, and `MainDispatcherRule` installs a `StandardTestDispatcher` that queues
+     rather than runs — so `.value` read without both is the `stateIn` seed, which looks exactly
+     like broken arithmetic. `util/FlowTestExt.kt` has `keepCollected`, `settledValue` and
+     `settledValues`; use `settledValues` when one assertion compares two flows, because
+     subscribing to them one at a time makes whichever is second read its seed.
 4. Coroutines: **inject `DispatcherProvider`** (cu-15) rather than referencing `Dispatchers.*` directly; UI on Main via `viewModelScope`. `GlobalScope` is gone and stays gone — three tests pin this (`CachedFileManagerScopeTest`, `RepositoryDispatcherTest`, `InternalApiUsageTest`). The five repositories are converted; ViewModels and the player service still hardcode dispatchers (cu-72) — don't add more. **Workers are a deliberate exemption** (cu-152): WorkManager builds them reflectively with a fixed `(Context, WorkerParameters)` signature, so a constructor cannot take a `DispatcherProvider` without a `WorkerFactory` and a `Configuration.Provider` — and that plumbing would buy nothing while no worker is unit-tested and `TestListenableWorkerBuilder` supplies its own executor anyway. The two `withContext(Dispatchers.IO)` calls that remain are *correct*: `doWork` runs on `Dispatchers.Default` and both wrap real blocking file I/O. `WorkerDispatcherTest` pins the exemption list and asserts every file on it really is a `CoroutineWorker`.
 5. **Never call `Injector.get()`** (cu-33). Take dependencies as constructor parameters — a class
    that fetches its own at runtime **cannot be constructed in a unit test at all**, because
@@ -335,7 +360,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `update(duration)` then `start(true)`, and `update` already leaves the state `Running`, so a
   guard that asks the state whether it is active makes every `BEGIN` a silent no-op.
 - **Do not do per-second work whose result cannot change** (cu-110). `ProgressUpdater` writes once
-  a second during playback and Room invalidates **per table**, so every `LiveData` on `Audiobook`
+  a second during playback and Room invalidates **per table**, so every query on `Audiobook`
   or `MediaItemTrack` re-emits at tick rate. The measured damage was not computation but
   **re-rendering**: 1405 `View.measure` calls in 20 s, 88% janky frames, dropped taps. Four causes,
   all the same shape — a constraint-graph rebuild for a constant aspect ratio, a slider refresh for
@@ -348,11 +373,15 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   single-track, 3-chapter fixture showed 1 jiffy/6 s and looked fixed; the 3-track, 8-chapter one
   put it back to 431 jiffies/12 s and exposed the real dominant cause. Measure against the worst
   realistic input.
-- **`postValue` defers to the next main-loop pass**, so a flag it sets cannot guard anything read
-  in the same pass (cu-110). `MediaServiceConnection.connectIfIdle` tested `isConnected.value`,
-  which `onConnected` publishes with `postValue` while clearing `isConnecting` immediately — so
+- **`postValue` deferred to the next main-loop pass**, so a flag it set could not guard anything
+  read in the same pass (cu-110). `MediaServiceConnection.connectIfIdle` tested `isConnected.value`,
+  which `onConnected` published with `postValue` while clearing `isConnecting` immediately — so
   both read idle while the browser was CONNECTED, and `MediaBrowserCompat.connect()` throws rather
-  than ignoring a redundant call. Ask the collaborator's own synchronous state instead.
+  than ignoring a redundant call. **`postValue` is gone tree-wide since cu-52** and
+  `PostValueUsageTest` fails the build on a new one, so this exact shape cannot return; the general
+  lesson survives it, which is to **ask the collaborator's own synchronous state** rather than a
+  published mirror of it. `connectIfIdle` still tests `mediaBrowser.isConnected` for that reason —
+  the browser's state also moves *during* `connect()`, before any callback of ours runs.
 - **The Plex auth token is resolved in one place, and empty counts as absent** (cu-33).
   `PlaybackSession.authToken` is the only statement of the precedence — server access token, then
   the profile's, then the account's. It was written out **twice** before, in
@@ -529,8 +558,9 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `android:visibility="gone"` in XML or it flashes its default for a frame; and a binding-adapter-backed type such as
   `FormattableString` must go through its helper, since a plain `.text =` renders the data class `toString()` silently.
   **`FirstFrameFlashTest` is now the gate** (cu-68): it fails the build on any Kotlin-driven view
-  with no XML default. "For a frame" understates it — several sources are cold (`DoubleLiveData`,
-  a `QuadLiveDataAsync` on `Dispatchers.IO`, an unseeded `MutableLiveData`), so the default held
+  with no XML default. "For a frame" understates it — several sources are cold (a
+  `stateIn(WhileSubscribed)` before anything collects it, a `combine` waiting on a slow source), so
+  the default held
   long enough to read "No libraries found" over onboarding, with the bottom nav and mini player on
   top of the login screen. 34 views were swept. The guard also checks the **mirror** risk, which is
   worse: a view defaulted to `gone` with no writer is *permanently* invisible. It caught two —

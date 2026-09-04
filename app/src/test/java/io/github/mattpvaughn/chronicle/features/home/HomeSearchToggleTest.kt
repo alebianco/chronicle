@@ -33,7 +33,8 @@ import org.junit.Test
  *
  * What these do pin is the **contract** — that reading the flag straight after setting it returns
  * what was set — so a future change that reintroduces a deferred publish *and* removes the rule
- * fails here. The race itself is a device-level fact (cu-73), evidenced there, not here.
+ * fails here. The race itself is a device-level fact (cu-73), evidenced there, not here, and
+ * `PostValueUsageTest` is what actually keeps `postValue` out of the tree.
  */
 class HomeSearchToggleTest {
   @get:Rule
