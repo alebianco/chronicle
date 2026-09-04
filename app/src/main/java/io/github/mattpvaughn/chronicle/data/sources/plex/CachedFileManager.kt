@@ -27,6 +27,8 @@ import io.github.mattpvaughn.chronicle.features.download.ResumePlan
 import io.github.mattpvaughn.chronicle.features.download.bookIdOrNull
 import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
 import io.github.mattpvaughn.chronicle.features.download.isBookFullyCached
+import io.github.mattpvaughn.chronicle.features.download.partialsSafeToPrune
+import io.github.mattpvaughn.chronicle.features.download.prunePartialFiles
 import io.github.mattpvaughn.chronicle.features.download.reconcileCachedTracks
 import io.github.mattpvaughn.chronicle.features.download.scanCachedMediaDir
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
@@ -129,6 +131,37 @@ class CachedFileManager
         }
         Timber.i("Retrying ${toRetry.size} interrupted download(s)")
         fetch.retry(toRetry)
+      }
+    }
+
+    /**
+     * Deletes incomplete files that no longer belong to anything (cu-81).
+     *
+     * Fetch2's own records are the authority on what is resumable, and they can only be read
+     * through a callback — so this asks, decides on the answer, and deletes there. A failure to
+     * read them deletes **nothing**: the safe direction is always to keep bytes, since keeping a
+     * stale partial costs disk while deleting a live one costs the user their download.
+     */
+    private fun pruneAbandonedPartials(
+      incompleteOnDisk: List<String>,
+      reportedCached: List<String>,
+      idToFileMap: Map<String, File>,
+    ) {
+      if (incompleteOnDisk.isEmpty()) {
+        return
+      }
+      fetch.getDownloads { allDownloads ->
+        val knownToFetch = allDownloads.map { MediaItemTrack.getTrackIdFromFileName(File(it.file).name) }
+        val prunable = partialsSafeToPrune(incompleteOnDisk, knownToFetch, reportedCached)
+        if (prunable.isEmpty()) {
+          return@getDownloads
+        }
+        val outcome = prunePartialFiles(prunable, idToFileMap)
+        if (outcome.failedIds.isNotEmpty()) {
+          // Not an error the user can act on: the files are offered again on the next scan.
+          Timber.i("Could not delete ${outcome.failedIds.size} abandoned partial(s)")
+        }
+        Timber.i("Pruned ${outcome.deleted} abandoned partial(s), reclaiming ${outcome.reclaimedBytes} bytes")
       }
     }
 
@@ -438,6 +471,10 @@ class CachedFileManager
       // matching file as cached, so a Wi-Fi drop mid-download left a partial file that the
       // next launch promoted to "available offline" — and the book played truncated. The
       // expected size has always been in the database; it was simply never read (cu-76).
+      // The incomplete ones are remembered rather than merely skipped (cu-81): a partial whose
+      // download was abandoned is invisible — the UI correctly says the book is not downloaded —
+      // so nothing ever pointed at the space it occupies.
+      val incompleteOnDisk = mutableListOf<String>()
       val trackIdsFoundOnDisk =
         filesOnDisk.mapNotNull { file ->
           val id = MediaItemTrack.getTrackIdFromFileName(file.name)
@@ -446,6 +483,8 @@ class CachedFileManager
             Timber.i(
               "Ignoring incomplete download for track $id: ${file.length()} of $expectedSize bytes",
             )
+            incompleteOnDisk.add(id)
+            idToFileMap[id] = file
             return@mapNotNull null
           }
           idToFileMap[id] = file
@@ -458,6 +497,11 @@ class CachedFileManager
       // Context or the Injector — see CacheReconciliation.
       val reconciliation =
         reconcileCachedTracks(onDisk = trackIdsFoundOnDisk, reportedCached = reportedCachedKeys)
+
+      // Delete partials nobody is coming back for (cu-81). After the reconciliation, so the
+      // database's view is the settled one; `partialsSafeToPrune` decides, and it keeps anything
+      // Fetch could still resume or the database still claims.
+      pruneAbandonedPartials(incompleteOnDisk, reportedCachedKeys, idToFileMap)
 
       val alteredTracks = mutableListOf<String>()
 
@@ -472,10 +516,12 @@ class CachedFileManager
       reconciliation.toMarkCached.forEach {
         val rowsUpdated = trackRepository.updateCachedStatus(it, true)
         if (rowsUpdated == 0) {
-          // TODO: this will be relevant when multiple sources is implemented, but for now
-          //       we just have to trust as we allow users to retain downloads across libraries
-//                // File has been orphaned- no longer exists in DB, remove it from file system!
-//                idToFileMap[it]?.delete()
+          // A complete file whose track has no row is left alone — deliberately, and this is the
+          // TODO cu-81 resolves rather than removes. Downloads are retained across libraries, so
+          // "no row here" does not mean "nobody wants this"; deleting it would take a good
+          // download to fix a bookkeeping gap. Only *incomplete* files are ever deleted, below,
+          // and only when nothing is coming back for them.
+          Timber.i("Complete file for unknown track $it — keeping it")
         } else {
           alteredTracks.add(it)
         }
