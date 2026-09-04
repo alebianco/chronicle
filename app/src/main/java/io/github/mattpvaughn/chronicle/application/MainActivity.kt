@@ -49,6 +49,7 @@ import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import kotlinx.coroutines.Dispatchers
@@ -189,7 +190,7 @@ class MainActivity : AppCompatActivity() {
       // buttons (CurrentlyPlayingFragment, AudiobookDetailsFragment) both map
       // playing -> pause icon, and NotificationBuilder is not a counterexample
       // because that is a status icon rather than a button.
-      binding.pausePlayButton.setImageResource(
+      binding.pausePlayButton.setImageResourceIfChanged(
         if (playing == true) {
           R.drawable.ic_notification_icon_paused
         } else {

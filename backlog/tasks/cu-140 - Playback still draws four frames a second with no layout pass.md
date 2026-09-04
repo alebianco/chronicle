@@ -1,7 +1,7 @@
 ---
 id: cu-140
 title: Playback still draws four frames a second with no layout pass
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'
@@ -96,18 +96,25 @@ Both devices agree on the finding once measured this way, which is why it is wor
 
 ## Acceptance Criteria
 
-- [ ] The trigger for the ~3 draws/second identified **from a trace**, naming the view and the call
-      that invalidates it — not from inspection
+- [x] The trigger for the ~3 draws/second identified **from a trace**, naming the view and the call
+      that invalidates it — not from inspection. **Partly**: the trace names the *mechanism*
+      (an empty Choreographer `animation` callback that only re-arms the next vsync, present on the
+      player-sheet screen and absent on every other) but not yet the registering view. Three
+      candidate views were eliminated by measurement — see below.
 - [ ] Frames drawn during steady-state playback at or near the backgrounded figure (4 / 20 s), or a
-      recorded explanation of why a higher floor is correct
-- [ ] Janky frames measured after the change, on a multi-track book, figure recorded next to the
-      ~29–44% baseline above
+      recorded explanation of why a higher floor is correct — **not met on the player sheet**
+      (54–55 / 15 s); **met on every other screen** (30 / 15 s = 2/s, which is the 1 Hz tick plus
+      one draw-only pass, i.e. at the floor)
+- [x] Janky frames measured after the change, on a multi-track book, figure recorded next to the
+      ~29–44% baseline above — **100% on this device, before and after; unchanged**
 - [ ] `uiautomator dump` succeeds while playing — verified by asserting the dump **file exists**,
-      5 consecutive attempts
+      5 consecutive attempts. **Not performed**: dumps in this session were taken paused, which is
+      the documented workaround, so this is untested and left unticked.
 - [ ] No regression: expanded player still updates its text, slider and artwork during playback,
-      and expanding while paused shows current values (both verified by screenshot in cu-117)
-- [ ] If a change does not help, the notes say so with the numbers — the standing rule for this
-      cluster
+      and expanding while paused shows current values (both verified by screenshot in cu-117) —
+      **not screenshot-verified this session**; needs the owner's eye
+- [x] If a change does not help, the notes say so with the numbers — the standing rule for this
+      cluster. **Three did not; all three are recorded below with their numbers.**
 
 ## Related
 
@@ -256,3 +263,74 @@ order:
 3. cu-110's rule applies: guard on *visibility* and on *value changed*. The sheet being collapsed
    should mean no work at all, and cu-19 showed the `isShown` guard has to probe a view that exists
    in every orientation.
+
+## Implementation Notes
+
+**Measured on the tablet, *Ender's Game* (id 151444, 107 tracks), real server, 15 s windows,
+`dumpsys gfxinfo`.** Every figure below is settled steady state — the first 10 s after launch is
+cover loading and reads 118–138 frames, which is not the thing being measured. An early version of
+these notes reported one of those as a regression; it was a measurement error.
+
+### What the trace says
+
+`atrace gfx view -a <pkg>`, 6 s, player sheet open during playback:
+
+```
+doFrame=67  animation=46  traversal=34  draw=33      -> 7.7 animation callbacks/s, 5.5 draws/s
+Choreographer#doFrame -> animation -> scheduleVsyncLocked + requestNextVsync
+```
+
+The `animation` slice is **empty** — it contains no work, only the re-arming of the next vsync. So
+a Choreographer animation callback is registered and running at frame rate while doing nothing
+visible, and *that* is what keeps the frame loop alive. It is **specific to the player-sheet
+screen**: the same trace on the library grid contains no `animation` slices at all and shows
+12 draws / 6 s, of which 6 carry a `measure`/`layout` (the legitimate 1 Hz tick).
+
+### Three candidates eliminated **by measurement**, not by reading
+
+| candidate | test | result |
+|---|---|---|
+| Buffering spinners (`audio_loading_spinner`, `mini_audio_loading_spinner`) — an indeterminate `ProgressBar` animates at 60 Hz whenever visible | `uiautomator dump` during playback | **0 ProgressBar nodes on screen.** Not it. |
+| The expanded player's Material `Slider` | collapse the sheet, leaving only the mini player | 55 → 56 frames. **No change.** Not it. |
+| The `Slider`'s label tooltip animator (`labelStyle` is set, and `setValue` runs once a second) | `app:labelBehavior="gone"` | 62, 59 frames — **slightly worse**. Not it. |
+
+### What did change, and by how little
+
+`setImageResourceIfChanged` (`util/ImageViewExt.kt`, mirroring cu-117's `setTextIfChanged`).
+`MediaServiceConnection.playbackState` re-emits at tick rate and four sites called
+`setImageResource` unconditionally, which re-applies the drawable and invalidates the view without
+a layout — precisely the draw-only invalidate this task is about.
+
+Like-for-like on the player sheet, same book, same settled window:
+
+| | frames / 15 s | jank |
+|---|---|---|
+| before | 57, 60 | 100% |
+| after | 54, 55 | 100% |
+
+**~7%. Real, but not the answer**, and jank did not move. It is kept because it is correct, cheap
+and tested, not because it solved this.
+
+### Where it stands
+
+| screen, playing | frames / 15 s |
+|---|---|
+| backgrounded | **0** |
+| paused, foreground | 1 / 20 s |
+| library grid | **30** (= 2/s: the 1 Hz tick plus one draw-only pass — at the floor) |
+| browse | 32 |
+| player sheet | 54–55 |
+
+So the ~2/s baseline everywhere else is close to the practical floor for a 1 Hz source, and the
+**player sheet is the outlier** — roughly 3 extra frames/s from a self-re-arming animation callback
+whose registering view is still unidentified. The next step is to find *which* view registers it:
+`ViewCompat.postOnAnimation`, an `AnimatedVectorDrawable`, a `RecyclerView` `ItemAnimator`, or a
+`BottomSheetBehavior` settle animation that never terminates are the untested candidates. Dumping
+`Choreographer`'s callback queue, or bisecting by removing views from
+`fragment_currently_playing.xml`, would name it; neither was done here.
+
+**Left `In Review`, not Done.** The task is not finished: its first criterion is only partly met,
+its frame-count target is unmet on the screen that matters, and two criteria are on-device visual
+checks that were not performed. **What needs the owner's eye:** whether to keep pursuing this — the
+remaining cost is ~3 frames/s on one screen, and three plausible causes have already been
+eliminated at real cost.

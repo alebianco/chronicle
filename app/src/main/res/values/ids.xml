@@ -10,4 +10,9 @@
     <!-- The aspect ratio a row's thumb container was last constrained to, so
          `setSquareAspectRatio` can skip rebuilding the constraint graph on every rebind. -->
     <item name="tag_thumb_aspect_ratio" type="id" />
+
+    <!-- The drawable resource an ImageView was last set to, so `setImageResourceIfChanged` can
+         skip a redundant `setImageResource` — an unconditional draw-only invalidate, and the
+         play/pause buttons re-set an identical icon on every playback tick (cu-140). -->
+    <item name="tag_last_image_res" type="id" />
 </resources>

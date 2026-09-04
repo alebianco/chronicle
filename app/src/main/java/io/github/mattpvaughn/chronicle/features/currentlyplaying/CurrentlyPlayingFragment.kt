@@ -29,6 +29,7 @@ import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.formatCoarseDuration
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarkNote
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarks
@@ -177,13 +178,13 @@ class CurrentlyPlayingFragment :
       binding.syncFailedBadge.isVisible = failed == true
     }
     viewModel.jumpBackwardsIcon.observe(viewLifecycleOwner) {
-      binding.rewindButton.setImageResource(it)
+      binding.rewindButton.setImageResourceIfChanged(it)
     }
     viewModel.jumpForwardsIcon.observe(viewLifecycleOwner) {
-      binding.skipForwardButton.setImageResource(it)
+      binding.skipForwardButton.setImageResourceIfChanged(it)
     }
     viewModel.isPlaying.observe(viewLifecycleOwner) { playing ->
-      binding.detailsPausePlay.setImageResource(
+      binding.detailsPausePlay.setImageResourceIfChanged(
         if (playing == true) {
           R.drawable.ic_pause_button_large_colored
         } else {

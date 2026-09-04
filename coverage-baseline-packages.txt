@@ -19,5 +19,5 @@ io/github/mattpvaughn/chronicle/features/search 83.55
 io/github/mattpvaughn/chronicle/features/settings 12.14
 io/github/mattpvaughn/chronicle/injection/modules 42.99
 io/github/mattpvaughn/chronicle/navigation 0.00
-io/github/mattpvaughn/chronicle/util 44.03
+io/github/mattpvaughn/chronicle/util 44.48
 io/github/mattpvaughn/chronicle/views 29.22
