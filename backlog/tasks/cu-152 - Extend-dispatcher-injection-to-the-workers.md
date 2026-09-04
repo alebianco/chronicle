@@ -1,13 +1,16 @@
 ---
-id: DRAFT-106
+id: CU-152
 title: Extend dispatcher injection to the workers
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-09-02'
-labels: [R2, architecture, debt]
+labels:
+  - R2
+  - architecture
+  - debt
+milestone: m-2
 dependencies: []
 priority: low
-milestone: m-2
 ---
 
 ## Description
