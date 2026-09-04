@@ -56,8 +56,14 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   Note incremental builds are *slower* than they were under KAPT (+13% on an ordinary edit, +97% when an annotated type
   changes) — this is fixed per-invocation overhead in KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating
   outputs, `ALL_FILES` poisoning, KSP1 fallback, larger daemon heap, newer Dagger. See cu-8 notes before re-investigating.
+- **The debug build's package is `io.github.mattpvaughn.chronicle.debug`**, not
+  `io.github.mattpvaughn.chronicle` — `app/build.gradle.kts` sets `applicationIdSuffix = ".debug"`
+  for the debug variant. Every `adb` line below therefore names the suffixed id, and a component
+  name must be fully qualified (`<pkg>.debug/io.github.…application.MainActivity`), since the
+  activity class does **not** move with the suffix. Seven examples in this file and in
+  `app/src/debug/` named the unsuffixed id and had never worked as written.
 - **Mock Plex mode** (cu-16): a debug build can run against the fixture pack with no account —
-  `adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity --ez mock_plex true`
+  `adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity --ez mock_plex true`
   (records the flag and restarts; it must apply before `setupNetwork()`). Use it to see and screenshot
   UI states without credentials. The machinery lives in `app/src/debug/`, with a no-op twin in
   `app/src/release/`, so it is not compiled into release builds at all.
@@ -72,8 +78,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   unit-tested only. `./capture-screens.sh <dir>` drives the app and screenshots the main
   screens; it asserts the app was actually foregrounded, because an earlier version silently captured
   the launcher.
-  **Getting back to a real server needs `adb shell pm clear <pkg>`, not `--ez mock_plex false`**
-  (cu-73). `MockPlexMode.enable` seeds `accountAuthToken`/`server`/`library` into prefs, and
+  **Getting back to a real server needs the prefs restored, not `--ez mock_plex false`**
+  (cu-73). `pm clear` does it but **destroys the login**, which matters whenever a human is not
+  available to sign in again: prefer restoring a captured `Chronicle.xml`/`ChronicleAuth.xml` with
+  the app **stopped** (`plex-session.sh real`, see below). `MockPlexMode.enable` seeds
+  `accountAuthToken`/`server`/`library` into prefs, and
   `determineLoginState` reports `LOGGED_IN_FULLY` whenever all three are present — so merely
   clearing the flag leaves the app "logged in" to a dead `127.0.0.1`, with no login screen.
   `MockPlexMode.disable()` would clear those prefs but is **dead code, called from nowhere**, and
@@ -81,6 +90,20 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
+  **`./plex-session.sh {backup|real|mock|status}` switches between the two without `pm clear`**
+  (2026-09-04). It captures the real session's `Chronicle.xml`/`ChronicleAuth.xml` to
+  `~/.chronicle-session-backup/` (outside the repo — they hold live tokens) and restores them with
+  the app **stopped**, so mock mode stops being a one-way door and the two modes *can* now be
+  interleaved. Three refusals make it safe to run unattended: `mock` will not proceed without a real
+  backup on disk, `real` will not restore a backup that is itself a mock session, and `backup` will
+  not overwrite a real backup with a mock one. All three are sabotage-verified.
+  **Two traps it encodes.** A `SharedPreferences` file edited **while the app runs** is silently
+  reverted when the process dies — the framework holds the map in memory and writes it back on
+  shutdown, so the file reads correct immediately and wrong at the next launch. That cost a real
+  login once: the `mock_plex` flag was set to `false` on disk, verified, and read back as `true` on
+  the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
+  returns before the kill completes) before touching `shared_prefs/`. And the device holds a
+  *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
 - Tests: **1165 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 

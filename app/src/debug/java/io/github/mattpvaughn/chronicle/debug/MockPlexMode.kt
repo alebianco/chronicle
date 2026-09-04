@@ -22,7 +22,7 @@ import timber.log.Timber
  *
  * Enable via adb without rebuilding:
  * ```
- * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \
+ * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \
  *   --ez mock_plex true
  * ```
  */

@@ -62,7 +62,7 @@ object DebugHooks : DebugHooksContract {
    * Records the mock-Plex preference and restarts the process so it takes effect:
    *
    * ```
-   * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \
    *   --ez mock_plex true
    * ```
    */
@@ -88,7 +88,7 @@ object DebugHooks : DebugHooksContract {
    * without depending on tap coordinates:
    *
    * ```
-   * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \\
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \\
    *   --el play_book 1001
    * ```
    *
@@ -132,7 +132,7 @@ object DebugHooks : DebugHooksContract {
    * seen:
    *
    * ```
-   * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \
    *   --ez fail_sync true
    * ```
    *
@@ -166,7 +166,7 @@ object DebugHooks : DebugHooksContract {
    * Replaces the stored server access token with a wrong one:
    *
    * ```
-   * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \
    *   --ez invalidate_server_token true
    * ```
    *
@@ -238,7 +238,7 @@ object DebugHooks : DebugHooksContract {
    * Expands the currently-playing sheet:
    *
    * ```
-   * adb shell am start -n io.github.mattpvaughn.chronicle/.application.MainActivity \
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \
    *   --ez show_player true
    * ```
    *

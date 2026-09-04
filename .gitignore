@@ -53,3 +53,11 @@ docs/superpowers/
 
 # Git worktrees (owner convention: .worktree/<branch-name>)
 .worktree/
+
+# Captured device session prefs — these hold real Plex tokens. plex-session.sh keeps its
+# backup in $HOME by default; these rules exist so a copy made inside the repo by mistake
+# cannot be committed.
+ChronicleAuth.xml
+Chronicle.xml
+chronicle_debug.xml
+.chronicle-session-backup/
