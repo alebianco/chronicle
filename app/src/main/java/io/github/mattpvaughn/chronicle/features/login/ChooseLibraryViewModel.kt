@@ -65,8 +65,8 @@ class ChooseLibraryViewModel
         }
       }
 
-    private val _userMessage = MutableStateFlow(Event(""))
-    val userMessage: StateFlow<Event<String>>
+    private val _userMessage = MutableStateFlow<Event<String>?>(null)
+    val userMessage: StateFlow<Event<String>?>
       get() = _userMessage
 
     private val _libraries = MutableStateFlow<List<PlexLibrary>>(emptyList())

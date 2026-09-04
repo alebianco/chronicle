@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.STATE_PAUSED
 import android.text.format.DateUtils
@@ -41,11 +40,19 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserSta
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
@@ -148,8 +155,8 @@ class CurrentlyPlayingViewModel(
       }
     }
 
-  private var _showUserMessage = MutableLiveData<Event<String>>()
-  val showUserMessage: LiveData<Event<String>>
+  private val _showUserMessage = MutableStateFlow<Event<String>?>(null)
+  val showUserMessage: StateFlow<Event<String>?>
     get() = _showUserMessage
 
   /**
@@ -159,86 +166,86 @@ class CurrentlyPlayingViewModel(
    * Failure-only by design — see [hasFailedSync] for why a synced/pending indicator
    * cannot be built honestly from WorkManager's states here.
    */
-  val hasFailedProgressSync: LiveData<Boolean> =
+  val hasFailedProgressSync: StateFlow<Boolean> =
     workManager
-      .getWorkInfosByTagLiveData(ProgressUpdater.PROGRESS_SYNC_WORK_TAG)
+      .getWorkInfosByTagFlow(ProgressUpdater.PROGRESS_SYNC_WORK_TAG)
       .map { hasFailedSync(it) }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  private var audiobookId = MutableLiveData(EMPTY_AUDIOBOOK.id)
+  private val audiobookId = MutableStateFlow(EMPTY_AUDIOBOOK.id)
 
-  val audiobook: LiveData<Audiobook?> =
-    audiobookId.switchMap { id ->
-      if (id == EMPTY_AUDIOBOOK.id) {
-        emptyAudiobook
-      } else {
-        bookRepository.getAudiobook(id)
-      }
-    }
-
-  private val emptyAudiobook = MutableLiveData(EMPTY_AUDIOBOOK)
-  private val emptyTrackList = MutableLiveData<List<MediaItemTrack>>(emptyList())
+  val audiobook: StateFlow<Audiobook?> =
+    audiobookId
+      .flatMapLatest { id ->
+        if (id == EMPTY_AUDIOBOOK.id) flowOf(EMPTY_AUDIOBOOK) else bookRepository.getAudiobook(id)
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_AUDIOBOOK)
 
   // TODO: expose combined track/chapter bits in ViewModel as "windowSomething" instead of in xml
-  val tracks: LiveData<List<MediaItemTrack>> =
-    audiobookId.switchMap { id ->
-      if (id == EMPTY_AUDIOBOOK.id) {
-        emptyTrackList
-      } else {
-        trackRepository.getTracksForAudiobook(id)
-      }
-    }
+  val tracks: StateFlow<List<MediaItemTrack>> =
+    audiobookId
+      .flatMapLatest { id ->
+        if (id == EMPTY_AUDIOBOOK.id) {
+          flowOf(emptyList())
+        } else {
+          trackRepository.getTracksForAudiobook(id)
+        }
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
   // Used to cache tracks.asChapterList when tracks changes
-  private val tracksAsChaptersCache: LiveData<List<Chapter>> =
-    mapAsync(tracks, viewModelScope) {
-      it.asChapterList()
-    }
+  private val tracksAsChaptersCache: Flow<List<Chapter>> = tracks.mapLatest { it.asChapterList() }
 
   /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
-  private val chaptersFromTable: LiveData<List<Chapter>> =
-    audiobookId.switchMap { id ->
+  private val chaptersFromTable: Flow<List<Chapter>> =
+    audiobookId.flatMapLatest { id ->
       if (id == EMPTY_AUDIOBOOK.id) {
-        MutableLiveData(emptyList())
+        flowOf(emptyList())
       } else {
         bookRepository.getChaptersForBookLive(id)
       }
     }
 
-  val chapters: TripleLiveData<List<Chapter>, Audiobook?, List<Chapter>, List<Chapter>> =
-    TripleLiveData(
+  val chapters: StateFlow<List<Chapter>> =
+    combineDistinct(
       chaptersFromTable,
       audiobook,
       tracksAsChaptersCache,
-    ) { _fromTable: List<Chapter>?, _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
-      resolveChaptersFromCache(_fromTable, _audiobook, _tracksAsChapters)
-    }
+    ) { fromTable, book, tracksAsChapters ->
+      resolveChaptersFromCache(fromTable, book, tracksAsChapters)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  val speed =
-    FloatPreferenceLiveData(
-      PrefsRepo.KEY_PLAYBACK_SPEED,
-      PLAYBACK_SPEED_DEFAULT,
-      sharedPrefs,
-    ).map {
-      Timber.i("Speed: %.2f", it)
-      return@map it.coerceIn(PLAYBACK_SPEED_MIN, PLAYBACK_SPEED_MAX)
-    }
+  val speed: StateFlow<Float> =
+    sharedPrefs
+      .floatFlow(PrefsRepo.KEY_PLAYBACK_SPEED, PLAYBACK_SPEED_DEFAULT)
+      .map {
+        Timber.i("Speed: %.2f", it)
+        it.coerceIn(PLAYBACK_SPEED_MIN, PLAYBACK_SPEED_MAX)
+      }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        PLAYBACK_SPEED_DEFAULT,
+      )
 
-  val playbackSpeedString =
-    speed.map { speed ->
-      return@map String.format("%.2f", speed) + "x"
-    }
+  val playbackSpeedString: StateFlow<String> =
+    speed
+      .map { String.format("%.2f", it) + "x" }
+      .stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        String.format("%.2f", PLAYBACK_SPEED_DEFAULT) + "x",
+      )
 
-  private var _showModalBottomSheetSpeedChooser = MutableLiveData<Event<Unit>>()
-  val showModalBottomSheetSpeedChooser: LiveData<Event<Unit>>
+  private val _showModalBottomSheetSpeedChooser = MutableStateFlow<Event<Unit>?>(null)
+  val showModalBottomSheetSpeedChooser: StateFlow<Event<Unit>?>
     get() = _showModalBottomSheetSpeedChooser
 
-  val activeTrackId: LiveData<String> =
-    mediaServiceConnection.nowPlaying.map { metadata ->
-      metadata.takeIf { !it.id.isNullOrEmpty() }?.id ?: TRACK_NOT_FOUND
-    }
+  val activeTrackId: StateFlow<String> =
+    mediaServiceConnection.nowPlaying
+      .map { metadata -> metadata.takeIf { !it.id.isNullOrEmpty() }?.id ?: TRACK_NOT_FOUND }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TRACK_NOT_FOUND)
 
-  val currentTrack: LiveData<MediaItemTrack> =
-    currentlyPlaying.track.asLiveData(viewModelScope.coroutineContext)
+  /** Already a `StateFlow` on the singleton, so this is an alias rather than another `stateIn`. */
+  val currentTrack: StateFlow<MediaItemTrack>
+    get() = currentlyPlaying.track
 
   // cachedChapter and activeChapter are declared here, above their first use in chapterDuration
   // below, and not further down the file. Kotlin initialises properties in declaration order, so a
@@ -246,11 +253,11 @@ class CurrentlyPlayingViewModel(
   // crashed MainActivity on launch with "Parameter specified as non-null is null" from
   // Transformations.map. Nothing in the unit suite constructs this ViewModel, so only the app
   // caught it (cu-87).
-  private val cachedChapter =
-    DoubleLiveData(
+  private val cachedChapter: Flow<Chapter> =
+    combineDistinct(
       chapters,
       tracks,
-    ) { _chapters: List<Chapter>?, _tracks: List<MediaItemTrack>? ->
+    ) { _chapters, _tracks ->
       // Deliberately not logged. These lines serialised the entire chapter list — 40+ objects —
       // several times a second on a real book, which is a measurable cost in a debug build and
       // drowned the log when diagnosing the seek churn (cu-93).
@@ -263,23 +270,20 @@ class CurrentlyPlayingViewModel(
       //
       // The helper also sorts, which matters: the list arrives from the DB and the network in no
       // guaranteed order, and the old walk trusted the given order.
-      if (_tracks != null && _chapters != null) {
-        _chapters.chapterAtBookProgress(_tracks.getProgress())
-      } else {
-        EMPTY_CHAPTER
-      }
-    }.asFlow()
+      _chapters.chapterAtBookProgress(_tracks.getProgress())
+    }
 
-  val activeChapter =
-    currentlyPlaying.chapter.combine(
+  val activeChapter: StateFlow<Chapter> =
+    combineDistinct(
+      currentlyPlaying.chapter,
       cachedChapter,
-    ) { activeChapter: Chapter, cachedChapter: Chapter ->
+    ) { activeChapter, cachedChapter ->
       if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
         activeChapter
       } else {
         cachedChapter
       }
-    }.distinctUntilChanged().asLiveData(viewModelScope.coroutineContext)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_CHAPTER)
 
   /**
    * The chapter the book is at, for the timeline readout.
@@ -291,44 +295,44 @@ class CurrentlyPlayingViewModel(
    * while the list highlighted the one derived from saved progress, and the two disagreed until
    * playback started (cu-87).
    */
-  val currentChapter: LiveData<Chapter> get() = activeChapter
+  val currentChapter: StateFlow<Chapter> get() = activeChapter
 
   // Both operands in the **book** frame. This was `track.progress - chapter.bookStartTimeOffset`,
   // which subtracts a book-absolute offset from an in-track one: on any track after the first the
   // result is a large negative, so the chapter elapsed time and the slider were nonsense. It
   // happened to work on a single-track book, where the two frames are the same number (cu-115).
-  val chapterProgress =
-    currentlyPlaying.chapter.combine(
+  val chapterProgress: StateFlow<Long> =
+    combineDistinct(
+      currentlyPlaying.chapter,
       currentlyPlaying.bookPosition,
-    ) { chapter: Chapter, bookPosition: BookOffset ->
+    ) { chapter, bookPosition ->
       millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
-    }.asLiveData(viewModelScope.coroutineContext)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
 
-  val chapterProgressForSlider =
-    currentlyPlaying.chapter.combine(
-      currentlyPlaying.bookPosition,
-    ) { chapter: Chapter, bookPosition: BookOffset ->
-      millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
-    }.filter { !isSliding }
+  val chapterProgressForSlider: StateFlow<Long> =
+    currentlyPlaying.chapter
+      .combine(currentlyPlaying.bookPosition) { chapter, bookPosition ->
+        millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
+      }.filter { !isSliding }
       // distinctUntilChanged, because `currentlyPlaying` publishes book, track *and* chapter on
       // every progress tick and each fans out through this combine. The device logged 228
       // recomputations in one minute — four a second for a value that changes once a second — and
       // every one of them wrote to the slider. That churn is what made seeking feel unstable
       // however well the in-flight guard worked (cu-93).
       .distinctUntilChanged()
-      .asLiveData(viewModelScope.coroutineContext)
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
 
-  val trackProgressForSlider =
+  val trackProgressForSlider: StateFlow<Long> =
     currentlyPlaying.track
       .filter { !isSliding }
       .map { it.progress }
       .distinctUntilChanged()
-      .asLiveData(viewModelScope.coroutineContext)
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
 
-  val chapterDuration =
-    currentChapter.map {
-      return@map it.bookEndTimeOffset - it.bookStartTimeOffset
-    }
+  val chapterDuration: StateFlow<Long> =
+    currentChapter
+      .map { it.bookEndTimeOffset - it.bookStartTimeOffset }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
 
   /**
    * The two-level progress the player shows, as data rather than a formatted string.
@@ -362,19 +366,23 @@ class CurrentlyPlayingViewModel(
    * through the LiveData graph needs `audiobookId` to have been populated by the ViewModel's own
    * init observers, which is plumbing rather than behaviour.
    */
-  val playerProgress: LiveData<PlayerProgress> =
-    TripleLiveData(
+  val playerProgress: StateFlow<PlayerProgress> =
+    combineDistinct(
       currentChapter,
-      currentlyPlaying.bookPosition.asLiveData(viewModelScope.coroutineContext),
+      currentlyPlaying.bookPosition,
       chapters,
     ) { chapter, bookPosition, chapterList ->
       playerProgressOf(
         chapter = chapter,
-        bookPosition = bookPosition ?: BookOffset.ZERO,
-        chapterList = chapterList.orEmpty(),
-        bookDurationMillis = tracks.value?.getDuration() ?: 0L,
+        bookPosition = bookPosition,
+        chapterList = chapterList,
+        bookDurationMillis = tracks.value.getDuration(),
       )
-    }.distinctUntilChanged()
+    }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+      playerProgressOf(EMPTY_CHAPTER, BookOffset.ZERO, emptyList(), 0L),
+    )
 
   /**
    * Suppresses slider writes while the user owns the position.
@@ -425,16 +433,20 @@ class CurrentlyPlayingViewModel(
       }
   }
 
-  private var _isSleepTimerActive = MutableLiveData(false)
-  val isSleepTimerActive: LiveData<Boolean>
+  private val _isSleepTimerActive = MutableStateFlow(false)
+  val isSleepTimerActive: StateFlow<Boolean>
     get() = _isSleepTimerActive
 
-  private var sleepTimerTimeRemaining = MutableLiveData(0L)
+  private val sleepTimerTimeRemaining = MutableStateFlow(0L)
 
-  val sleepTimerTimeRemainingString =
-    sleepTimerTimeRemaining.map {
-      return@map DateUtils.formatElapsedTime(StringBuilder(), it / 1000)
-    }
+  val sleepTimerTimeRemainingString: StateFlow<String> =
+    sleepTimerTimeRemaining
+      .map { DateUtils.formatElapsedTime(StringBuilder(), it / 1000) }
+      .stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        DateUtils.formatElapsedTime(StringBuilder(), 0L),
+      )
 
   /**
    * True while the player is buffering or connecting, i.e. play was asked for but no audio is
@@ -449,16 +461,17 @@ class CurrentlyPlayingViewModel(
    * playback has started, so a starved stream partway through still shows as normal playback; that
    * is recorded in cu-95 as a separate question.
    */
-  val isAudioLoading: LiveData<Boolean> =
-    mediaServiceConnection.playbackState.map { state ->
-      state.state == PlaybackStateCompat.STATE_BUFFERING ||
-        state.state == PlaybackStateCompat.STATE_CONNECTING
-    }
+  val isAudioLoading: StateFlow<Boolean> =
+    mediaServiceConnection.playbackState
+      .map { state ->
+        state.state == PlaybackStateCompat.STATE_BUFFERING ||
+          state.state == PlaybackStateCompat.STATE_CONNECTING
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  val isPlaying: LiveData<Boolean> =
-    mediaServiceConnection.playbackState.map { state ->
-      return@map state.isPlaying
-    }
+  val isPlaying: StateFlow<Boolean> =
+    mediaServiceConnection.playbackState
+      .map { it.isPlaying }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
   /**
    * The book's completion percentage, derived from the **same** source as the timeline.
@@ -471,39 +484,39 @@ class CurrentlyPlayingViewModel(
    * The track list still supplies the *total* duration, which does not change during playback; only
    * the position now comes from `currentlyPlaying`.
    */
-  val progressPercentageString =
-    DoubleLiveData(
+  val progressPercentageString: StateFlow<String> =
+    combineDistinct(
       tracks,
-      currentlyPlaying.track.asLiveData(viewModelScope.coroutineContext),
-    ) { _tracks: List<MediaItemTrack>?, playing: MediaItemTrack? ->
-      val total = _tracks?.getDuration() ?: 0L
-      if (_tracks.isNullOrEmpty() || total == 0L || playing == null) {
-        return@DoubleLiveData "0%"
+      currentlyPlaying.track,
+    ) { _tracks, playing ->
+      val total = _tracks.getDuration()
+      if (_tracks.isEmpty() || total == 0L) {
+        return@combineDistinct "0%"
       }
       // Position of the playing track's start, plus how far into it playback has reached.
       val before = _tracks.sorted().takeWhile { it.id != playing.id }.sumOf { it.duration }
       val percent = (((before + playing.progress) / total.toDouble()) * 100).roundToInt()
-      return@DoubleLiveData "${percent.coerceIn(0, 100)}%"
-    }
+      "${percent.coerceIn(0, 100)}%"
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0%")
 
-  private var _isLoadingTracks = MutableLiveData(false)
-  val isLoadingTracks: LiveData<Boolean>
+  private val _isLoadingTracks = MutableStateFlow(false)
+  val isLoadingTracks: StateFlow<Boolean>
     get() = _isLoadingTracks
 
-  private var _bottomChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
-  val bottomChooserState: LiveData<BottomChooserState>
+  private val _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+  val bottomChooserState: StateFlow<BottomChooserState>
     get() = _bottomChooserState
 
-  private var _sleepTimerChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
-  val sleepTimerChooserState: LiveData<BottomChooserState>
+  private val _sleepTimerChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+  val sleepTimerChooserState: StateFlow<BottomChooserState>
     get() = _sleepTimerChooserState
 
-  private var _jumpForwardsIcon = MutableLiveData(makeJumpForwardsIcon())
-  val jumpForwardsIcon: LiveData<Int>
+  private val _jumpForwardsIcon = MutableStateFlow(makeJumpForwardsIcon())
+  val jumpForwardsIcon: StateFlow<Int>
     get() = _jumpForwardsIcon
 
-  private var _jumpBackwardsIcon = MutableLiveData(makeJumpBackwardsIcon())
-  val jumpBackwardsIcon: LiveData<Int>
+  private val _jumpBackwardsIcon = MutableStateFlow(makeJumpBackwardsIcon())
+  val jumpBackwardsIcon: StateFlow<Int>
     get() = _jumpBackwardsIcon
 
   private val prefsChangeListener =
@@ -514,36 +527,32 @@ class CurrentlyPlayingViewModel(
       }
     }
 
-  private val networkObserver =
-    Observer<Boolean> { isConnected ->
-      if (isConnected) {
-        audiobookId.value?.let {
-          refreshTracks(it)
-        }
-      }
-    }
-
-  private val playbackObserver =
-    Observer<MediaMetadataCompat> { metadata ->
-      if (metadata.id?.isEmpty() == false) {
-        setAudiobook(metadata.id!!)
-      }
-    }
-
-  private fun setAudiobook(trackId: String) {
+  private suspend fun setAudiobook(trackId: String) {
     val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
-    viewModelScope.launch(exceptionHandler) {
-      // only update [audiobookId] when we see a new audiobook
-      val potentiallyNewAudiobookId = trackRepository.getBookIdForTrack(trackId)
-      if (potentiallyNewAudiobookId != previousAudiobookId) {
-        audiobookId.postValue(potentiallyNewAudiobookId)
-      }
+    // only update [audiobookId] when we see a new audiobook
+    val potentiallyNewAudiobookId = trackRepository.getBookIdForTrack(trackId)
+    if (potentiallyNewAudiobookId != previousAudiobookId) {
+      audiobookId.value = potentiallyNewAudiobookId
     }
   }
 
   init {
-    mediaServiceConnection.nowPlaying.observeForever(playbackObserver)
-    plexConfig.isConnected.observeForever(networkObserver)
+    // Collected on viewModelScope rather than observed forever; the scope's cancellation is what
+    // the explicit removeObserver pair in onCleared was doing by hand.
+    viewModelScope.launch(exceptionHandler) {
+      mediaServiceConnection.nowPlaying.collect { metadata ->
+        if (metadata.id?.isEmpty() == false) {
+          setAudiobook(metadata.id!!)
+        }
+      }
+    }
+    viewModelScope.launch(exceptionHandler) {
+      plexConfig.isConnected.collect { isConnected ->
+        if (isConnected) {
+          refreshTracks(audiobookId.value)
+        }
+      }
+    }
 
     // Listen for changes in SharedPreferences that could effect playback
     prefsRepo.registerPrefsListener(prefsChangeListener)
@@ -583,7 +592,7 @@ class CurrentlyPlayingViewModel(
     if (mediaServiceConnection.isConnected.value == true) {
       if (audiobook.value == null) {
         Timber.e("Tried to play null audiobook!")
-        _showUserMessage.postEvent(
+        _showUserMessage.setEvent(
           "Audiobook is null. Try restarting the app and trying again",
         )
         return
@@ -756,31 +765,35 @@ class CurrentlyPlayingViewModel(
         transportControls?.sendCustomAction(action, null)
       } else {
         Timber.i("Updating DB progress!")
-        // Service is not alive, so update track repo directly
-        tracks.observeOnce { _tracks ->
-          viewModelScope.launch(exceptionHandler) {
-            // don't bother seeking if there aren't any files
-            if (_tracks.isEmpty()) {
-              return@launch
-            }
-            val manager = TrackListStateManager()
-            manager.trackList = _tracks
-            manager.seekToActiveTrack()
-            manager.seekByRelative(offset)
-            // `updateTrackProgress` writes `MediaItemTrack.progress`, which is the offset within
-            // *that track* — so it takes `currentTrackProgress`, not `currentBookPosition`. It
-            // used to take the book position, inflating the row by the sum of every preceding
-            // track's duration, and `getActiveTrack` (furthest-started) then read a corrupt
-            // position. Single-track books were unaffected, which is why it survived (cu-136).
-            //
-            // The index is into the sorted list, matching `manager.currentTrackIndex`.
-            val updatedTrack = _tracks.sorted()[manager.currentTrackIndex.value]
-            trackRepository.updateTrackProgress(
-              manager.currentTrackProgress.millis,
-              updatedTrack.id,
-              System.currentTimeMillis(),
-            )
+        // Service is not alive, so update track repo directly.
+        //
+        // Read straight from the repository rather than from the `tracks` StateFlow. That one is
+        // `WhileSubscribed`, so with no collector its cached value is the `emptyList()` seed and a
+        // `first()` on it would return immediately with nothing — the `observeOnce` this replaces
+        // did not have that failure mode, since a cold `LiveData` waits for a real emission.
+        viewModelScope.launch(exceptionHandler) {
+          val trackList = trackRepository.getTracksForAudiobook(audiobookId.value).first()
+          // don't bother seeking if there aren't any files
+          if (trackList.isEmpty()) {
+            return@launch
           }
+          val manager = TrackListStateManager()
+          manager.trackList = trackList
+          manager.seekToActiveTrack()
+          manager.seekByRelative(offset)
+          // `updateTrackProgress` writes `MediaItemTrack.progress`, which is the offset within
+          // *that track* — so it takes `currentTrackProgress`, not `currentBookPosition`. It
+          // used to take the book position, inflating the row by the sum of every preceding
+          // track's duration, and `getActiveTrack` (furthest-started) then read a corrupt
+          // position. Single-track books were unaffected, which is why it survived (cu-136).
+          //
+          // The index is into the sorted list, matching `manager.currentTrackIndex`.
+          val updatedTrack = trackList.sorted()[manager.currentTrackIndex.value]
+          trackRepository.updateTrackProgress(
+            manager.currentTrackProgress.millis,
+            updatedTrack.id,
+            System.currentTimeMillis(),
+          )
         }
       }
     }
@@ -941,14 +954,13 @@ class CurrentlyPlayingViewModel(
         }
       }
 
-    _sleepTimerChooserState.postValue(
+    _sleepTimerChooserState.value =
       BottomChooserState(
         title = title,
         options = options,
         listener = listener,
         shouldShow = true,
-      ),
-    )
+      )
   }
 
   /**
@@ -958,8 +970,8 @@ class CurrentlyPlayingViewModel(
    * `Context` is (convention 5), and the position needs formatting through `DurationFormat` — which
    * `showUserMessage`, being a bare `String`, cannot express without building the sentence here.
    */
-  private var _bookmarkAdded = MutableLiveData<Event<Bookmark>>()
-  val bookmarkAdded: LiveData<Event<Bookmark>>
+  private val _bookmarkAdded = MutableStateFlow<Event<Bookmark>?>(null)
+  val bookmarkAdded: StateFlow<Event<Bookmark>?>
     get() = _bookmarkAdded
 
   /**
@@ -969,18 +981,17 @@ class CurrentlyPlayingViewModel(
    * progress tick, and re-subscribing a Room query once a second is exactly the per-second waste
    * cu-110 was about.
    */
-  val bookmarks: LiveData<List<Bookmark>> =
+  val bookmarks: StateFlow<List<Bookmark>> =
     currentlyPlaying.book
       .map { it.id }
       .distinctUntilChanged()
-      .asLiveData(viewModelScope.coroutineContext)
-      .switchMap { bookId ->
+      .flatMapLatest { bookId ->
         if (bookId.isEmpty() || bookId == NO_AUDIOBOOK_FOUND_ID) {
-          MutableLiveData(emptyList())
+          flowOf(emptyList())
         } else {
           bookmarkRepository.getBookmarksForBook(bookId)
         }
-      }
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
   /**
    * Marks the current moment.
@@ -1002,12 +1013,12 @@ class CurrentlyPlayingViewModel(
     viewModelScope.launch {
       try {
         val bookmark = bookmarkRepository.add(bookId = book.id, position = position)
-        _bookmarkAdded.postEvent(bookmark)
+        _bookmarkAdded.setEvent(bookmark)
       } catch (e: Throwable) {
         // Reported rather than swallowed: the user pressed a button and is entitled to know it
         // did nothing.
         Timber.e(e, "Failed to add a bookmark for ${book.id}")
-        _showUserMessage.postEvent("Could not add bookmark")
+        _showUserMessage.setEvent("Could not add bookmark")
       }
     }
   }
@@ -1056,19 +1067,15 @@ class CurrentlyPlayingViewModel(
   }
 
   fun showPlaybackSpeedChooser() {
-    _showModalBottomSheetSpeedChooser.postEvent(Unit)
+    _showModalBottomSheetSpeedChooser.value = Event(Unit)
   }
 
   private fun hideSleepTimerChooser() {
-    _sleepTimerChooserState.postValue(
-      _sleepTimerChooserState.value?.copy(shouldShow = false) ?: EMPTY_BOTTOM_CHOOSER,
-    )
+    _sleepTimerChooserState.value = _sleepTimerChooserState.value.copy(shouldShow = false)
   }
 
   private fun hideOptionsMenu() {
-    _bottomChooserState.postValue(
-      _bottomChooserState.value?.copy(shouldShow = false) ?: EMPTY_BOTTOM_CHOOSER,
-    )
+    _bottomChooserState.value = _bottomChooserState.value.copy(shouldShow = false)
   }
 
   private fun showOptionsMenu(
@@ -1076,14 +1083,13 @@ class CurrentlyPlayingViewModel(
     options: List<FormattableString>,
     listener: BottomChooserListener,
   ) {
-    _bottomChooserState.postValue(
+    _bottomChooserState.value =
       BottomChooserState(
         title = title,
         options = options,
         listener = listener,
         shouldShow = true,
-      ),
-    )
+      )
   }
 
   val onUpdateSleepTimer =
@@ -1100,7 +1106,9 @@ class CurrentlyPlayingViewModel(
         // (cu-21). The fallback keeps an older sender working.
         val isActive =
           intent.getBooleanExtra(ARG_SLEEP_TIMER_IS_ACTIVE, timeLeftMillis > 0L)
-        _isSleepTimerActive.postValue(isActive)
+        // A BroadcastReceiver callback, so this may not be the main thread — which is why it was a
+        // `postValue`. A `MutableStateFlow` assignment is thread-safe and lands immediately.
+        _isSleepTimerActive.value = isActive
         sleepTimerTimeRemaining.value = timeLeftMillis
 
         // Three cases, not two. An end-of-chapter timer is active with nothing to count down, so
@@ -1126,22 +1134,18 @@ class CurrentlyPlayingViewModel(
       isActive && remainingMillis > 0L ->
         FormattableString.ResourceString(
           stringRes = R.string.sleep_timer_active_title,
-          placeHolderStrings = listOf(sleepTimerTimeRemainingString.value ?: "<Error>"),
+          placeHolderStrings = listOf(sleepTimerTimeRemainingString.value),
         )
       isActive -> FormattableString.from(R.string.sleep_timer_active_end_of_chapter)
       else -> FormattableString.from(R.string.sleep_timer)
     }
 
   private fun setSleepTimerTitle(formattableString: FormattableString) {
-    _sleepTimerChooserState.postValue(
-      _sleepTimerChooserState.value?.copy(title = formattableString) ?: EMPTY_BOTTOM_CHOOSER,
-    )
+    _sleepTimerChooserState.value = _sleepTimerChooserState.value.copy(title = formattableString)
   }
 
   override fun onCleared() {
-    mediaServiceConnection.nowPlaying.removeObserver(playbackObserver)
     prefsRepo.unregisterPrefsListener(prefsChangeListener)
-    plexConfig.isConnected.removeObserver(networkObserver)
     super.onCleared()
   }
 

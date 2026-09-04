@@ -11,7 +11,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.OAuthResponse
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.UsersResponse
 import io.github.mattpvaughn.chronicle.util.Event
-import io.github.mattpvaughn.chronicle.util.setEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
@@ -110,13 +109,13 @@ class PlexLoginRepo
 
     override suspend fun postOAuthPin(): OAuthResponse? {
       return try {
-        _loginState.setEvent(AWAITING_LOGIN_RESULTS)
+        _loginState.value = Event(AWAITING_LOGIN_RESULTS)
         val pin = plexLoginService.postAuthPin()
         plexPrefsRepo.oAuthTempId = pin.id
         pin
       } catch (e: Throwable) {
         Timber.e(e, "Failed to log in")
-        _loginState.setEvent(FAILED_TO_LOG_IN)
+        _loginState.value = Event(FAILED_TO_LOG_IN)
         null
       }
     }
@@ -124,12 +123,12 @@ class PlexLoginRepo
     override fun beginReauthentication() {
       plexPrefsRepo.clearCredentials()
       accountAuthState.onAuthenticated()
-      _loginState.setEvent(NOT_LOGGED_IN)
+      _loginState.value = Event(NOT_LOGGED_IN)
     }
 
     override fun chooseUser(responseUser: PlexUser) {
       plexPrefsRepo.user = responseUser
-      _loginState.setEvent(LOGGED_IN_NO_SERVER_CHOSEN)
+      _loginState.value = Event(LOGGED_IN_NO_SERVER_CHOSEN)
     }
 
     override fun makeOAuthUrl(
@@ -172,7 +171,7 @@ class PlexLoginRepo
             chooseUser(userResponse.users[0])
           } else {
             // now we proceed to choose user
-            _loginState.setEvent(LOGGED_IN_NO_USER_CHOSEN)
+            _loginState.value = Event(LOGGED_IN_NO_USER_CHOSEN)
           }
         } catch (t: Throwable) {
           Timber.e(t, "Failed to load users, cannot proceed to profile")
@@ -184,7 +183,7 @@ class PlexLoginRepo
       Timber.i("User chose server: $serverModel")
       plexConfig.setPotentialConnections(serverModel.connections)
       plexPrefsRepo.server = serverModel
-      _loginState.setEvent(LOGGED_IN_NO_LIBRARY_CHOSEN)
+      _loginState.value = Event(LOGGED_IN_NO_LIBRARY_CHOSEN)
     }
 
     /**
@@ -208,7 +207,7 @@ class PlexLoginRepo
       val replacedDifferentLibrary = previous != null && previous.id != plexLibrary.id
       Timber.i("User chose library: $plexLibrary (replaces different library: $replacedDifferentLibrary)")
       plexPrefsRepo.library = plexLibrary
-      _loginState.setEvent(LOGGED_IN_FULLY)
+      _loginState.value = Event(LOGGED_IN_FULLY)
       return replacedDifferentLibrary
     }
 
@@ -230,31 +229,32 @@ class PlexLoginRepo
                     |library = ${library?.name}
         """.trimMargin(),
       )
-      _loginState.setEvent(
-        when {
-          token.isEmpty() -> NOT_LOGGED_IN
-          // A stored token is not a valid one. Plex tokens are invalidated by an event, never on a
-          // timer, so presence proves nothing — and reporting LOGGED_IN_FULLY here is what made the
-          // app show stale data with no way back (cu-84). Only a request that actually came back
-          // 401 sets this, so being offline does not land here.
-          // Deliberately *not* NOT_LOGGED_IN: that routes through `Navigator.showLogin()`, which
-          // calls `plexConfig.clear()` and wipes server, library and connections — so an expired
-          // token cost the user their whole configuration (decision-17, cu-73). A revoked account
-          // keeps its config and its downloads; the UI surfaces `account_signed_out` and points at
-          // Settings -> ACCOUNT -> "Sign in again", which already restores sync in place.
-          accountAuthState.isRevoked -> {
-            Timber.w("Stored token was rejected by the server; account needs re-authentication")
-            LOGGED_IN_FULLY
-          }
-          server != null && library != null -> LOGGED_IN_FULLY // Migrating from v0.41, impossible otherwise
-          user == null -> LOGGED_IN_NO_USER_CHOSEN
-          server == null -> LOGGED_IN_NO_SERVER_CHOSEN
-          library == null -> LOGGED_IN_NO_LIBRARY_CHOSEN
-          else -> {
-            Timber.i("Fully logged in branch, awaiting server checks")
-            LOGGED_IN_FULLY
-          }
-        },
-      )
+      _loginState.value =
+        Event(
+          when {
+            token.isEmpty() -> NOT_LOGGED_IN
+            // A stored token is not a valid one. Plex tokens are invalidated by an event, never on a
+            // timer, so presence proves nothing — and reporting LOGGED_IN_FULLY here is what made the
+            // app show stale data with no way back (cu-84). Only a request that actually came back
+            // 401 sets this, so being offline does not land here.
+            // Deliberately *not* NOT_LOGGED_IN: that routes through `Navigator.showLogin()`, which
+            // calls `plexConfig.clear()` and wipes server, library and connections — so an expired
+            // token cost the user their whole configuration (decision-17, cu-73). A revoked account
+            // keeps its config and its downloads; the UI surfaces `account_signed_out` and points at
+            // Settings -> ACCOUNT -> "Sign in again", which already restores sync in place.
+            accountAuthState.isRevoked -> {
+              Timber.w("Stored token was rejected by the server; account needs re-authentication")
+              LOGGED_IN_FULLY
+            }
+            server != null && library != null -> LOGGED_IN_FULLY // Migrating from v0.41, impossible otherwise
+            user == null -> LOGGED_IN_NO_USER_CHOSEN
+            server == null -> LOGGED_IN_NO_SERVER_CHOSEN
+            library == null -> LOGGED_IN_NO_LIBRARY_CHOSEN
+            else -> {
+              Timber.i("Fully logged in branch, awaiting server checks")
+              LOGGED_IN_FULLY
+            }
+          },
+        )
     }
   }

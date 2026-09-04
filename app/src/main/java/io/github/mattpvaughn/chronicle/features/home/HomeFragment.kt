@@ -10,7 +10,6 @@ import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
@@ -26,6 +25,8 @@ import io.github.mattpvaughn.chronicle.features.library.bindRecyclerView
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 class HomeFragment : Fragment() {
@@ -63,7 +64,7 @@ class HomeFragment : Fragment() {
       val added = viewModel.recentlyAdded.value.orEmpty()
       val listened = viewModel.recentlyListened.value.orEmpty()
       val downloaded = viewModel.downloaded.value.orEmpty()
-      val offline = viewModel.offlineMode.value == true
+      val offline = viewModel.offlineMode.value
       val allEmpty = added.isEmpty() && listened.isEmpty() && downloaded.isEmpty()
 
       binding.noBooksMessage.isVisible = allEmpty && !offline
@@ -80,15 +81,15 @@ class HomeFragment : Fragment() {
       bindRecyclerView(binding.onDeckRecyclerview, listened)
       bindRecyclerView(binding.recentlyAddedRecyclerview, added)
     }
-    viewModel.recentlyAdded.observe(viewLifecycleOwner) { refreshShelves() }
-    viewModel.recentlyListened.observe(viewLifecycleOwner) { refreshShelves() }
-    viewModel.downloaded.observe(viewLifecycleOwner) { refreshShelves() }
-    viewModel.offlineMode.observe(viewLifecycleOwner) { refreshShelves() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.recentlyAdded) { refreshShelves() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.recentlyListened) { refreshShelves() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.downloaded) { refreshShelves() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.offlineMode) { refreshShelves() }
 
-    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
-      bindRecyclerView(binding.downloadedRecyclerview, connected == true)
-      bindRecyclerView(binding.onDeckRecyclerview, connected == true)
-      bindRecyclerView(binding.recentlyAddedRecyclerview, connected == true)
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
+      bindRecyclerView(binding.downloadedRecyclerview, connected)
+      bindRecyclerView(binding.onDeckRecyclerview, connected)
+      bindRecyclerView(binding.recentlyAddedRecyclerview, connected)
     }
 
     binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
@@ -108,7 +109,7 @@ class HomeFragment : Fragment() {
     // this screen off DataBinding — the adapter was set and never given any data, so search
     // returned nothing however well the query worked. Same omission as the choose-user list; both
     // were found on the owner's device during cu-73.
-    viewModel.searchRows.observe(viewLifecycleOwner) { rows ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { rows ->
       searchAdapter.submitList(rows)
     }
 
@@ -119,51 +120,39 @@ class HomeFragment : Fragment() {
     //
     // `gone` in XML is the correct default and stays: it is what stops the list flashing over the
     // shelves for a frame before this observer first fires.
-    viewModel.isSearchActive.observe(viewLifecycleOwner) { isActive ->
-      binding.searchResultsList.isVisible = isActive == true
+    viewLifecycleOwner.collectWhileStarted(viewModel.isSearchActive) { isActive ->
+      binding.searchResultsList.isVisible = isActive
     }
 
     // The third dropped binding, `serverConnectedSearch`. The shelves above get this through
     // `bindRecyclerView` in the isConnected observer, which runs before this adapter exists — so
     // the search list needs its own. It gates cover-art loading when the server is unreachable.
-    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
-      searchAdapter.setServerConnected(connected == true)
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
+      searchAdapter.setServerConnected(connected)
     }
 
     binding.swipeToRefresh.setOnRefreshListener {
       viewModel.refreshData()
     }
 
-    viewModel.isRefreshing.observe(
-      viewLifecycleOwner,
-      Observer {
-        binding.swipeToRefresh.isRefreshing = it
-      },
-    )
+    viewLifecycleOwner.collectWhileStarted(viewModel.isRefreshing) {
+      binding.swipeToRefresh.isRefreshing = it
+    }
 
-    viewModel.messageForUser.observe(
-      viewLifecycleOwner,
-      Observer {
-        if (!it.hasBeenHandled) {
-          Toast.makeText(context, it.getContentIfNotHandled(), LENGTH_SHORT).show()
-        }
-      },
-    )
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.messageForUser) { message ->
+      Toast.makeText(context, message, LENGTH_SHORT).show()
+    }
 
     // A resume that could not start — offline with an uncached book. A tap that silently does
     // nothing is the worst outcome: the user cannot tell a broken app from an unavailable book.
-    viewModel.resumeError.observe(viewLifecycleOwner) {
-      it.getContentIfNotHandled()?.let { messageRes ->
-        Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
-      }
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.resumeError) { messageRes ->
+      Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
     }
 
     // A refresh failure. It arrives as a string resource because it is raised on an IO
     // dispatcher, where `Toast.show()` throws; the toast belongs here, on the main thread.
-    viewModel.syncError.observe(viewLifecycleOwner) {
-      it.getContentIfNotHandled()?.let { messageRes ->
-        Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
-      }
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.syncError) { messageRes ->
+      Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
     }
 
     (activity as MainActivity).setSupportActionBar(binding.toolbar)

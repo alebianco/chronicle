@@ -26,10 +26,10 @@ import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter
 import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.util.formatCoarseDuration
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
-import io.github.mattpvaughn.chronicle.util.observeEvent
 import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarkNote
@@ -80,8 +80,8 @@ class CurrentlyPlayingFragment :
   private fun showBookmarkList() {
     val sheet = ModalBottomSheetBookmarks()
     sheet.show(childFragmentManager, ModalBottomSheetBookmarks.TAG)
-    viewModel.bookmarks.observe(viewLifecycleOwner) { bookmarks ->
-      sheet.setBookmarks(bookmarks.orEmpty())
+    viewLifecycleOwner.collectWhileStarted(viewModel.bookmarks) { bookmarks ->
+      sheet.setBookmarks(bookmarks)
     }
   }
 
@@ -144,14 +144,14 @@ class CurrentlyPlayingFragment :
     boundTitle = null
     boundThumb = null
 
-    viewModel.showUserMessage.observeEvent(viewLifecycleOwner) { message ->
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.showUserMessage) { message ->
       Toast.makeText(context, message, LENGTH_SHORT).show()
     }
 
     // A new bookmark opens its note sheet straight away, so writing one is part of the same
     // gesture rather than something to go and find afterwards (cu-22). The note is optional —
     // dismissing the sheet leaves a perfectly good positional bookmark.
-    viewModel.bookmarkAdded.observeEvent(viewLifecycleOwner) { bookmark ->
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.bookmarkAdded) { bookmark ->
       ModalBottomSheetBookmarkNote.forBookmark(
         bookmarkId = bookmark.id,
         positionMillis = bookmark.position.millis,
@@ -175,18 +175,18 @@ class CurrentlyPlayingFragment :
       true
     }
 
-    viewModel.hasFailedProgressSync.observe(viewLifecycleOwner) { failed ->
-      binding.syncFailedBadge.isVisible = failed == true
+    viewLifecycleOwner.collectWhileStarted(viewModel.hasFailedProgressSync) { failed ->
+      binding.syncFailedBadge.isVisible = failed
     }
-    viewModel.jumpBackwardsIcon.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.jumpBackwardsIcon) {
       binding.rewindButton.setImageResourceIfChanged(it)
     }
-    viewModel.jumpForwardsIcon.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.jumpForwardsIcon) {
       binding.skipForwardButton.setImageResourceIfChanged(it)
     }
-    viewModel.isPlaying.observe(viewLifecycleOwner) { playing ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.isPlaying) { playing ->
       binding.detailsPausePlay.setImageResourceIfChanged(
-        if (playing == true) {
+        if (playing) {
           R.drawable.ic_pause_button_large_colored
         } else {
           R.drawable.ic_play_button_large_colored
@@ -200,15 +200,14 @@ class CurrentlyPlayingFragment :
     //
     // The control stays clickable while buffering: cancelling a stalled start is exactly when a
     // listener wants to press it.
-    viewModel.isAudioLoading.observe(viewLifecycleOwner) { loading ->
-      binding.audioLoadingSpinner.isVisible = loading == true
-      binding.detailsPausePlay.visibility =
-        if (loading == true) View.INVISIBLE else View.VISIBLE
+    viewLifecycleOwner.collectWhileStarted(viewModel.isAudioLoading) { loading ->
+      binding.audioLoadingSpinner.isVisible = loading
+      binding.detailsPausePlay.visibility = if (loading) View.INVISIBLE else View.VISIBLE
     }
-    viewModel.playbackSpeedString.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.playbackSpeedString) {
       binding.changeSpeedButton.setTextIfChanged(it)
     }
-    viewModel.isSleepTimerActive.observe(viewLifecycleOwner) { active ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.isSleepTimerActive) { active ->
       binding.sleepTimerButton.imageTintList =
         ColorStateList.valueOf(
           ContextCompat.getColor(
@@ -216,9 +215,9 @@ class CurrentlyPlayingFragment :
             if (active == true) R.color.iconActive else R.color.icon,
           ),
         )
-      binding.sleepTimerCountdown.isVisible = active == true
+      binding.sleepTimerCountdown.isVisible = active
     }
-    viewModel.sleepTimerTimeRemainingString.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.sleepTimerTimeRemainingString) {
       binding.sleepTimerCountdown.setTextIfChanged(it)
     }
 
@@ -370,8 +369,8 @@ class CurrentlyPlayingFragment :
         return
       }
 
-      val chapterDuration = viewModel.chapterDuration.value ?: 0L
-      val trackDuration = viewModel.currentTrack.value?.duration ?: 0L
+      val chapterDuration = viewModel.chapterDuration.value
+      val trackDuration = viewModel.currentTrack.value.duration
       val max = (if (chapterDuration == 0L) trackDuration else chapterDuration).toFloat()
       val chapterProgress = viewModel.chapterProgressForSlider.value ?: -1L
       val trackProgress = viewModel.trackProgressForSlider.value ?: 0L
@@ -390,10 +389,10 @@ class CurrentlyPlayingFragment :
         binding.chapterProgressSeekbar.value = newValue
       }
     }
-    viewModel.chapterDuration.observe(viewLifecycleOwner) { refreshSlider() }
-    viewModel.currentTrack.observe(viewLifecycleOwner) { refreshSlider() }
-    viewModel.chapterProgressForSlider.observe(viewLifecycleOwner) { refreshSlider() }
-    viewModel.trackProgressForSlider.observe(viewLifecycleOwner) { refreshSlider() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.chapterDuration) { refreshSlider() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.currentTrack) { refreshSlider() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.chapterProgressForSlider) { refreshSlider() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.trackProgressForSlider) { refreshSlider() }
 
     // Every observer below fires on the 1 Hz progress tick, and each one writes to a view in the
     // expanded player. While the sheet is *collapsed* those views cannot be seen, but the writes
@@ -427,10 +426,12 @@ class CurrentlyPlayingFragment :
     // One source for the progress line now, instead of four strings that each re-rendered the
     // whole block (cu-19). `playerProgress` is already distinctUntilChanged, so this fires only
     // when a displayed number actually moved.
-    viewModel.playerProgress.observe(viewLifecycleOwner) { renderPlayerText() }
-    viewModel.progressPercentageString.observe(viewLifecycleOwner) { renderPlayerText() }
-    viewModel.currentChapter.observe(viewLifecycleOwner) { renderPlayerText() }
-    viewModel.audiobook.observe(viewLifecycleOwner) { renderPlayerArtwork() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.playerProgress) { renderPlayerText() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.progressPercentageString) {
+      renderPlayerText()
+    }
+    viewLifecycleOwner.collectWhileStarted(viewModel.currentChapter) { renderPlayerText() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.audiobook) { renderPlayerArtwork() }
     viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
       bindImageRounded(
         binding.detailsArtwork,
@@ -440,13 +441,13 @@ class CurrentlyPlayingFragment :
       )
     }
 
-    viewModel.isLoadingTracks.observe(viewLifecycleOwner) {
-      binding.loadingTracksSpinner.isVisible = it == true
+    viewLifecycleOwner.collectWhileStarted(viewModel.isLoadingTracks) {
+      binding.loadingTracksSpinner.isVisible = it
     }
-    viewModel.bottomChooserState.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) {
       setBottomChooserState(binding.bottomSheetChooser, it)
     }
-    viewModel.sleepTimerChooserState.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.sleepTimerChooserState) {
       setBottomChooserState(binding.sleepTimerChooser, it)
     }
 
@@ -479,7 +480,7 @@ class CurrentlyPlayingFragment :
       formatPrecisePosition(value.toLong())
     }
 
-    viewModel.activeChapter.observe(viewLifecycleOwner) { chapter ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.activeChapter) { chapter ->
       Timber.i(
         "Updating current chapter: (${chapter.trackId}, ${chapter.discNumber}, ${chapter.index})",
       )
@@ -494,12 +495,12 @@ class CurrentlyPlayingFragment :
 
     // Same omission as the details screen: the `chapterList` binding was dropped in the cu-58
     // conversion and nothing fed this adapter, so the chapter list was empty while playing (cu-73).
-    viewModel.chapters.observe(viewLifecycleOwner) { chapters ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.chapters) { chapters ->
       adapter.submitChapters(chapters)
     }
 
     // Keeps the highlighted row in step with playback; the adapter diffs on the active flag.
-    viewModel.currentChapter.observe(viewLifecycleOwner) { chapter ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.currentChapter) { chapter ->
       adapter.updateCurrentChapter(chapter.trackId, chapter.discNumber, chapter.index)
     }
 
@@ -507,14 +508,11 @@ class CurrentlyPlayingFragment :
       currentlyPlayingInterface.setBottomSheetState(COLLAPSED)
     }
 
-    viewModel.showModalBottomSheetSpeedChooser.observe(viewLifecycleOwner) { eventShowChooser ->
-      if (!eventShowChooser.hasBeenHandled) {
-        ModalBottomSheetSpeedChooser().show(
-          childFragmentManager,
-          ModalBottomSheetSpeedChooser.TAG,
-        )
-        eventShowChooser.getContentIfNotHandled()
-      }
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.showModalBottomSheetSpeedChooser) {
+      ModalBottomSheetSpeedChooser().show(
+        childFragmentManager,
+        ModalBottomSheetSpeedChooser.TAG,
+      )
     }
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).

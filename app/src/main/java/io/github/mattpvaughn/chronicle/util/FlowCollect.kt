@@ -43,10 +43,13 @@ fun <T> LifecycleOwner.collectWhileStarted(
  * configuration change does not re-show a Toast or re-navigate. That matters more here than it did
  * with `LiveData`, because a `StateFlow` replays its current value to *every* new collector — so
  * without the [Event] wrapper, rotating the screen would replay the last error message.
+ *
+ * The flow's element is nullable so a state holder with no meaningful "empty" value — an error
+ * event, say — can seed itself `null` rather than inventing a blank one to publish.
  */
 fun <T> LifecycleOwner.collectEventsWhileStarted(
-  flow: Flow<Event<T>>,
+  flow: Flow<Event<T>?>,
   onEach: (T) -> Unit,
 ) {
-  collectWhileStarted(flow) { event -> event.getContentIfNotHandled()?.let(onEach) }
+  collectWhileStarted(flow) { event -> event?.getContentIfNotHandled()?.let(onEach) }
 }

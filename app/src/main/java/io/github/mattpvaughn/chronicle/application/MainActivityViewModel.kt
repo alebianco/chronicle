@@ -134,8 +134,8 @@ class MainActivityViewModel(
       }
     }
 
-  private val _errorMessage = MutableStateFlow(Event(""))
-  val errorMessage: StateFlow<Event<String>>
+  private val _errorMessage = MutableStateFlow<Event<String>?>(null)
+  val errorMessage: StateFlow<Event<String>?>
     get() = _errorMessage
 
   val hasCollections: StateFlow<Boolean> =

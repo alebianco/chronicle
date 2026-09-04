@@ -22,7 +22,7 @@ fun <T> MutableLiveData<Event<T>>.postEvent(value: T) {
  * Assigns rather than posts, which is the point: a `StateFlow` write lands immediately, so a reader
  * in the same main-loop pass sees it (cu-52).
  */
-fun <T> MutableStateFlow<Event<T>>.setEvent(value: T) {
+fun <T> MutableStateFlow<Event<T>?>.setEvent(value: T) {
   this.value = Event(value)
 }
 

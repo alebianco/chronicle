@@ -16,11 +16,16 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.search.SearchController
 import io.github.mattpvaughn.chronicle.features.search.SearchRow
-import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import io.github.mattpvaughn.chronicle.util.booksKey
-import io.github.mattpvaughn.chronicle.util.distinctBy
+import io.github.mattpvaughn.chronicle.util.combineDistinct
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -62,8 +67,8 @@ class HomeViewModel(
       }
     }
 
-  private var _offlineMode = MutableLiveData(prefsRepo.offlineMode)
-  val offlineMode: LiveData<Boolean>
+  private val _offlineMode = MutableStateFlow(prefsRepo.offlineMode)
+  val offlineMode: StateFlow<Boolean>
     get() = _offlineMode
 
   /**
@@ -80,16 +85,12 @@ class HomeViewModel(
    * progress change still propagates — dropping that is what froze `LibraryViewModel`'s bars.
    */
   private val recentlyListenedSource =
-    bookRepository.getRecentlyListened().distinctBy { it.booksKey() }
+    bookRepository.getRecentlyListened().distinctUntilChangedBy { it.booksKey() }
 
-  val recentlyListened =
-    DoubleLiveData(recentlyListenedSource, _offlineMode) { recents, offline ->
-      return@DoubleLiveData if (offline == true) {
-        recents?.filter { it.isCached }
-      } else {
-        recents
-      } ?: emptyList()
-    }
+  val recentlyListened: StateFlow<List<Audiobook>> =
+    combineDistinct(recentlyListenedSource, _offlineMode) { recents, offline ->
+      if (offline) recents.filter { it.isCached } else recents
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
   val isRefreshing = librarySyncRepository.isRefreshing
 
@@ -97,8 +98,8 @@ class HomeViewModel(
    *  event carrying a string resource rather than a `Toast` (which would throw there). */
   val syncError = librarySyncRepository.errorMessage
 
-  private var _messageForUser = MutableLiveData<Event<String>>()
-  val messageForUser: LiveData<Event<String>>
+  private val _messageForUser = MutableStateFlow<Event<String>?>(null)
+  val messageForUser: StateFlow<Event<String>?>
     get() = _messageForUser
 
   /**
@@ -108,83 +109,83 @@ class HomeViewModel(
    * user-facing text belongs in `strings.xml` — the same shape as
    * `LibrarySyncRepository.errorMessage`.
    */
-  private val _resumeError = MutableLiveData<Event<Int>>()
-  val resumeError: LiveData<Event<Int>>
+  private val _resumeError = MutableStateFlow<Event<Int>?>(null)
+  val resumeError: StateFlow<Event<Int>?>
     get() = _resumeError
 
-  var recentlyAdded: DoubleLiveData<List<Audiobook>, Boolean, List<Audiobook>> =
-    DoubleLiveData(
-      bookRepository.getRecentlyAdded().distinctBy { it.booksKey() },
+  val recentlyAdded: StateFlow<List<Audiobook>> =
+    combineDistinct(
+      bookRepository.getRecentlyAdded().distinctUntilChangedBy { it.booksKey() },
       _offlineMode,
     ) { recents, offline ->
-      /** We only want books which have actually been listened to! */
-      if (offline == true) {
-        return@DoubleLiveData recents?.filter { book -> book.isCached } ?: emptyList()
-      } else {
-        return@DoubleLiveData recents ?: emptyList()
-      }
-    }
+      // We only want books which have actually been listened to!
+      if (offline) recents.filter { it.isCached } else recents
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  val downloaded: LiveData<List<Audiobook>> =
-    bookRepository.getCachedAudiobooks().distinctBy { it.booksKey() }
+  val downloaded: StateFlow<List<Audiobook>> =
+    bookRepository
+      .getCachedAudiobooks()
+      .distinctUntilChangedBy { it.booksKey() }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  private var _isSearchActive = MutableLiveData<Boolean>()
-  val isSearchActive: LiveData<Boolean>
+  private val _isSearchActive = MutableStateFlow(false)
+  val isSearchActive: StateFlow<Boolean>
     get() = _isSearchActive
 
   /** Typo-tolerant grouped search, shared with the library and collections screens (cu-25). */
   private val searchController = SearchController(bookRepository, viewModelScope)
 
-  val searchRows: LiveData<List<SearchRow>>
+  val searchRows: StateFlow<List<SearchRow>>
     get() = searchController.rows
 
-  val isQueryEmpty: LiveData<Boolean>
+  val isQueryEmpty: StateFlow<Boolean>
     get() = searchController.isQueryEmpty
 
+  /**
+   * A `SharedPreferences` listener fires on whichever thread called `apply()`, and a settings
+   * *import* writes this key off the main thread (`SettingsBackup.BACKUP_SETTING_KEYS` includes
+   * it). That is why the `MutableLiveData` this replaces had to use `postValue` and carried an
+   * explicit carve-out; assigning a `MutableStateFlow` is thread-safe, so the exception is gone.
+   */
   private val offlineModeListener =
     SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
       when (key) {
-        // **Stays `postValue`** (cu-52). A `SharedPreferences` listener fires on whichever thread
-        // called `apply()`, and a settings *import* writes this key off the main thread
-        // (`SettingsBackup.BACKUP_SETTING_KEYS` includes it). `value =` would throw there.
-        PrefsRepo.KEY_OFFLINE_MODE -> _offlineMode.postValue(prefsRepo.offlineMode)
+        PrefsRepo.KEY_OFFLINE_MODE -> _offlineMode.value = prefsRepo.offlineMode
         else -> { // Do nothing
         }
       }
     }
 
-  private val serverConnectionObserver =
-    Observer<Boolean> { isConnectedToServer ->
-      if (isConnectedToServer) {
-        viewModelScope.launch(exceptionHandler) {
-          val millisSinceLastRefresh =
-            System.currentTimeMillis() - prefsRepo.lastRefreshTimeStamp
-          val minutesSinceLastRefresh = millisSinceLastRefresh / 1000 / 60
-          val bookCount = bookRepository.getBookCount()
-          val shouldRefresh =
-            minutesSinceLastRefresh > prefsRepo.refreshRateMinutes || bookCount == 0
-          Timber.i(
-            "$minutesSinceLastRefresh minutes since last libraryrefresh,${prefsRepo.refreshRateMinutes} needed",
-          )
-          if (shouldRefresh) {
-            refreshData()
-          }
-        }
-      }
+  private suspend fun refreshIfStale() {
+    val millisSinceLastRefresh = System.currentTimeMillis() - prefsRepo.lastRefreshTimeStamp
+    val minutesSinceLastRefresh = millisSinceLastRefresh / 1000 / 60
+    val bookCount = bookRepository.getBookCount()
+    val shouldRefresh = minutesSinceLastRefresh > prefsRepo.refreshRateMinutes || bookCount == 0
+    Timber.i(
+      "$minutesSinceLastRefresh minutes since last libraryrefresh,${prefsRepo.refreshRateMinutes} needed",
+    )
+    if (shouldRefresh) {
+      refreshData()
     }
+  }
 
   init {
     Timber.i("HomeViewModel init")
-    if (plexConfig.isConnected.value == true) {
-      // if already connected, call it just once
-      serverConnectionObserver.onChanged(true)
+    // No "if already connected, call it once" special case any more: `isConnected` is a StateFlow,
+    // so the collector below is handed the current value immediately. The LiveData version needed
+    // that branch because `observeForever` also delivers at once — it ran the handler *twice* when
+    // already connected, which is a duplicate refresh rather than a missing one.
+    viewModelScope.launch(exceptionHandler) {
+      plexConfig.isConnected.collect { isConnectedToServer ->
+        if (isConnectedToServer) {
+          refreshIfStale()
+        }
+      }
     }
-    plexConfig.isConnected.observeForever(serverConnectionObserver)
     prefsRepo.registerPrefsListener(offlineModeListener)
   }
 
   override fun onCleared() {
-    plexConfig.isConnected.removeObserver(serverConnectionObserver)
     prefsRepo.unregisterPrefsListener(offlineModeListener)
     super.onCleared()
   }

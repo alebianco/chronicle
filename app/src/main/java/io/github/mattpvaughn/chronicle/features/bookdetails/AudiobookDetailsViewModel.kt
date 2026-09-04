@@ -117,8 +117,8 @@ class AudiobookDetailsViewModel(
       resolveChaptersFromCache(fromTable, book, tracksAsChapters)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  private val _messageForUser = MutableStateFlow(Event(FormattableString.from("")))
-  val messageForUser: StateFlow<Event<FormattableString>>
+  private val _messageForUser = MutableStateFlow<Event<FormattableString>?>(null)
+  val messageForUser: StateFlow<Event<FormattableString>?>
     get() = _messageForUser
 
   /**
