@@ -33,3 +33,29 @@ inline fun assembleChapters(
   }
   return assembled.sorted()
 }
+
+/**
+ * Picks the best available chapter list, table first (cu-82).
+ *
+ * Three levels, in descending order of trust:
+ *  1. `ChapterDatabase` rows — the source of truth since cu-49, and the only one a future backend
+ *     has to populate.
+ *  2. [Audiobook.chapters] — the legacy column. Still consulted because the backfill (cu-158) is
+ *     *launched, not awaited* (`ChronicleApplication.backfillChapterTable`), so a book can still
+ *     have no rows on the first launch after an upgrade. Retiring this level needs a released build
+ *     that has run the backfill, which is why cu-82 does not drop the column.
+ *  3. [asChapterList] — cu-13's no-chapter-data fallback, which is **permanent**: a book whose
+ *     server reports no chapters has nothing to fall back *to*.
+ *
+ * Kept pure and free of Room types so the precedence is testable without a database.
+ */
+fun resolveChapters(
+  fromTable: List<Chapter>,
+  fromBook: List<Chapter>,
+  tracks: List<MediaItemTrack>,
+): List<Chapter> =
+  when {
+    fromTable.isNotEmpty() -> fromTable
+    fromBook.isNotEmpty() -> fromBook
+    else -> tracks.asChapterList()
+  }
