@@ -5,7 +5,6 @@ import android.support.v4.media.MediaMetadataCompat
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack.Companion.EMPTY_TRACK
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -167,11 +166,23 @@ data class MediaItemTrack(
     return "$id.${File(media).extension}"
   }
 
-  fun getTrackSource(): String {
+  /**
+   * Where this track's audio actually is: a local file when cached, the server otherwise.
+   *
+   * Both dependencies arrive as parameters (cu-79). They used to be fetched from the DI graph
+   * inside this data class, which made the model unconstructable in a test without standing up
+   * `ChronicleApplication` — and, worse for [plexConfig], put a *Plex-specific* type inside a
+   * *domain* model, which is exactly the coupling the `MediaSource` seam exists to remove
+   * (cu-15, decision-11). `toMediaMetadata` already took `plexConfig` this way; this follows it.
+   */
+  fun getTrackSource(
+    cachedMediaDir: File,
+    plexConfig: PlexConfig,
+  ): String {
     return if (cached) {
-      cachedTrackUri(Injector.get().prefsRepo().cachedMediaDir, getCachedFileName())
+      cachedTrackUri(cachedMediaDir, getCachedFileName())
     } else {
-      Injector.get().plexConfig().toServerString(media)
+      plexConfig.toServerString(media)
     }
   }
 
@@ -308,14 +319,17 @@ fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
 private fun MediaItemTrack.hasProgress(): Boolean = progress > 0L
 
 /** Converts the metadata of a [MediaItemTrack] to a [MediaMetadataCompat]. */
-fun MediaItemTrack.toMediaMetadata(plexConfig: PlexConfig): MediaMetadataCompat {
+fun MediaItemTrack.toMediaMetadata(
+  plexConfig: PlexConfig,
+  cachedMediaDir: File,
+): MediaMetadataCompat {
   val metadataBuilder = MediaMetadataCompat.Builder()
   metadataBuilder.id = this.id
   metadataBuilder.title = this.title
   metadataBuilder.displayTitle = this.album
   metadataBuilder.displaySubtitle = this.artist
   metadataBuilder.trackNumber = this.playQueueItemID
-  metadataBuilder.mediaUri = getTrackSource()
+  metadataBuilder.mediaUri = getTrackSource(cachedMediaDir, plexConfig)
   metadataBuilder.albumArtUri = plexConfig.makeThumbUri(this.thumb ?: "").toString()
   metadataBuilder.trackNumber = this.index.toLong()
   metadataBuilder.duration = this.duration

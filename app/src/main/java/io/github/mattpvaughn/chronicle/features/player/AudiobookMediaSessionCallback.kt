@@ -372,7 +372,7 @@ class AudiobookMediaSessionCallback
         Timber.i("Playing book $bookId with ${tracks.size} tracks")
 
         trackListStateManager.trackList = tracks
-        val metadataList = buildPlaylist(tracks, plexConfig)
+        val metadataList = buildPlaylist(tracks, plexConfig, prefsRepo.cachedMediaDir)
 
         val queueItems =
           metadataList.zip(tracks).mapIndexed { index, (metadata, _) ->

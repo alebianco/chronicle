@@ -4,8 +4,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.SourceManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
@@ -60,9 +60,24 @@ data class Collection(
   }
 }
 
+/**
+ * Serializes a collection's child ids to the stored JSON array.
+ *
+ * Room instantiates a `@TypeConverters(::class)` converter reflectively, so this cannot take a
+ * dependency by construction without moving to `addTypeConverter` plumbing on every database that
+ * uses it. It does not need to: this builds its **own** `Moshi` (cu-79) rather than reaching into
+ * the DI graph, which is what made the model unconstructable in a test without standing up
+ * `ChronicleApplication`.
+ *
+ * That is safe here because the application's Moshi is a bare `Moshi.Builder().build()` with no
+ * custom adapters, and the payload is a `List<String>` — the most primitive thing Moshi handles.
+ * **If the app's Moshi ever gains an adapter that changes how a string list is written, this must
+ * move to `addTypeConverter`**; `CollectionIdConverterTest` pins the stored form so that change
+ * cannot pass unnoticed.
+ */
 class CollectionIdConverter {
   private val stringType = Types.newParameterizedType(List::class.java, String::class.java)
-  private val stringsAdapter = Injector.get().moshi().adapter<List<String>>(stringType)
+  private val stringsAdapter = Moshi.Builder().build().adapter<List<String>>(stringType)
 
   // The stored form is unchanged by cu-71: this always serialized a JSON array of strings
   // and only converted to Long in Kotlin. Dropping that conversion removes a lossy step —
