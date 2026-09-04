@@ -1,6 +1,6 @@
 io/github/mattpvaughn/chronicle/application 31.73
 io/github/mattpvaughn/chronicle/data/local 61.46
-io/github/mattpvaughn/chronicle/data/model 88.06
+io/github/mattpvaughn/chronicle/data/model 88.16
 io/github/mattpvaughn/chronicle/data/sources 86.40
 io/github/mattpvaughn/chronicle/data/sources/local 73.02
 io/github/mattpvaughn/chronicle/data/sources/plex 54.89
