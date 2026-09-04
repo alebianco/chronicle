@@ -85,6 +85,19 @@ interface DebugHooksContract {
   )
 
   /**
+   * Opens the settings screen, so it can be checked without tapping a bottom-nav tab (cu-33).
+   *
+   * Settings sits behind a `BottomNavigationItemView`, which `input tap` cannot drive — the
+   * obstacle recorded in cu-54 — and unlike Browse it has no other entry point, so the screen was
+   * unreachable from a script entirely.
+   */
+  fun onShowSettingsIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+    navigator: Navigator,
+  )
+
+  /**
    * Expands the currently-playing sheet, so the player — and the "position not synced" badge on
    * it — can be reached without tap coordinates (cu-73).
    *

@@ -44,6 +44,7 @@ object DebugHooks : DebugHooksContract {
   private const val KEY_FAIL_SYNC = "fail_sync"
   private const val EXTRA_SHOW_PLAYER = "show_player"
   private const val EXTRA_SHOW_BROWSE = "show_browse"
+  private const val EXTRA_SHOW_SETTINGS = "show_settings"
   private const val EXTRA_INVALIDATE_SERVER_TOKEN = "invalidate_server_token"
   private const val EXTRA_MOVE_SYNC_LOCATION = "move_sync_location"
 
@@ -235,6 +236,37 @@ object DebugHooks : DebugHooksContract {
     activity.window.decorView.post {
       if (!activity.isFinishing && !activity.isDestroyed) {
         navigator.showBrowse()
+      }
+    }
+  }
+
+  /**
+   * Opens the settings screen (cu-33):
+   *
+   * ```
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/\
+   *   io.github.mattpvaughn.chronicle.application.MainActivity --ez show_settings true
+   * ```
+   *
+   * Settings is reachable *only* from its bottom-nav tab, and a `BottomNavigationItemView` sits
+   * under the system bars where `input tap` cannot reach it (cu-54) — so unlike Browse, which at
+   * least has a facet entry point, the screen could not be opened from a script at all.
+   *
+   * Posted for the same reason as `show_browse`: called straight from `onCreate` a `commit()`
+   * throws `FragmentManager has not been attached to a host`.
+   */
+  override fun onShowSettingsIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+    navigator: Navigator,
+  ) {
+    if (intent == null || !intent.getBooleanExtra(EXTRA_SHOW_SETTINGS, false)) {
+      return
+    }
+    Timber.i("Opening the settings screen (show_settings)")
+    activity.window.decorView.post {
+      if (!activity.isFinishing && !activity.isDestroyed) {
+        navigator.showSettings()
       }
     }
   }

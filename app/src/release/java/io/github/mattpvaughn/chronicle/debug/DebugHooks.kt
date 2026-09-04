@@ -40,6 +40,12 @@ object DebugHooks : DebugHooksContract {
     navigator: Navigator,
   ) = Unit
 
+  override fun onShowSettingsIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+    navigator: Navigator,
+  ) = Unit
+
   override fun onShowPlayerIntent(
     intent: Intent?,
     lifecycleOwner: LifecycleOwner,
