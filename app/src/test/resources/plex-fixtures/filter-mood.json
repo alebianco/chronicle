@@ -3,7 +3,7 @@
     "size": 1,
     "identifier": "com.plexapp.plugins.library",
     "Directory": [
-      { "key": "/library/sections/1/mood/401", "title": "Series: Mistborn" }
+      { "fastKey": "/library/sections/1/all?mood=401", "key": "401", "title": "Series: Mistborn" }
     ]
   }
 }

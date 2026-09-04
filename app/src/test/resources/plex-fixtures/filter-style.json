@@ -3,8 +3,8 @@
     "size": 2,
     "identifier": "com.plexapp.plugins.library",
     "Directory": [
-      { "key": "/library/sections/1/style/301", "title": "Michael Kramer" },
-      { "key": "/library/sections/1/style/302", "title": "Rob Inglis" }
+      { "fastKey": "/library/sections/1/all?style=301", "key": "301", "title": "Michael Kramer" },
+      { "fastKey": "/library/sections/1/all?style=302", "key": "302", "title": "Rob Inglis" }
     ]
   }
 }
