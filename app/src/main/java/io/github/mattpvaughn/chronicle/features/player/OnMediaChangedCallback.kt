@@ -87,11 +87,62 @@ class OnMediaChangedCallback
         "onChapterChange called: chapter = [${chapter.index}] ${chapter.title} || current: [${currentlyPlaying.chapter.value.index}] ${currentlyPlaying.chapter.value.title}",
       )
 
+      publishChapterAsSessionMetadata(chapter)
+
       mediaController.playbackState?.let { state ->
         serviceScope.launch(Injector.get().unhandledExceptionHandler()) {
           updateNotification(state.state)
         }
       }
+    }
+
+    /**
+     * Puts the current chapter into the **session** metadata, which is what the notification
+     * actually renders (cu-50).
+     *
+     * `NotificationBuilder` sets the chapter as the notification's content title, but the
+     * notification uses `MediaStyle.setMediaSession()` and Android then draws the session metadata
+     * instead, discarding it — a comment there says so. The session metadata was refreshed only
+     * from *track*-level player events, and **a chapter is not a track**: most of this library is
+     * single-track books with many chapters, so a chapter boundary fires no player event and the
+     * notification kept the same title for the whole book.
+     *
+     * The **media id stays the track's**. `onMetadataChanged` resolves the playing book by looking
+     * that id up in the track repository, and `onPositionDiscontinuity` reads it to attribute
+     * progress; a chapter id there would break both silently. Only the display fields change.
+     *
+     * An empty chapter title falls back to the book, since a blank session title renders as a
+     * blank notification.
+     *
+     * `setMetadata` **replaces** the whole bundle, so this copies the metadata the player already
+     * published and overrides only the display fields. Rebuilding from scratch instead would drop
+     * whatever the track path had set — `MediaItemTrack.toMediaMetadata` contributes
+     * `albumArtUri`, `mediaUri`, `duration` and `trackNumber`, and the
+     * `MediaDescriptionCompat` path contributes `displayIconUri` — none of which this class has
+     * the inputs to reconstruct. Losing the art keys would show up only as a blank lockscreen
+     * image, and losing `duration` as a dead scrubber: neither throws, so neither would fail a
+     * test that did not look for it.
+     */
+    private fun publishChapterAsSessionMetadata(chapter: Chapter) {
+      val book = currentlyPlaying.book.value
+      if (book.id == NO_AUDIOBOOK_FOUND_ID) {
+        // Nothing is really playing yet; leave whatever the player published in place rather than
+        // overwriting it with placeholders.
+        return
+      }
+      val title = chapter.title.ifEmpty { book.title }
+      val builder =
+        mediaController.metadata?.let { MediaMetadataCompat.Builder(it) }
+          ?: MediaMetadataCompat.Builder()
+      mediaSession.setMetadata(
+        builder.apply {
+          // The id must keep naming the *track*: see above.
+          id = currentlyPlaying.track.value.id
+          this.title = title
+          displayTitle = title
+          displaySubtitle = book.title
+        }.build(),
+      )
     }
 
     private suspend fun updateNotification(state: Int) {

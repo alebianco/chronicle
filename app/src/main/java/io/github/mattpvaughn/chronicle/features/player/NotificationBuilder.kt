@@ -12,7 +12,6 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
-import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.ACTION_PAUSE
 import android.support.v4.media.session.PlaybackStateCompat.ACTION_PLAY
 import android.view.KeyEvent
@@ -25,11 +24,8 @@ import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.FLAG_OPEN_ACTIVITY_TO_CURRENTLY_PLAYING
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.REQUEST_CODE_OPEN_APP_TO_CURRENTLY_PLAYING
-import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import io.github.mattpvaughn.chronicle.data.model.EMPTY_CHAPTER
-import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
@@ -156,29 +152,6 @@ class NotificationBuilder
     }
 
     var bookTitleBitmapPair: Pair<String, Bitmap?>? = null
-
-    private var currentNotificationMetadata =
-      NotificationData(
-        bookId = NO_AUDIOBOOK_FOUND_ID,
-        trackId = ITrackRepository.TRACK_NOT_FOUND,
-        chapterId = EMPTY_CHAPTER.id,
-        playbackState = PlaybackStateCompat.STATE_NONE,
-      )
-
-    private data class NotificationData(
-      private val bookId: String,
-      private val trackId: String,
-      private val chapterId: String,
-      private val playbackState: Int,
-    )
-
-    private val currentID =
-      NotificationData(
-        bookId = currentlyPlaying.book.value.id,
-        trackId = currentlyPlaying.track.value.id,
-        chapterId = currentlyPlaying.chapter.value.id,
-        playbackState = PlaybackStateCompat.STATE_NONE,
-      )
 
     /**
      * Builds a notification for the current playback state, **waiting for cover art**.

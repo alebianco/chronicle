@@ -15,6 +15,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.model.Chapter
+import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
+import io.github.mattpvaughn.chronicle.data.model.EMPTY_TRACK
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.coEvery
 import io.mockk.every
@@ -239,11 +241,16 @@ class NotificationStateMachineTest {
         notificationManager = notificationManager,
         foregroundServiceController = foreground,
         serviceController = service,
-        // `onChapterChange` logs `currentlyPlaying.chapter.value`, and a relaxed mock hands back a
-        // bare Object for the generic StateFlow, which fails to cast. Stub it with a real one.
+        // `onChapterChange` reads `chapter`, `book` and `track` off this, and a relaxed mock hands
+        // back a bare Object for a generic StateFlow, which fails to cast. Stub each with a real
+        // one. `book` is EMPTY_AUDIOBOOK on purpose: these tests are about the state machine, and
+        // an empty book makes `publishChapterAsSessionMetadata` return early (cu-50), so nothing
+        // here depends on session metadata being published.
         currentlyPlaying =
           mockk(relaxed = true) {
             every { chapter } returns MutableStateFlow(Chapter())
+            every { book } returns MutableStateFlow(EMPTY_AUDIOBOOK)
+            every { track } returns MutableStateFlow(EMPTY_TRACK)
           },
         trackRepo = mockk(relaxed = true),
         bookRepo = mockk(relaxed = true),
