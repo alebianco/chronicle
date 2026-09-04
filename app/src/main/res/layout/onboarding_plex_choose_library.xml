@@ -32,6 +32,8 @@ xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:android="http://schema
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/library_list"
+        android:visibility="gone"
+        tools:visibility="visible"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginLeft="@dimen/screen_horizontal_padding"
@@ -47,6 +49,8 @@ xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:android="http://schema
 
     <TextView
         android:id="@+id/no_libraries_found"
+        android:visibility="gone"
+        tools:visibility="visible"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/no_libraries_found"

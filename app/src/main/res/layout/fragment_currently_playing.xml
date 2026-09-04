@@ -56,6 +56,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                 <ImageView
                     android:id="@+id/details_pause_play"
+                    android:visibility="gone"
+                    tools:visibility="visible"
                     android:layout_width="@dimen/details_play_button"
                     android:layout_height="@dimen/details_play_button"
                     android:layout_margin="@dimen/margin_normal"
@@ -313,6 +315,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                 <TextView
                     android:id="@+id/sleep_timer_countdown"
+                    android:visibility="gone"
+                    tools:visibility="visible"
                     style="@style/TextAppearance.SleepTimerCountdown"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
@@ -350,6 +354,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
     <ProgressBar
         android:id="@+id/loading_tracks_spinner"
+        android:visibility="gone"
+        tools:visibility="visible"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"

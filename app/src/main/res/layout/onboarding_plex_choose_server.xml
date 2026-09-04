@@ -33,6 +33,8 @@ xmlns:app="http://schemas.android.com/apk/res-auto"
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/server_list"
+        android:visibility="gone"
+        tools:visibility="visible"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginLeft="@dimen/screen_horizontal_padding"
@@ -48,6 +50,8 @@ xmlns:app="http://schemas.android.com/apk/res-auto"
 
     <TextView
         android:id="@+id/no_servers_found"
+        android:visibility="gone"
+        tools:visibility="visible"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/no_servers_found"

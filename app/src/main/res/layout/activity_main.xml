@@ -10,6 +10,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
+        android:visibility="gone"
+        tools:visibility="visible"
         android:layout_width="0dp"
         android:layout_height="@dimen/bottom_nav_bar_height"
         android:background="@color/colorPrimary"
@@ -34,6 +36,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
     <FrameLayout
         android:id="@+id/currently_playing_container"
+        android:visibility="gone"
+        tools:visibility="visible"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintLeft_toLeftOf="parent"
@@ -86,6 +90,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
             <ImageView
                 android:id="@+id/pause_play_button"
+                android:visibility="gone"
+                tools:visibility="visible"
                 android:layout_width="@dimen/app_bar_height"
                 android:layout_height="@dimen/app_bar_height"
                 android:contentDescription="@string/pause_play_button"

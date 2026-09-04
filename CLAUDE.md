@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **1139 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1142 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -448,6 +448,14 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   set from Kotlin. Two traps when converting or reviewing UI code: a view whose visibility is Kotlin-driven needs
   `android:visibility="gone"` in XML or it flashes its default for a frame; and a binding-adapter-backed type such as
   `FormattableString` must go through its helper, since a plain `.text =` renders the data class `toString()` silently.
+  **`FirstFrameFlashTest` is now the gate** (cu-68): it fails the build on any Kotlin-driven view
+  with no XML default. "For a frame" understates it — several sources are cold (`DoubleLiveData`,
+  a `QuadLiveDataAsync` on `Dispatchers.IO`, an unseeded `MutableLiveData`), so the default held
+  long enough to read "No libraries found" over onboarding, with the bottom nav and mini player on
+  top of the login screen. 34 views were swept. The guard also checks the **mirror** risk, which is
+  worse: a view defaulted to `gone` with no writer is *permanently* invisible. It caught two —
+  driven through a local `tempBinding` rather than `binding`, so match `\w*[Bb]inding` when
+  scanning for these, not just `binding`.
 
 ## Definition of done
 

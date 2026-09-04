@@ -80,6 +80,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                     <ProgressBar
                         android:id="@+id/caching_tracks_spinner"
+                        android:visibility="gone"
+                        tools:visibility="visible"
                         android:layout_width="@dimen/list_icon_size"
                         android:layout_height="@dimen/list_icon_size"
                         android:contentDescription="@string/downloading_book" />
@@ -93,6 +95,8 @@ xmlns:tools="http://schemas.android.com/tools"
                     -->
                     <ImageView
                         android:id="@+id/download"
+                        android:visibility="gone"
+                        tools:visibility="visible"
                         android:layout_width="@dimen/list_icon_size"
                         android:layout_height="@dimen/list_icon_size"
                         android:enabled="false"
@@ -183,6 +187,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                     <ImageView
                         android:id="@+id/details_pause_play"
+                        android:visibility="gone"
+                        tools:visibility="visible"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:background="?android:attr/selectableItemBackgroundBorderless"
@@ -193,6 +199,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                     <ProgressBar
                         android:id="@+id/audio_loading_spinner"
+                        android:visibility="gone"
+                        tools:visibility="visible"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:padding="@dimen/margin_small" />
@@ -200,6 +208,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                 <TextView
                     android:id="@+id/info_summary"
+                    android:visibility="gone"
+                    tools:visibility="visible"
                     style="@style/TextAppearance.Body2"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -213,6 +223,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                 <Button
                     android:id="@+id/info_expand_summary"
+                    android:visibility="gone"
+                    tools:visibility="visible"
                     style="@style/TextAppearance.Button"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -232,6 +244,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                 <ProgressBar
                     android:id="@+id/loading_tracks_spinner"
+                    android:visibility="gone"
+                    tools:visibility="visible"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/margin_normal"
@@ -257,6 +271,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                     <com.google.android.material.progressindicator.LinearProgressIndicator
                         android:id="@+id/connecting_to_server_indicator"
+                        android:visibility="gone"
+                        tools:visibility="visible"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:indeterminate="true"
@@ -264,6 +280,8 @@ xmlns:tools="http://schemas.android.com/tools"
 
                     <androidx.appcompat.widget.AppCompatTextView
                         android:id="@+id/connection_failed_message"
+                        android:visibility="gone"
+                        tools:visibility="visible"
                         style="@style/TextAppearance.Body1"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
