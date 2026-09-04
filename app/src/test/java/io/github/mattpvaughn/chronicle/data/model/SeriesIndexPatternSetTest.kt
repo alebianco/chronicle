@@ -203,7 +203,7 @@ class SeriesIndexPatternSetTest {
    * An optional group absent from the matching pattern must not throw.
    *
    * `MatchResult.groups["name"]` raises `IllegalArgumentException` for a group the matching pattern
-   * never declared — it does not return null. Four of the seven built-ins declare no `series`
+   * never declared — it does not return null. Four of the eight built-ins declare no `series`
    * group, so reading it naively crashed the majority of matches while this was being written.
    */
   @Test

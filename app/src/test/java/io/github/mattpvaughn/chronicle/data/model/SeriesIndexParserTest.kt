@@ -183,6 +183,28 @@ class SeriesIndexParserTest {
   }
 
   /**
+   * `<Series>, Book <n>, <Subseries> - <Title>` — the number terminated by a **comma** rather than
+   * the ` - ` the plain `audnexus` shape requires (cu-155).
+   *
+   * Two real values on the household server carry a sub-series between the number and the title.
+   * The widening is safe because the **label** is still required: `"Warhammer 40,000"` has no
+   * `Book`/`Vol` before its comma-digit run, so a thousands separator can never be read as a
+   * position — which is the trap that kept this filed rather than fixed in passing.
+   */
+  @Test
+  fun `a sub-series after the book number still parses`() {
+    assertPosition(1.0, "Warhammer 40,000, Book 1, Bequin: Warhammer 40,000 - Pariah")
+    assertPosition(2.0, "Warhammer 40,000, Book 2, Bequin: Warhammer 40,000 - Penitent")
+  }
+
+  /** The thousands separator this task's widening had to avoid reading as a position. */
+  @Test
+  fun `a thousands separator in the series name is not a position`() {
+    assertUnknown("Warhammer 40,000 - Pariah")
+    assertUnknown("Warhammer 40,000")
+  }
+
+  /**
    * A series whose own *name* contains a number must not have it read as the position.
    *
    * This was the stated reason the old parser anchored to the end. Un-anchoring keeps the

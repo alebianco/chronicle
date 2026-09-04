@@ -405,7 +405,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   was **end-anchored** and both dominant taggers put the number at the *front* — Audnexus writes
   `"<Series>, Book <n> - <Title>"`, seanap prescribes `"<Series> <n> - <Title>"` — so it read
   **1 of 8** real formats, the one being our own fixture, which happened to end with the number
-  (the cu-24 fixture trap in a new field). `SERIES_INDEX_PATTERNS` now holds seven patterns tried
+  (the cu-24 fixture trap in a new field). `SERIES_INDEX_PATTERNS` now holds eight patterns tried
   **most specific first**, and that order is load-bearing: `audnexus` must precede `label-first`
   or `"Book 2 of the Saga, Book 5"` reads 2, which is exactly what the old anchoring protected.
   Values are **hundredths** (`SERIES_INDEX_SCALE`, so book 2 is `200`) because a novella genuinely
@@ -417,7 +417,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   (`"Mistborn, Bk 2"`, `"Mistborn, 2"`) were silently dropped when un-anchoring and restored after
   `BookFacetsTest` failed — don't remove `Bk` or the loosest `comma-trail` pattern. `Book 0` reads
   as **unknown** on purpose (0 is the sentinel), so a prequel numbered zero sorts last; a test says
-  so.
+  so. An eighth pattern, `audnexus_subseries`, reads the `<Series>, Book <n>, <Subseries> - <Title>`
+  shape where the number is terminated by a **comma** (cu-155). It must follow `audnexus`, and it
+  keeps the `Book`/`Vol` label **required** — that requirement is the only thing stopping
+  `"Warhammer 40,000"` from reading as book 40000, and dropping it is sabotage-verified to break the
+  parse.
   **The rules are data, not constants** (cu-147, decision-18). They live in
   `data/model/SeriesIndexPatterns.kt` as named `SeriesIndexPattern`s with named capture groups, and
   `Audiobook.installSeriesIndexPatterns(patterns, order)` lets a user's own rules go **before**,
@@ -428,7 +432,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   Hence `SeriesIndexPatternSet.explain()`, which reports every rule's verdict. Two traps: **do not
   use `RegexOption.COMMENTS`** — like Python's `re.VERBOSE` it strips literal spaces, which cost a
   tvnamer user real debugging time; and **`MatchResult.groups["name"]` throws** for a group the
-  *matching* pattern never declared rather than returning null, so four of the seven built-ins
+  *matching* pattern never declared rather than returning null, so four of the eight built-ins
   (which declare no `series` group) crashed every match until every named read went through
   `namedGroupOrNull`. A user's own rules live in **`series-index-rules.json`** in the app's files
   directory (cu-148) — `{version, order, rules:[{name, pattern, description}]}`, absent by default,

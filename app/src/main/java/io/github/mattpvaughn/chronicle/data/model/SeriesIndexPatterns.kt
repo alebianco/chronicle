@@ -319,6 +319,18 @@ val DEFAULT_SERIES_INDEX_PATTERNS: List<SeriesIndexPattern> =
           "reads 2.",
     ),
     SeriesIndexPattern(
+      name = "audnexus_subseries",
+      source =
+        """^(?<series>.+?),\s*(?:Book|Bk\.?|Vol\.?|Volume)\s+$INDEX(?:\s*[-+]\s*\d{1,3})?\b\s*,\s*\S""",
+      description =
+        "\"Warhammer 40,000, Book 1, Bequin: ... - Pariah\" — the audnexus shape with a " +
+          "sub-series between the number and the title, so the number is terminated by a comma " +
+          "rather than \" - \". Two real values on the household server take this form (cu-155). " +
+          "Must follow audnexus, which handles the commoner unbroken form. The Book/Vol label " +
+          "stays required, which is what stops \"Warhammer 40,000\" — a thousands separator with " +
+          "no label — reading as book 40000.",
+    ),
+    SeriesIndexPattern(
       name = "label_first",
       source = """^(?:Vol\.?|Volume|Book|Bk\.?)\s*$INDEX\b(?:\s*[-.:]\s*|\s+)""",
       description = "\"Book 5: Sourcery: Discworld\" — the label opens the string.",

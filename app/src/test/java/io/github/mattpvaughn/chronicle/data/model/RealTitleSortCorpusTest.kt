@@ -32,17 +32,16 @@ class RealTitleSortCorpusTest {
     val values = corpus()
     val parsed = values.filter { Audiobook.seriesIndexFromTitleSort(it) != Audiobook.NO_SERIES_INDEX }
 
-    // 136/139 on the captured library. Pinned as a floor rather than an equality so that adding a
-    // pattern is an improvement rather than a failure; a regression below it is a real one.
+    // 138/139 on the captured library, up from 136 when cu-155 added `audnexus_subseries`. Pinned
+    // as a floor rather than an equality so that adding a pattern is an improvement rather than a
+    // failure; a regression below it is a real one.
     //
-    // The three that do not parse are understood, and two of them are correct:
-    //  - "Hell Divers Series 0 - ..." -- `Book 0` is deliberately unknown, since 0 is the
-    //    NO_SERIES_INDEX sentinel and a prequel numbered zero should sort last (cu-146).
-    //  - "Warhammer 40,000, Book 1, Bequin: ... - Pariah" (x2) -- a real unhandled shape, where the
-    //    number is followed by a comma rather than " - ". Filed as cu-155.
+    // The one that does not parse is correct: "Hell Divers Series 0 - ..." is `Book 0`, deliberately
+    // unknown, since 0 is the NO_SERIES_INDEX sentinel and a prequel numbered zero should sort last
+    // (cu-146).
     assertTrue(
-      "only ${parsed.size}/${values.size} real titleSort values parsed; the measured floor is 136",
-      parsed.size >= 136,
+      "only ${parsed.size}/${values.size} real titleSort values parsed; the measured floor is 138",
+      parsed.size >= 138,
     )
   }
 

@@ -1,7 +1,7 @@
 ---
 id: cu-155
 title: Series index misses the comma-after-number titleSort shape
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-04'
 labels:
@@ -40,14 +40,48 @@ series position.
 
 ## Acceptance Criteria
 
-- [ ] `"<Series>, Book <n>, <anything> - <Title>"` parses to `<n>`
-- [ ] `"Warhammer 40,000 - Pariah"` (no book number) still reads as **unknown**, not 40000
-- [ ] The two real values above are added to the `RealTitleSortCorpusTest` corpus expectations, and
+- [x] `"<Series>, Book <n>, <anything> - <Title>"` parses to `<n>`
+- [x] `"Warhammer 40,000 - Pariah"` (no book number) still reads as **unknown**, not 40000
+- [x] The two real values above are added to the `RealTitleSortCorpusTest` corpus expectations, and
       the floor there raised from 136 to 138
-- [ ] Pattern order still tried most-specific-first; `explain()` names the new pattern
+- [x] Pattern order still tried most-specific-first; `explain()` names the new pattern
 
 ## Related
 
 - [[cu-146]] — added the seven built-in patterns and the ordering rule
 - [[cu-147]] — made the patterns configurable data; a user could already fix this themselves
 - [[cu-150]] — captured the corpus that found it
+
+## Implementation Notes
+
+An eighth built-in pattern, **`audnexus_subseries`**, placed immediately after `audnexus` so the
+most-specific-first ordering still holds. It is the `audnexus` shape with the number terminated by
+a **comma** instead of ` - `:
+
+```
+^(?<series>.+?),\s*(?:Book|Bk\.?|Vol\.?|Volume)\s+(?<index>...)(?:\s*[-+]\s*\d{1,3})?\b\s*,\s*\S
+```
+
+**Why a new named pattern rather than loosening `audnexus`.** Widening `audnexus`'s terminator to
+`[-,]` also passes every case, and was tried first — but `explain()` would then report a match from
+a rule whose description does not describe the string, which is the diagnosis gap cu-147 exists to
+close (tvnamer #216). A separate name costs one list entry and makes a mis-parse traceable.
+
+**The thousands-separator trap, resolved.** The task warned that a naive loosening makes
+`"Warhammer 40,000"` parse as book 40000. It does not here, because the `Book`/`Vol` **label stays
+required** and a thousands separator never carries one. That is the load-bearing part of the
+pattern: **sabotage-verified** by making the label optional (`)?` → `)?\s*`), which fails
+`a sub-series after the book number still parses` with `expected:<1.0> but was:<0.0>`. Restored with
+`--rerun-tasks`.
+
+**The corpus floor is now 138 of 139, and it is exact** — raising it to 139 fails with
+`only 138/139 real titleSort values parsed`. The single holdout is
+`"Hell Divers Series 0 - ..."`, which is `Book 0` and deliberately unknown (0 is the
+`NO_SERIES_INDEX` sentinel, so a prequel numbered zero sorts last — cu-146). The two Warhammer
+values were already in the committed corpus resource; only the expectation moved.
+
+**Closed to `Done` rather than `In Review`**: no screen changed and no product choice was made —
+the proof is three tests plus the real-server corpus, all reproducible headless.
+
+Verify loop green (6 stages). Coverage ratcheted **up**: aggregate 37.75 → 37.76, `data/model`
+88.15 → 88.17.
