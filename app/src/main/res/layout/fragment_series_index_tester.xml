@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The series numbering rules tester (cu-151).
+
+  A dedicated screen rather than a new `PreferenceType`: the tester needs a free-text input, a
+  per-rule verdict list *and* a tappable sample list — three new row types, two of them lists inside
+  a list, to express one screen. `PreferenceType`'s value is that it stays small.
+
+  Both lists are `wrap_content` inside a `NestedScrollView` and have `nestedScrollingEnabled=false`,
+  so the page scrolls as one thing rather than trapping a short list inside its own scroller. They
+  are short by construction — eight built-in rules, and samples capped at 25.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorPrimaryDark"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/toolbar_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:theme="@style/ToolbarTheme"
+            app:navigationIcon="@drawable/ic_arrow_back_white"
+            app:title="@string/series_rules_screen_title" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/margin_normal"
+            android:paddingBottom="@dimen/margin_normal">
+
+            <!-- How the library parses today, so the screen is useful before any rule exists. -->
+            <TextView
+                android:id="@+id/library_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_normal"
+                android:textColor="@color/textSecondary"
+                android:textSize="14sp"
+                tools:text="180 of 196 books have a sort title; 138 of those give a series position." />
+
+            <!-- Which rules are in force. Never empty: it names the built-ins when the user has
+                 written none, which is itself the answer to "are my rules being used?". -->
+            <TextView
+                android:id="@+id/rule_order"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_small"
+                android:textColor="@color/textSecondary"
+                android:textSize="14sp"
+                tools:text="No rules of your own; the built-in ones are in use" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/title_sort_input_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_normal"
+                android:hint="@string/series_rules_input_hint">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/title_sort_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionDone"
+                    android:inputType="text"
+                    android:maxLines="1" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- The headline answer. GONE by default because it is Kotlin-driven and there is
+                 nothing to report until something is typed (cu-68's FirstFrameFlashTest). -->
+            <TextView
+                android:id="@+id/parse_result"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_small"
+                android:textColor="@color/textPrimary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="Read as book 2, by the rule “audnexus”"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/rules_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_normal"
+                android:text="@string/series_rules_rules_title"
+                android:textColor="@color/textPrimary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rule_verdicts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_small"
+                android:nestedScrollingEnabled="false"
+                android:visibility="gone"
+                tools:itemCount="3"
+                tools:listitem="@layout/list_item_rule_verdict"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/samples_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_normal"
+                android:text="@string/series_rules_samples_title"
+                android:textColor="@color/textPrimary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/samples_explanation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/series_rules_samples_explanation"
+                android:textColor="@color/textSecondary"
+                android:textSize="14sp" />
+
+            <!-- Shown only when the library has nothing left to fix, which is a real state and a
+                 reassuring one. Kotlin-driven, so it declares its default here. -->
+            <TextView
+                android:id="@+id/samples_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_small"
+                android:text="@string/series_rules_samples_empty"
+                android:textColor="@color/textSecondary"
+                android:textSize="14sp"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <!-- GONE until the library has been read: the list is empty at that point either way,
+                 and an empty RecyclerView between two labels reads as a gap (cu-68). -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/sample_titles"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_small"
+                android:nestedScrollingEnabled="false"
+                android:visibility="gone"
+                tools:itemCount="4"
+                tools:listitem="@layout/list_item_sample_title" />
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

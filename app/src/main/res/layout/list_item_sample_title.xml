@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One library title offered as a test subject (cu-151).
+
+  These are the books that currently parse to no position, which is what a user would write a rule
+  to fix. Tapping loads it into the input rather than making the user retype it.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/sample_title"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:paddingVertical="@dimen/margin_small"
+    android:textColor="@color/textPrimary"
+    android:textSize="14sp"
+    tools:text="Warhammer 40,000 - Horus Rising" />

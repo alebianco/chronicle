@@ -110,6 +110,16 @@ enum class PatternOrder {
  */
 class SeriesIndexPatternSet(
   patterns: List<SeriesIndexPattern>,
+  /**
+   * How user rules were combined with the built-ins, retained so the tester can say so (cu-151).
+   *
+   * [of] consumed this and threw it away, which left the fifth acceptance criterion — show the
+   * effective order — unanswerable from the set itself. It matters to a user reading a verdict
+   * list: "my rule did not match" and "a built-in ran first and won" look identical without it.
+   * Defaults to [PatternOrder.BEFORE], which is what a bare `SeriesIndexPatternSet(builtins)`
+   * effectively is — no user rules, so every order behaves the same.
+   */
+  val order: PatternOrder = PatternOrder.BEFORE,
 ) {
   /**
    * Every pattern as given, in order, including ones that cannot be used.
@@ -240,7 +250,7 @@ class SeriesIndexPatternSet(
           PatternOrder.AFTER -> DEFAULT_SERIES_INDEX_PATTERNS + user
           PatternOrder.REPLACE -> user
         }
-      return SeriesIndexPatternSet(combined)
+      return SeriesIndexPatternSet(combined, order)
     }
   }
 }

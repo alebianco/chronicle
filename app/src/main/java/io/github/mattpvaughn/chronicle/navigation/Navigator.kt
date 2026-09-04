@@ -22,6 +22,7 @@ import io.github.mattpvaughn.chronicle.features.login.ChooseLibraryFragment
 import io.github.mattpvaughn.chronicle.features.login.ChooseServerFragment
 import io.github.mattpvaughn.chronicle.features.login.ChooseUserFragment
 import io.github.mattpvaughn.chronicle.features.login.LoginFragment
+import io.github.mattpvaughn.chronicle.features.settings.SeriesIndexTesterFragment
 import io.github.mattpvaughn.chronicle.features.settings.SettingsFragment
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
@@ -179,6 +180,14 @@ class Navigator
       fragmentManager.beginTransaction()
         .replace(R.id.fragNavHost, FacetBooksFragment.newInstance(kind, value))
         .addToBackStack(FacetBooksFragment.TAG)
+        .commit()
+    }
+
+    /** The series-numbering rules tester, reached from Settings (cu-151). */
+    fun showSeriesIndexTester() {
+      fragmentManager.beginTransaction()
+        .replace(R.id.fragNavHost, SeriesIndexTesterFragment.newInstance())
+        .addToBackStack(SeriesIndexTesterFragment.TAG)
         .commit()
     }
 

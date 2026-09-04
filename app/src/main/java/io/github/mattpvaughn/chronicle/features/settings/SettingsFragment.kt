@@ -160,6 +160,10 @@ class SettingsFragment : Fragment() {
       }
     }
 
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.showSeriesIndexTester) {
+      navigator.showSeriesIndexTester()
+    }
+
     viewLifecycleOwner.collectWhileStarted(viewModel.showLicenseActivity) {
       if (it) {
         startActivity(Intent(context, OssLicensesMenuActivity::class.java))

@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.features.home.HomeFragment
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater
+import io.github.mattpvaughn.chronicle.features.settings.SeriesIndexTesterFragment
 import io.github.mattpvaughn.chronicle.features.settings.SettingsFragment
 import io.github.mattpvaughn.chronicle.features.settings.SettingsViewModel
 import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
@@ -61,6 +62,8 @@ interface ActivityComponent {
   fun inject(browseFragment: BrowseFragment)
 
   fun inject(facetBooksFragment: FacetBooksFragment)
+
+  fun inject(seriesIndexTesterFragment: SeriesIndexTesterFragment)
 
   fun inject(modalBottomSheetSpeedChooser: ModalBottomSheetSpeedChooser)
 }

@@ -334,6 +334,34 @@
     <string name="settings_licenses_explanation">Open source libraries used by Chronicle</string>
     <string name="settings_github_title">github.com/alebianco/chronicle</string>
     <string name="settings_github_explanation">Chronicle Unabridged is free and open source (GPLv3). Report an issue or read the code here.</string>
+    <!-- Series index rules tester (cu-151). The screen exists so a user can see what a parsing
+         rule does before trusting it; the wording matters most in the negative cases, since the
+         whole point is telling "my rule is wrong" apart from "the app is broken". -->
+    <string name="settings_series_rules_title">Series numbering rules</string>
+    <string name="settings_series_rules_explanation">See how your books\' titles are read, and test a rule before trusting it</string>
+    <string name="series_rules_screen_title">Series numbering rules</string>
+    <string name="series_rules_input_hint">Sort title to test</string>
+    <string name="series_rules_input_label">Enter a sort title to see how the rules read it</string>
+    <!-- "unparsed" is not a defect count: a standalone novel legitimately has no series position,
+         so this is worded as an upper bound on what rules could help with, never as an error. -->
+    <string name="series_rules_summary">%1$d of %2$d books have a sort title; %3$d of those give a series position. The other %4$d may simply be standalone books.</string>
+    <string name="series_rules_result_found">Read as book %1$s, by the rule “%2$s”</string>
+    <string name="series_rules_result_none">No rule read a position from this title</string>
+    <string name="series_rules_verdict_won">Matched, and this is the rule that decided</string>
+    <string name="series_rules_verdict_also_matched">Also matched, but an earlier rule decided first</string>
+    <string name="series_rules_rule_origin_yours">Your rule</string>
+    <string name="series_rules_rule_origin_builtin">Built in</string>
+    <string name="series_rules_order_before">Your rules are tried before the built-in ones</string>
+    <string name="series_rules_order_after">Your rules are tried after the built-in ones</string>
+    <string name="series_rules_order_replace">Your rules replace the built-in ones</string>
+    <string name="series_rules_order_none">No rules of your own; the built-in ones are in use</string>
+    <string name="series_rules_samples_title">Books with no series position</string>
+    <string name="series_rules_samples_explanation">Tap one to test it. These are the titles a rule could help with — many are standalone books that simply have no position to find.</string>
+    <string name="series_rules_samples_empty">Every book with a sort title already gives a series position.</string>
+    <string name="series_rules_rules_title">Rules, in the order they are tried</string>
+    <!-- Content descriptions. A verdict must never be conveyed by colour alone (cu-47). -->
+    <string name="series_rules_rule_description">Rule %1$s, %2$s. %3$s</string>
+    <string name="series_rules_sample_description">Test the title %1$s</string>
     <string name="settings_credits_title">Credits</string>
     <string name="settings_credits_explanation">Built on the work of others</string>
     <string name="settings_credits_body">Chronicle was created by Matt Vaughn (@mattttvaughn), who built and open-sourced the original app — the playback engine, Plex integration, Android Auto and the offline downloader are all his work. Chronicle Unabridged is a friendly fork of that project and remains GPLv3, as he released it.\n\nThe Chronicle Epilogue fork by fabiogermann is an actively-maintained continuation whose fixes are a reference for this one. Its name, logo and branding are its own and are not used here.\n\nThe Plex Audiobook Guide community (seanap) documented the tagging conventions that make audiobooks work on Plex at all.\n\nDesign influences are credited in the project documentation; no assets are copied.</string>

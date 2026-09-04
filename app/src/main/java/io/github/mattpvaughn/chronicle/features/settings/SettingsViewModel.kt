@@ -133,6 +133,19 @@ class SettingsViewModel(
   val webLink: StateFlow<Event<String>?>
     get() = _webLink
 
+  /**
+   * Asks the fragment to open the series-numbering rules tester (cu-151).
+   *
+   * An event rather than a navigation call, because `Navigator` is `@ActivityScope` and this
+   * ViewModel is not — the same shape as `webLink` and `exportFileRequest` above.
+   *
+   * Nullable, like every other event holder here: "no event yet" is a real state, and seeding one
+   * with a blank `Event` would make a fresh screen hold an event that never happened (cu-52).
+   */
+  private val _showSeriesIndexTester = MutableStateFlow<Event<Unit>?>(null)
+  val showSeriesIndexTester: StateFlow<Event<Unit>?>
+    get() = _showSeriesIndexTester
+
   private val _showLicenseActivity = MutableStateFlow(false)
   val showLicenseActivity: StateFlow<Boolean>
     get() = _showLicenseActivity
@@ -265,6 +278,19 @@ class SettingsViewModel(
                       }
                     },
                 )
+              }
+            },
+        ),
+        // Beside the cover style: both are about how the library is presented, and a user looking
+        // for "why is this book numbered oddly" looks where the other display settings are.
+        PreferenceModel(
+          type = PreferenceType.CLICKABLE,
+          title = FormattableString.from(R.string.settings_series_rules_title),
+          explanation = FormattableString.from(R.string.settings_series_rules_explanation),
+          click =
+            object : PreferenceClick {
+              override fun onClick() {
+                _showSeriesIndexTester.setEvent(Unit)
               }
             },
         ),
