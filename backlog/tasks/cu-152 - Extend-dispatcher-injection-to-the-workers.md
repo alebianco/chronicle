@@ -1,8 +1,9 @@
 ---
 id: CU-152
 title: Extend dispatcher injection to the workers
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-02'
 labels:
   - R2
@@ -57,3 +58,45 @@ is on the path that protects the listener's position (cu-9).
 
 `work-testing` being on the classpath and unused was flagged in the pre-R2 review as paid-for
 coverage nobody had collected. This task is where that gets spent.
+
+## Implementation Notes
+
+**The task's premise did not survive contact, and the answer is "don't".** Three findings, in order:
+
+1. **`PlexSyncScrobbleWorker` names no dispatcher at all.** It was listed as one of the three
+   offenders and as the riskiest — it is on the position-reporting path (cu-9) — but it has never
+   referenced `Dispatchers`. Nothing to convert.
+2. **Injection is not possible as things stand.** WorkManager constructs a worker reflectively
+   through its default factory with a fixed `(Context, WorkerParameters)` signature. There is no
+   `WorkerFactory` and no `Configuration.Provider` here, so a constructor simply cannot take a
+   `DispatcherProvider` without adding both.
+3. **The two remaining uses are correct.** `CoroutineWorker.doWork` runs on `Dispatchers.Default`;
+   `DownloadNotificationWorker` and `MoveSyncLocationWorker` each wrap genuine blocking file I/O in
+   `withContext(Dispatchers.IO)`, which is what that dispatcher is for. Converting them would have
+   renamed a correct call, not fixed a bug.
+
+So the question became whether to build the plumbing. `RepositoryDispatcherTest` states the
+convention's purpose in its own failure message — *"these repositories still cannot have their
+dispatchers controlled by a test"* — and that purpose is unmet either way here: **no worker is unit
+tested**, and WorkManager's own harness (`TestListenableWorkerBuilder`) supplies its own executor
+regardless. A `WorkerFactory`, a `Configuration.Provider` and three changed constructors would buy
+nothing today.
+
+**What shipped instead is a guard that makes the exemption explicit.** `WorkerDispatcherTest` pins
+which files may name `Dispatchers` directly, asserts every exempt file really *is* a
+`CoroutineWorker` (so the list cannot be quietly extended with a repository), and asserts the
+scrobble worker still names none. Sabotage-verified: adding one to the scrobble worker fails two
+tests.
+
+Convention 4 in CLAUDE.md said "workers still hardcode dispatchers (cu-72) — don't add more",
+implying a conversion was pending. It now says workers are exempt and why, so the next reader does
+not re-derive this.
+
+**Revisit if** a worker gains a unit test, or a `WorkerFactory` appears for another reason — at
+that point injection becomes both possible and worth something.
+
+**Verification**
+
+- `./verify.sh --format` green, 7 stages. **1145 unit tests**, 0 failures.
+- Sabotage-verified the guard.
+- No production behaviour changed: this task adds a test and corrects two documents.

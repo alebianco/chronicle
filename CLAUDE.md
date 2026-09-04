@@ -81,7 +81,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   `mock_plex` flag itself, since it lives in `chronicle_debug.xml`. The two modes therefore cannot
   be interleaved within one verification pass — plan mock items and live-server items as separate
   blocks.
-- Tests: **1142 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1145 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -99,7 +99,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 1. DI via constructor `@Inject`/factories; respect scopes (`@Singleton`, `@ActivityScope`, `@ServiceScope`); never instantiate singletons manually.
 2. UI logic in Fragments/XML; business logic in ViewModels/Repositories; DB never accessed from UI.
 3. LiveData for UI state: private `MutableLiveData`, public immutable `LiveData`. (StateFlow migration is future work — don't mix ad hoc.)
-4. Coroutines: **inject `DispatcherProvider`** (cu-15) rather than referencing `Dispatchers.*` directly; UI on Main via `viewModelScope`. `GlobalScope` is gone and stays gone — three tests pin this (`CachedFileManagerScopeTest`, `RepositoryDispatcherTest`, `InternalApiUsageTest`). The five repositories are converted; ViewModels, workers and the player service still hardcode dispatchers (cu-72) — don't add more.
+4. Coroutines: **inject `DispatcherProvider`** (cu-15) rather than referencing `Dispatchers.*` directly; UI on Main via `viewModelScope`. `GlobalScope` is gone and stays gone — three tests pin this (`CachedFileManagerScopeTest`, `RepositoryDispatcherTest`, `InternalApiUsageTest`). The five repositories are converted; ViewModels and the player service still hardcode dispatchers (cu-72) — don't add more. **Workers are a deliberate exemption** (cu-152): WorkManager builds them reflectively with a fixed `(Context, WorkerParameters)` signature, so a constructor cannot take a `DispatcherProvider` without a `WorkerFactory` and a `Configuration.Provider` — and that plumbing would buy nothing while no worker is unit-tested and `TestListenableWorkerBuilder` supplies its own executor anyway. The two `withContext(Dispatchers.IO)` calls that remain are *correct*: `doWork` runs on `Dispatchers.Default` and both wrap real blocking file I/O. `WorkerDispatcherTest` pins the exemption list and asserts every file on it really is a `CoroutineWorker`.
 5. User-facing text in `res/values/strings.xml`, always.
 6. Room schema change ⇒ bump DB version + write a migration in the same PR.
 7. Navigation through `Navigator.kt`; data via Bundles/args.
