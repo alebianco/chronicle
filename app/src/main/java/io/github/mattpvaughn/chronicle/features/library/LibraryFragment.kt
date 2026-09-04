@@ -80,7 +80,7 @@ class LibraryFragment : Fragment() {
   ): View? {
     Timber.i("Lib frag view create")
     val binding = FragmentLibraryBinding.inflate(inflater, container, false)
-    searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) })
+    searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
 
     // Was compound visibility expressions in fragment_library.xml. XML combined
     // several LiveData sources implicitly; in Kotlin each source has to re-run
@@ -139,6 +139,7 @@ class LibraryFragment : Fragment() {
             openAudiobookDetails(audiobook)
           }
         },
+        plexConfig::toServerString,
       ).apply {
         stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
       }

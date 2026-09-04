@@ -39,7 +39,7 @@ class GroupedSearchAdapterTest {
     clicked.clear()
   }
 
-  private fun adapter() = GroupedSearchAdapter(onBookClick = { clicked += it })
+  private fun adapter() = GroupedSearchAdapter(onBookClick = { clicked += it }, coverUrl = { it })
 
   private fun book(
     id: String,
@@ -131,7 +131,7 @@ class GroupedSearchAdapterTest {
     val holder =
       adapter().onCreateViewHolder(parent, VIEW_TYPE_BOOK)
         as GroupedSearchAdapter.BookViewHolder
-    holder.bind(row, onBookClick = { clicked += it }, isConnected = true)
+    holder.bind(row, onBookClick = { clicked += it }, isConnected = true, coverUrl = { it })
     return holder.itemView
   }
 

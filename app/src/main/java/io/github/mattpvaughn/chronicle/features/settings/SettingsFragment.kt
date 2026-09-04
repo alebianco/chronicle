@@ -130,7 +130,7 @@ class SettingsFragment : Fragment() {
     }
 
     viewModel.preferences.observe(viewLifecycleOwner) { preferences ->
-      binding.settingsList.setPreferences(preferences)
+      binding.settingsList.setPreferences(preferences, prefsRepo)
     }
 
     viewModel.messageForUser.observe(

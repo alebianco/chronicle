@@ -101,7 +101,7 @@ class HomeFragment : Fragment() {
     binding.onDeckRecyclerview.itemAnimator?.changeDuration = 0
     binding.downloadedRecyclerview.adapter = makeAudiobookAdapter(openDetails)
     binding.downloadedRecyclerview.itemAnimator?.changeDuration = 0
-    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) })
+    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
     binding.searchResultsList.adapter = searchAdapter
 
     // Was `searchBookList="@{viewModel.searchResults}"` on the list. Missed when cu-58 converted
@@ -262,6 +262,7 @@ class HomeFragment : Fragment() {
       isVertical = false,
       isSquare = prefsRepo.bookCoverStyle == BOOK_COVER_STYLE_SQUARE,
       audiobookClick = audiobookClick,
+      coverUrl = plexConfig::toServerString,
     )
   }
 

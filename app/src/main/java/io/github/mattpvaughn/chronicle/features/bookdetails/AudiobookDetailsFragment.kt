@@ -152,6 +152,7 @@ class AudiobookDetailsFragment : Fragment() {
         binding.detailsArtwork,
         book?.thumb,
         plexConfig.isConnected.value == true,
+        plexConfig::toServerString,
       )
     }
     plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
@@ -159,6 +160,7 @@ class AudiobookDetailsFragment : Fragment() {
         binding.detailsArtwork,
         viewModel.audiobook.value?.thumb,
         connected == true,
+        plexConfig::toServerString,
       )
     }
 

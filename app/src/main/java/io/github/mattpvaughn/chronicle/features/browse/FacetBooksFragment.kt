@@ -17,6 +17,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentFacetBooksBinding
 import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
@@ -37,6 +38,9 @@ class FacetBooksFragment : Fragment() {
 
   @Inject
   lateinit var navigator: Navigator
+
+  @Inject
+  lateinit var plexConfig: PlexConfig
 
   @Inject
   lateinit var viewModelFactory: FacetBooksViewModel.Factory
@@ -76,6 +80,7 @@ class FacetBooksFragment : Fragment() {
             navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
           }
         },
+        plexConfig::toServerString,
       ).apply {
         stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
       }

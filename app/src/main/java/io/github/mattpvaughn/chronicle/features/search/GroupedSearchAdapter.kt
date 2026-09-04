@@ -11,6 +11,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.SearchField
 import io.github.mattpvaughn.chronicle.databinding.ListItemSearchHeaderBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemSearchResultAudiobookBinding
+import io.github.mattpvaughn.chronicle.views.CoverUrlBuilder
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 
 /**
@@ -22,6 +23,7 @@ import io.github.mattpvaughn.chronicle.views.bindImageRounded
  */
 class GroupedSearchAdapter(
   private val onBookClick: (Audiobook) -> Unit,
+  private val coverUrl: CoverUrlBuilder,
 ) : ListAdapter<SearchRow, RecyclerView.ViewHolder>(DiffCallback) {
   private var serverConnected: Boolean = false
 
@@ -57,7 +59,7 @@ class GroupedSearchAdapter(
   ) {
     when (val row = getItem(position)) {
       is SearchRow.Header -> (holder as HeaderViewHolder).bind(row)
-      is SearchRow.Book -> (holder as BookViewHolder).bind(row, onBookClick, serverConnected)
+      is SearchRow.Book -> (holder as BookViewHolder).bind(row, onBookClick, serverConnected, coverUrl)
     }
   }
 
@@ -81,6 +83,7 @@ class GroupedSearchAdapter(
       row: SearchRow.Book,
       onBookClick: (Audiobook) -> Unit,
       isConnected: Boolean,
+      coverUrl: CoverUrlBuilder,
     ) {
       val book = row.book
       binding.searchResultRoot.setOnClickListener { onBookClick(book) }
@@ -89,7 +92,7 @@ class GroupedSearchAdapter(
       // said while hiding the fact that matched; say what matched instead.
       binding.author.text = subtitleFor(row)
       binding.bookCoverImg.contentDescription = book.title
-      bindImageRounded(binding.bookCoverImg, book.thumb, isConnected)
+      bindImageRounded(binding.bookCoverImg, book.thumb, isConnected, coverUrl)
       binding.notPlayedDogEar.isVisible = book.viewCount == 0L && book.progress == 0L
     }
 

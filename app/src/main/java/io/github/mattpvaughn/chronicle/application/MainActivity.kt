@@ -98,6 +98,9 @@ class MainActivity : AppCompatActivity() {
   @Inject
   lateinit var mediaServiceConnection: MediaServiceConnection
 
+  @Inject
+  lateinit var accountAuthState: AccountAuthState
+
   var activityComponent: ActivityComponent? = null
 
   override fun onDestroy() {
@@ -181,6 +184,7 @@ class MainActivity : AppCompatActivity() {
         binding.currentlyPlayingThumb,
         thumb,
         plexConfig.isConnected.value == true,
+        plexConfig::toServerString,
       )
     }
     viewModel.isPlaying.observe(this) { playing ->
@@ -223,7 +227,7 @@ class MainActivity : AppCompatActivity() {
     // the server, library or downloads; this adds discovery, not a new recovery path.
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
-        Injector.get().accountAuthState().state.collect { state ->
+        accountAuthState.state.collect { state ->
           if (state == AccountAuthState.State.Revoked) {
             if (signedOutSnackbar?.isShown != true) {
               signedOutSnackbar =

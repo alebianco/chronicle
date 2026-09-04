@@ -340,7 +340,7 @@ class CurrentlyPlayingFragment :
 
       binding.bookTitle.setTextIfChanged(title)
       binding.detailsArtwork.contentDescription = title
-      bindImageRounded(binding.detailsArtwork, thumb, plexConfig.isConnected.value == true)
+      bindImageRounded(binding.detailsArtwork, thumb, plexConfig.isConnected.value == true, plexConfig::toServerString)
     }
 
     // The slider falls back to track values when there is no chapter. valueTo
@@ -435,6 +435,7 @@ class CurrentlyPlayingFragment :
         binding.detailsArtwork,
         viewModel.audiobook.value?.thumb,
         connected == true,
+        plexConfig::toServerString,
       )
     }
 

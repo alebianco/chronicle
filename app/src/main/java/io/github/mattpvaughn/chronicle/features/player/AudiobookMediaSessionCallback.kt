@@ -146,7 +146,7 @@ class AudiobookMediaSessionCallback
     }
 
     private fun skipToNext() {
-      currentPlayer.skipToNext(trackListStateManager, currentlyPlaying, progressUpdater)
+      currentPlayer.skipToNext(trackListStateManager, currentlyPlaying, progressUpdater, appContext)
     }
 
     private fun skipToPrevious() {

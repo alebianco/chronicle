@@ -77,6 +77,7 @@ class CollectionsFragment : Fragment() {
             openCollectionDetails(collection)
           }
         },
+        plexConfig::toServerString,
       ).apply {
         stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
       }
@@ -152,7 +153,7 @@ class CollectionsFragment : Fragment() {
         }
       adapter!!.viewStyle = style
     }
-    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) })
+    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
     binding.searchResultsList.adapter = searchAdapter
 
     // Was the `searchBookList`/`serverConnectedSearch` binding adapters on search_results_list.

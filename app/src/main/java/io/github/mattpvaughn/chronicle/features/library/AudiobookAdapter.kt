@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.model.isCompleted
 import io.github.mattpvaughn.chronicle.databinding.GridItemAudiobookBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookTextOnlyBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookWithDetailsBinding
+import io.github.mattpvaughn.chronicle.views.CoverUrlBuilder
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 
 class AudiobookAdapter(
@@ -23,6 +24,7 @@ class AudiobookAdapter(
   private val isVertical: Boolean,
   private val isSquare: Boolean,
   private val audiobookClick: LibraryFragment.AudiobookClick,
+  private val coverUrl: CoverUrlBuilder,
 ) : ListAdapter<Audiobook, RecyclerView.ViewHolder>(AudiobookDiffCallback()) {
   private val COVER_GRID = 1
   private val TEXT_ONLY = 2
@@ -81,13 +83,13 @@ class AudiobookAdapter(
   ) {
     when (holder) {
       is ViewHolder -> {
-        holder.bind(getItem(position), audiobookClick, serverConnected)
+        holder.bind(getItem(position), audiobookClick, serverConnected, coverUrl)
       }
       is TextOnlyViewHolder -> {
         holder.bind(getItem(position), audiobookClick)
       }
       is DetailsStyleViewHolder -> {
-        holder.bind(getItem(position), audiobookClick, serverConnected)
+        holder.bind(getItem(position), audiobookClick, serverConnected, coverUrl)
       }
       else -> throw IllegalStateException("Unknown view type")
     }
@@ -107,6 +109,7 @@ class AudiobookAdapter(
       audiobook: Audiobook,
       audiobookClick: LibraryFragment.AudiobookClick,
       serverConnected: Boolean,
+      coverUrl: CoverUrlBuilder,
     ) {
       // Was binding expressions in grid_item_audiobook.xml.
       setSquareAspectRatio(binding.gridItemRoot, isSquare)
@@ -123,7 +126,7 @@ class AudiobookAdapter(
       binding.title.text = audiobook.title
       binding.author.text = audiobook.author
       binding.bookCoverImg.contentDescription = audiobook.title
-      bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected)
+      bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected, coverUrl)
       bindProgressIndicators(binding.notPlayedDogEar, binding.bookProgress, audiobook)
     }
 
@@ -214,6 +217,7 @@ class DetailsStyleViewHolder(
     audiobook: Audiobook,
     audiobookClick: LibraryFragment.AudiobookClick,
     serverConnected: Boolean,
+    coverUrl: CoverUrlBuilder,
   ) {
     // Was binding expressions in list_item_audiobook_with_details.xml.
     setSquareAspectRatio(binding.detailsItemRoot, isSquare)
@@ -223,7 +227,7 @@ class DetailsStyleViewHolder(
     binding.author.text = audiobook.author
     binding.bookProgressString.text = formatProgress(audiobook)
     binding.bookCoverImg.contentDescription = audiobook.title
-    bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected)
+    bindImageRounded(binding.bookCoverImg, audiobook.thumb, serverConnected, coverUrl)
     bindProgressIndicators(binding.notPlayedDogEar, binding.bookProgress, audiobook)
   }
 

@@ -93,6 +93,7 @@ class CollectionDetailsFragment : Fragment() {
             openAudiobookDetails(audiobook)
           }
         },
+        plexConfig::toServerString,
       ).apply {
         stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
       }

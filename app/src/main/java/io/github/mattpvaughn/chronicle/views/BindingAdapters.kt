@@ -12,7 +12,16 @@ import coil3.request.crossfade
 import coil3.request.error
 import coil3.request.placeholder
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
+
+/**
+ * Builds the server-side URL for a cover, given the artwork's `src` path.
+ *
+ * Passed in rather than resolved here (cu-33): this function is called from a `RecyclerView`
+ * binder, so it used to reach `Injector.get().plexConfig()` **on every bind** — in a hot render
+ * path the whole of cu-110 was about. A function rather than the `PlexConfig` itself keeps the
+ * adapters that call it from knowing there is a Plex.
+ */
+typealias CoverUrlBuilder = (String) -> String
 
 /**
  * Loads a book cover into [imageView] via Plex's photo transcoder.
@@ -27,6 +36,7 @@ fun bindImageRounded(
   imageView: ImageView,
   src: String?,
   serverConnected: Boolean,
+  coverUrl: CoverUrlBuilder,
 ) {
   val activity = imageView.context as? Activity
   if (activity?.isDestroyed == true) {
@@ -53,10 +63,8 @@ fun bindImageRounded(
 
   val imageSize =
     imageView.resources.getDimension(R.dimen.currently_playing_artwork_max_size).toInt()
-  val config = Injector.get().plexConfig()
   val url: Uri =
-    config.toServerString("photo/:/transcode?width=$imageSize&height=$imageSize&url=$src")
-      .toUri()
+    coverUrl("photo/:/transcode?width=$imageSize&height=$imageSize&url=$src").toUri()
 
   imageView.load(url) {
     memoryCacheKey(url.query ?: url.toString())

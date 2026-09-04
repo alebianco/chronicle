@@ -13,6 +13,7 @@ import io.github.mattpvaughn.chronicle.databinding.ListItemCollectionTextOnlyBin
 import io.github.mattpvaughn.chronicle.databinding.ListItemCollectionWithDetailsBinding
 import io.github.mattpvaughn.chronicle.features.library.overrideWidth
 import io.github.mattpvaughn.chronicle.features.library.setSquareAspectRatio
+import io.github.mattpvaughn.chronicle.views.CoverUrlBuilder
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 
 /**
@@ -29,6 +30,7 @@ class CollectionsAdapter(
   private val isVertical: Boolean,
   private val isSquare: Boolean,
   private val collectionClick: CollectionsFragment.CollectionClick,
+  private val coverUrl: CoverUrlBuilder,
 ) : ListAdapter<Collection, RecyclerView.ViewHolder>(CollectionsDiffCallback()) {
   private val COVER_GRID = 1
   private val TEXT_ONLY = 2
@@ -85,13 +87,13 @@ class CollectionsAdapter(
   ) {
     when (holder) {
       is ViewHolder -> {
-        holder.bind(getItem(position), collectionClick, serverConnected)
+        holder.bind(getItem(position), collectionClick, serverConnected, coverUrl)
       }
       is TextOnlyViewHolder -> {
         holder.bind(getItem(position), collectionClick)
       }
       is DetailsStyleViewHolder -> {
-        holder.bind(getItem(position), collectionClick, serverConnected, isSquare)
+        holder.bind(getItem(position), collectionClick, serverConnected, isSquare, coverUrl)
       }
       else -> throw IllegalStateException("Unknown view type")
     }
@@ -111,6 +113,7 @@ class CollectionsAdapter(
       collection: Collection,
       collectionClick: CollectionsFragment.CollectionClick,
       serverConnected: Boolean,
+      coverUrl: CoverUrlBuilder,
     ) {
       // Was binding expressions in grid_item_collection.xml.
       setSquareAspectRatio(binding.gridItemRoot, isSquare)
@@ -126,7 +129,7 @@ class CollectionsAdapter(
       binding.title.text = collection.title
       binding.author.text = itemCountLabel(collection)
       binding.bookCoverImg.contentDescription = collection.title
-      bindImageRounded(binding.bookCoverImg, collection.thumb, serverConnected)
+      bindImageRounded(binding.bookCoverImg, collection.thumb, serverConnected, coverUrl)
     }
 
     companion object {
@@ -174,6 +177,7 @@ class DetailsStyleViewHolder(
     collectionClick: CollectionsFragment.CollectionClick,
     serverConnected: Boolean,
     isSquare: Boolean,
+    coverUrl: CoverUrlBuilder,
   ) {
     // Was binding expressions in list_item_collection_with_details.xml.
     setSquareAspectRatio(binding.detailsRoot, isSquare)
@@ -181,7 +185,7 @@ class DetailsStyleViewHolder(
     binding.title.text = collection.title
     binding.author.text = itemCountLabel(collection)
     binding.bookCoverImg.contentDescription = collection.title
-    bindImageRounded(binding.bookCoverImg, collection.thumb, serverConnected)
+    bindImageRounded(binding.bookCoverImg, collection.thumb, serverConnected, coverUrl)
   }
 
   companion object {

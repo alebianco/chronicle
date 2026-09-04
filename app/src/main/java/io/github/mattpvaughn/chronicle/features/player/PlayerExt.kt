@@ -1,10 +1,10 @@
 package io.github.mattpvaughn.chronicle.features.player
 
+import android.content.Context
 import android.view.Gravity
 import android.widget.Toast
 import androidx.media3.common.Player
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.TrackIndex
@@ -65,6 +65,7 @@ fun Player.skipToNext(
   trackListStateManager: TrackListStateManager,
   currentlyPlaying: CurrentlyPlaying,
   progressUpdater: ProgressUpdater,
+  appContext: Context,
 ) {
   Timber.i("Player.skipToNext called")
   val currentChapterIndex =
@@ -90,7 +91,7 @@ fun Player.skipToNext(
   } else {
     val toast =
       Toast.makeText(
-        Injector.get().applicationContext(),
+        appContext,
         R.string.skip_forwards_reached_last_chapter,
         Toast.LENGTH_LONG,
       )

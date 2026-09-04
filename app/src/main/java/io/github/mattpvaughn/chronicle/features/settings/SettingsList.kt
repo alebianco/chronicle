@@ -12,7 +12,6 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.PreferenceItemClickableBinding
 import io.github.mattpvaughn.chronicle.databinding.PreferenceItemSwitchBinding
@@ -31,18 +30,32 @@ class SettingsList : FrameLayout {
     defStyle,
   )
 
-  private val prefsRepo = Injector.get().prefsRepo()
-  private val prefAdapter = PreferencesListAdapter(prefsRepo)
+  /**
+   * The adapter, created on the first [setPreferences] call.
+   *
+   * A `View` is inflated by the framework, so it cannot take constructor dependencies — this used
+   * to reach `Injector.get().prefsRepo()` for that reason, which made the whole settings screen
+   * unreachable from a unit test (cu-33). The owning fragment already has `prefsRepo` injected and
+   * hands it over with the data, so nothing needs to fetch anything.
+   */
+  private var prefAdapter: PreferencesListAdapter? = null
 
   private var list: RecyclerView =
     RecyclerView(context).apply {
-      adapter = prefAdapter
       layoutManager = LinearLayoutManager(context)
       layoutParams = LayoutParams(MATCH_PARENT, MATCH_PARENT)
     }
 
-  fun setPreferences(prefs: List<PreferenceModel>) {
-    prefAdapter.submitList(prefs)
+  fun setPreferences(
+    prefs: List<PreferenceModel>,
+    prefsRepo: PrefsRepo,
+  ) {
+    val adapter =
+      prefAdapter ?: PreferencesListAdapter(prefsRepo).also {
+        prefAdapter = it
+        list.adapter = it
+      }
+    adapter.submitList(prefs)
   }
 
   init {
