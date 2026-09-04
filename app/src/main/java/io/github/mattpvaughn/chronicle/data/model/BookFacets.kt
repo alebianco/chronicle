@@ -35,6 +35,16 @@ data class FacetList(
   /** Whether anything is missing, i.e. whether the UI must qualify what it is showing. */
   val isPartial: Boolean
     get() = unknownCount > 0
+
+  companion object {
+    /**
+     * The "nothing grouped yet" value, for a `StateFlow`'s required initial emission (cu-52).
+     *
+     * `unknownCount = 0` so [isPartial] is false: an empty list is not a *partial* one, and a
+     * screen with no books yet must not claim metadata is missing.
+     */
+    val EMPTY = FacetList(kind = FacetKind.Author, facets = emptyList(), unknownCount = 0)
+  }
 }
 
 /**

@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import androidx.lifecycle.LiveData
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -12,6 +11,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asTrackList
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -41,15 +41,15 @@ interface ITrackRepository {
   ): Int
 
   /** Return all tracks in the [TrackDatabase]  */
-  fun getAllTracks(): LiveData<List<MediaItemTrack>>
+  fun getAllTracks(): Flow<List<MediaItemTrack>>
 
   suspend fun getAllTracksAsync(): List<MediaItemTrack>
 
   /**
-   * Return a [LiveData<List<MediaItemTrack>>] containing all [MediaItemTrack]s where
+   * Return a [Flow<List<MediaItemTrack>>] containing all [MediaItemTrack]s where
    * [MediaItemTrack.parentKey] == [bookId]
    */
-  fun getTracksForAudiobook(bookId: String): LiveData<List<MediaItemTrack>>
+  fun getTracksForAudiobook(bookId: String): Flow<List<MediaItemTrack>>
 
   suspend fun getTracksForAudiobookAsync(bookId: String): List<MediaItemTrack>
 
@@ -322,7 +322,7 @@ class TrackRepository
       }
     }
 
-    override fun getAllTracks(): LiveData<List<MediaItemTrack>> {
+    override fun getAllTracks(): Flow<List<MediaItemTrack>> {
       return trackDao.getAllTracks()
     }
 
@@ -332,7 +332,7 @@ class TrackRepository
       }
     }
 
-    override fun getTracksForAudiobook(bookId: String): LiveData<List<MediaItemTrack>> {
+    override fun getTracksForAudiobook(bookId: String): Flow<List<MediaItemTrack>> {
       return trackDao.getTracksForAudiobook(bookId, prefsRepo.offlineMode)
     }
 

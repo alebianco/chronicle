@@ -1,16 +1,16 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import androidx.lifecycle.LiveData
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** The user's bookmarks (cu-22). */
 interface IBookmarkRepository {
-  fun getBookmarksForBook(bookId: String): LiveData<List<Bookmark>>
+  fun getBookmarksForBook(bookId: String): Flow<List<Bookmark>>
 
   suspend fun getBookmarksForBookAsync(bookId: String): List<Bookmark>
 
@@ -61,7 +61,7 @@ class BookmarkRepository
     private val bookmarkDao: BookmarkDao,
     private val dispatchers: DispatcherProvider,
   ) : IBookmarkRepository {
-    override fun getBookmarksForBook(bookId: String): LiveData<List<Bookmark>> = bookmarkDao.getBookmarksForBook(bookId)
+    override fun getBookmarksForBook(bookId: String): Flow<List<Bookmark>> = bookmarkDao.getBookmarksForBook(bookId)
 
     override suspend fun getBookmarksForBookAsync(bookId: String): List<Bookmark> =
       withContext(dispatchers.io) { bookmarkDao.getBookmarksForBookAsync(bookId) }

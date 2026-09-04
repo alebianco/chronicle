@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import androidx.lifecycle.LiveData
 import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.IngestionPlan
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
@@ -17,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.toChapter
 import io.github.mattpvaughn.chronicle.data.sources.plex.withSeededTags
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -25,7 +25,7 @@ import javax.inject.Singleton
 /** A repository abstracting all [Audiobook]s from all [MediaSource]s */
 interface IBookRepository {
   /** Return all [Audiobook]s in the DB, sorted by [Audiobook.titleSort] */
-  fun getAllBooks(): LiveData<List<Audiobook>>
+  fun getAllBooks(): Flow<List<Audiobook>>
 
   suspend fun getAllBooksAsync(): List<Audiobook>
 
@@ -70,10 +70,10 @@ interface IBookRepository {
   suspend fun updateTrackData(updates: List<BookTrackData>)
 
   /**
-   * Returns a [LiveData<Audiobook>] corresponding to an [Audiobook] with the [Audiobook.id]
+   * Returns a [Flow<Audiobook>] corresponding to an [Audiobook] with the [Audiobook.id]
    * equal to [id]
    */
-  fun getAudiobook(id: String): LiveData<Audiobook?>
+  fun getAudiobook(id: String): Flow<Audiobook?>
 
   suspend fun getAudiobookAsync(bookId: String): Audiobook?
 
@@ -81,7 +81,7 @@ interface IBookRepository {
    * Returns the [getBookCount] most recently added books in the local database, ordered by most
    * recently added to added the longest time ago
    */
-  fun getRecentlyAdded(): LiveData<List<Audiobook>>
+  fun getRecentlyAdded(): Flow<List<Audiobook>>
 
   suspend fun getRecentlyAddedAsync(): List<Audiobook>
 
@@ -89,7 +89,7 @@ interface IBookRepository {
    * Returns the [getBookCount] most recently added listened to books in the local database,
    * ordered from most recently listened to last listened book
    */
-  fun getRecentlyListened(): LiveData<List<Audiobook>>
+  fun getRecentlyListened(): Flow<List<Audiobook>>
 
   /**
    * Returns the [getBookCount] most recently added listened to books in the local database,
@@ -108,10 +108,10 @@ interface IBookRepository {
   )
 
   /**
-   * Return a [LiveData<List<Audiobook>>] of all audiobooks containing [query] within their
+   * Return a [Flow<List<Audiobook>>] of all audiobooks containing [query] within their
    * [Audiobook.author] or [Audiobook.title] fields
    */
-  fun search(query: String): LiveData<List<Audiobook>>
+  fun search(query: String): Flow<List<Audiobook>>
 
   /**
    * Return a [List<Audiobook>] of all audiobooks containing [query] within their
@@ -138,10 +138,10 @@ interface IBookRepository {
   suspend fun getMostRecentlyPlayed(): Audiobook
 
   /**
-   * Returns a [LiveData<List<Audiobook>>] with all [Audiobook]s in the local DB where
+   * Returns a [Flow<List<Audiobook>>] with all [Audiobook]s in the local DB where
    * [Audiobook.isCached] == true.
    */
-  fun getCachedAudiobooks(): LiveData<List<Audiobook>>
+  fun getCachedAudiobooks(): Flow<List<Audiobook>>
 
   /**
    * Returns a [List<Audiobook>] with all [Audiobook]s in the local DB where [Audiobook.isCached] == true.
@@ -216,7 +216,7 @@ interface IBookRepository {
    * book and its tracks. Emits an empty list for a book the backfill has not reached, so callers
    * still resolve through `resolveChapters`.
    */
-  fun getChaptersForBookLive(bookId: String): LiveData<List<Chapter>>
+  fun getChaptersForBookLive(bookId: String): Flow<List<Chapter>>
 }
 
 @Singleton
@@ -238,7 +238,7 @@ class BookRepository
      */
     private val limitReturnCount = 25
 
-    override fun getAllBooks(): LiveData<List<Audiobook>> {
+    override fun getAllBooks(): Flow<List<Audiobook>> {
       return bookDao.getAllRows(prefsRepo.offlineMode)
     }
 
@@ -337,7 +337,7 @@ class BookRepository
      * A book that fails is logged and skipped, leaving it exactly as it is today — with a column
      * and no rows — rather than aborting the pass for every book after it.
      */
-    override fun getChaptersForBookLive(bookId: String): LiveData<List<Chapter>> = chapterDao.getChaptersForBookLive(bookId)
+    override fun getChaptersForBookLive(bookId: String): Flow<List<Chapter>> = chapterDao.getChaptersForBookLive(bookId)
 
     override suspend fun getChaptersForBook(bookId: String): List<Chapter> =
       withContext(dispatchers.io) { chapterDao.getChaptersForBook(bookId) }
@@ -479,11 +479,11 @@ class BookRepository
       }
     }
 
-    override fun getAudiobook(id: String): LiveData<Audiobook?> {
+    override fun getAudiobook(id: String): Flow<Audiobook?> {
       return bookDao.getAudiobook(id, prefsRepo.offlineMode)
     }
 
-    override fun getRecentlyAdded(): LiveData<List<Audiobook>> {
+    override fun getRecentlyAdded(): Flow<List<Audiobook>> {
       return bookDao.getRecentlyAdded(limitReturnCount, prefsRepo.offlineMode)
     }
 
@@ -493,7 +493,7 @@ class BookRepository
       }
     }
 
-    override fun getRecentlyListened(): LiveData<List<Audiobook>> {
+    override fun getRecentlyListened(): Flow<List<Audiobook>> {
       return bookDao.getRecentlyListened(limitReturnCount, prefsRepo.offlineMode)
     }
 
@@ -563,7 +563,7 @@ class BookRepository
       }
     }
 
-    override fun search(query: String): LiveData<List<Audiobook>> {
+    override fun search(query: String): Flow<List<Audiobook>> {
       return bookDao.search("%$query%", prefsRepo.offlineMode)
     }
 
@@ -631,7 +631,7 @@ class BookRepository
       }
     }
 
-    override fun getCachedAudiobooks(): LiveData<List<Audiobook>> {
+    override fun getCachedAudiobooks(): Flow<List<Audiobook>> {
       return bookDao.getCachedAudiobooks()
     }
 

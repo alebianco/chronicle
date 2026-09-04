@@ -5,8 +5,12 @@ import androidx.lifecycle.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.OAuthResponse
 import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import io.github.mattpvaughn.chronicle.util.postEvent
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -40,9 +44,9 @@ class LoginViewModel(
   private var hasLaunched = false
 
   val isLoading =
-    plexLoginRepo.loginEvent.map { loginState ->
-      return@map loginState.peekContent() == IPlexLoginRepo.LoginState.AWAITING_LOGIN_RESULTS
-    }
+    plexLoginRepo.loginEvent
+      .map { it.peekContent() == IPlexLoginRepo.LoginState.AWAITING_LOGIN_RESULTS }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
   fun loginWithOAuth() {
     viewModelScope.launch(exceptionHandler) {

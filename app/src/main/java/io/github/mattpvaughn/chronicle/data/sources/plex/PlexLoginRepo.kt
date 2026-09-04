@@ -1,8 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.net.Uri
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState
@@ -13,7 +11,9 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.OAuthResponse
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.UsersResponse
 import io.github.mattpvaughn.chronicle.util.Event
-import io.github.mattpvaughn.chronicle.util.postEvent
+import io.github.mattpvaughn.chronicle.util.setEvent
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -61,7 +61,7 @@ interface IPlexLoginRepo {
    */
   fun beginReauthentication()
 
-  val loginEvent: LiveData<Event<LoginState>>
+  val loginEvent: StateFlow<Event<LoginState>>
 
   enum class LoginState {
     NOT_LOGGED_IN,
@@ -94,19 +94,29 @@ class PlexLoginRepo
     private val plexConfig: PlexConfig,
     private val accountAuthState: AccountAuthState,
   ) : IPlexLoginRepo {
-    private var _loginState = MutableLiveData<Event<LoginState>>()
-    override val loginEvent: LiveData<Event<LoginState>>
+    /**
+     * Seeded [NOT_LOGGED_IN] rather than empty, and `init` overwrites it synchronously below.
+     *
+     * As a `MutableLiveData` this started with **no** value and every write went through
+     * `postEvent`, so `loginEvent.value` was null for anything reading in the same main-loop pass
+     * as construction — `MediaPlayerService` and `MainActivity` both do `.value?.let`, which
+     * silently did nothing in that window. A `StateFlow` cannot be empty and its assignment lands
+     * immediately, so the window does not exist (cu-52). The seed is the safe direction: it is
+     * what `determineLoginState` itself returns for an absent token.
+     */
+    private val _loginState = MutableStateFlow(Event(NOT_LOGGED_IN))
+    override val loginEvent: StateFlow<Event<LoginState>>
       get() = _loginState
 
     override suspend fun postOAuthPin(): OAuthResponse? {
       return try {
-        _loginState.postEvent(AWAITING_LOGIN_RESULTS)
+        _loginState.setEvent(AWAITING_LOGIN_RESULTS)
         val pin = plexLoginService.postAuthPin()
         plexPrefsRepo.oAuthTempId = pin.id
         pin
       } catch (e: Throwable) {
         Timber.e(e, "Failed to log in")
-        _loginState.postEvent(FAILED_TO_LOG_IN)
+        _loginState.setEvent(FAILED_TO_LOG_IN)
         null
       }
     }
@@ -114,12 +124,12 @@ class PlexLoginRepo
     override fun beginReauthentication() {
       plexPrefsRepo.clearCredentials()
       accountAuthState.onAuthenticated()
-      _loginState.postEvent(NOT_LOGGED_IN)
+      _loginState.setEvent(NOT_LOGGED_IN)
     }
 
     override fun chooseUser(responseUser: PlexUser) {
       plexPrefsRepo.user = responseUser
-      _loginState.postEvent(LOGGED_IN_NO_SERVER_CHOSEN)
+      _loginState.setEvent(LOGGED_IN_NO_SERVER_CHOSEN)
     }
 
     override fun makeOAuthUrl(
@@ -162,7 +172,7 @@ class PlexLoginRepo
             chooseUser(userResponse.users[0])
           } else {
             // now we proceed to choose user
-            _loginState.postEvent(LOGGED_IN_NO_USER_CHOSEN)
+            _loginState.setEvent(LOGGED_IN_NO_USER_CHOSEN)
           }
         } catch (t: Throwable) {
           Timber.e(t, "Failed to load users, cannot proceed to profile")
@@ -174,7 +184,7 @@ class PlexLoginRepo
       Timber.i("User chose server: $serverModel")
       plexConfig.setPotentialConnections(serverModel.connections)
       plexPrefsRepo.server = serverModel
-      _loginState.postEvent(LOGGED_IN_NO_LIBRARY_CHOSEN)
+      _loginState.setEvent(LOGGED_IN_NO_LIBRARY_CHOSEN)
     }
 
     /**
@@ -198,7 +208,7 @@ class PlexLoginRepo
       val replacedDifferentLibrary = previous != null && previous.id != plexLibrary.id
       Timber.i("User chose library: $plexLibrary (replaces different library: $replacedDifferentLibrary)")
       plexPrefsRepo.library = plexLibrary
-      _loginState.postEvent(LOGGED_IN_FULLY)
+      _loginState.setEvent(LOGGED_IN_FULLY)
       return replacedDifferentLibrary
     }
 
@@ -220,7 +230,7 @@ class PlexLoginRepo
                     |library = ${library?.name}
         """.trimMargin(),
       )
-      _loginState.postEvent(
+      _loginState.setEvent(
         when {
           token.isEmpty() -> NOT_LOGGED_IN
           // A stored token is not a valid one. Plex tokens are invalidated by an event, never on a

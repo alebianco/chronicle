@@ -1,11 +1,11 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.support.v4.media.MediaMetadataCompat
-import androidx.lifecycle.LiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.toAlbumMediaMetadata
 import io.github.mattpvaughn.chronicle.features.player.AbstractMediaSource
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 class PlexMediaRepository
@@ -13,10 +13,16 @@ class PlexMediaRepository
   constructor(private val bookRepository: IBookRepository) :
   AbstractMediaSource() {
     private val bookIndex = 0
-    private lateinit var books: LiveData<List<Audiobook>>
+
+    /**
+     * A snapshot, not a stream: [load] is a `suspend fun` called once, and [iterator] reads the
+     * list synchronously. Holding the `Flow` instead would need a collector running for the source's
+     * whole life to keep a value available, which is more machinery than a one-shot read deserves.
+     */
+    private var books: List<Audiobook> = emptyList()
 
     override suspend fun load() {
-      books = bookRepository.getAllBooks()
+      books = bookRepository.getAllBooks().first()
     }
 
     override fun whenReady(performAction: (Boolean) -> Unit): Boolean {
@@ -28,12 +34,11 @@ class PlexMediaRepository
     override fun iterator(): Iterator<MediaMetadataCompat> {
       return object : Iterator<MediaMetadataCompat> {
         override fun hasNext(): Boolean {
-          return bookIndex < (books.value?.size ?: 0) - 1
+          return bookIndex < books.size - 1
         }
 
         override fun next(): MediaMetadataCompat {
-          requireNotNull(books.value)
-          return books.value!![bookIndex].toAlbumMediaMetadata()
+          return books[bookIndex].toAlbumMediaMetadata()
         }
       }
     }

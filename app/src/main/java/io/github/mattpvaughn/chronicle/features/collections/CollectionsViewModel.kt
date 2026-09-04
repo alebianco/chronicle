@@ -15,9 +15,16 @@ import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.features.search.SearchController
 import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.util.*
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import io.github.mattpvaughn.chronicle.util.booleanFlow
+import io.github.mattpvaughn.chronicle.util.combineDistinctAsync
+import io.github.mattpvaughn.chronicle.util.stringFlow
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -29,6 +36,7 @@ class CollectionsViewModel(
   sharedPreferences: SharedPreferences,
   private val bookRepository: BookRepository,
   private val exceptionHandler: CoroutineExceptionHandler,
+  private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -40,6 +48,7 @@ class CollectionsViewModel(
       private val sharedPreferences: SharedPreferences,
       private val bookRepository: BookRepository,
       private val exceptionHandler: CoroutineExceptionHandler,
+      private val dispatchers: DispatcherProvider,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CollectionsViewModel::class.java)) {
@@ -50,6 +59,7 @@ class CollectionsViewModel(
             sharedPreferences,
             bookRepository,
             exceptionHandler,
+            dispatchers,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -65,101 +75,85 @@ class CollectionsViewModel(
    *  event carrying a string resource rather than a `Toast` (which would throw there). */
   val syncError = librarySyncRepository.errorMessage
 
-  private var _isSearchActive = MutableLiveData<Boolean>()
-  val isSearchActive: LiveData<Boolean>
+  private var _isSearchActive = MutableStateFlow(false)
+  val isSearchActive: StateFlow<Boolean>
     get() = _isSearchActive
 
   val viewStyle =
-    StringPreferenceLiveData(
+    sharedPreferences.stringFlow(
       KEY_LIBRARY_VIEW_STYLE,
       prefsRepo.libraryBookViewStyle,
-      sharedPreferences,
     )
 
   val isSortDescending =
-    BooleanPreferenceLiveData(
+    sharedPreferences.booleanFlow(
       KEY_IS_LIBRARY_SORT_DESCENDING,
       true,
-      sharedPreferences,
     )
 
   val arePlayedAudiobooksHidden =
-    BooleanPreferenceLiveData(
+    sharedPreferences.booleanFlow(
       KEY_HIDE_PLAYED_AUDIOBOOKS,
       false,
-      sharedPreferences,
     )
 
   private val sortKey =
-    StringPreferenceLiveData(
+    sharedPreferences.stringFlow(
       KEY_BOOK_SORT_BY,
       SORT_KEY_TITLE,
-      sharedPreferences,
     )
 
-  private var prevCollections = emptyList<Collection>()
-
   private val allCollections = collectionsRepository.getAllCollections()
-  val collections =
-    QuadLiveDataAsync(
-      viewModelScope,
+
+  /**
+   * The sorted collections.
+   *
+   * `combineDistinctAsync` rather than the old `QuadLiveDataAsync`: the sort is O(n log n) and ran
+   * on every Room re-emission, which is once a second during playback (cu-110). The dedup that
+   * `prevCollections` used to do by hand — comparing id lists and returning the previous instance —
+   * is now `distinctUntilChanged` inside the combinator, so the mutable field is gone with it.
+   *
+   * The nullable handling also disappears: `Flow.combine` waits for every source to emit, where the
+   * LiveData version published immediately with nulls and defaulted them inline.
+   */
+  val collections: Flow<List<Collection>> =
+    combineDistinctAsync(
       allCollections,
       isSortDescending,
       sortKey,
       arePlayedAudiobooksHidden,
-    ) { _collections, _isDescending, _sortKey, _hidePlayed ->
-      if (_collections.isNullOrEmpty()) {
-        return@QuadLiveDataAsync emptyList<Collection>()
+      dispatchers.io,
+    ) { collections, isDescending, _, _ ->
+      if (collections.isEmpty()) {
+        emptyList()
+      } else {
+        // TODO: Currently only support sort by title!
+        val descMultiplier = if (isDescending) 1 else -1
+        collections.sortedWith { coll1, coll2 ->
+          descMultiplier * coll1.title.compareTo(coll2.title)
+        }
       }
-
-      // TODO: Currently only support sort by title!
-      val key = SORT_KEY_TITLE
-
-      // Use defaults if provided null values
-      val desc = _isDescending ?: true
-      val hidePlayed = _hidePlayed ?: false
-
-      val results =
-        _collections.sortedWith(
-          Comparator { coll1, coll2 ->
-            val descMultiplier = if (desc) 1 else -1
-            return@Comparator descMultiplier *
-              when (key) {
-                SORT_KEY_TITLE -> coll1.title.compareTo(coll2.title)
-                else -> throw NoWhenBranchMatchedException("Unknown sort key: $key")
-              }
-          },
-        )
-
-      // If nothing has changed, return prevBooks
-      if (prevCollections.map { it.id } == results.map { it.id }) {
-        return@QuadLiveDataAsync prevCollections
-      }
-
-      prevCollections = results
-
-      return@QuadLiveDataAsync results
     }
 
-  private var _messageForUser = MutableLiveData<Event<String>>()
-  val messageForUser: LiveData<Event<String>>
+  private var _messageForUser = MutableStateFlow<Event<String>?>(null)
+  val messageForUser: StateFlow<Event<String>?>
     get() = _messageForUser
 
   /** Typo-tolerant grouped search, shared with the library and home screens (cu-25). */
   private val searchController = SearchController(bookRepository, viewModelScope)
 
-  val searchRows: LiveData<List<SearchRow>>
+  val searchRows: StateFlow<List<SearchRow>>
     get() = searchController.rows
 
-  val isQueryEmpty: LiveData<Boolean>
+  val isQueryEmpty: StateFlow<Boolean>
     get() = searchController.isQueryEmpty
 
-  private var _bottomChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
-  val bottomChooserState: LiveData<BottomSheetChooser.BottomChooserState>
+  private var _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+  val bottomChooserState: StateFlow<BottomSheetChooser.BottomChooserState>
     get() = _bottomChooserState
 
   fun setSearchActive(isSearchActive: Boolean) {
-    _isSearchActive.postValue(isSearchActive)
+    _isSearchActive.value = isSearchActive
     searchController.setSearchActive(isSearchActive)
   }
 

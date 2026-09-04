@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.util
 import androidx.annotation.MainThread
 import androidx.lifecycle.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
 
 inline fun <T> LiveData<Event<T>>.observeEvent(
   owner: LifecycleOwner,
@@ -13,6 +14,16 @@ inline fun <T> LiveData<Event<T>>.observeEvent(
 
 fun <T> MutableLiveData<Event<T>>.postEvent(value: T) {
   postValue(Event(value))
+}
+
+/**
+ * The [MutableStateFlow] counterpart of [postEvent].
+ *
+ * Assigns rather than posts, which is the point: a `StateFlow` write lands immediately, so a reader
+ * in the same main-loop pass sees it (cu-52).
+ */
+fun <T> MutableStateFlow<Event<T>>.setEvent(value: T) {
+  this.value = Event(value)
 }
 
 /**

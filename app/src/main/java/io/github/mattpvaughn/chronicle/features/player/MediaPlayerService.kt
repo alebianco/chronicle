@@ -19,7 +19,6 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.view.KeyEvent
 import android.view.KeyEvent.KEYCODE_MEDIA_STOP
 import androidx.core.content.IntentCompat
-import androidx.lifecycle.Observer
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media3.common.AudioAttributes
@@ -290,7 +289,28 @@ class MediaPlayerService :
     observeBookSpeedOverride()
     progressUpdater.startRegularProgressUpdates()
 
-    plexConfig.connectionState.observeForever(serverChangedListener)
+    observeConnectionState()
+  }
+
+  /**
+   * Re-prepares playback when the server connection changes (a LAN/WAN/relay switch).
+   *
+   * Collected on [serviceScope] rather than observed forever, so it ends with the service's job —
+   * the explicit `removeObserver` in `onDestroy` is what `serviceJob.cancel()` now does implicitly.
+   * Note [PlexConfig.connectionState] is a `StateFlow`, so an unchanged state no longer re-fires
+   * this the way a repeated `LiveData` post did; re-preparing for a state that did not move was
+   * wasted work.
+   */
+  private fun observeConnectionState() {
+    serviceScope.launch(exceptionHandler) {
+      plexConfig.connectionState.collect {
+        if (mediaController.playbackState.isPrepared) {
+          // Only can change server when playback is prepared because otherwise we would be
+          // attempting to load data on a null/empty tracklist
+          onChangeConnection()
+        }
+      }
+    }
   }
 
   /**
@@ -392,15 +412,6 @@ class MediaPlayerService :
             )
           }
         }
-      }
-    }
-
-  private val serverChangedListener =
-    Observer<PlexConfig.ConnectionState> {
-      if (mediaController.playbackState.isPrepared) {
-        // Only can change server when playback is prepared because otherwise we would be
-        // attempting to load data on a null/empty tracklist
-        onChangeConnection()
       }
     }
 
@@ -572,7 +583,6 @@ class MediaPlayerService :
     progressUpdater.cancel()
     serviceJob.cancel()
 
-    plexConfig.connectionState.removeObserver(serverChangedListener)
     prefsRepo.unregisterPrefsListener(prefsListener)
     localBroadcastManager.unregisterReceiver(sleepTimerBroadcastReceiver)
     sleepTimer.cancel()

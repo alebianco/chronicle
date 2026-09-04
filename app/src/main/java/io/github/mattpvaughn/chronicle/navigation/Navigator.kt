@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.navigation
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.FragmentManager
-import androidx.lifecycle.Observer
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
@@ -25,6 +24,7 @@ import io.github.mattpvaughn.chronicle.features.login.ChooseUserFragment
 import io.github.mattpvaughn.chronicle.features.login.LoginFragment
 import io.github.mattpvaughn.chronicle.features.settings.SettingsFragment
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -46,13 +46,12 @@ class Navigator
     activity: AppCompatActivity,
   ) {
     init {
-      // never remove observer, but this is a singleton so it's okay
-      plexLoginRepo.loginEvent.observe(
-        activity,
-        Observer { event ->
-          if (event.hasBeenHandled) {
-            return@Observer
-          }
+      // Collected only while the activity is STARTED, so navigation cannot be attempted against a
+      // stopped FragmentManager. As an `observe` this was documented "never remove observer, but
+      // this is a singleton so it's okay" — it did detach with the activity, but it also ran in
+      // CREATED, where a `commit()` can throw.
+      activity.collectWhileStarted(plexLoginRepo.loginEvent) { event ->
+        if (!event.hasBeenHandled) {
           Timber.i("Login event changed to ${event.peekContent()}")
           when (event.getContentIfNotHandled()) {
             LOGGED_IN_NO_USER_CHOSEN -> showUserChooser()
@@ -66,8 +65,8 @@ class Navigator
             }
             else -> throw NoWhenBranchMatchedException("Unknown login event: $event")
           }
-        },
-      )
+        }
+      }
     }
 
     fun showLogin() {

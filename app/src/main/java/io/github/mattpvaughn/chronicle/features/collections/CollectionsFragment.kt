@@ -29,6 +29,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionsBinding
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,7 +85,7 @@ class CollectionsFragment : Fragment() {
 
     binding.collectionsGrid.adapter = adapter
 
-    viewModel.collections.observe(viewLifecycleOwner) { collections ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.collections) { collections ->
       // Was three visibility binding expressions in fragment_collections.xml.
       val isEmpty = collections.isEmpty()
       binding.offlineModeContainer.isVisible = isEmpty
@@ -93,14 +94,14 @@ class CollectionsFragment : Fragment() {
 
       // Adapter is always non-null between view creation and view destruction
       if (adapter == null) {
-        return@observe
+        return@collectWhileStarted
       }
 
       // If there are no previous books, submit normally
       if (adapter!!.currentList.isEmpty()) {
         Timber.i("Updating book list: no previous books")
         adapter!!.submitList(collections)
-        return@observe
+        return@collectWhileStarted
       }
 
       // Sometimes [books] will be the same as [adapter.currentList] so don't do any
@@ -137,11 +138,11 @@ class CollectionsFragment : Fragment() {
       }
     }
 
-    plexConfig.isConnected.observe(viewLifecycleOwner) { isConnected ->
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { isConnected ->
       adapter?.setServerConnected(isConnected)
     }
 
-    viewModel.viewStyle.observe(viewLifecycleOwner) { style ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
       Timber.i("View style is: $style")
       val isGrid =
         viewStyleIsGrid(style)
@@ -159,17 +160,17 @@ class CollectionsFragment : Fragment() {
     // Was the `searchBookList`/`serverConnectedSearch` binding adapters on search_results_list.
     // These must stay below the adapter assignment above, since observe() delivers an
     // already-set value synchronously.
-    viewModel.searchRows.observe(viewLifecycleOwner) { rows ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { rows ->
       searchAdapter.submitList(rows)
       updateSearchVisibility(binding)
     }
 
-    plexConfig.isConnected.observe(viewLifecycleOwner) { isConnected ->
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { isConnected ->
       searchAdapter.setServerConnected(isConnected)
     }
 
-    viewModel.isSearchActive.observe(viewLifecycleOwner) { updateSearchVisibility(binding) }
-    viewModel.isQueryEmpty.observe(viewLifecycleOwner) { updateSearchVisibility(binding) }
+    viewLifecycleOwner.collectWhileStarted(viewModel.isSearchActive) { updateSearchVisibility(binding) }
+    viewLifecycleOwner.collectWhileStarted(viewModel.isQueryEmpty) { updateSearchVisibility(binding) }
 
     binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
 
@@ -177,20 +178,22 @@ class CollectionsFragment : Fragment() {
       viewModel.refreshData()
     }
 
-    viewModel.isRefreshing.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.isRefreshing) {
       binding.swipeToRefresh.isRefreshing = it
     }
 
-    viewModel.messageForUser.observe(viewLifecycleOwner) {
-      if (!it.hasBeenHandled) {
-        Toast.makeText(context, it.getContentIfNotHandled(), LENGTH_SHORT).show()
+    // A `StateFlow` must hold a value, so a one-shot event starts null and stays null until one
+    // fires — unlike `LiveData`, which simply never emitted (cu-52).
+    viewLifecycleOwner.collectWhileStarted(viewModel.messageForUser) { event ->
+      if (event != null && !event.hasBeenHandled) {
+        Toast.makeText(context, event.getContentIfNotHandled(), LENGTH_SHORT).show()
       }
     }
 
     // A refresh failure. It arrives as a string resource because it is raised on an IO
     // dispatcher, where `Toast.show()` throws; the toast belongs here, on the main thread.
-    viewModel.syncError.observe(viewLifecycleOwner) {
-      it.getContentIfNotHandled()?.let { messageRes ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.syncError) { event ->
+      event?.getContentIfNotHandled()?.let { messageRes ->
         Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
       }
     }

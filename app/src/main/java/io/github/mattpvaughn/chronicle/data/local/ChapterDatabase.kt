@@ -1,11 +1,11 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.Context
-import androidx.lifecycle.LiveData
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.Chapter
+import kotlinx.coroutines.flow.Flow
 
 private const val CHAPTER_DATABASE_NAME = "chapter_db"
 
@@ -39,7 +39,7 @@ abstract class ChapterDatabase : RoomDatabase() {
 @Dao
 interface ChapterDao {
   @Query("SELECT * FROM Chapter ORDER BY discNumber, `index`")
-  fun getAllRows(): LiveData<List<Chapter>>
+  fun getAllRows(): Flow<List<Chapter>>
 
   @Query("SELECT * FROM Chapter")
   fun getChapters(): List<Chapter>
@@ -55,7 +55,7 @@ interface ChapterDao {
   suspend fun getChaptersForBook(bookId: String): List<Chapter>
 
   @Query("SELECT * FROM Chapter WHERE bookId = :bookId ORDER BY discNumber, `index`")
-  fun getChaptersForBookLive(bookId: String): LiveData<List<Chapter>>
+  fun getChaptersForBookLive(bookId: String): Flow<List<Chapter>>
 
   /**
    * The number of books that have any chapter rows.

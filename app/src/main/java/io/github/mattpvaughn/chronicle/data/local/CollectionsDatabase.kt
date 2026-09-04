@@ -1,11 +1,11 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.Context
-import androidx.lifecycle.LiveData
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.Collection
+import kotlinx.coroutines.flow.Flow
 
 private const val COLLECTIONS_DATABASE_NAME = "collections_db"
 
@@ -33,10 +33,10 @@ abstract class CollectionsDatabase : RoomDatabase() {
 @Dao
 interface CollectionsDao {
   @Query("SELECT * FROM Collection ORDER BY title")
-  fun getAllRows(): LiveData<List<Collection>>
+  fun getAllRows(): Flow<List<Collection>>
 
   @Query("SELECT * FROM Collection WHERE id = :id LIMIT 1")
-  fun getCollection(id: String): LiveData<Collection?>
+  fun getCollection(id: String): Flow<Collection?>
 
   @Query("SELECT * FROM Collection WHERE :collectionId = id")
   suspend fun getCollectionAsync(collectionId: String): Collection
@@ -45,7 +45,7 @@ interface CollectionsDao {
   fun getCollections(): List<Collection>
 
   @Query("SELECT Count(id) FROM Collection")
-  fun countCollections(): LiveData<Long>
+  fun countCollections(): Flow<Long>
 
   @Query("DELETE FROM Collection")
   suspend fun clear()

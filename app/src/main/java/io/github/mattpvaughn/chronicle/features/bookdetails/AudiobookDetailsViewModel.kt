@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
+import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
@@ -25,15 +26,20 @@ import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
-import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
-import io.github.mattpvaughn.chronicle.util.TripleLiveData
-import io.github.mattpvaughn.chronicle.util.mapAsync
-import io.github.mattpvaughn.chronicle.util.postEvent
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
+import io.github.mattpvaughn.chronicle.util.combineDistinct
+import io.github.mattpvaughn.chronicle.util.setEvent
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -85,67 +91,76 @@ class AudiobookDetailsViewModel(
       }
     }
 
-  val audiobook: LiveData<Audiobook?> = bookRepository.getAudiobook(inputAudiobook.id)
-  val tracks = trackRepository.getTracksForAudiobook(inputAudiobook.id)
+  val audiobook: StateFlow<Audiobook?> =
+    bookRepository
+      .getAudiobook(inputAudiobook.id)
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+  val tracks: StateFlow<List<MediaItemTrack>> =
+    trackRepository
+      .getTracksForAudiobook(inputAudiobook.id)
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
   // Used to cache tracks.asChapterList when tracks changes
-  private val tracksAsChaptersCache: LiveData<List<Chapter>> =
-    mapAsync(tracks, viewModelScope) {
-      it.asChapterList()
-    }
+  private val tracksAsChaptersCache: Flow<List<Chapter>> = tracks.mapLatest { it.asChapterList() }
 
   /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
-  private val chaptersFromTable: LiveData<List<Chapter>> =
+  private val chaptersFromTable: Flow<List<Chapter>> =
     bookRepository.getChaptersForBookLive(inputAudiobook.id)
 
-  val chapters: TripleLiveData<List<Chapter>, Audiobook?, List<Chapter>, List<Chapter>> =
-    TripleLiveData(
+  val chapters: StateFlow<List<Chapter>> =
+    combineDistinct(
       chaptersFromTable,
       audiobook,
       tracksAsChaptersCache,
-    ) { _fromTable: List<Chapter>?, _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
-      resolveChaptersFromCache(_fromTable, _audiobook, _tracksAsChapters)
-    }
+    ) { fromTable, book, tracksAsChapters ->
+      resolveChaptersFromCache(fromTable, book, tracksAsChapters)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  private var _messageForUser = MutableLiveData<Event<FormattableString>>()
-  val messageForUser: LiveData<Event<FormattableString>>
+  private val _messageForUser = MutableStateFlow(Event(FormattableString.from("")))
+  val messageForUser: StateFlow<Event<FormattableString>>
     get() = _messageForUser
 
   /**
    * Cache status of the current audiobook. Reflects the cache status of [tracks] if they've
    * been loaded, otherwise default to [_manualCacheStatus].
    */
-  val cacheStatus =
-    DoubleLiveData(
+  val cacheStatus: StateFlow<CacheStatus> =
+    combineDistinct(
       cachedFileManager.activeBookDownloads,
       audiobook,
-    ) { activeDownloadIDs: Set<String>?, _audiobook: Audiobook? ->
-      Timber.i("Active downloads: ${activeDownloadIDs?.size ?: 0}")
-      return@DoubleLiveData when {
-        _audiobook?.isCached == true -> CACHED
-        inputAudiobook.id in (activeDownloadIDs ?: emptySet()) -> CACHING
+    ) { activeDownloadIDs, book ->
+      Timber.i("Active downloads: ${activeDownloadIDs.size}")
+      when {
+        book?.isCached == true -> CACHED
+        inputAudiobook.id in activeDownloadIDs -> CACHING
         else -> NOT_CACHED
       }
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), NOT_CACHED)
 
-  val cacheIconTint =
-    cacheStatus.map { status ->
-      return@map when (status) {
-        CACHING -> R.color.icon // Doesn't matter, we show a spinner over it
-        NOT_CACHED -> R.color.icon
-        CACHED -> R.color.iconActive
-        null -> R.color.icon
-      }
-    }
+  val cacheIconTint: StateFlow<Int> =
+    cacheStatus
+      .map { status ->
+        when (status) {
+          CACHING -> R.color.icon // Doesn't matter, we show a spinner over it
+          NOT_CACHED -> R.color.icon
+          CACHED -> R.color.iconActive
+        }
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.color.icon)
 
-  val cacheIconDrawable: LiveData<Int> =
-    cacheStatus.map { status ->
-      return@map when (status) {
-        CACHING -> R.drawable.ic_cloud_download_white // Doesn't matter, we show a spinner over it
-        NOT_CACHED -> R.drawable.ic_cloud_download_white
-        CACHED -> R.drawable.ic_cloud_done_white
-      }
-    }
+  val cacheIconDrawable: StateFlow<Int> =
+    cacheStatus
+      .map { status ->
+        when (status) {
+          CACHING -> R.drawable.ic_cloud_download_white // Doesn't matter, spinner covers it
+          NOT_CACHED -> R.drawable.ic_cloud_download_white
+          CACHED -> R.drawable.ic_cloud_done_white
+        }
+      }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        R.drawable.ic_cloud_download_white,
+      )
 
   /**
    * What the download control announces, one label per state (cu-149).
@@ -159,38 +174,40 @@ class AudiobookDetailsViewModel(
    * download it, remove the download, or cancel one in flight. `CacheLabelPairingTest` pins the two
    * `when` blocks to the same states so a new one cannot be added to the icon alone.
    */
-  val cacheContentDescription: LiveData<Int> =
-    cacheStatus.map { status ->
-      return@map when (status) {
-        CACHING -> R.string.download_cancel
-        NOT_CACHED -> R.string.download
-        CACHED -> R.string.download_remove
-      }
-    }
-
-  private val activeBook = currentlyPlaying.book.asLiveData(viewModelScope.coroutineContext)
+  val cacheContentDescription: StateFlow<Int> =
+    cacheStatus
+      .map { status ->
+        when (status) {
+          CACHING -> R.string.download_cancel
+          NOT_CACHED -> R.string.download
+          CACHED -> R.string.download_remove
+        }
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.string.download)
 
   /** Whether the book in the current view is also the same on in the [MediaController] */
-  private val isBookInViewActive =
-    DoubleLiveData<Audiobook, Audiobook?, Boolean>(
-      activeBook,
-      audiobook,
-    ) { activeBook, currentBook ->
-      return@DoubleLiveData activeBook?.id == currentBook?.id &&
-        activeBook?.id != null
-    }
+  private val isBookInViewActive: StateFlow<Boolean> =
+    combineDistinct(currentlyPlaying.book, audiobook) { activeBook, currentBook ->
+      activeBook.id == currentBook?.id && activeBook.id != EMPTY_AUDIOBOOK.id
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  /** Whether the book in the current view is playing */
-  val isBookInViewPlaying =
-    DoubleLiveData<Boolean, PlaybackStateCompat, Boolean>(
+  /**
+   * Whether the book in the current view is playing.
+   *
+   * The combiner used to read `isBookActive ?: false && currState?.isPlaying ?: false`, which
+   * Kotlin parses as `isBookActive ?: (false && …)` — so a non-null `isBookActive` short-circuited
+   * and the playback state was never consulted at all. Non-null `Flow` sources make the intended
+   * expression the only one that compiles (cu-52).
+   */
+  val isBookInViewPlaying: StateFlow<Boolean> =
+    combineDistinct(
       isBookInViewActive,
       mediaServiceConnection.playbackState,
     ) { isBookActive, currState ->
-      return@DoubleLiveData isBookActive ?: false && currState?.isPlaying ?: false
-    }
+      isBookActive && currState.isPlaying
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  val progressString =
-    tracks.map { tracks: List<MediaItemTrack> ->
+  val progressString: StateFlow<String> =
+    tracks.map { tracks ->
       if (tracks.isEmpty()) {
         return@map "0:00/0:00"
       }
@@ -205,29 +222,29 @@ class AudiobookDetailsViewModel(
           tracks.getDuration() / 1000L,
         )
       return@map "$progressStr/$durationStr"
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0:00/0:00")
 
-  val progressPercentageString =
-    tracks.map { tracks: List<MediaItemTrack> ->
-      return@map "${tracks.getProgressPercentage()}%"
-    }
+  val progressPercentageString: StateFlow<String> =
+    tracks
+      .map { "${it.getProgressPercentage()}%" }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0%")
 
-  private var _isLoadingTracks = MutableLiveData(false)
-  val isLoadingTracks: LiveData<Boolean>
+  private val _isLoadingTracks = MutableStateFlow(false)
+  val isLoadingTracks: StateFlow<Boolean>
     get() = _isLoadingTracks
 
-  private var _bottomChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
-  val bottomChooserState: LiveData<BottomChooserState>
+  private val _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+  val bottomChooserState: StateFlow<BottomChooserState>
     get() = _bottomChooserState
 
   // The maximum number of lines to shown in the info section
   private val lineCountSummaryMinimized = 5
   private val lineCountSummaryMaximized = Int.MAX_VALUE
-  private var _summaryLinesShown = MutableLiveData(lineCountSummaryMinimized)
-  val summaryLinesShown: LiveData<Int>
+  private val _summaryLinesShown = MutableStateFlow(lineCountSummaryMinimized)
+  val summaryLinesShown: StateFlow<Int>
     get() = _summaryLinesShown
 
-  val isAudioLoading =
+  val isAudioLoading: StateFlow<Boolean> =
     mediaServiceConnection.playbackState.map { state ->
       if (state.state == PlaybackStateCompat.STATE_ERROR) {
         Timber.i("Playback state: ${state.stateName}, (${state.errorMessage})")
@@ -235,19 +252,19 @@ class AudiobookDetailsViewModel(
         Timber.i("Playback state: ${state.stateName}")
       }
       state.state == STATE_BUFFERING || state.state == STATE_CONNECTING
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  val showSummary =
-    audiobook.map { book ->
-      book?.summary?.isNotEmpty() ?: false
-    }
+  val showSummary: StateFlow<Boolean> =
+    audiobook
+      .map { it?.summary?.isNotEmpty() ?: false }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  val isExpanded =
-    summaryLinesShown.map { lines ->
-      return@map lines == lineCountSummaryMaximized
-    }
+  val isExpanded: StateFlow<Boolean> =
+    summaryLinesShown
+      .map { it == lineCountSummaryMaximized }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  val serverConnection = plexConfig.connectionState.map { it }
+  val serverConnection: StateFlow<PlexConfig.ConnectionState> = plexConfig.connectionState
 
   fun onToggleSummaryView() {
     _summaryLinesShown.value =
@@ -260,49 +277,51 @@ class AudiobookDetailsViewModel(
     }
   }
 
-  private val networkObserver =
-    Observer<Boolean> { isConnected ->
-      if (isConnected) {
-        loadBookDetails(inputAudiobook.id)
-      }
-    }
-
-  private val cachedChapter =
-    DoubleLiveData(
+  private val cachedChapter: Flow<Chapter> =
+    combineDistinct(
       chapters,
       tracks,
-    ) { _chapters: List<Chapter>?, _tracks: List<MediaItemTrack>? ->
+    ) { _chapters, _tracks ->
       // Deliberately not logged. These lines serialised the entire chapter list — 40+ objects —
       // several times a second on a real book, which is a measurable cost in a debug build and
       // drowned the log when diagnosing the seek churn (cu-93).
 
       // See the same fix in CurrentlyPlayingViewModel: the hand-rolled walk this replaces mixed
       // relative and absolute chapter offsets and resolved the wrong chapter (cu-73).
-      if (_tracks != null && _chapters != null) {
-        _chapters.chapterAtBookProgress(_tracks.getProgress())
-      } else {
-        EMPTY_CHAPTER
-      }
-    }.asFlow()
+      _chapters.chapterAtBookProgress(_tracks.getProgress())
+    }
 
-  val activeChapter =
-    currentlyPlaying.chapter.combine(
+  val activeChapter: StateFlow<Chapter> =
+    combineDistinct(
+      currentlyPlaying.chapter,
       cachedChapter,
-    ) { activeChapter: Chapter, cachedChapter: Chapter ->
+    ) { activeChapter, cachedChapter ->
       if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
         activeChapter
       } else {
         cachedChapter
       }
-    }.asLiveData(viewModelScope.coroutineContext)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_CHAPTER)
 
-  val isWatchedIcon: LiveData<Int> =
-    audiobook.map {
-      if (it?.viewCount != 0L) R.drawable.ic_visibility_off else R.drawable.ic_visibility
-    }
+  val isWatchedIcon: StateFlow<Int> =
+    audiobook
+      .map { if (it?.viewCount != 0L) R.drawable.ic_visibility_off else R.drawable.ic_visibility }
+      .stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        R.drawable.ic_visibility_off,
+      )
 
   init {
-    plexConfig.isConnected.observeForever(networkObserver)
+    // Collected on viewModelScope rather than observed forever, which is what the explicit
+    // removeObserver in onCleared was doing by hand — the scope cancels there anyway.
+    viewModelScope.launch {
+      plexConfig.isConnected.collect { isConnected ->
+        if (isConnected) {
+          loadBookDetails(inputAudiobook.id)
+        }
+      }
+    }
   }
 
   /**
@@ -321,7 +340,7 @@ class AudiobookDetailsViewModel(
         // spinner replaces chapters that were already on screen, too long and every refresh pays
         // for it. `chapters` derives from `audiobook`, so the question is only whether that first
         // emission has arrived; ask the value, not the clock.
-        val noExistingChapters = chapters.value.isNullOrEmpty()
+        val noExistingChapters = chapters.value.isEmpty()
         _isLoadingTracks.value = noExistingChapters
         val trackRequest = trackRepository.loadTracksForAudiobook(bookId)
         if (trackRequest.isOk) {
@@ -343,7 +362,7 @@ class AudiobookDetailsViewModel(
     when (cacheStatus.value) {
       NOT_CACHED -> {
         Timber.i("Caching tracks for \"${audiobook.value?.title}\"")
-        if (plexConfig.isConnected.value != true) {
+        if (!plexConfig.isConnected.value) {
           showUserMessage(FormattableString.from(R.string.unable_to_cache_audiobook))
         } else {
           cachedFileManager.downloadTracks(inputAudiobook.id, inputAudiobook.title)
@@ -357,16 +376,11 @@ class AudiobookDetailsViewModel(
         Timber.i("Cancelling download: ${inputAudiobook.id}")
         cachedFileManager.cancelGroup(inputAudiobook.id)
       }
-      // null until `cacheStatus` has an observer *and* both its sources have emitted. That is
-      // "not known yet", not an error — throwing here crashed a main-screen control (cu-92). The
-      // Fragment also keeps the button disabled until the status resolves, so this is the backstop
-      // rather than the only guard.
-      null -> Timber.i("Cache button pressed before the status resolved; ignoring")
     }
   }
 
   private fun showUserMessage(message: FormattableString) {
-    _messageForUser.postEvent(message)
+    _messageForUser.setEvent(message)
   }
 
   private fun promptUserToUncache() {
@@ -395,7 +409,7 @@ class AudiobookDetailsViewModel(
   }
 
   fun pausePlayButtonClicked() {
-    if (plexConfig.isConnected.value != true && audiobook.value?.isCached == false) {
+    if (!plexConfig.isConnected.value && audiobook.value?.isCached == false) {
       showUserMessage(FormattableString.from(R.string.cannot_play_media_no_server))
       return
     }
@@ -407,7 +421,7 @@ class AudiobookDetailsViewModel(
         forcePlayFromMediaId = false,
       )
     }
-    if (mediaServiceConnection.isConnected.value != true) {
+    if (!mediaServiceConnection.isConnected.value) {
       mediaServiceConnection.connect(pausePlayAction)
     } else {
       pausePlayAction()
@@ -434,7 +448,7 @@ class AudiobookDetailsViewModel(
     trackId: String? = null,
     forcePlayFromMediaId: Boolean = false,
   ) {
-    if (mediaServiceConnection.isConnected.value != true) {
+    if (!mediaServiceConnection.isConnected.value) {
       Timber.e("MediaServiceConnection not connected")
       return
     }
@@ -451,8 +465,8 @@ class AudiobookDetailsViewModel(
     )
     when {
       forcePlayFromMediaId -> transportControls.playFromMediaId(bookId, extras)
-      isBookInViewPlaying.value == true -> transportControls.pause()
-      isBookInViewActive.value == true -> transportControls.play()
+      isBookInViewPlaying.value -> transportControls.pause()
+      isBookInViewActive.value -> transportControls.play()
       else -> transportControls.playFromMediaId(bookId, extras)
     }
   }
@@ -494,7 +508,7 @@ class AudiobookDetailsViewModel(
         pausePlay(book.id, inTrackOffset.millis, trackId, forcePlayFromMediaId = true)
       }
     }
-    if (mediaServiceConnection.isConnected.value != true) {
+    if (!mediaServiceConnection.isConnected.value) {
       mediaServiceConnection.connect(onConnected = jumpToChapterAction)
     } else {
       jumpToChapterAction()
@@ -503,9 +517,7 @@ class AudiobookDetailsViewModel(
 
   private fun hideBottomSheet() {
     Timber.i("Hiding bottom sheet?")
-    _bottomChooserState.postValue(
-      _bottomChooserState.value?.copy(shouldShow = false) ?: EMPTY_BOTTOM_CHOOSER,
-    )
+    _bottomChooserState.value = _bottomChooserState.value.copy(shouldShow = false)
   }
 
   private fun showOptionsMenu(
@@ -513,19 +525,13 @@ class AudiobookDetailsViewModel(
     options: List<FormattableString>,
     listener: BottomChooserListener,
   ) {
-    _bottomChooserState.postValue(
+    _bottomChooserState.value =
       BottomChooserState(
         title = title,
         options = options,
         listener = listener,
         shouldShow = true,
-      ),
-    )
-  }
-
-  override fun onCleared() {
-    plexConfig.isConnected.removeObserver(networkObserver)
-    super.onCleared()
+      )
   }
 
   fun toggleWatched() {
@@ -636,7 +642,7 @@ class AudiobookDetailsViewModel(
         return@launch
       } else {
         Timber.i("Refreshing track data!!!")
-        if (plexConfig.isConnected.value != true) {
+        if (!plexConfig.isConnected.value) {
           showUserMessage(FormattableString.from(R.string.cannot_sync_no_server))
           return@launch
         }

@@ -1,12 +1,12 @@
 package io.github.mattpvaughn.chronicle.features.search
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.model.GroupedSearchResults
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -23,17 +23,17 @@ class SearchController(
   private val scope: CoroutineScope,
   private val debounceMillis: Long = DEFAULT_DEBOUNCE_MILLIS,
 ) {
-  private val _results = MutableLiveData(GroupedSearchResults(emptyList()))
-  val results: LiveData<GroupedSearchResults> get() = _results
+  private val _results = MutableStateFlow(GroupedSearchResults(emptyList()))
+  val results: StateFlow<GroupedSearchResults> get() = _results
 
-  private val _rows = MutableLiveData<List<SearchRow>>(emptyList())
-  val rows: LiveData<List<SearchRow>> get() = _rows
+  private val _rows = MutableStateFlow<List<SearchRow>>(emptyList())
+  val rows: StateFlow<List<SearchRow>> get() = _rows
 
-  private val _isQueryEmpty = MutableLiveData(true)
-  val isQueryEmpty: LiveData<Boolean> get() = _isQueryEmpty
+  private val _isQueryEmpty = MutableStateFlow(true)
+  val isQueryEmpty: StateFlow<Boolean> get() = _isQueryEmpty
 
-  private val _isSearchActive = MutableLiveData(false)
-  val isSearchActive: LiveData<Boolean> get() = _isSearchActive
+  private val _isSearchActive = MutableStateFlow(false)
+  val isSearchActive: StateFlow<Boolean> get() = _isSearchActive
 
   /**
    * The in-flight search, cancelled by the next keystroke.
@@ -44,7 +44,7 @@ class SearchController(
   private var pending: Job? = null
 
   fun setSearchActive(active: Boolean) {
-    _isSearchActive.postValue(active)
+    _isSearchActive.value = active
     if (!active) clear()
   }
 
@@ -52,7 +52,7 @@ class SearchController(
   fun search(query: String) {
     pending?.cancel()
     val trimmed = query.trim()
-    _isQueryEmpty.postValue(trimmed.isEmpty())
+    _isQueryEmpty.value = trimmed.isEmpty()
     if (trimmed.isEmpty()) {
       publish(GroupedSearchResults(emptyList()))
       return
@@ -72,13 +72,20 @@ class SearchController(
 
   private fun clear() {
     pending?.cancel()
-    _isQueryEmpty.postValue(true)
+    _isQueryEmpty.value = true
     publish(GroupedSearchResults(emptyList()))
   }
 
+  /**
+   * Publishes the results and the rows derived from them.
+   *
+   * Both were `postValue` before cu-52, which is asynchronous *and coalescing*: the two are one
+   * fact in two fields, and nothing stopped a collector observing the new results beside the
+   * previous rows for a frame. `value =` is synchronous, so they land together.
+   */
   private fun publish(grouped: GroupedSearchResults) {
-    _results.postValue(grouped)
-    _rows.postValue(grouped.toRows())
+    _results.value = grouped
+    _rows.value = grouped.toRows()
   }
 
   companion object {

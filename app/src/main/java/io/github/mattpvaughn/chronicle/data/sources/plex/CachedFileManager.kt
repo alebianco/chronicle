@@ -6,8 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.work.*
 import com.tonyodev.fetch2.*
 import com.tonyodev.fetch2core.DownloadBlock
@@ -32,6 +30,8 @@ import io.github.mattpvaughn.chronicle.features.download.reconcileCachedTracks
 import io.github.mattpvaughn.chronicle.features.download.scanCachedMediaDir
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -42,7 +42,7 @@ import javax.inject.Inject
 interface ICachedFileManager {
   enum class CacheStatus { CACHED, CACHING, NOT_CACHED }
 
-  val activeBookDownloads: LiveData<Set<String>>
+  val activeBookDownloads: StateFlow<Set<String>>
 
   fun cancelCaching()
 
@@ -332,19 +332,19 @@ class CachedFileManager
         override val size: Int
           get() = internalSet.size
 
-        // Posts a copy *after* mutating. Both of these used to post the mutable set itself
-        // before the change landed, so an observer saw the previous contents — and because
-        // LiveData compares by reference, posting the same instance twice can be coalesced
-        // away entirely, leaving the download indicator stale.
+        // Publishes a copy *after* mutating. Both of these used to publish the mutable set
+        // itself before the change landed, so a collector saw the previous contents. The copy is
+        // still required: a `StateFlow` conflates by `equals`, so handing it the same mutable
+        // instance twice looks like no change at all and leaves the download indicator stale.
         override fun add(elem: String): Boolean {
           val changed = internalSet.add(elem)
-          _activeBookDownloads.postValue(internalSet.toSet())
+          _activeBookDownloads.value = internalSet.toSet()
           return changed
         }
 
         override fun remove(elem: String): Boolean {
           val changed = internalSet.remove(elem)
-          _activeBookDownloads.postValue(internalSet.toSet())
+          _activeBookDownloads.value = internalSet.toSet()
           return changed
         }
 
@@ -353,8 +353,8 @@ class CachedFileManager
         override operator fun contains(elem: String) = internalSet.contains(elem)
       }
 
-    private val _activeBookDownloads = MutableLiveData<Set<String>>()
-    override val activeBookDownloads: LiveData<Set<String>>
+    private val _activeBookDownloads = MutableStateFlow<Set<String>>(emptySet())
+    override val activeBookDownloads: StateFlow<Set<String>>
       get() = _activeBookDownloads
 
     init {

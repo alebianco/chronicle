@@ -4,7 +4,9 @@ import android.content.SharedPreferences
 import androidx.lifecycle.*
 import io.github.mattpvaughn.chronicle.data.local.*
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import io.github.mattpvaughn.chronicle.util.StringPreferenceLiveData
+import io.github.mattpvaughn.chronicle.util.stringFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -22,8 +24,8 @@ class CollectionDetailsViewModel(
     }
   }
 
-  private val _booksInCollection = MutableLiveData<List<Audiobook>>(emptyList())
-  val booksInCollection: LiveData<List<Audiobook>>
+  private val _booksInCollection = MutableStateFlow<List<Audiobook>>(emptyList())
+  val booksInCollection: StateFlow<List<Audiobook>>
     get() = _booksInCollection
 
   val title = collectionRepo.getCollection(collectionId)
@@ -35,10 +37,9 @@ class CollectionDetailsViewModel(
   }
 
   val viewStyle =
-    StringPreferenceLiveData(
+    sharedPreferences.stringFlow(
       PrefsRepo.KEY_LIBRARY_VIEW_STYLE,
       prefsRepo.libraryBookViewStyle,
-      sharedPreferences,
     )
 
   @Suppress("UNCHECKED_CAST")

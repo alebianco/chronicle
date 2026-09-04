@@ -34,6 +34,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.checkRadioButtonWithTag
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.Dispatchers
@@ -85,15 +86,21 @@ class LibraryFragment : Fragment() {
     // Was compound visibility expressions in fragment_library.xml. XML combined
     // several LiveData sources implicitly; in Kotlin each source has to re-run
     // the whole condition, so the shared logic is factored into one function.
+    // `books` and `isOffline` are cold `Flow`s, so there is no `.value` to read (cu-52). The two
+    // collectors below keep these locals current and call this; a `StateFlow` would work too, but
+    // the sort is O(library) and there is no reason to run it while the screen is away.
+    var latestBooks: List<Audiobook> = emptyList()
+    var latestOffline = false
+
     fun refreshEmptyStates() {
-      val books = viewModel.books.value.orEmpty()
-      val offline = viewModel.isOffline.value == true
+      val books = latestBooks
+      val offline = latestOffline
       binding.offlineEmptyMessage.isVisible = books.isEmpty() && offline
       binding.noBooksMessage.isVisible = books.isEmpty() && !offline
       binding.swipeToRefresh.isVisible = books.isNotEmpty()
     }
-    viewModel.books.observe(viewLifecycleOwner) { refreshEmptyStates() }
-    viewModel.isOffline.observe(viewLifecycleOwner) { refreshEmptyStates() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.books) { refreshEmptyStates() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.isOffline) { refreshEmptyStates() }
 
     fun refreshSearchStates() {
       val rows = viewModel.searchRows.value.orEmpty()
@@ -103,22 +110,22 @@ class LibraryFragment : Fragment() {
       binding.noSearchResultsMessage.isVisible = rows.isEmpty() && active && !queryEmpty
       searchAdapter.submitList(rows)
     }
-    viewModel.searchRows.observe(viewLifecycleOwner) { refreshSearchStates() }
-    viewModel.isSearchActive.observe(viewLifecycleOwner) { refreshSearchStates() }
-    viewModel.isQueryEmpty.observe(viewLifecycleOwner) { refreshSearchStates() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { refreshSearchStates() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.isSearchActive) { refreshSearchStates() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.isQueryEmpty) { refreshSearchStates() }
 
-    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
       searchAdapter.setServerConnected(connected == true)
     }
 
-    viewModel.bottomChooserState.observe(viewLifecycleOwner) { state ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->
       setBottomChooserState(binding.bottomSheetChooser, state)
     }
 
     binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
     binding.doneFiltering.setOnClickListener { viewModel.setFilterMenuVisible(false) }
     binding.sortByContainer.setOnClickListener { viewModel.toggleSortDirection() }
-    viewModel.isSortDescending.observe(viewLifecycleOwner) { descending ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.isSortDescending) { descending ->
       binding.sortByContainer.contentDescription =
         getString(
           if (descending == true) {
@@ -146,7 +153,7 @@ class LibraryFragment : Fragment() {
 
     binding.libraryGrid.adapter = adapter
 
-    viewModel.books.observe(viewLifecycleOwner) { books ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.books) { books ->
       // Adapter is always non-null between view creation and view destruction
       checkNotNull(adapter) { "Adapter must not be null while view exists" }
 
@@ -154,7 +161,7 @@ class LibraryFragment : Fragment() {
       if (adapter!!.currentList.isEmpty()) {
         Timber.i("Updating book list: no previous books")
         adapter!!.submitList(books)
-        return@observe
+        return@collectWhileStarted
       }
 
       // Sometimes [books] will be the same as [adapter.currentList] so don't do any
@@ -191,11 +198,11 @@ class LibraryFragment : Fragment() {
       }
     }
 
-    plexConfig.isConnected.observe(viewLifecycleOwner) { isConnected ->
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { isConnected ->
       adapter?.setServerConnected(isConnected)
     }
 
-    viewModel.viewStyle.observe(viewLifecycleOwner) { style ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
       Timber.i("View style is: $style")
       val isGrid =
         viewStyleIsGrid(style)
@@ -213,7 +220,7 @@ class LibraryFragment : Fragment() {
       viewModel.refreshData()
     }
 
-    viewModel.isRefreshing.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.isRefreshing) {
       binding.swipeToRefresh.isRefreshing = it
     }
 
@@ -231,16 +238,16 @@ class LibraryFragment : Fragment() {
       prefsRepo.libraryBookViewStyle = key
     }
 
-    viewModel.messageForUser.observe(viewLifecycleOwner) {
-      if (!it.hasBeenHandled) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.messageForUser) {
+      if (it != null && !it.hasBeenHandled) {
         Toast.makeText(context, it.getContentIfNotHandled(), LENGTH_SHORT).show()
       }
     }
 
     // A refresh failure. It arrives as a string resource because it is raised on an IO
     // dispatcher, where `Toast.show()` throws; the toast belongs here, on the main thread.
-    viewModel.syncError.observe(viewLifecycleOwner) {
-      it.getContentIfNotHandled()?.let { messageRes ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.syncError) {
+      it?.getContentIfNotHandled()?.let { messageRes ->
         Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
       }
     }
@@ -271,14 +278,14 @@ class LibraryFragment : Fragment() {
     // cu-58 conversion, leaving the "hide played" switch inert — it moved when tapped and changed
     // nothing, and never reflected the stored preference. The filtering behind it always worked
     // (cu-73).
-    viewModel.arePlayedAudiobooksHidden.observe(viewLifecycleOwner) { hidden ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.arePlayedAudiobooksHidden) { hidden ->
       if (binding.hidePlayed.isChecked != hidden) {
         binding.hidePlayed.isChecked = hidden
       }
     }
     binding.hidePlayed.setOnClickListener { viewModel.toggleHidePlayedAudiobooks() }
 
-    viewModel.isFilterShown.observe(viewLifecycleOwner) { isFilterShown ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.isFilterShown) { isFilterShown ->
       Timber.i("Showing filter view: $isFilterShown")
       val filterBottomSheetState =
         if (isFilterShown) {

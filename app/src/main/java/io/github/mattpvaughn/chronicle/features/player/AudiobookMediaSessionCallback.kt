@@ -9,7 +9,6 @@ import android.text.format.DateUtils
 import android.view.KeyEvent
 import android.view.KeyEvent.*
 import androidx.core.content.IntentCompat
-import androidx.lifecycle.Observer
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
@@ -38,6 +37,7 @@ import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -69,8 +69,8 @@ class AudiobookMediaSessionCallback
     // Default to ExoPlayer to prevent having a nullable field
     var currentPlayer: Player = defaultPlayer
 
-    /** The pending resume observer, if a resume is waiting for a server connection. */
-    private var resumeConnectedObserver: Observer<Boolean>? = null
+    /** The pending resume, if one is waiting for a server connection. */
+    private var resumeJob: Job? = null
 
     companion object {
       const val ACTION_SEEK = "seek"
@@ -540,45 +540,36 @@ class AudiobookMediaSessionCallback
      * refreshing data.
      */
     private fun resumePlayFromEmpty(playWhenReady: Boolean) {
-      // Held so [onStop] can detach it. `removeObserver` used to be called only from inside
-      // `onChanged`, on the connected path — so if the server was never reached the observer stayed
-      // registered on a process-lifetime LiveData with no lifecycle to release it. Repeated resume
-      // attempts stacked up more of them, each holding this callback and its sixteen collaborators.
-      resumeConnectedObserver?.let { plexConfig.isConnected.removeObserver(it) }
+      // Cancelled so a second resume attempt replaces the first rather than stacking. As an
+      // `observeForever` this leaked: `removeObserver` was called only from inside `onChanged`, on
+      // the connected path — so if the server was never reached the observer stayed registered on a
+      // process-lifetime LiveData with no lifecycle to release it, each one holding this callback
+      // and its sixteen collaborators. A cancellable job cannot have that shape.
+      cancelPendingResume()
 
-      val connectedObserver =
-        object : Observer<Boolean> {
-          override fun onChanged(isConnected: Boolean) {
-            // Don't try starting playback until we've connected to a server
-            if (!isConnected) {
-              return
-            }
+      resumeJob =
+        serviceScope.launch(exceptionHandler) {
+          // Suspends until the server is reachable, then proceeds exactly once — the "only run
+          // these resume methods once after reconnecting" rule, expressed by the operator rather
+          // than by detaching an observer from inside its own callback.
+          plexConfig.isConnected.first { it }
 
-            // Only run these resume methods once after reconnecting
-            clearResumeObserver()
-
-            serviceScope.launch(exceptionHandler) {
-              val mostRecentBook = bookRepository.getMostRecentlyPlayed()
-              if (mostRecentBook == EMPTY_AUDIOBOOK) {
-                return@launch
-              }
-              if (playWhenReady) {
-                onPlayFromMediaId(mostRecentBook.id, null)
-              } else {
-                onPrepareFromMediaId(mostRecentBook.id, null)
-              }
-            }
+          val mostRecentBook = bookRepository.getMostRecentlyPlayed()
+          if (mostRecentBook == EMPTY_AUDIOBOOK) {
+            return@launch
+          }
+          if (playWhenReady) {
+            onPlayFromMediaId(mostRecentBook.id, null)
+          } else {
+            onPrepareFromMediaId(mostRecentBook.id, null)
           }
         }
-
-      resumeConnectedObserver = connectedObserver
-      plexConfig.isConnected.observeForever(connectedObserver)
     }
 
-    /** Detaches the resume observer if one is registered. Safe to call when none is. */
-    private fun clearResumeObserver() {
-      resumeConnectedObserver?.let { plexConfig.isConnected.removeObserver(it) }
-      resumeConnectedObserver = null
+    /** Cancels a resume that is still waiting for a connection. Safe to call when none is. */
+    private fun cancelPendingResume() {
+      resumeJob?.cancel()
+      resumeJob = null
     }
 
     // Kill the playback service when stop() is called, so Service can be recreated when needed
@@ -586,7 +577,7 @@ class AudiobookMediaSessionCallback
     override fun onStop() {
       Timber.i("Stopping media playback")
       // A resume that never connected would otherwise outlive the service it was resuming.
-      clearResumeObserver()
+      cancelPendingResume()
       currentPlayer.stop()
       mediaSession.setPlaybackState(EMPTY_PLAYBACK_STATE)
       foregroundServiceController.stopForegroundService(true)

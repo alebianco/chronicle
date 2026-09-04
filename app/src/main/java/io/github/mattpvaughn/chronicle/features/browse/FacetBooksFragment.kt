@@ -23,6 +23,7 @@ import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 /**
@@ -87,7 +88,7 @@ class FacetBooksFragment : Fragment() {
     adapter = bookAdapter
     binding.facetBooksGrid.adapter = bookAdapter
 
-    viewModel.viewStyle.observe(viewLifecycleOwner) { style ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
       binding.facetBooksGrid.layoutManager =
         if (viewStyleIsGrid(style)) {
           GridLayoutManager(requireContext(), 3)
@@ -97,7 +98,7 @@ class FacetBooksFragment : Fragment() {
       bookAdapter.viewStyle = style
     }
 
-    viewModel.books.observe(viewLifecycleOwner) { books ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.books) { books ->
       bookAdapter.submitList(books)
       binding.noBooksMessage.isVisible = books.isEmpty()
     }

@@ -48,7 +48,8 @@ import io.github.mattpvaughn.chronicle.injection.components.DaggerActivityCompon
 import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.navigation.Navigator
-import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
@@ -148,21 +149,21 @@ class MainActivity : AppCompatActivity() {
     registerBackHandler(binding)
 
     // Was binding expressions in activity_main.xml.
-    viewModel.currentlyPlayingLayoutState.observe(this) { state ->
+    collectWhileStarted(viewModel.currentlyPlayingLayoutState) { state ->
       setBottomSheetState(binding.mainRoot, state)
     }
-    viewModel.isLoggedIn.observe(this) { loggedIn ->
-      binding.bottomNav.isVisible = loggedIn == true
+    collectWhileStarted(viewModel.isLoggedIn) { loggedIn ->
+      binding.bottomNav.isVisible = loggedIn
       // INVISIBLE, not GONE: the collapsed player keeps its layout slot so the
       // content above it does not reflow when it appears.
       binding.currentlyPlayingContainer.visibility =
-        if (loggedIn == true) View.VISIBLE else View.INVISIBLE
+        if (loggedIn) View.VISIBLE else View.INVISIBLE
     }
     // The mini player is on every screen, so this is the one per-tick view write that no screen
     // can avoid. `setText` re-lays-out even when handed an equal string, and a chapter title is
     // identical for minutes at a time (cu-117).
-    viewModel.currentChapterTitle.observe(this) {
-      binding.chapterTitle.setTextIfChanged(it.orEmpty())
+    collectWhileStarted(viewModel.currentChapterTitle) {
+      binding.chapterTitle.setTextIfChanged(it)
     }
     // Bind only when the *displayed* fields change. `audiobook` is Room-backed and
     // `ProgressUpdater` writes `Audiobook.progress` once a second during playback, so this emits
@@ -171,11 +172,11 @@ class MainActivity : AppCompatActivity() {
     // from **1 jiffy / 10 s** paused to **285 playing**, and backgrounding the app (same playback,
     // same ticks, no views) dropped it to **15** — so the cost was rendering, not the data layer
     // (cu-117, same shape as cu-110).
-    viewModel.audiobook.observe(this) { book ->
-      val title = book?.title.orEmpty()
-      val thumb = book?.thumb
+    collectWhileStarted(viewModel.audiobook) { book ->
+      val title = book.title
+      val thumb = book.thumb
       if (title == boundBookTitle && thumb == boundBookThumb) {
-        return@observe
+        return@collectWhileStarted
       }
       boundBookTitle = title
       boundBookThumb = thumb
@@ -184,11 +185,11 @@ class MainActivity : AppCompatActivity() {
       bindImageRounded(
         binding.currentlyPlayingThumb,
         thumb,
-        plexConfig.isConnected.value == true,
+        plexConfig.isConnected.value,
         plexConfig::toServerString,
       )
     }
-    viewModel.isPlaying.observe(this) { playing ->
+    collectWhileStarted(viewModel.isPlaying) { playing ->
       // A button shows the action a tap performs, not the current state: while
       // playing it must offer pause. The drawables are state-named, which is how
       // this got inverted during the cu-58 conversion — the other two play/pause
@@ -196,18 +197,18 @@ class MainActivity : AppCompatActivity() {
       // playing -> pause icon, and NotificationBuilder is not a counterexample
       // because that is a status icon rather than a button.
       binding.pausePlayButton.setImageResourceIfChanged(
-        if (playing == true) {
+        if (playing) {
           R.drawable.ic_notification_icon_paused
         } else {
           R.drawable.ic_notification_icon_playing
         },
       )
     }
-    viewModel.isAudioLoading.observe(this) { loading ->
+    collectWhileStarted(viewModel.isAudioLoading) { loading ->
       // Spinner instead of the icon, INVISIBLE so the mini player's layout does not reflow — the
       // same treatment as the expanded player (cu-95).
-      binding.miniAudioLoadingSpinner.isVisible = loading == true
-      binding.pausePlayButton.visibility = if (loading == true) View.INVISIBLE else View.VISIBLE
+      binding.miniAudioLoadingSpinner.isVisible = loading
+      binding.pausePlayButton.visibility = if (loading) View.INVISIBLE else View.VISIBLE
     }
     binding.pausePlayButton.setOnClickListener { viewModel.pausePlayButtonClicked() }
 
@@ -215,7 +216,7 @@ class MainActivity : AppCompatActivity() {
       viewModel.onCurrentlyPlayingClicked()
     }
 
-    viewModel.errorMessage.observeEvent(this) { errorMessage ->
+    collectEventsWhileStarted(viewModel.errorMessage) { errorMessage ->
       Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
     }
 
@@ -246,7 +247,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // TODO: show/hide this item on launch more performantly
-    viewModel.hasCollections.observe(this) {
+    collectWhileStarted(viewModel.hasCollections) {
       binding.bottomNav.menu.findItem(R.id.nav_collections).isVisible = it
     }
 

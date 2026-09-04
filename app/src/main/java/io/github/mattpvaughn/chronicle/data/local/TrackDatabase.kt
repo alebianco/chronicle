@@ -1,11 +1,11 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.Context
-import androidx.lifecycle.LiveData
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import kotlinx.coroutines.flow.Flow
 
 private const val TRACK_DATABASE_NAME = "track_db"
 
@@ -85,7 +85,7 @@ val MIGRATION_3_4 =
 @Dao
 interface TrackDao {
   @Query("SELECT * FROM MediaItemTrack")
-  fun getAllTracks(): LiveData<List<MediaItemTrack>>
+  fun getAllTracks(): Flow<List<MediaItemTrack>>
 
   // Ordered, because callers derive book position from the result and `getTrackStartTime` sums
   // the tracks *before* the active one. It sorts defensively now (cu-115), but an unordered
@@ -109,7 +109,7 @@ interface TrackDao {
   fun getTracksForAudiobook(
     bookId: String,
     isOfflineMode: Boolean,
-  ): LiveData<List<MediaItemTrack>>
+  ): Flow<List<MediaItemTrack>>
 
   @Query(
     "SELECT * FROM MediaItemTrack WHERE parentKey = :id AND cached >= :offlineModeActive ORDER BY `discNumber` ASC, `index` ASC",

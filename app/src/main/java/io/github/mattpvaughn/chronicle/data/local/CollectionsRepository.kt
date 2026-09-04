@@ -1,7 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.map
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
@@ -9,6 +7,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asCollections
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,11 +28,11 @@ class CollectionsRepository
       return collectionsDao.getCollectionAsync(collectionId).childIds
     }
 
-    fun getCollection(id: String): LiveData<Collection?> = collectionsDao.getCollection(id)
+    fun getCollection(id: String): Flow<Collection?> = collectionsDao.getCollection(id)
 
-    fun getAllCollections(): LiveData<List<Collection>> = collectionsDao.getAllRows()
+    fun getAllCollections(): Flow<List<Collection>> = collectionsDao.getAllRows()
 
-    fun hasCollections(): LiveData<Boolean> =
+    fun hasCollections(): Flow<Boolean> =
       collectionsDao
         .countCollections()
         .map { it > 0 }

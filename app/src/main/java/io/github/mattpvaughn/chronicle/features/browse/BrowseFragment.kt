@@ -15,6 +15,7 @@ import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.model.FacetList
 import io.github.mattpvaughn.chronicle.databinding.FragmentBrowseBinding
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 /**
@@ -80,7 +81,7 @@ class BrowseFragment : Fragment() {
       },
     )
 
-    viewModel.facets.observe(viewLifecycleOwner) { facets ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.facets) { facets ->
       adapter.submitList(facets.facets)
       render(facets)
     }

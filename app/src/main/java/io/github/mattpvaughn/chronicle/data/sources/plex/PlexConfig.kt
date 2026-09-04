@@ -3,8 +3,6 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.toBitmap
@@ -19,6 +17,11 @@ import io.github.mattpvaughn.chronicle.features.download.EXTRA_BOOK_ID
 import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
 import io.github.mattpvaughn.chronicle.util.toUri
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,28 +42,35 @@ class PlexConfig
     private val connectionChooser: ConnectionChooser,
     private val appContext: Context,
   ) {
+    /**
+     * Scope for the derived [isConnected] only.
+     *
+     * `PlexConfig` is a `@Singleton` and lives for the process, so this never needs cancelling —
+     * `SupervisorJob` so a failure in one derivation cannot take the scope down, and `Main.immediate`
+     * because the sole consumer is UI state that is read synchronously.
+     */
+    private val configScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     private val connectionSet = mutableSetOf<Connection>()
 
     var url: String = PLACEHOLDER_URL
 
-    private val _isConnected = MutableLiveData(false)
-    val isConnected: LiveData<Boolean>
-      get() = _isConnected
-
-    private val _connectionState =
-      object : MutableLiveData<ConnectionState>(NOT_CONNECTED) {
-        override fun postValue(value: ConnectionState?) {
-          _isConnected.postValue(value == CONNECTED)
-          super.postValue(value)
-        }
-
-        override fun setValue(value: ConnectionState?) {
-          _isConnected.postValue(value == CONNECTED)
-          super.setValue(value)
-        }
-      }
-    val connectionState: LiveData<ConnectionState>
+    private val _connectionState = MutableStateFlow(NOT_CONNECTED)
+    val connectionState: StateFlow<ConnectionState>
       get() = _connectionState
+
+    /**
+     * Whether the server is reachable — derived from [connectionState], not stored beside it.
+     *
+     * This used to be a second `MutableLiveData` kept in sync by an anonymous subclass that
+     * overrode both `postValue` and `setValue` to mirror into it (cu-52). Two fields holding one
+     * fact, updated by hand in two overrides: the flag could disagree with the state for a frame,
+     * and every new writer had to remember both. `map` makes the derivation the only definition.
+     */
+    val isConnected: StateFlow<Boolean> =
+      _connectionState
+        .map { it == CONNECTED }
+        .stateIn(configScope, SharingStarted.Eagerly, false)
 
     enum class ConnectionState {
       CONNECTING,
@@ -186,7 +196,7 @@ class PlexConfig
 
     fun connectToServer(plexMediaService: PlexMediaService) {
       prevConnectToServerJob?.cancel("Killing previous connection attempt")
-      _connectionState.postValue(CONNECTING)
+      _connectionState.value = CONNECTING
       prevConnectToServerJob =
         Job().also {
           val context = CoroutineScope(it + Dispatchers.Main)
@@ -195,10 +205,10 @@ class PlexConfig
             Timber.i("Returned connection $connectionResult")
             if (connectionResult is Success && connectionResult.url != PLACEHOLDER_URL) {
               url = connectionResult.url
-              _connectionState.postValue(CONNECTED)
+              _connectionState.value = CONNECTED
               Timber.i("Connection success: $url")
             } else {
-              _connectionState.postValue(CONNECTION_FAILED)
+              _connectionState.value = CONNECTION_FAILED
             }
           }
         }
@@ -207,13 +217,13 @@ class PlexConfig
     /** Clear server data from [plexPrefsRepo] and [url] managed by [PlexConfig] */
     fun clear() {
       plexPrefsRepo.clear()
-      _connectionState.postValue(NOT_CONNECTED)
+      _connectionState.value = NOT_CONNECTED
       url = PLACEHOLDER_URL
       connectionSet.clear()
     }
 
     fun clearServer() {
-      _connectionState.postValue(NOT_CONNECTED)
+      _connectionState.value = NOT_CONNECTED
       url = PLACEHOLDER_URL
       plexPrefsRepo.server = null
       plexPrefsRepo.library = null

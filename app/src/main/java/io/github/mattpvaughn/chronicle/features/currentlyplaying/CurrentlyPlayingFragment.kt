@@ -26,6 +26,7 @@ import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter
 import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.util.formatCoarseDuration
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 import io.github.mattpvaughn.chronicle.util.observeEvent
@@ -430,11 +431,11 @@ class CurrentlyPlayingFragment :
     viewModel.progressPercentageString.observe(viewLifecycleOwner) { renderPlayerText() }
     viewModel.currentChapter.observe(viewLifecycleOwner) { renderPlayerText() }
     viewModel.audiobook.observe(viewLifecycleOwner) { renderPlayerArtwork() }
-    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
       bindImageRounded(
         binding.detailsArtwork,
         viewModel.audiobook.value?.thumb,
-        connected == true,
+        connected,
         plexConfig::toServerString,
       )
     }

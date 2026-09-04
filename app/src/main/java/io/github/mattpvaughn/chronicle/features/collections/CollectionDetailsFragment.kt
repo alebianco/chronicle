@@ -23,6 +23,7 @@ import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
@@ -98,7 +99,7 @@ class CollectionDetailsFragment : Fragment() {
         stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
       }
 
-    viewModel.viewStyle.observe(viewLifecycleOwner) { style ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
       Timber.i("View style is: $style")
       val isGrid =
         viewStyleIsGrid(style)
@@ -113,7 +114,7 @@ class CollectionDetailsFragment : Fragment() {
 
     binding.collectionsGrid.adapter = adapter
 
-    viewModel.booksInCollection.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.booksInCollection) {
       adapter!!.submitList(it)
       // Was an `android:visibility` binding expression in fragment_collection_details.xml.
       binding.noBooksMessage.isVisible = it.isEmpty()
@@ -125,7 +126,7 @@ class CollectionDetailsFragment : Fragment() {
       requireActivity().onBackPressed()
     }
 
-    viewModel.title.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.title) {
       binding.toolbar.title = it?.title ?: ""
     }
 

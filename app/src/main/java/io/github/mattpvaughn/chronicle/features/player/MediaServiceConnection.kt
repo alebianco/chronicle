@@ -8,8 +8,8 @@ import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.Builder
 import android.support.v4.media.session.PlaybackStateCompat.STATE_NONE
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -20,9 +20,16 @@ class MediaServiceConnection
     applicationContext: Context,
     serviceComponent: ComponentName,
   ) {
-    val isConnected = MutableLiveData(false)
-    val playbackState = MutableLiveData(EMPTY_PLAYBACK_STATE)
-    val nowPlaying = MutableLiveData(NOTHING_PLAYING)
+    // Publicly mutable, exactly as the `MutableLiveData` fields these replaced were (cu-52). The
+    // unit tests drive this class as a fake — setting `playbackState.value` to simulate the
+    // service — so hiding the writer behind a private backing field would only buy a set of
+    // test-only mutators. `MutableStateFlow` is thread-safe and its assignment lands
+    // **immediately**, which is the whole reason for the change: every publish here used to be a
+    // `postValue` that deferred to the next main-loop pass, and `connectIfIdle` below documents
+    // the crash that caused.
+    val isConnected = MutableStateFlow(false)
+    val playbackState = MutableStateFlow(EMPTY_PLAYBACK_STATE)
+    val nowPlaying = MutableStateFlow(NOTHING_PLAYING)
 
     /**
      * True between calling [MediaBrowserCompat.connect] and one of its three terminal callbacks.
@@ -40,7 +47,7 @@ class MediaServiceConnection
       object : MediaBrowserCompat.ConnectionCallback() {
         override fun onConnected() {
           isConnecting = false
-          isConnected.postValue(true)
+          isConnected.value = true
 
           // Create a MediaControllerCompat from the session token
           mediaController =
@@ -54,10 +61,8 @@ class MediaServiceConnection
 
           // If the service already exists, bind the state right now
           if (mediaController?.playbackState?.state ?: STATE_NONE != STATE_NONE) {
-            playbackState.postValue(
-              mediaController?.playbackState ?: EMPTY_PLAYBACK_STATE,
-            )
-            nowPlaying.postValue(mediaController?.metadata ?: NOTHING_PLAYING)
+            playbackState.value = mediaController?.playbackState ?: EMPTY_PLAYBACK_STATE
+            nowPlaying.value = mediaController?.metadata ?: NOTHING_PLAYING
           }
         }
 
@@ -65,14 +70,14 @@ class MediaServiceConnection
           // The Service has crashed. Disable transport controls until it automatically reconnects
           Timber.i("Service connection suspended")
           isConnecting = false
-          isConnected.postValue(false)
+          isConnected.value = false
         }
 
         override fun onConnectionFailed() {
           // The Service has refused our connection
           Timber.i("Service connection failed")
           isConnecting = false
-          isConnected.postValue(false)
+          isConnected.value = false
         }
       }
 
@@ -103,23 +108,23 @@ class MediaServiceConnection
       override fun onPlaybackStateChanged(state: PlaybackStateCompat?) {
         onConnected = {}
         Timber.i("MediaController state: $state")
-        playbackState.postValue(state ?: EMPTY_PLAYBACK_STATE)
+        playbackState.value = state ?: EMPTY_PLAYBACK_STATE
       }
 
       override fun onMetadataChanged(metadata: MediaMetadataCompat?) {
         onConnected = {}
         Timber.i("MediaController metadata: ${metadata?.describe()}")
         if (metadata?.id == null || metadata.title == null) {
-          nowPlaying.postValue(NOTHING_PLAYING)
+          nowPlaying.value = NOTHING_PLAYING
         } else {
-          nowPlaying.postValue(metadata)
+          nowPlaying.value = metadata
         }
       }
 
       override fun onSessionDestroyed() {
         onConnected = {}
         Timber.i("MediaController callback is kill")
-        isConnected.postValue(false)
+        isConnected.value = false
         super.onSessionDestroyed()
       }
     }
@@ -127,7 +132,7 @@ class MediaServiceConnection
     fun disconnect() {
       Timber.i("Disconnecting MediaServiceConnection")
       isConnecting = false
-      isConnected.postValue(false)
+      isConnected.value = false
       mediaControllerCallback.onConnected = {}
       mediaController?.unregisterCallback(mediaControllerCallback)
       mediaBrowser.disconnect()
@@ -154,9 +159,9 @@ class MediaServiceConnection
       // `mediaBrowser.isConnected` is the browser's *own* synchronous state, and it is the only
       // reliable thing to test here.
       //
-      // The guard used to be `isConnecting || isConnected.value == true`, and both halves can be
-      // false while the browser is already CONNECTED: `onConnected` clears `isConnecting`
-      // immediately but publishes `isConnected` with **postValue**, which defers to the next
+      // The guard used to be `isConnecting || isConnected.value == true`, and both halves could
+      // be false while the browser was already CONNECTED: `onConnected` cleared `isConnecting`
+      // immediately but published `isConnected` with **postValue**, which defers to the next
       // main-loop pass. Anything calling `connect()` inside that window — `onNewIntent`, an
       // Activity recreation — reached `MediaBrowserCompat.connect()`, which throws rather than
       // ignoring a redundant call:
@@ -164,9 +169,10 @@ class MediaServiceConnection
       //   IllegalStateException: connect() called while neither disconnecting nor disconnected
       //   (state=CONNECT_STATE_CONNECTED)
       //
-      // Reproduced on a device by delivering two intents in quick succession. Same
-      // postValue-defers-the-write hazard as `_currentlyPlayingLayoutState` in
-      // `MainActivityViewModel`.
+      // Reproduced on a device by delivering two intents in quick succession. The publish is a
+      // `MutableStateFlow` assignment now, which lands immediately, so that particular window is
+      // closed (cu-52) — but the browser's own state stays the right thing to ask, since it also
+      // moves during `connect()` itself, before any callback of ours runs.
       if (isConnecting || mediaBrowser.isConnected) {
         Timber.i("Already connected or connecting; skipping redundant connect()")
         return

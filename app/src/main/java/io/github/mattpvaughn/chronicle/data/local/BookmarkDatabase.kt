@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.Context
-import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Insert
@@ -12,6 +11,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.model.OffsetConverters
+import kotlinx.coroutines.flow.Flow
 
 private const val BOOKMARK_DATABASE_NAME = "bookmark_db"
 
@@ -60,7 +60,7 @@ interface BookmarkDao {
    * without it SQLite may return them in either order and the list would reshuffle between reads.
    */
   @Query("SELECT * FROM Bookmark WHERE bookId = :bookId ORDER BY position ASC, createdAt ASC")
-  fun getBookmarksForBook(bookId: String): LiveData<List<Bookmark>>
+  fun getBookmarksForBook(bookId: String): Flow<List<Bookmark>>
 
   @Query("SELECT * FROM Bookmark WHERE bookId = :bookId ORDER BY position ASC, createdAt ASC")
   suspend fun getBookmarksForBookAsync(bookId: String): List<Bookmark>

@@ -1,12 +1,12 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.Context
-import androidx.lifecycle.LiveData
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookTrackData
+import kotlinx.coroutines.flow.Flow
 
 private const val BOOK_DATABASE_NAME = "book_db"
 
@@ -191,7 +191,7 @@ abstract class BookDatabase : RoomDatabase() {
 @Dao
 interface BookDao {
   @Query("SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive ORDER BY titleSort")
-  fun getAllRows(offlineModeActive: Boolean): LiveData<List<Audiobook>>
+  fun getAllRows(offlineModeActive: Boolean): Flow<List<Audiobook>>
 
   @Query("SELECT * FROM Audiobook")
   fun getAudiobooks(): List<Audiobook>
@@ -223,7 +223,7 @@ interface BookDao {
   fun getAudiobook(
     id: String,
     isOfflineModeActive: Boolean,
-  ): LiveData<Audiobook?>
+  ): Flow<Audiobook?>
 
   @Query(
     "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive ORDER BY addedAt DESC LIMIT :bookCount",
@@ -231,7 +231,7 @@ interface BookDao {
   fun getRecentlyAdded(
     bookCount: Int,
     offlineModeActive: Boolean,
-  ): LiveData<List<Audiobook>>
+  ): Flow<List<Audiobook>>
 
   @Query(
     "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive ORDER BY addedAt DESC LIMIT :bookCount",
@@ -242,7 +242,7 @@ interface BookDao {
   ): List<Audiobook>
 
   @Query("SELECT * FROM Audiobook ORDER BY updatedAt DESC LIMIT 25")
-  fun getOnDeck(): LiveData<List<Audiobook>>
+  fun getOnDeck(): Flow<List<Audiobook>>
 
   @Query(
     """
@@ -255,7 +255,7 @@ interface BookDao {
   fun getRecentlyListened(
     bookCount: Int,
     offlineModeActive: Boolean,
-  ): LiveData<List<Audiobook>>
+  ): Flow<List<Audiobook>>
 
   @Query(
     """
@@ -309,7 +309,7 @@ interface BookDao {
   fun search(
     query: String,
     offlineModeActive: Boolean,
-  ): LiveData<List<Audiobook>>
+  ): Flow<List<Audiobook>>
 
   @Query(
     "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive AND (title LIKE :query OR author LIKE :query)",
@@ -329,7 +329,7 @@ interface BookDao {
   suspend fun getAudiobookAsync(bookId: String): Audiobook?
 
   @Query("SELECT * FROM Audiobook WHERE isCached >= :isCached")
-  fun getCachedAudiobooks(isCached: Boolean = true): LiveData<List<Audiobook>>
+  fun getCachedAudiobooks(isCached: Boolean = true): Flow<List<Audiobook>>
 
   @Query("SELECT * FROM Audiobook WHERE isCached >= :isCached")
   fun getCachedAudiobooksAsync(isCached: Boolean = true): List<Audiobook>

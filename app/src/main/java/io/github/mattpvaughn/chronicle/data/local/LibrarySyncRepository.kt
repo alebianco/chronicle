@@ -1,7 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.BookTrackData
 import io.github.mattpvaughn.chronicle.data.model.getProgress
@@ -10,6 +8,8 @@ import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.Event
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -27,8 +27,8 @@ class LibrarySyncRepository
     private var repoJob = Job()
     private val repoScope = CoroutineScope(repoJob + dispatchers.io)
 
-    private var _isRefreshing = MutableLiveData<Boolean>()
-    val isRefreshing: LiveData<Boolean>
+    private var _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean>
       get() = _isRefreshing
 
     /**
@@ -40,24 +40,24 @@ class LibrarySyncRepository
      * trigger that also made `refreshDataPaginated` prune the library. Emitting an event instead
      * keeps the decision about *how* to tell the user in the UI layer, where a Looper exists.
      */
-    private val _errorMessage = MutableLiveData<Event<Int>>()
-    val errorMessage: LiveData<Event<Int>>
+    private val _errorMessage = MutableStateFlow<Event<Int>?>(null)
+    val errorMessage: StateFlow<Event<Int>?>
       get() = _errorMessage
 
     fun refreshLibrary() {
       repoScope.launch {
         val refreshed =
           try {
-            _isRefreshing.postValue(true)
+            _isRefreshing.value = true
             bookRepository.refreshDataPaginated()
             trackRepository.refreshDataPaginated()
             true
           } catch (e: Throwable) {
             Timber.e(e, "Failed to refresh the library")
-            _errorMessage.postValue(Event(R.string.failed_to_refresh_library))
+            _errorMessage.value = Event(R.string.failed_to_refresh_library)
             false
           } finally {
-            _isRefreshing.postValue(false)
+            _isRefreshing.value = false
           }
 
         // Only the re-derive is skipped on failure: nothing was fetched, so nothing changed, and

@@ -3,7 +3,9 @@ package io.github.mattpvaughn.chronicle.features.library
 import android.content.Context
 import android.content.SharedPreferences
 import android.text.format.Formatter
-import androidx.lifecycle.*
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
@@ -29,13 +31,24 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.Cach
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.NOT_CACHED
 import io.github.mattpvaughn.chronicle.features.search.SearchController
 import io.github.mattpvaughn.chronicle.features.search.SearchRow
-import io.github.mattpvaughn.chronicle.util.*
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.booksKey
+import io.github.mattpvaughn.chronicle.util.booleanFlow
+import io.github.mattpvaughn.chronicle.util.bytesAvailable
+import io.github.mattpvaughn.chronicle.util.combineDistinctAsync
+import io.github.mattpvaughn.chronicle.util.stringFlow
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserListener
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString.ResourceString
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -49,6 +62,7 @@ class LibraryViewModel(
   sharedPreferences: SharedPreferences,
   private val exceptionHandler: CoroutineExceptionHandler,
   private val appContext: Context,
+  private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -62,6 +76,7 @@ class LibraryViewModel(
       private val sharedPreferences: SharedPreferences,
       private val exceptionHandler: CoroutineExceptionHandler,
       private val appContext: Context,
+      private val dispatchers: DispatcherProvider,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
@@ -74,6 +89,7 @@ class LibraryViewModel(
             sharedPreferences,
             exceptionHandler,
             appContext,
+            dispatchers,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -89,67 +105,54 @@ class LibraryViewModel(
    *  event carrying a string resource rather than a `Toast` (which would throw there). */
   val syncError = librarySyncRepository.errorMessage
 
-  private var _isSearchActive = MutableLiveData<Boolean>()
-  val isSearchActive: LiveData<Boolean>
+  private var _isSearchActive = MutableStateFlow(false)
+  val isSearchActive: StateFlow<Boolean>
     get() = _isSearchActive
 
   val viewStyle =
-    StringPreferenceLiveData(
+    sharedPreferences.stringFlow(
       KEY_LIBRARY_VIEW_STYLE,
       prefsRepo.libraryBookViewStyle,
-      sharedPreferences,
     )
 
-  private var _isFilterShown = MutableLiveData(false)
-  val isFilterShown: LiveData<Boolean>
+  private var _isFilterShown = MutableStateFlow(false)
+  val isFilterShown: StateFlow<Boolean>
     get() = _isFilterShown
 
   val isSortDescending =
-    BooleanPreferenceLiveData(
+    sharedPreferences.booleanFlow(
       KEY_IS_LIBRARY_SORT_DESCENDING,
       true,
-      sharedPreferences,
     )
 
   val arePlayedAudiobooksHidden =
-    BooleanPreferenceLiveData(
+    sharedPreferences.booleanFlow(
       KEY_HIDE_PLAYED_AUDIOBOOKS,
       false,
-      sharedPreferences,
     )
 
   private val sortKey =
-    StringPreferenceLiveData(KEY_BOOK_SORT_BY, SORT_KEY_TITLE, sharedPreferences)
-  val isOffline = BooleanPreferenceLiveData(KEY_OFFLINE_MODE, false, sharedPreferences)
-
-  private var prevBooks = emptyList<Audiobook>()
+    sharedPreferences.stringFlow(KEY_BOOK_SORT_BY, SORT_KEY_TITLE)
+  val isOffline = sharedPreferences.booleanFlow(KEY_OFFLINE_MODE, false)
 
   // Deduped at the source: this is the *whole library*, and Room re-emits it on every write to
   // the Audiobook table — once a second during playback. Without this the sort and filter below
   // ran per tick over every book, scaling with library size rather than with what changed
   // (cu-110, and the mechanism behind cu-51).
-  private val allBooks = bookRepository.getAllBooks().distinctBy { it.booksKey() }
-  val books =
-    QuintLiveDataAsync(
-      viewModelScope,
+  private val allBooks = bookRepository.getAllBooks().distinctUntilChangedBy { it.booksKey() }
+  val books: Flow<List<Audiobook>> =
+    combineDistinctAsync(
       allBooks,
       isSortDescending,
       sortKey,
       arePlayedAudiobooksHidden,
       isOffline,
-    ) { _books, _isDescending, _sortKey, _hidePlayed, _isOffline ->
-      if (_books.isNullOrEmpty()) {
-        return@QuintLiveDataAsync emptyList<Audiobook>()
-      }
-
-      // Use defaults if provided null values
-      val desc = _isDescending ?: true
-      val key = _sortKey ?: SORT_KEY_TITLE
-      val hidePlayed = _hidePlayed ?: false
-      val offline = _isOffline ?: false
-
-      val results =
-        _books.filter {
+      dispatchers.io,
+    ) { books, desc, key, hidePlayed, offline ->
+      if (books.isEmpty()) {
+        emptyList()
+      } else {
+        books.filter {
           (!offline || it.isCached && offline) && (!hidePlayed || hidePlayed && it.viewCount == 0L)
         }
           .sortedWith(
@@ -175,26 +178,16 @@ class LibraryViewModel(
                 }
             },
           )
-
-      // If nothing the UI draws has changed, return the previous list so the RecyclerView diff
-      // is skipped.
-      //
-      // Keyed on `booksKey()` — id, cached and progress — not on ids alone. Ids alone made this
-      // return the *stale* list for any change that kept the same books, so a book's progress bar
-      // in the library never moved: listen for an hour, come back, see the old value. The set of
-      // ids is unchanged in the overwhelmingly common case, which is exactly when progress *does*
-      // change (cu-110).
-      if (prevBooks.booksKey() == results.booksKey()) {
-        return@QuintLiveDataAsync prevBooks
       }
-
-      prevBooks = results
-
-      return@QuintLiveDataAsync results
     }
+      // Keyed on `booksKey()` — id, cached and progress — not on the list's own `equals`. Ids alone
+      // made the old hand-rolled version hold the *stale* list for any change that kept the same
+      // books, so a book's progress bar in the library never moved (cu-110). This replaces the
+      // `prevBooks` field that version compared by hand.
+      .distinctUntilChangedBy { it.booksKey() }
 
-  private var _messageForUser = MutableLiveData<Event<String>>()
-  val messageForUser: LiveData<Event<String>>
+  private var _messageForUser = MutableStateFlow<Event<String>?>(null)
+  val messageForUser: StateFlow<Event<String>?>
     get() = _messageForUser
 
   /**
@@ -205,18 +198,18 @@ class LibraryViewModel(
    */
   private val searchController = SearchController(bookRepository, viewModelScope)
 
-  val searchRows: LiveData<List<SearchRow>>
+  val searchRows: StateFlow<List<SearchRow>>
     get() = searchController.rows
 
-  val isQueryEmpty: LiveData<Boolean>
+  val isQueryEmpty: StateFlow<Boolean>
     get() = searchController.isQueryEmpty
 
-  private var _bottomChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
-  val bottomChooserState: LiveData<BottomSheetChooser.BottomChooserState>
+  private var _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+  val bottomChooserState: StateFlow<BottomSheetChooser.BottomChooserState>
     get() = _bottomChooserState
 
   private var _tracks = trackRepository.getAllTracks()
-  val tracks: LiveData<List<MediaItemTrack>>
+  val tracks: Flow<List<MediaItemTrack>>
     get() = _tracks
 
   private val cacheStatus =
@@ -230,7 +223,7 @@ class LibraryViewModel(
     }
 
   fun setSearchActive(isSearchActive: Boolean) {
-    _isSearchActive.postValue(isSearchActive)
+    _isSearchActive.value = isSearchActive
     searchController.setSearchActive(isSearchActive)
   }
 
@@ -238,28 +231,6 @@ class LibraryViewModel(
   fun search(query: String) {
     searchController.search(query)
   }
-
-  private val serverConnectionObserver =
-    Observer<Boolean> { isConnectedToServer ->
-      if (isConnectedToServer) {
-        viewModelScope.launch(exceptionHandler) {
-          val millisSinceLastRefresh =
-            System.currentTimeMillis() - prefsRepo.lastRefreshTimeStamp
-          val minutesSinceLastRefresh = millisSinceLastRefresh / 1000 / 60
-          val bookCount = bookRepository.getBookCount()
-          val shouldRefresh =
-            minutesSinceLastRefresh > prefsRepo.refreshRateMinutes || bookCount == 0
-          Timber.i(
-            """$minutesSinceLastRefresh minutes since last libraryrefresh,
-                    |${prefsRepo.refreshRateMinutes} needed
-            """.trimMargin(),
-          )
-          if (shouldRefresh) {
-            refreshData()
-          }
-        }
-      }
-    }
 
   fun disableOfflineMode() {
     prefsRepo.offlineMode = false
@@ -322,14 +293,13 @@ class LibraryViewModel(
     options: List<FormattableString>,
     listener: BottomChooserListener,
   ) {
-    _bottomChooserState.postValue(
+    _bottomChooserState.value =
       BottomSheetChooser.BottomChooserState(
         title = title,
         options = options,
         listener = listener,
         shouldShow = true,
-      ),
-    )
+      )
   }
 
   fun refreshData() {
@@ -339,7 +309,7 @@ class LibraryViewModel(
   /** Shows/hides the filter/sort/view menu to the user. Show if [isVisible] is true, hide otherwise */
   fun setFilterMenuVisible(isVisible: Boolean) {
     if (isVisible != _isFilterShown.value) {
-      _isFilterShown.postValue(isVisible)
+      _isFilterShown.value = isVisible
     }
   }
 

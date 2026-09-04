@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.application
 
-import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.STATE_NONE
 import androidx.lifecycle.*
@@ -18,12 +17,20 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginSta
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.id
 import io.github.mattpvaughn.chronicle.features.player.isPlaying
-import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
-import io.github.mattpvaughn.chronicle.util.TripleLiveData
-import io.github.mattpvaughn.chronicle.util.mapAsync
-import io.github.mattpvaughn.chronicle.util.postEvent
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
+import io.github.mattpvaughn.chronicle.util.combineDistinct
+import io.github.mattpvaughn.chronicle.util.setEvent
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -72,10 +79,10 @@ class MainActivityViewModel(
     EXPANDED,
   }
 
-  val isLoggedIn =
-    loginRepo.loginEvent.map {
-      it.peekContent() == LOGGED_IN_FULLY
-    }
+  val isLoggedIn: StateFlow<Boolean> =
+    loginRepo.loginEvent
+      .map { it.peekContent() == LOGGED_IN_FULLY }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
   /**
    * True while the user is part-way through onboarding — signed in, but without a user, server or
@@ -87,82 +94,81 @@ class MainActivityViewModel(
    * (cu-124). The emptier the cache, the more obviously broken it would have looked; with a full
    * one it was invisible.
    */
-  val isOnboarding =
-    loginRepo.loginEvent.map {
-      when (it.peekContent()) {
-        LOGGED_IN_NO_USER_CHOSEN, LOGGED_IN_NO_SERVER_CHOSEN, LOGGED_IN_NO_LIBRARY_CHOSEN -> true
-        else -> false
-      }
-    }
+  val isOnboarding: StateFlow<Boolean> =
+    loginRepo.loginEvent
+      .map {
+        when (it.peekContent()) {
+          LOGGED_IN_NO_USER_CHOSEN, LOGGED_IN_NO_SERVER_CHOSEN, LOGGED_IN_NO_LIBRARY_CHOSEN -> true
+          else -> false
+        }
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
   /**
-   * The player sheet's state. Written with `value =`, **never** `postValue`.
+   * The player sheet's state.
    *
-   * Every writer here runs on the main thread — click handlers and LiveData observers — and
-   * `postValue` defers the write to the next main-loop pass. Three things read this state back to
-   * decide what to do ([minimizeCurrentlyPlaying], [maximizeCurrentlyPlaying],
-   * [onCurrentlyPlayingHandleDragged]) and so does the activity's back handler, so a deferred write
-   * means the next reader sees the *previous* state. Back then decided the sheet was not expanded
-   * and fell through to leaving the app (cu-73).
-   *
-   * `postValue` also coalesces: several posts in one loop keep only the last, so a
-   * collapse-then-expand pair could lose the collapse entirely.
+   * Three things read this state back to decide what to do ([minimizeCurrentlyPlaying],
+   * [maximizeCurrentlyPlaying], [onCurrentlyPlayingHandleDragged]) and so does the activity's back
+   * handler. As a `MutableLiveData` written with `postValue` the write deferred to the next
+   * main-loop pass, so the next reader saw the *previous* state — back then decided the sheet was
+   * not expanded and fell through to leaving the app (cu-73) — and several posts in one loop
+   * coalesced, losing a collapse-then-expand pair entirely. A `MutableStateFlow` assignment lands
+   * immediately and cannot have either shape (cu-52).
    */
-  private var _currentlyPlayingLayoutState = MutableLiveData(HIDDEN)
-  val currentlyPlayingLayoutState: LiveData<BottomSheetState>
+  private val _currentlyPlayingLayoutState = MutableStateFlow(HIDDEN)
+  val currentlyPlayingLayoutState: StateFlow<BottomSheetState>
     get() = _currentlyPlayingLayoutState
 
-  private var audiobookId = MutableLiveData(NO_AUDIOBOOK_FOUND_ID)
+  private val audiobookId = MutableStateFlow(NO_AUDIOBOOK_FOUND_ID)
 
-  val audiobook =
-    mapAsync(audiobookId, viewModelScope) { id ->
-      bookRepository.getAudiobookAsync(id) ?: EMPTY_AUDIOBOOK
-    }
+  val audiobook: StateFlow<Audiobook> =
+    audiobookId
+      .mapLatest { id -> bookRepository.getAudiobookAsync(id) ?: EMPTY_AUDIOBOOK }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_AUDIOBOOK)
 
-  private var tracks =
-    audiobookId.switchMap { id ->
+  private val tracks: Flow<List<MediaItemTrack>> =
+    audiobookId.flatMapLatest { id ->
       if (id != NO_AUDIOBOOK_FOUND_ID) {
         trackRepository.getTracksForAudiobook(id)
       } else {
-        MutableLiveData(emptyList())
+        flowOf(emptyList())
       }
     }
 
-  private var _errorMessage = MutableLiveData<Event<String>>()
-  val errorMessage: LiveData<Event<String>>
+  private val _errorMessage = MutableStateFlow(Event(""))
+  val errorMessage: StateFlow<Event<String>>
     get() = _errorMessage
 
-  val hasCollections = collectionsRepository.hasCollections()
+  val hasCollections: StateFlow<Boolean> =
+    collectionsRepository
+      .hasCollections()
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
   // Used to cache tracks.asChapterList when tracks changes
-  private val tracksAsChaptersCache =
-    mapAsync(tracks, viewModelScope) {
-      it.asChapterList()
-    }
+  private val tracksAsChaptersCache: Flow<List<Chapter>> = tracks.mapLatest { it.asChapterList() }
 
   /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
-  private val chaptersFromTable =
-    audiobookId.switchMap { id ->
+  private val chaptersFromTable: Flow<List<Chapter>> =
+    audiobookId.flatMapLatest { id ->
       if (id != NO_AUDIOBOOK_FOUND_ID) {
         bookRepository.getChaptersForBookLive(id)
       } else {
-        MutableLiveData(emptyList())
+        flowOf(emptyList())
       }
     }
 
-  val chapters: TripleLiveData<List<Chapter>, Audiobook, List<Chapter>, List<Chapter>> =
-    TripleLiveData(
+  val chapters: StateFlow<List<Chapter>> =
+    combineDistinct(
       chaptersFromTable,
       audiobook,
       tracksAsChaptersCache,
-    ) { _fromTable: List<Chapter>?, _audiobook: Audiobook?, _tracksAsChapters: List<Chapter>? ->
-      resolveChaptersFromCache(_fromTable, _audiobook, _tracksAsChapters)
-    }
+    ) { fromTable, book, tracksAsChapters ->
+      resolveChaptersFromCache(fromTable, book, tracksAsChapters)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  val currentChapterTitle =
-    DoubleLiveData(tracks, chapters) { _tracks, _chapters ->
-      if (_chapters.isNullOrEmpty() || _tracks.isNullOrEmpty()) {
-        return@DoubleLiveData "No track playing"
+  val currentChapterTitle: StateFlow<String> =
+    combineDistinct(tracks, chapters) { _tracks, _chapters ->
+      if (_chapters.isEmpty() || _tracks.isEmpty()) {
+        return@combineDistinct "No track playing"
       }
       // Book-absolute, because `Chapter.bookStartTimeOffset` is (cu-115). This used to pass
       // `activeTrack.progress` — an **in-track** offset — into a lookup that compares against
@@ -173,13 +179,17 @@ class MainActivityViewModel(
       //
       // `chapterAtBookProgress` is the book-frame lookup, and it clamps past the end rather than
       // returning EMPTY_CHAPTER — which is what `CurrentlyPlayingSingleton` already falls back to.
-      return@DoubleLiveData _chapters.chapterAtBookProgress(_tracks.getProgress()).title
-    }
+      return@combineDistinct _chapters.chapterAtBookProgress(_tracks.getProgress()).title
+    }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+      "No track playing",
+    )
 
-  val isPlaying =
-    mediaServiceConnection.playbackState.map {
-      it.isPlaying
-    }
+  val isPlaying: StateFlow<Boolean> =
+    mediaServiceConnection.playbackState
+      .map { it.isPlaying }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
   /**
    * True while the player is buffering or connecting.
@@ -188,55 +198,64 @@ class MainActivityViewModel(
    * playback control on screen, so without this a stalled start there looks identical to a paused
    * book (cu-95).
    */
-  val isAudioLoading =
-    mediaServiceConnection.playbackState.map { state ->
-      state.state == PlaybackStateCompat.STATE_BUFFERING ||
-        state.state == PlaybackStateCompat.STATE_CONNECTING
-    }
+  val isAudioLoading: StateFlow<Boolean> =
+    mediaServiceConnection.playbackState
+      .map { state ->
+        state.state == PlaybackStateCompat.STATE_BUFFERING ||
+          state.state == PlaybackStateCompat.STATE_CONNECTING
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  private val metadataObserver =
-    Observer<MediaMetadataCompat> { metadata ->
-      metadata.id?.let { trackId ->
-        if (trackId.isNotEmpty()) {
-          viewModelScope.launch(exceptionHandler) {
+  /**
+   * Collected on [viewModelScope] rather than observed forever.
+   *
+   * As `observeForever` pairs these needed an explicit `removeObserver` in [onCleared] against a
+   * collaborator that outlives the ViewModel; the scope's own cancellation is what does that now.
+   */
+  private fun observePlaybackState() {
+    viewModelScope.launch(exceptionHandler) {
+      mediaServiceConnection.nowPlaying.collect { metadata ->
+        metadata.id?.let { trackId ->
+          if (trackId.isNotEmpty()) {
             setAudiobook(trackId)
           }
-        }
-      } ?: run { _currentlyPlayingLayoutState.value = HIDDEN }
+        } ?: run { _currentlyPlayingLayoutState.value = HIDDEN }
+      }
     }
+    viewModelScope.launch(exceptionHandler) {
+      mediaServiceConnection.playbackState.collect { state -> onPlaybackStateChanged(state) }
+    }
+  }
 
-  private val playbackObserver =
-    Observer<PlaybackStateCompat> { state ->
-      Timber.i("Observing playback: $state")
-      when (state.state) {
-        // Only STATE_NONE hides the player. It means "there is no longer anything to play" —
-        // the service tore down, or nothing was ever loaded.
-        //
-        // STATE_STOPPED deliberately does **not**: it fires when a book reaches the end of its
-        // last track, and the book is still the current one, merely not advancing. Hiding on it
-        // was a one-way door — nothing could bring the sheet back, because the only routes off
-        // HIDDEN need either a later non-stopped state (there is none; playback has ended) or
-        // `setAudiobook` seeing a *different* book id, which re-selecting the same book fails.
-        // Since the collapsed player is the only handle that expands the sheet, the player became
-        // unreachable, and for an already-finished book it was never reachable at all (cu-119).
-        STATE_NONE -> setBottomSheetState(HIDDEN)
-        else -> {
-          if (currentlyPlayingLayoutState.value == HIDDEN) {
-            setBottomSheetState(COLLAPSED)
-          }
+  private fun onPlaybackStateChanged(state: PlaybackStateCompat) {
+    Timber.i("Observing playback: $state")
+    when (state.state) {
+      // Only STATE_NONE hides the player. It means "there is no longer anything to play" —
+      // the service tore down, or nothing was ever loaded.
+      //
+      // STATE_STOPPED deliberately does **not**: it fires when a book reaches the end of its
+      // last track, and the book is still the current one, merely not advancing. Hiding on it
+      // was a one-way door — nothing could bring the sheet back, because the only routes off
+      // HIDDEN need either a later non-stopped state (there is none; playback has ended) or
+      // `setAudiobook` seeing a *different* book id, which re-selecting the same book fails.
+      // Since the collapsed player is the only handle that expands the sheet, the player became
+      // unreachable, and for an already-finished book it was never reachable at all (cu-119).
+      STATE_NONE -> setBottomSheetState(HIDDEN)
+      else -> {
+        if (currentlyPlayingLayoutState.value == HIDDEN) {
+          setBottomSheetState(COLLAPSED)
         }
       }
     }
+  }
 
   init {
-    mediaServiceConnection.nowPlaying.observeForever(metadataObserver)
-    mediaServiceConnection.playbackState.observeForever(playbackObserver)
+    observePlaybackState()
   }
 
   /** The track [setAudiobook] last resolved, so an unchanged tick costs nothing. */
   private var lastResolvedTrackId: String = TRACK_NOT_FOUND
 
-  private fun setAudiobook(trackId: String) {
+  private suspend fun setAudiobook(trackId: String) {
     // Cheapest guard first (DRAFT-117). `nowPlaying` re-emits on every 1 Hz progress tick with
     // the *same* track, and this method used to do a suspending DB read on each one before the
     // "has the book changed?" check below could reject it. Measured: 48 `mapAsync` resumptions
@@ -248,26 +267,24 @@ class MainActivityViewModel(
     }
     lastResolvedTrackId = trackId
 
-    val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
-    viewModelScope.launch(exceptionHandler) {
-      val bookId = trackRepository.getBookIdForTrack(trackId)
-      if (bookId == NO_AUDIOBOOK_FOUND_ID) {
-        return@launch
-      }
-      // Only change the active audiobook if it differs from the one currently in metadata
-      if (previousAudiobookId != bookId) {
-        audiobookId.postValue(bookId)
-      }
-      // Revealing the sheet is *not* conditional on the book having changed. It used to be, which
-      // stranded the player: re-selecting the same book after it had been hidden was rejected by
-      // the guard above, so nothing could bring the collapsed handle back (cu-119). Whether there
-      // is something playing and whether it is a *new* something are different questions.
-      if (_currentlyPlayingLayoutState.value == HIDDEN) {
-        // The one legitimate postValue: this runs in a coroutine after a suspending DB read, so
-        // it may not be on the main thread. Every other writer of this field uses `value =` —
-        // see the field's own note for why that matters.
-        _currentlyPlayingLayoutState.postValue(COLLAPSED)
-      }
+    val previousAudiobookId = audiobook.value.id
+    val bookId = trackRepository.getBookIdForTrack(trackId)
+    if (bookId == NO_AUDIOBOOK_FOUND_ID) {
+      return
+    }
+    // Only change the active audiobook if it differs from the one currently in metadata
+    if (previousAudiobookId != bookId) {
+      audiobookId.value = bookId
+    }
+    // Revealing the sheet is *not* conditional on the book having changed. It used to be, which
+    // stranded the player: re-selecting the same book after it had been hidden was rejected by
+    // the guard above, so nothing could bring the collapsed handle back (cu-119). Whether there
+    // is something playing and whether it is a *new* something are different questions.
+    if (_currentlyPlayingLayoutState.value == HIDDEN) {
+      // Both writes are plain assignments now. This runs in a coroutine after a suspending DB
+      // read so it may not be on the main thread, which is why it used to need `postValue` — a
+      // `MutableStateFlow` is thread-safe, so the exception the field's note carved out is gone.
+      _currentlyPlayingLayoutState.value = COLLAPSED
     }
   }
 
@@ -299,7 +316,7 @@ class MainActivityViewModel(
   }
 
   fun pausePlayButtonClicked() {
-    if (mediaServiceConnection.isConnected.value != true) {
+    if (!mediaServiceConnection.isConnected.value) {
       mediaServiceConnection.connect(this::pausePlay)
     } else {
       pausePlay()
@@ -308,23 +325,15 @@ class MainActivityViewModel(
 
   private fun pausePlay() {
     // Require [mediaServiceConnection] is connected
-    check(mediaServiceConnection.isConnected.value == true)
+    check(mediaServiceConnection.isConnected.value)
     val transportControls = mediaServiceConnection.transportControls
-    mediaServiceConnection.playbackState.value?.let { playbackState ->
-      if (playbackState.isPlaying) {
-        Timber.i("Pausing!")
-        transportControls?.pause()
-      } else {
-        Timber.i("Playing!")
-        transportControls?.play()
-      }
+    if (mediaServiceConnection.playbackState.value.isPlaying) {
+      Timber.i("Pausing!")
+      transportControls?.pause()
+    } else {
+      Timber.i("Playing!")
+      transportControls?.play()
     }
-  }
-
-  override fun onCleared() {
-    mediaServiceConnection.nowPlaying.removeObserver(metadataObserver)
-    mediaServiceConnection.playbackState.removeObserver(playbackObserver)
-    super.onCleared()
   }
 
   override fun setBottomSheetState(state: BottomSheetState) {
@@ -333,7 +342,7 @@ class MainActivityViewModel(
 
   fun showUserMessage(errorMessage: String) {
     Timber.i("Showing error message: $errorMessage")
-    _errorMessage.postEvent(errorMessage)
+    _errorMessage.setEvent(errorMessage)
   }
 
   /** Minimize the currently playing modal/overlay if it is expanded */
