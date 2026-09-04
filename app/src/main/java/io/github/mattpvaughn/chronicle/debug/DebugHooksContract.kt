@@ -97,4 +97,19 @@ interface DebugHooksContract {
     lifecycleOwner: LifecycleOwner,
     viewModel: MainActivityViewModel,
   )
+
+  /**
+   * Moves the sync location to another volume and runs the move worker, as the settings screen
+   * does (cu-153).
+   *
+   * Exists because the question — whether changing the sync location strands partial downloads on
+   * the old volume — needs **two real volumes**, so it cannot be answered by the fixture pack, and
+   * the settings control behind it is not reachable from `adb shell input tap` any more than the
+   * bottom nav is. This runs exactly what `SettingsViewModel.setSyncLocation` runs: set the pref,
+   * then enqueue `MoveSyncLocationWorker`.
+   */
+  fun onMoveSyncLocationIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+  )
 }

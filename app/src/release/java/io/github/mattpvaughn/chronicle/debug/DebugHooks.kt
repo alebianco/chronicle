@@ -45,4 +45,9 @@ object DebugHooks : DebugHooksContract {
     lifecycleOwner: LifecycleOwner,
     viewModel: MainActivityViewModel,
   ) = Unit
+
+  override fun onMoveSyncLocationIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+  ) = Unit
 }

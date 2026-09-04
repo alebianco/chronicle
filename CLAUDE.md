@@ -452,6 +452,17 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   so a corrupted one silently misinforms the next migration. `RoomSchemaTest` checks each file's
   name against the `version` inside it; comparing column counts between neighbours does **not**
   work, because an overwritten file is an exact copy of the newer one and compares equal.
+- **Changing the sync location does *not* strand partial downloads** (cu-153). Fetch2 downloads
+  **in place** and resumes over HTTP Range, so a partial is named `<trackId>.<ext>` exactly like a
+  finished file — there is no `.part`/`.tmp` suffix. `MoveSyncLocationWorker` selects with
+  `MediaItemTrack.cachedFilePattern`, cannot tell the two apart, and moves both. Correct, but
+  load-bearing: give partials a distinguishing suffix and they start being orphaned, because
+  cu-81's prune only ever scans the *active* `cachedMediaDir`. `SyncLocationMoveTest` pins it.
+  Verified on the tablet's two real volumes (internal + a physical SD card) in **both** directions —
+  worth doing both, since they are different filesystems and `Files.move` may fall back to
+  copy+delete across them. `--es move_sync_location <dir>` is the debug hook that replays it; it
+  validates the path against `externalDeviceDirs()` by **exact** match, since `cachedMediaDir`
+  accepts any string and a bad one fails much later as "downloads don't work".
 - **The bottom navigation cannot be driven by `adb shell input tap`** — a `BottomNavigationItemView`
   sits under the system bars (the obstacle recorded in cu-54). Screens behind a tab need a debug
   hook to be reachable from a script: `--ez show_browse true` is one (cu-24). Such a hook must

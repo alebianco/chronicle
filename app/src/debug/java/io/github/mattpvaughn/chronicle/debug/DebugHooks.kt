@@ -5,10 +5,14 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
+import io.github.mattpvaughn.chronicle.features.download.MoveSyncLocationWorker
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
@@ -41,6 +45,7 @@ object DebugHooks : DebugHooksContract {
   private const val EXTRA_SHOW_PLAYER = "show_player"
   private const val EXTRA_SHOW_BROWSE = "show_browse"
   private const val EXTRA_INVALIDATE_SERVER_TOKEN = "invalidate_server_token"
+  private const val EXTRA_MOVE_SYNC_LOCATION = "move_sync_location"
 
   /**
    * The bogus token. Non-empty on purpose: `SharedPreferencesPlexPrefsRepo.server`'s getter
@@ -349,4 +354,63 @@ object DebugHooks : DebugHooksContract {
       .putBoolean(KEY_MOCK_PLEX, enabled)
       .commit()
   }
+
+  /**
+   * Moves the sync location to another volume and runs the move worker (cu-153).
+   *
+   * ```
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/\
+   *   io.github.mattpvaughn.chronicle.application.MainActivity \
+   *   --es move_sync_location /storage/XXXX-XXXX/Android/data/<pkg>/files
+   * ```
+   *
+   * Runs exactly what `SettingsViewModel.setSyncLocation` runs — set `cachedMediaDir`, then
+   * enqueue `MoveSyncLocationWorker` as unique work — because the question this exists to answer
+   * (does a location change strand partial downloads?) needs **two real volumes**, which the
+   * fixture pack cannot provide, and the settings control is no more reachable from
+   * `adb shell input tap` than the bottom nav is.
+   *
+   * The path is **validated against the app's own external dirs** rather than trusted: an
+   * arbitrary path would set `cachedMediaDir` somewhere the app cannot write, and the failure
+   * would surface later as downloads silently not working.
+   */
+  override fun onMoveSyncLocationIntent(
+    intent: Intent?,
+    activity: FragmentActivity,
+  ) {
+    val target = intent?.getStringExtra(EXTRA_MOVE_SYNC_LOCATION) ?: return
+    val candidates = Injector.get().externalDeviceDirs()
+    val dir = resolveSyncTarget(target, candidates)
+    if (dir == null) {
+      Timber.w(
+        "move_sync_location: %s is not one of this app's external dirs (%s); ignoring",
+        target,
+        candidates.map { it.absolutePath },
+      )
+      return
+    }
+
+    val prefsRepo = Injector.get().prefsRepo()
+    Timber.i("move_sync_location: %s -> %s", prefsRepo.cachedMediaDir.absolutePath, dir.absolutePath)
+    prefsRepo.cachedMediaDir = dir
+
+    WorkManager.getInstance(activity.applicationContext).beginUniqueWork(
+      MoveSyncLocationWorker.WORKER_ID,
+      ExistingWorkPolicy.REPLACE,
+      OneTimeWorkRequestBuilder<MoveSyncLocationWorker>().build(),
+    ).enqueue()
+  }
+
+  /**
+   * The external dir matching [target], or null when it is not one of them (cu-153).
+   *
+   * Split out as a pure function so the refusal is testable without a device. It matters more than
+   * it looks: `cachedMediaDir` accepts any path, so an unmatched one would point downloads at a
+   * directory the app cannot write, and the failure would surface much later as downloads silently
+   * not working rather than as a bad argument here.
+   */
+  internal fun resolveSyncTarget(
+    target: String,
+    candidates: List<java.io.File>,
+  ): java.io.File? = candidates.firstOrNull { it.absolutePath == target }
 }
