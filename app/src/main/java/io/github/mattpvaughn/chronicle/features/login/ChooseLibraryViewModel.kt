@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.login
 
 import androidx.lifecycle.*
-import androidx.lifecycle.Observer
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
@@ -13,9 +12,15 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType.Companion.ARTIST
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asLibrary
-import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
-import io.github.mattpvaughn.chronicle.util.postEvent
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
+import io.github.mattpvaughn.chronicle.util.combineDistinct
+import io.github.mattpvaughn.chronicle.util.setEvent
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.*
@@ -60,29 +65,32 @@ class ChooseLibraryViewModel
         }
       }
 
-    private val _userMessage = MutableLiveData<Event<String>>()
-    val userMessage: LiveData<Event<String>>
+    private val _userMessage = MutableStateFlow(Event(""))
+    val userMessage: StateFlow<Event<String>>
       get() = _userMessage
 
-    private var _libraries = MutableLiveData<List<PlexLibrary>>(emptyList())
-    val libraries: LiveData<List<PlexLibrary>>
+    private val _libraries = MutableStateFlow<List<PlexLibrary>>(emptyList())
+    val libraries: StateFlow<List<PlexLibrary>>
       get() = _libraries
 
     /**
      * LoadingStatus represents the status of the "connected to server" state as well as the
      * "fetched libraries" state
      */
-    private var _loadingStatus = MutableLiveData(LoadingStatus.LOADING)
-    val loadingStatus: LiveData<LoadingStatus> =
-      DoubleLiveData(plexConfig.connectionState, _loadingStatus) { serverConn, loadingConn ->
+    private val _loadingStatus = MutableStateFlow(LoadingStatus.LOADING)
+    val loadingStatus: StateFlow<LoadingStatus> =
+      combineDistinct(plexConfig.connectionState, _loadingStatus) { serverConn, loadingConn ->
         when (serverConn) {
           PlexConfig.ConnectionState.CONNECTING -> LoadingStatus.LOADING
           PlexConfig.ConnectionState.NOT_CONNECTED -> LoadingStatus.LOADING
           PlexConfig.ConnectionState.CONNECTED -> loadingConn
           PlexConfig.ConnectionState.CONNECTION_FAILED -> LoadingStatus.ERROR
-          null -> throw IllegalStateException("Cannot have a null server connection!")
         }
-      }
+      }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        LoadingStatus.LOADING,
+      )
 
     /**
      * Why the picker is empty, so the screen can say something true.
@@ -107,24 +115,24 @@ class ChooseLibraryViewModel
       REQUEST_FAILED,
     }
 
-    private val _emptyReason = MutableLiveData(EmptyReason.NO_LIBRARIES)
-    val emptyReason: LiveData<EmptyReason> = _emptyReason
+    private val _emptyReason = MutableStateFlow(EmptyReason.NO_LIBRARIES)
+    val emptyReason: StateFlow<EmptyReason> = _emptyReason
 
-    private val networkObserver =
-      Observer<Boolean> { isConnected ->
-        if (isConnected) {
-          Timber.i("Connected to server at ${plexConfig.url}, fetching libraries")
-          loadLibraries()
-        }
-      }
+    /** Held so [refresh] can restart it; see there for why restarting is the point. */
+    private var networkJob: Job? = null
 
-    private val connectionStateObserver =
-      Observer<PlexConfig.ConnectionState> { state ->
-        if (state == PlexConfig.ConnectionState.CONNECTION_FAILED) {
-          // Distinct from a failed *request*: nothing was reachable to ask.
-          _emptyReason.value = EmptyReason.CANNOT_CONNECT
+    private fun observeConnection() {
+      networkJob?.cancel()
+      networkJob =
+        viewModelScope.launch {
+          plexConfig.isConnected.collect { isConnected ->
+            if (isConnected) {
+              Timber.i("Connected to server at ${plexConfig.url}, fetching libraries")
+              loadLibraries()
+            }
+          }
         }
-      }
+    }
 
     init {
       viewModelScope.launch {
@@ -136,14 +144,15 @@ class ChooseLibraryViewModel
           Timber.i("Failed to return result!")
         }
       }
-      plexConfig.isConnected.observeForever(networkObserver)
-      plexConfig.connectionState.observeForever(connectionStateObserver)
-    }
-
-    override fun onCleared() {
-      plexConfig.isConnected.removeObserver(networkObserver)
-      plexConfig.connectionState.removeObserver(connectionStateObserver)
-      super.onCleared()
+      observeConnection()
+      viewModelScope.launch {
+        plexConfig.connectionState.collect { state ->
+          if (state == PlexConfig.ConnectionState.CONNECTION_FAILED) {
+            // Distinct from a failed *request*: nothing was reachable to ask.
+            _emptyReason.value = EmptyReason.CANNOT_CONNECT
+          }
+        }
+      }
     }
 
     private fun loadLibraries() {
@@ -156,23 +165,30 @@ class ChooseLibraryViewModel
               .filter { it.type == ARTIST.typeString }
               .map { it.asLibrary() }
           Timber.i("Libraries: ${tempLibraries.map { it.name }}")
-          _libraries.postValue(tempLibraries)
+          _libraries.value = tempLibraries
           // An empty list here is the one case where "no libraries found" is *true*: the server
           // answered and has none of the right type.
           _emptyReason.value = EmptyReason.NO_LIBRARIES
           _loadingStatus.value = if (tempLibraries.isEmpty()) LoadingStatus.ERROR else LoadingStatus.DONE
         } catch (e: Throwable) {
           Timber.e(e, "Error loading libraries")
-          _userMessage.postEvent("Unable to load libraries: ${e.message}")
+          _userMessage.setEvent("Unable to load libraries: ${e.message}")
           _emptyReason.value = EmptyReason.REQUEST_FAILED
           _loadingStatus.value = LoadingStatus.ERROR
         }
       }
     }
 
+    /**
+     * Re-runs the connected handler against the current connection state.
+     *
+     * The restart *is* the mechanism, as it was when this removed and re-added an `observeForever`:
+     * a `StateFlow` replays its current value to each new collector, so cancelling and relaunching
+     * re-delivers `isConnected` and re-fetches the libraries. Collecting a second time without
+     * cancelling would leave two collectors and fetch twice.
+     */
     fun refresh() {
-      plexConfig.isConnected.removeObserver(networkObserver)
-      plexConfig.isConnected.observeForever(networkObserver)
+      observeConnection()
     }
 
     /**

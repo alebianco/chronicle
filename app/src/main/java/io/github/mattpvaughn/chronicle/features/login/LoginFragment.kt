@@ -20,6 +20,7 @@ import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.FEATURE_FLAG_IS_AUTO_ENABLED
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.OnboardingLoginBinding
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -62,16 +63,9 @@ class LoginFragment : Fragment() {
     binding.enableAuto.visibility =
       if (FEATURE_FLAG_IS_AUTO_ENABLED) View.VISIBLE else View.GONE
 
-    loginViewModel.isLoading.observe(
-      viewLifecycleOwner,
-      Observer { isLoading: Boolean ->
-        if (isLoading) {
-          binding.loading.visibility = View.VISIBLE
-        } else {
-          binding.loading.visibility = View.GONE
-        }
-      },
-    )
+    viewLifecycleOwner.collectWhileStarted(loginViewModel.isLoading) { isLoading ->
+      binding.loading.visibility = if (isLoading) View.VISIBLE else View.GONE
+    }
 
     binding.oauthLogin.setOnClickListener {
       loginViewModel.loginWithOAuth()

@@ -17,6 +17,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.HttpException
@@ -298,7 +299,7 @@ object DebugHooks : DebugHooksContract {
       return
     }
     Timber.i("Waiting for playback before expanding the player sheet (show_player)")
-    viewModel.currentlyPlayingLayoutState.observe(lifecycleOwner) { state ->
+    lifecycleOwner.collectWhileStarted(viewModel.currentlyPlayingLayoutState) { state ->
       if (state == MainActivityViewModel.BottomSheetState.COLLAPSED) {
         Timber.i("Expanding the player sheet (show_player)")
         viewModel.expandCurrentlyPlaying()
