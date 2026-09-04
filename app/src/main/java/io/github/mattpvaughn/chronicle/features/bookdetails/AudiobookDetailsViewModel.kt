@@ -122,10 +122,18 @@ class AudiobookDetailsViewModel(
     get() = _messageForUser
 
   /**
-   * Cache status of the current audiobook. Reflects the cache status of [tracks] if they've
-   * been loaded, otherwise default to [_manualCacheStatus].
+   * Cache status of the current audiobook.
+   *
+   * Null until both sources have emitted, which means **"not known yet"** rather than "not cached".
+   *
+   * The nullability is load-bearing and survives the `Flow` conversion deliberately (cu-52).
+   * `audiobook` is Room-backed, so there is a real window at screen open where the book has not
+   * arrived; seeding this `NOT_CACHED` instead would let the download button render enabled and
+   * offer to download a book that is already on disk. The Fragment keeps the control disabled
+   * while this is null, and `onCacheButtonClick` ignores a press — throwing there crashed a
+   * main-screen control once (cu-92).
    */
-  val cacheStatus: StateFlow<CacheStatus> =
+  val cacheStatus: StateFlow<CacheStatus?> =
     combineDistinct(
       cachedFileManager.activeBookDownloads,
       audiobook,
@@ -136,15 +144,15 @@ class AudiobookDetailsViewModel(
         inputAudiobook.id in activeDownloadIDs -> CACHING
         else -> NOT_CACHED
       }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), NOT_CACHED)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
   val cacheIconTint: StateFlow<Int> =
     cacheStatus
       .map { status ->
         when (status) {
           CACHING -> R.color.icon // Doesn't matter, we show a spinner over it
-          NOT_CACHED -> R.color.icon
           CACHED -> R.color.iconActive
+          NOT_CACHED, null -> R.color.icon
         }
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.color.icon)
 
@@ -152,9 +160,9 @@ class AudiobookDetailsViewModel(
     cacheStatus
       .map { status ->
         when (status) {
-          CACHING -> R.drawable.ic_cloud_download_white // Doesn't matter, spinner covers it
-          NOT_CACHED -> R.drawable.ic_cloud_download_white
           CACHED -> R.drawable.ic_cloud_done_white
+          // Spinner covers it while CACHING; null is "not known yet" and the control is disabled.
+          CACHING, NOT_CACHED, null -> R.drawable.ic_cloud_download_white
         }
       }.stateIn(
         viewModelScope,
@@ -179,8 +187,8 @@ class AudiobookDetailsViewModel(
       .map { status ->
         when (status) {
           CACHING -> R.string.download_cancel
-          NOT_CACHED -> R.string.download
           CACHED -> R.string.download_remove
+          NOT_CACHED, null -> R.string.download
         }
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.string.download)
 
@@ -376,6 +384,11 @@ class AudiobookDetailsViewModel(
         Timber.i("Cancelling download: ${inputAudiobook.id}")
         cachedFileManager.cancelGroup(inputAudiobook.id)
       }
+      // Null until both of `cacheStatus`'s sources have emitted. That is "not known yet", not an
+      // error — throwing here crashed a main-screen control (cu-92). The Fragment also keeps the
+      // button disabled until the status resolves, so this is the backstop rather than the only
+      // guard.
+      null -> Timber.i("Cache button pressed before the status resolved; ignoring")
     }
   }
 
@@ -619,8 +632,8 @@ class AudiobookDetailsViewModel(
     toast.show()
   }
 
-  private var _forceSyncInProgress = MutableLiveData(false)
-  val forceSyncInProgress: LiveData<Boolean>
+  private val _forceSyncInProgress = MutableStateFlow(false)
+  val forceSyncInProgress: StateFlow<Boolean>
     get() = _forceSyncInProgress
 
   fun forceSyncBook(hasUserConfirmation: Boolean = false) {

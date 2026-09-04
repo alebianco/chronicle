@@ -32,7 +32,8 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBindi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
-import io.github.mattpvaughn.chronicle.util.observeEvent
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -142,7 +143,7 @@ class AudiobookDetailsFragment : Fragment() {
       ViewModelProvider(this, viewModelFactory)[AudiobookDetailsViewModel::class.java]
 
     // Was 29 binding expressions in fragment_audiobook_details.xml.
-    viewModel.audiobook.observe(viewLifecycleOwner) { book ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.audiobook) { book ->
       binding.bookTitle.text = book?.title.orEmpty()
       binding.author.text = book?.author.orEmpty()
       bindMetadataLines(binding, book)
@@ -151,25 +152,25 @@ class AudiobookDetailsFragment : Fragment() {
       bindImageRounded(
         binding.detailsArtwork,
         book?.thumb,
-        plexConfig.isConnected.value == true,
+        plexConfig.isConnected.value,
         plexConfig::toServerString,
       )
     }
-    plexConfig.isConnected.observe(viewLifecycleOwner) { connected ->
+    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
       bindImageRounded(
         binding.detailsArtwork,
         viewModel.audiobook.value?.thumb,
-        connected == true,
+        connected,
         plexConfig::toServerString,
       )
     }
 
-    viewModel.progressString.observe(viewLifecycleOwner) { binding.progress.text = it }
-    viewModel.progressPercentageString.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.progressString) { binding.progress.text = it }
+    viewLifecycleOwner.collectWhileStarted(viewModel.progressPercentageString) {
       binding.progressPercentage.text = it
     }
 
-    viewModel.cacheStatus.observe(viewLifecycleOwner) { status ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.cacheStatus) { status ->
       binding.cachingTracksSpinner.isVisible = status == CacheStatus.CACHING
       // INVISIBLE, not GONE: the icon keeps its slot while the spinner overlays it.
       binding.download.visibility =
@@ -181,22 +182,24 @@ class AudiobookDetailsFragment : Fragment() {
       binding.download.isEnabled = statusKnown
       binding.cachingTracksSpinner.isEnabled = statusKnown
     }
-    viewModel.cacheIconDrawable.observe(viewLifecycleOwner) { binding.download.setImageResource(it) }
+    viewLifecycleOwner.collectWhileStarted(viewModel.cacheIconDrawable) {
+      binding.download.setImageResource(it)
+    }
     // Immediately beside the icon it labels, so the two cannot drift apart again (cu-149). The
     // layout's static `android:contentDescription` is gone: it said "Download" for a book that was
     // already downloaded, which is what a screen reader announced.
-    viewModel.cacheContentDescription.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.cacheContentDescription) {
       binding.download.contentDescription = getString(it)
     }
-    viewModel.cacheIconTint.observe(viewLifecycleOwner) { tint ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.cacheIconTint) { tint ->
       binding.download.imageTintList = ColorStateList.valueOf(tint)
     }
     binding.download.setOnClickListener { viewModel.onCacheButtonClick() }
     binding.cachingTracksSpinner.setOnClickListener { viewModel.onCacheButtonClick() }
 
-    viewModel.isBookInViewPlaying.observe(viewLifecycleOwner) { playing ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.isBookInViewPlaying) { playing ->
       binding.detailsPausePlay.setImageResource(
-        if (playing == true) {
+        if (playing) {
           R.drawable.ic_pause_button_large_colored
         } else {
           R.drawable.ic_play_button_large_colored
@@ -204,26 +207,27 @@ class AudiobookDetailsFragment : Fragment() {
       )
     }
     binding.detailsPausePlay.setOnClickListener { viewModel.pausePlayButtonClicked() }
-    viewModel.isAudioLoading.observe(viewLifecycleOwner) { loading ->
-      binding.audioLoadingSpinner.isVisible = loading == true
-      binding.detailsPausePlay.isVisible = loading != true
+    viewLifecycleOwner.collectWhileStarted(viewModel.isAudioLoading) { loading ->
+      binding.audioLoadingSpinner.isVisible = loading
+      binding.detailsPausePlay.isVisible = !loading
     }
 
-    viewModel.summaryLinesShown.observe(viewLifecycleOwner) { binding.infoSummary.maxLines = it }
-    viewModel.showSummary.observe(viewLifecycleOwner) { show ->
-      binding.infoSummary.isVisible = show == true
-      binding.infoExpandSummary.isVisible = show == true
+    viewLifecycleOwner.collectWhileStarted(viewModel.summaryLinesShown) {
+      binding.infoSummary.maxLines = it
     }
-    viewModel.isExpanded.observe(viewLifecycleOwner) { expanded ->
-      binding.infoExpandSummary.text =
-        getString(if (expanded == true) R.string.less else R.string.more)
+    viewLifecycleOwner.collectWhileStarted(viewModel.showSummary) { show ->
+      binding.infoSummary.isVisible = show
+      binding.infoExpandSummary.isVisible = show
+    }
+    viewLifecycleOwner.collectWhileStarted(viewModel.isExpanded) { expanded ->
+      binding.infoExpandSummary.text = getString(if (expanded) R.string.less else R.string.more)
     }
     binding.infoExpandSummary.setOnClickListener { viewModel.onToggleSummaryView() }
 
-    viewModel.isLoadingTracks.observe(viewLifecycleOwner) {
-      binding.loadingTracksSpinner.isVisible = it == true
+    viewLifecycleOwner.collectWhileStarted(viewModel.isLoadingTracks) {
+      binding.loadingTracksSpinner.isVisible = it
     }
-    viewModel.serverConnection.observe(viewLifecycleOwner) { state ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.serverConnection) { state ->
       binding.connectingToServerIndicator.isVisible = state == ConnectionState.CONNECTING
       binding.connectionFailedMessage.isVisible = state == ConnectionState.CONNECTION_FAILED
     }
@@ -231,8 +235,10 @@ class AudiobookDetailsFragment : Fragment() {
 
     // Must run after the tracks adapter is assigned: setChapterList casts
     // recyclerView.adapter, and observe() delivers an already-set value at once.
-    viewModel.chapters.observe(viewLifecycleOwner) { bindChapterList(binding.tracks, it) }
-    viewModel.bottomChooserState.observe(viewLifecycleOwner) {
+    viewLifecycleOwner.collectWhileStarted(viewModel.chapters) {
+      bindChapterList(binding.tracks, it)
+    }
+    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) {
       setBottomChooserState(binding.bottomSheetChooser, it)
     }
 
@@ -254,7 +260,7 @@ class AudiobookDetailsFragment : Fragment() {
     // screen off DataBinding, so the chapter list rendered empty (cu-73). `submitChapters`, not
     // `submitList`: the adapter inserts section headers, and `submitList` is overridden to route
     // through it.
-    viewModel.chapters.observe(viewLifecycleOwner) { chapters ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.chapters) { chapters ->
       adapter.submitChapters(chapters)
     }
 
@@ -284,11 +290,11 @@ class AudiobookDetailsFragment : Fragment() {
       requireActivity().onBackPressed()
     }
 
-    viewModel.messageForUser.observeEvent(viewLifecycleOwner) { message ->
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.messageForUser) { message ->
       Toast.makeText(context, message.format(resources), LENGTH_SHORT).show()
     }
 
-    viewModel.activeChapter.observe(viewLifecycleOwner) { chapter ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.activeChapter) { chapter ->
       Timber.i(
         "Updating current chapter: (${chapter.trackId}, ${chapter.discNumber}, ${chapter.index})",
       )
@@ -306,11 +312,11 @@ class AudiobookDetailsFragment : Fragment() {
     // so on every unlock `findItem` returned null and `.setIcon` threw, killing the process and
     // with it playback. `menuItemOrNull` is the guard; the observers also re-apply in
     // `onPrepareMenu`, which is what makes the state correct rather than merely non-fatal.
-    viewModel.forceSyncInProgress.observe(viewLifecycleOwner) { isSyncing ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.forceSyncInProgress) { isSyncing ->
       applySyncIconState(isSyncing)
     }
 
-    viewModel.isWatchedIcon.observe(viewLifecycleOwner) { icon ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.isWatchedIcon) { icon ->
       applyWatchedIcon(icon)
     }
 
