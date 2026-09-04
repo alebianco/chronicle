@@ -251,6 +251,84 @@ class SeriesIndexPatternSetTest {
     assertFalse(greedy.succeeded)
   }
 
+  /**
+   * The tvnamer #216 failure, exactly: a rule that will not compile is dropped from `usable` with
+   * only a Timber line, so `explain()` never mentioned it. The user then sees their rule having no
+   * effect with nothing anywhere telling them why — which is the whole reason cu-151's tester
+   * exists, and a tester that cannot show this would reproduce the bug it exists to prevent.
+   */
+  @Test
+  fun `explain reports a rule that does not compile`() {
+    val set =
+      SeriesIndexPatternSet(
+        listOf(
+          SeriesIndexPattern(
+            name = "broken",
+            source = """(?<index>\d+""",
+            description = "unbalanced paren",
+            isUserDefined = true,
+          ),
+        ),
+      )
+
+    val attempts = set.explain("Mistborn, Book 2 - Well")
+
+    val broken = attempts.single { it.patternName == "broken" }
+    assertFalse(broken.succeeded)
+    // Asserting the *intent* rather than the exact wording: the message has to tell the user the
+    // rule is not usable and is being ignored, which is what they cannot currently discover.
+    val reason = broken.rejectedReason
+    assertTrue(
+      "expected the reason to say the rule is not a valid expression, got '$reason'",
+      reason?.contains("not a valid regular expression") == true,
+    )
+    assertTrue("expected the reason to say it is ignored, got '$reason'", reason?.contains("ignored") == true)
+  }
+
+  /**
+   * A rule that compiles but never captures a position is equally useless and equally silent —
+   * `isValid` requires the `index` group, so it is dropped the same way.
+   */
+  @Test
+  fun `explain reports a rule that captures no index group`() {
+    val set =
+      SeriesIndexPatternSet(
+        listOf(
+          SeriesIndexPattern(
+            name = "no-index-group",
+            source = """Book (\d+)""",
+            description = "captures positionally, not by name",
+            isUserDefined = true,
+          ),
+        ),
+      )
+
+    val attempt = set.explain("Mistborn, Book 2 - Well").single { it.patternName == "no-index-group" }
+
+    assertFalse(attempt.succeeded)
+    assertTrue(
+      "expected the reason to name the missing group, got '${attempt.rejectedReason}'",
+      attempt.rejectedReason?.contains("index") == true,
+    )
+  }
+
+  /** The tester has to say which rules are the user's, so `explain()` has to carry it. */
+  @Test
+  fun `explain says whether a rule is the users own`() {
+    val set =
+      SeriesIndexPatternSet.of(
+        listOf(
+          SeriesIndexPattern(name = "mine", source = """Vol (?<index>\d+)""", description = "d"),
+        ),
+        order = PatternOrder.BEFORE,
+      )
+
+    val attempts = set.explain("Vol 4")
+
+    assertTrue(attempts.single { it.patternName == "mine" }.isUserDefined)
+    assertFalse(attempts.first { it.patternName != "mine" }.isUserDefined)
+  }
+
   @Test
   fun `explain reports a non-match as such`() {
     val set = SeriesIndexPatternSet(DEFAULT_SERIES_INDEX_PATTERNS)

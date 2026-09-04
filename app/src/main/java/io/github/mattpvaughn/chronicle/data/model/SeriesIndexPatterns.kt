@@ -112,6 +112,14 @@ class SeriesIndexPatternSet(
   patterns: List<SeriesIndexPattern>,
 ) {
   /**
+   * Every pattern as given, in order, including ones that cannot be used.
+   *
+   * [usable] is what matching runs over; this is what [explain] reports on, so a dropped rule is
+   * still visible to the user who wrote it.
+   */
+  val all: List<SeriesIndexPattern> = patterns
+
+  /**
    * Only the patterns that compile *and* capture a position.
    *
    * An unusable pattern is **dropped with a log line, not fatally** — the tvnamer failure mode
@@ -167,7 +175,24 @@ class SeriesIndexPatternSet(
    * what their pattern does to a real title before they save it.
    */
   fun explain(titleSort: String): List<PatternAttempt> =
-    usable.map { pattern ->
+    all.map { pattern ->
+      // An unusable pattern never reaches `usable`, so reporting it here is the point rather than
+      // an edge case: a rule that will not compile is otherwise dropped with only a log line, and
+      // the user sees it having no effect with nothing telling them why. That is tvnamer's #216
+      // (see the file header) and precisely what this method exists to make visible.
+      if (!pattern.isValid) {
+        return@map PatternAttempt(
+          patternName = pattern.name,
+          matched = false,
+          rejectedReason =
+            if (pattern.regex == null) {
+              "not a valid regular expression, so it is ignored"
+            } else {
+              "compiles but captures no '(?<${SeriesIndexGroups.INDEX}>...)' group, so it is ignored"
+            },
+          isUserDefined = pattern.isUserDefined,
+        )
+      }
       val match = pattern.regex?.find(titleSort)
       val captured = match?.namedGroupOrNull(SeriesIndexGroups.INDEX)
       val position = captured?.toDoubleOrNull()
@@ -184,6 +209,7 @@ class SeriesIndexPatternSet(
             position >= MAX_SERIES_POSITION -> "captured '$captured', out of range"
             else -> null
           },
+        isUserDefined = pattern.isUserDefined,
       )
     }
 
@@ -229,6 +255,14 @@ data class PatternAttempt(
   val matched: Boolean,
   val capturedIndex: String? = null,
   val rejectedReason: String? = null,
+  /**
+   * Whether this rule came from the user's `series-index-rules.json` rather than being built in.
+   *
+   * Surfaced so the cu-151 tester can say which rules are the user's own: "my rule did not match"
+   * and "a built-in matched first" are different problems with different fixes, and a flat list of
+   * names cannot distinguish them.
+   */
+  val isUserDefined: Boolean = false,
 ) {
   val succeeded: Boolean get() = rejectedReason == null
 }
