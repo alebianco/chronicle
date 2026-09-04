@@ -1,7 +1,7 @@
 ---
 id: cu-52
 title: StateFlow migration (LiveData replacement)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-13'
 labels: [R2, architecture, trust]
@@ -56,6 +56,58 @@ Do it **after** cu-33 if the two collide, since cu-33 changes the same repositor
 Unlike cu-58, nothing is blocked by LiveData and it is not deprecated. Upstream's own note ("may not
 be worth it if LiveData works well") stands on its own terms — the postValue race record is what
 overrides it.
+
+## Implementation Plan (2026-09-04)
+
+### The recorded scope is understated — measured, not read
+
+| | task says | actual |
+|---|---|---|
+| files referencing LiveData | 28 | **39** |
+| `MutableLiveData` declarations | 73 | **83** |
+| `observe` call sites | 35 | **121** |
+| `postValue` sites | 72 | **68** |
+
+`observe` is 3.5× the recorded figure. That matters because it is the number that decides how big a
+"phased rollout" actually is.
+
+### The blocker the task does not mention: Room returns LiveData
+
+Nine DAO methods across `BookDatabase` and `TrackDatabase` return `LiveData<…>` **directly from
+Room**, and eight files build on `DoubleLiveData`/`TripleLiveData`/`QuadLiveDataAsync` combinators
+over them. So "migrate ViewModels to StateFlow" is not a ViewModel-local change: either the DAOs
+change return type (Room supports `Flow`, so this is possible but touches the data layer and every
+combinator), or each ViewModel calls `.asFlow()` and the app runs **both** frameworks — which
+CLAUDE.md convention 3 explicitly forbids ("don't mix ad hoc").
+
+That is a genuine architectural fork, and it is the reason this task is much larger than its
+description implies.
+
+### Recommendation: split, and do the correctness half first
+
+**The justification for promoting this to R2 was correctness, not tidiness** — three cu-73 device
+bugs were `postValue` races. That half can be fixed *without* migrating anything:
+
+- `postValue` is asynchronous and coalescing; `value =` is synchronous. Every one of those three
+  bugs was fixed by that substitution, not by StateFlow.
+- The one **read-modify-write** the task names (`SettingsViewModel.kt:124`,
+  `postValue(it.copy(shouldShow = …))`) is a genuine lost-update race, and `LiveData` has no atomic
+  `update {}`. That single site is the strongest argument for StateFlow — and it is *one site*.
+
+So the plan is:
+
+1. **cu-52a (this task): eliminate the `postValue` race class.** Convert the 68 sites to `value =`
+   where the call is already on the main thread, and to an explicit main-dispatcher hop where it is
+   not. Fix the read-modify-write. Add a guard test in the style of `InternalApiUsageTest`, which is
+   criterion 4 and is what stops the sites creeping back. This delivers the entire correctness
+   argument at a fraction of the risk.
+2. **cu-52b (new task): the framework migration itself**, starting with the Room return types, since
+   that is the real dependency and the thing that decides whether the rest is even coherent.
+
+Splitting is proposed rather than assumed — see "What needs your eye" at the end. The pilot
+criterion (`features/home`) is preserved either way: it is the smallest file with real `postValue`
+sites and is where step 1 starts.
+
 
 ## Acceptance Criteria
 

@@ -144,6 +144,9 @@ class HomeViewModel(
   private val offlineModeListener =
     SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
       when (key) {
+        // **Stays `postValue`** (cu-52). A `SharedPreferences` listener fires on whichever thread
+        // called `apply()`, and a settings *import* writes this key off the main thread
+        // (`SettingsBackup.BACKUP_SETTING_KEYS` includes it). `value =` would throw there.
         PrefsRepo.KEY_OFFLINE_MODE -> _offlineMode.postValue(prefsRepo.offlineMode)
         else -> { // Do nothing
         }
@@ -199,7 +202,8 @@ class HomeViewModel(
    */
   fun resume(audiobook: Audiobook) {
     if (plexConfig.isConnected.value != true && !audiobook.isCached) {
-      _resumeError.postValue(Event(R.string.cannot_play_media_no_server))
+      // Main thread: `resume` is a click handler. See `setSearchActive` above.
+      _resumeError.value = Event(R.string.cannot_play_media_no_server)
       return
     }
 
@@ -218,7 +222,11 @@ class HomeViewModel(
   }
 
   fun setSearchActive(isSearchActive: Boolean) {
-    _isSearchActive.postValue(isSearchActive)
+    // `value =`, not `postValue` (cu-52). Called from a click listener, so this is already the main
+    // thread — and `postValue` coalesces, so two toggles in one frame collapse to one while the
+    // `searchController` call below runs twice. The flag and the controller would then disagree
+    // about whether search is open, which is the shape of the three device races in cu-73.
+    _isSearchActive.value = isSearchActive
     searchController.setSearchActive(isSearchActive)
   }
 
