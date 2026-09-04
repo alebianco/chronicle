@@ -104,7 +104,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1165 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1240 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -113,8 +113,8 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - `application/ChronicleApplication.kt`, `application/MainActivity.kt` — entry points + DI root
 - `injection/` — Dagger components/modules/scopes
 - `data/local/` — Room DBs, DAOs · `data/sources/plex/` — Plex API (`PlexService.kt`), login/config, `CachedFileManager.kt`
-- `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — multi-backend scaffolding, **declared but not yet load-bearing**. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made `SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`. Don't call it; don't delete it (cu-33 resurrects it properly).
-- `features/` — Fragment + ViewModel + adapters per feature (28 files import `data.sources.plex.*` directly — known debt, task cu-33)
+- `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — multi-backend scaffolding, **declared but not yet load-bearing**. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made `SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`. Don't call it; don't delete it (**cu-80** resurrects it properly — cu-33 did the service-locator half and handed this half over, since a capability flag cannot be verified while there is no second source to render against).
+- `features/` — Fragment + ViewModel + adapters per feature (27 files import `data.sources.plex.*` directly — known debt, now task **cu-80**; dominated by `PlexConfig` at 17, a connection-state holder rather than a fetch API)
 - `navigation/Navigator.kt` — centralized navigation · `views/BindingAdapters.kt` — reusable bindings
 
 ## Conventions (the golden rules)
@@ -123,12 +123,22 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 2. UI logic in Fragments/XML; business logic in ViewModels/Repositories; DB never accessed from UI.
 3. LiveData for UI state: private `MutableLiveData`, public immutable `LiveData`. (StateFlow migration is future work — don't mix ad hoc.)
 4. Coroutines: **inject `DispatcherProvider`** (cu-15) rather than referencing `Dispatchers.*` directly; UI on Main via `viewModelScope`. `GlobalScope` is gone and stays gone — three tests pin this (`CachedFileManagerScopeTest`, `RepositoryDispatcherTest`, `InternalApiUsageTest`). The five repositories are converted; ViewModels and the player service still hardcode dispatchers (cu-72) — don't add more. **Workers are a deliberate exemption** (cu-152): WorkManager builds them reflectively with a fixed `(Context, WorkerParameters)` signature, so a constructor cannot take a `DispatcherProvider` without a `WorkerFactory` and a `Configuration.Provider` — and that plumbing would buy nothing while no worker is unit-tested and `TestListenableWorkerBuilder` supplies its own executor anyway. The two `withContext(Dispatchers.IO)` calls that remain are *correct*: `doWork` runs on `Dispatchers.Default` and both wrap real blocking file I/O. `WorkerDispatcherTest` pins the exemption list and asserts every file on it really is a `CoroutineWorker`.
-5. User-facing text in `res/values/strings.xml`, always.
-6. Room schema change ⇒ bump DB version + write a migration in the same PR.
-7. Navigation through `Navigator.kt`; data via Bundles/args.
-8. Playback via `MediaServiceConnection`/`MediaPlayerService` — never touch ExoPlayer from UI.
-9. Network endpoints in `PlexService.kt`; errors handled in repositories; log with Timber (`Timber.e(e, "context")`).
-10. ktlint style; no wildcard imports; new libraries needing keep rules ⇒ update `app/proguard-rules.pro` **and** run `./test_release_build.sh`.
+5. **Never call `Injector.get()`** (cu-33). Take dependencies as constructor parameters — a class
+   that fetches its own at runtime **cannot be constructed in a unit test at all**, because
+   `ChronicleApplication.get()` is `INSTANCE!!` and the first line reaching the locator throws NPE.
+   That, and `Dispatchers.Main` (cu-15's `MainDispatcherRule`), are the two reasons nine of the
+   twelve ViewModels had no test. `ServiceLocatorUsageTest` fails the build on a new call. Two
+   exemptions, both on its list: `CoroutineWorker`s (WorkManager builds them reflectively with a
+   fixed `(Context, WorkerParameters)` signature — the cu-152 reasoning) and `ChronicleApplication`
+   itself, which *is* the DI root. A framework-inflated `View`, a binding adapter or an extension
+   function has no constructor either — pass what it needs at the call site, as `SettingsList`,
+   `bindImageRounded` and `Player.skipToNext` now do.
+6. User-facing text in `res/values/strings.xml`, always.
+7. Room schema change ⇒ bump DB version + write a migration in the same PR.
+8. Navigation through `Navigator.kt`; data via Bundles/args.
+9. Playback via `MediaServiceConnection`/`MediaPlayerService` — never touch ExoPlayer from UI.
+10. Network endpoints in `PlexService.kt`; errors handled in repositories; log with Timber (`Timber.e(e, "context")`).
+11. ktlint style; no wildcard imports; new libraries needing keep rules ⇒ update `app/proguard-rules.pro` **and** run `./test_release_build.sh`.
 
 ## Gotchas (things that waste agent runs)
 
@@ -332,6 +342,16 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   which `onConnected` publishes with `postValue` while clearing `isConnecting` immediately — so
   both read idle while the browser was CONNECTED, and `MediaBrowserCompat.connect()` throws rather
   than ignoring a redundant call. Ask the collaborator's own synchronous state instead.
+- **The Plex auth token is resolved in one place, and empty counts as absent** (cu-33).
+  `PlaybackSession.authToken` is the only statement of the precedence — server access token, then
+  the profile's, then the account's. It was written out **twice** before, in
+  `AudiobookMediaSessionCallback` and `ServiceModule.plexDataSourceFactory`, and both were wrong the
+  same way: they used `?:`, but neither `ServerModel` nor `PlexUser` stores null for a missing
+  token — `asServerModel` writes `accessToken = this.accessToken ?: ""`. So a server reporting no
+  token of its own, **the ordinary case for a server the user owns**, stored `""`, won the elvis,
+  and authorized every media request with an *empty* `X-Plex-Token` while a good account token sat
+  unused. `PlaybackSession` also owns the `/playQueues` session handshake, whose failure is logged
+  and swallowed on purpose: the media is already resolved, and the endpoint is unofficial.
 - **Never log an auth token.** `TokenLoggingTest` fails the build on any `Timber` call that
   interpolates one — it caught three live leaks, including one logging *two* tokens per media
   item. Logging *presence* (`token.isNotEmpty()`) is fine and is what the guard permits.
