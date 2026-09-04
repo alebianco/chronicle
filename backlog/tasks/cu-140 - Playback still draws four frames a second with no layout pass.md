@@ -114,3 +114,30 @@ Both devices agree on the finding once measured this way, which is why it is wor
 - [[cu-117]] — the guards that removed the layout half; this is the draw half
 - [[cu-110]] — the original fan-out, and the "profile, do not read" gotcha this task must obey
 - [[cu-51]] — large-library performance, which shares the RecyclerView rebind path
+
+
+## Measured baseline (2026-09-04, from cu-117)
+
+Tablet, real ANTARES session, **Ender's Game (id 151444, 107 tracks)** — the worst realistic input
+in the household's library:
+
+| | playing | paused |
+|---|---|---|
+| main-thread CPU | **234 jiffies/10 s** | 1 jiffy/10 s |
+| `uiautomator dump` | **0/5** | 3/3 |
+
+The same measurement on the A33 phone with a 28-track book gives 42 j/10 s — so the cost **scales
+with track count** and the phone understated it by 5.6×. Measure this task's fix on the tablet with
+a 100+ track book, or the number will flatter it again; that mistake has now been made three times
+in this area (cu-110, cu-115, cu-117).
+
+**Targets:** main-thread CPU within a small multiple of the paused figure, and `uiautomator dump`
+succeeding while playing — the two criteria cu-117 could not meet. Delete the dump target before
+each attempt: a failed dump leaves the previous file in place and a stale read looks like success.
+
+**Profiling still owed.** `am profile start --sampling` is the tool that named the cause in cu-110
+after four rounds of inspection produced plausible wrong answers; it had not been run when the
+tablet went offline. Do that before theorising.
+
+**Incidental, possibly related:** `NotificationBuilder` logs *"Building notification!
+state=STATE_PLAYING"* five times within 400 ms at playback start (see cu-50).

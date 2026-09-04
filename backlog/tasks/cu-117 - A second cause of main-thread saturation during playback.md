@@ -149,10 +149,15 @@ cases.
       615 jiffies/5s vs **0**)
       — improved 76 → **42** j/10 s against 1 paused. Still ~40×, so **not met**. The remaining
       cost is draw-only, not the data layer; see the trace analysis above.
+      **Re-measured on the tablet, 2026-09-04: 234 j/10 s playing against 1 paused — a 234×
+      ratio, 5.6× worse than the phone figure.** See notes; the task's own "measure against the
+      worst realistic input" rule had not been followed even by its re-measurement.
 - [ ] `uiautomator dump` succeeds *while playing*, which is the criterion cu-110 claimed and this
       still blocks
       — **un-ticked 2026-09-03.** Re-measured as 0/5 playing, 5/5 paused. The earlier 5/5 claim
       read a stale dump file left behind by a failed run.
+      **Confirmed on the tablet, 2026-09-04: 0/5 playing, 3/3 paused**, with the target file
+      deleted before each attempt so a stale read could not flatter the result.
 - [x] `printDebug`'s per-second main-thread log removed or moved behind a debug flag
 - [x] No behaviour regression: position still survives a process kill (cu-9), and the mini player
       still updates its chapter title and progress
@@ -244,3 +249,35 @@ on this GSI (SELinux denies `/sdcard`, and both `/data/local/tmp` and the app's 
 0-byte traces). Without one, further changes would be guesswork of exactly the kind cu-110's own
 gotcha warns against — *"four rounds of inspection produced plausible wrong answers here"*. Better
 to stop at a measured, verified improvement than to keep changing code on a hypothesis.
+
+
+## Re-measurement on the tablet (2026-09-04)
+
+The figures above come from the A33 **phone** and a 28-track book. Re-run on the **tablet**
+against **Ender's Game (id 151444, 107 tracks)**, the worst realistic input in the household's
+library, on a real ANTARES session with the build installed from `47718ef`:
+
+| | phone, 28 tracks | tablet, 107 tracks |
+|---|---|---|
+| main thread, playing | 42 j/10 s | **234 j/10 s** |
+| main thread, paused | 1 j/10 s | **1 j/10 s** |
+| ratio | ~42× | **~234×** |
+| `uiautomator dump` playing | 0/5 | **0/5** |
+| `uiautomator dump` paused | 5/5 | **3/3** |
+
+So the remaining cost scales with **track count**, and the phone measurement understated it by
+5.6×. This is the third time in this area that a smaller input produced a reassuring number
+(cu-110's 3-chapter fixture, cu-115's, and now cu-117's 28-track book) — the "measure against the
+worst realistic input" rule in CLAUDE.md is evidently easy to nod at and skip.
+
+Both open criteria therefore stay **unmet**, and the numbers are now the tablet's rather than the
+phone's. The work to close them is **cu-140**, which already owns the draw-side cost; these figures
+are its baseline and its target.
+
+**An incidental observation for cu-50:** `NotificationBuilder` logged *"Building notification!
+state=STATE_PLAYING"* five times within 400 ms on starting playback. Whatever the draw cost turns
+out to be, the notification is also being rebuilt far more often than its content changes.
+
+**Profiling was not completed** — the tablet dropped off the network (`Host is down`, no ping)
+before `am profile start` could run, and it did not return. The sampling run is the one thing still
+owed here, and it belongs to cu-140 rather than to this task.
