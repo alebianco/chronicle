@@ -12,7 +12,6 @@ import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
@@ -20,6 +19,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseUserBinding
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 /** Handles the picking of user profiles. */
@@ -103,35 +104,33 @@ class ChooseUserFragment : Fragment() {
     tempBinding.pinSubmit.setOnClickListener { viewModel.submitPin() }
 
     // Was `viewModel.showPin ? ... : ...` on the two container layouts.
-    viewModel.showPin.observe(viewLifecycleOwner) { showPin ->
-      tempBinding.userChooser.isVisible = showPin != true
-      tempBinding.pinChooser.isVisible = showPin == true
+    viewLifecycleOwner.collectWhileStarted(viewModel.showPin) { showPin ->
+      tempBinding.userChooser.isVisible = !showPin
+      tempBinding.pinChooser.isVisible = showPin
     }
 
     // Was `app:users="@{viewModel.users}"` on the list. Missed when cu-58 converted this screen
     // off DataBinding, so the adapter was set and the list made visible but never given any data —
     // "choose user" rendered permanently empty against a real account, while the mock's
     // single-user path looked fine. Found on the owner's phone during cu-73.
-    viewModel.users.observe(viewLifecycleOwner) { users ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.users) { users ->
       userListAdapter.submitList(users)
     }
 
     // Was three `app:loadingStatus` bindings on the user list.
-    viewModel.usersLoadingStatus.observe(viewLifecycleOwner) { status ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.usersLoadingStatus) { status ->
       tempBinding.userList.isVisible = status == LoadingStatus.DONE
       tempBinding.noUsersFound.isVisible = status == LoadingStatus.ERROR
       tempBinding.loadingIcon.isVisible = status == LoadingStatus.LOADING
     }
 
-    viewModel.pinLoadingStatus.observe(viewLifecycleOwner) { status ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.pinLoadingStatus) { status ->
       tempBinding.pinLoadingIcon.isVisible = status == LoadingStatus.LOADING
       tempBinding.pinSubmit.isVisible = status != LoadingStatus.LOADING
     }
 
-    viewModel.userMessage.observe(viewLifecycleOwner) {
-      if (!it.hasBeenHandled) {
-        Toast.makeText(requireContext(), it.getContentIfNotHandled(), LENGTH_SHORT).show()
-      }
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.userMessage) { message ->
+      Toast.makeText(requireContext(), message, LENGTH_SHORT).show()
     }
 
     tempBinding.pinToolbar.setNavigationOnClickListener {
@@ -146,17 +145,9 @@ class ChooseUserFragment : Fragment() {
       return@setOnEditorActionListener false
     }
 
-    viewModel.pinErrorMessage.observe(
-      viewLifecycleOwner,
-      Observer
-        {
-          if (!it.isNullOrEmpty()) {
-            tempBinding.pinEdittext.error = it
-          } else {
-            tempBinding.pinEdittext.error = null
-          }
-        },
-    )
+    viewLifecycleOwner.collectWhileStarted(viewModel.pinErrorMessage) {
+      tempBinding.pinEdittext.error = it?.takeIf { message -> message.isNotEmpty() }
+    }
 
     binding = tempBinding
     return tempBinding.root
@@ -172,7 +163,7 @@ class ChooseUserFragment : Fragment() {
   }
 
   fun isPinEntryScreenVisible(): Boolean {
-    return viewModel.showPin.value == true
+    return viewModel.showPin.value
   }
 
   fun hidePinEntryScreen() {

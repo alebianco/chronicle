@@ -7,8 +7,10 @@ import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService
 import io.github.mattpvaughn.chronicle.util.Event
-import io.github.mattpvaughn.chronicle.util.postEvent
+import io.github.mattpvaughn.chronicle.util.setEvent
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -36,16 +38,16 @@ class ChooseServerViewModel
         }
       }
 
-    private val _userMessage = MutableLiveData<Event<String>>()
-    val userMessage: LiveData<Event<String>>
+    private val _userMessage = MutableStateFlow<Event<String>?>(null)
+    val userMessage: StateFlow<Event<String>?>
       get() = _userMessage
 
-    private var _servers = MutableLiveData(emptyList<ServerModel>())
-    val servers: LiveData<List<ServerModel>>
+    private val _servers = MutableStateFlow(emptyList<ServerModel>())
+    val servers: StateFlow<List<ServerModel>>
       get() = _servers
 
-    private var _loadingStatus = MutableLiveData(LoadingStatus.LOADING)
-    val loadingStatus: LiveData<LoadingStatus>
+    private val _loadingStatus = MutableStateFlow(LoadingStatus.LOADING)
+    val loadingStatus: StateFlow<LoadingStatus>
       get() = _loadingStatus
 
     init {
@@ -59,14 +61,13 @@ class ChooseServerViewModel
           val serverContainer = plexLoginService.resources()
           Timber.i("Server: $serverContainer")
           _loadingStatus.value = LoadingStatus.DONE
-          _servers.postValue(
+          _servers.value =
             serverContainer
               .filter { it.provides.contains("server") }
-              .map { it.asServer() },
-          )
+              .map { it.asServer() }
         } catch (e: Throwable) {
           Timber.e(e, "Failed to get servers")
-          _userMessage.postEvent("Failed to load servers: ${e.message}")
+          _userMessage.setEvent("Failed to load servers: ${e.message}")
           _loadingStatus.value = LoadingStatus.ERROR
         }
       }

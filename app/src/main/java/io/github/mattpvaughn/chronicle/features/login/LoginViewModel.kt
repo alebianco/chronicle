@@ -6,9 +6,11 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.OAuthResponse
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
-import io.github.mattpvaughn.chronicle.util.postEvent
+import io.github.mattpvaughn.chronicle.util.setEvent
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,12 +35,12 @@ class LoginViewModel(
       }
     }
 
-  private var _authEvent = MutableLiveData<Event<OAuthResponse?>>()
-  val authEvent: LiveData<Event<OAuthResponse?>>
+  private val _authEvent = MutableStateFlow<Event<OAuthResponse?>?>(null)
+  val authEvent: StateFlow<Event<OAuthResponse?>?>
     get() = _authEvent
 
-  private var _errorEvent = MutableLiveData<Event<String>>()
-  val errorEvent: LiveData<Event<String>>
+  private val _errorEvent = MutableStateFlow<Event<String>?>(null)
+  val errorEvent: StateFlow<Event<String>?>
     get() = _errorEvent
 
   private var hasLaunched = false
@@ -52,9 +54,9 @@ class LoginViewModel(
     viewModelScope.launch(exceptionHandler) {
       try {
         val pin = plexLoginRepo.postOAuthPin()
-        _authEvent.postEvent(pin)
+        _authEvent.setEvent(pin)
       } catch (e: Exception) {
-        _errorEvent.postEvent("Login failed: ${e.message}")
+        _errorEvent.setEvent("Login failed: ${e.message}")
         timber.log.Timber.e(e, "OAuth login failed")
       }
     }

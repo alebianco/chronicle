@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import io.github.mattpvaughn.chronicle.application.MainActivity
@@ -26,6 +25,8 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentSettingsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.getString
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import timber.log.Timber
@@ -125,71 +126,46 @@ class SettingsFragment : Fragment() {
     val binding = FragmentSettingsBinding.inflate(inflater, container, false)
 
     // Was `bottomChooserState` / `preferences` binding adapters in fragment_settings.xml.
-    viewModel.bottomChooserState.observe(viewLifecycleOwner) { state ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->
       setBottomChooserState(binding.bottomSheetChooser, state)
     }
 
-    viewModel.preferences.observe(viewLifecycleOwner) { preferences ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.preferences) { preferences ->
       binding.settingsList.setPreferences(preferences, prefsRepo)
     }
 
-    viewModel.messageForUser.observe(
-      viewLifecycleOwner,
-      Observer { message ->
-        if (!message.hasBeenHandled) {
-          val formattableString = message.getContentIfNotHandled()
-          Toast.makeText(
-            context,
-            resources.getString(formattableString),
-            Toast.LENGTH_SHORT,
-          )
-            .show()
-        }
-      },
-    )
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.messageForUser) { formattableString ->
+      Toast.makeText(context, resources.getString(formattableString), Toast.LENGTH_SHORT).show()
+    }
 
-    viewModel.webLink.observe(
-      viewLifecycleOwner,
-      Observer {
-        if (!it.hasBeenHandled) {
-          startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(it.getContentIfNotHandled())),
-          )
-        }
-      },
-    )
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.webLink) { link ->
+      startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+    }
 
-    viewModel.exportFileRequest.observe(viewLifecycleOwner) { event ->
-      event.getContentIfNotHandled()?.let { defaultFileName ->
-        try {
-          exportFileLauncher.launch(defaultFileName)
-        } catch (e: ActivityNotFoundException) {
-          Timber.w(e, "No document picker available for export")
-          viewModel.onNoFilePickerAvailable()
-        }
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.exportFileRequest) { defaultFileName ->
+      try {
+        exportFileLauncher.launch(defaultFileName)
+      } catch (e: ActivityNotFoundException) {
+        Timber.w(e, "No document picker available for export")
+        viewModel.onNoFilePickerAvailable()
       }
     }
 
-    viewModel.importFileRequest.observe(viewLifecycleOwner) { event ->
-      event.getContentIfNotHandled()?.let {
-        try {
-          importFileLauncher.launch(BACKUP_OPEN_MIME_TYPES)
-        } catch (e: ActivityNotFoundException) {
-          Timber.w(e, "No document picker available for import")
-          viewModel.onNoFilePickerAvailable()
-        }
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.importFileRequest) {
+      try {
+        importFileLauncher.launch(BACKUP_OPEN_MIME_TYPES)
+      } catch (e: ActivityNotFoundException) {
+        Timber.w(e, "No document picker available for import")
+        viewModel.onNoFilePickerAvailable()
       }
     }
 
-    viewModel.showLicenseActivity.observe(
-      viewLifecycleOwner,
-      Observer {
-        if (it) {
-          startActivity(Intent(context, OssLicensesMenuActivity::class.java))
-          viewModel.setShowLicenseActivity(false)
-        }
-      },
-    )
+    viewLifecycleOwner.collectWhileStarted(viewModel.showLicenseActivity) {
+      if (it) {
+        startActivity(Intent(context, OssLicensesMenuActivity::class.java))
+        viewModel.setShowLicenseActivity(false)
+      }
+    }
 
     // Settings has no toolbar, so the list itself takes the top inset (cu-63).
 

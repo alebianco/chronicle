@@ -26,11 +26,13 @@ import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.settings.SettingsViewModel.NavigationDestination.*
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.bytesAvailable
-import io.github.mattpvaughn.chronicle.util.postEvent
+import io.github.mattpvaughn.chronicle.util.setEvent
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -111,47 +113,46 @@ class SettingsViewModel(
       }
     }
 
-  private var _preferences = MutableLiveData(makePreferences())
-  val preferences: LiveData<List<PreferenceModel>>
+  private val _preferences = MutableStateFlow(makePreferences())
+  val preferences: StateFlow<List<PreferenceModel>>
     get() = _preferences
 
-  private var _bottomChooserState = MutableLiveData(EMPTY_BOTTOM_CHOOSER)
-  val bottomChooserState: LiveData<BottomChooserState>
+  private val _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+  val bottomChooserState: StateFlow<BottomChooserState>
     get() = _bottomChooserState
 
   fun setBottomSheetVisibility(shouldShow: Boolean) {
-    bottomChooserState.value?.let {
-      _bottomChooserState.postValue(it.copy(shouldShow = shouldShow))
-    }
+    _bottomChooserState.value = _bottomChooserState.value.copy(shouldShow = shouldShow)
   }
 
-  private var _messageForUser = MutableLiveData<Event<FormattableString>>()
-  val messageForUser: LiveData<Event<FormattableString>>
+  private val _messageForUser = MutableStateFlow<Event<FormattableString>?>(null)
+  val messageForUser: StateFlow<Event<FormattableString>?>
     get() = _messageForUser
 
-  private var _webLink = MutableLiveData<Event<String>>()
-  val webLink: LiveData<Event<String>>
+  private val _webLink = MutableStateFlow<Event<String>?>(null)
+  val webLink: StateFlow<Event<String>?>
     get() = _webLink
 
-  private var _showLicenseActivity = MutableLiveData(false)
-  val showLicenseActivity: LiveData<Boolean>
+  private val _showLicenseActivity = MutableStateFlow(false)
+  val showLicenseActivity: StateFlow<Boolean>
     get() = _showLicenseActivity
 
   /**
    * Asks the fragment to open the system "create document" picker, carrying the default filename.
    *
-   * An event rather than a state flag: the picker must open exactly once per tap, and a
-   * [MutableLiveData] the fragment re-reads on a configuration change would open it again.
+   * An event rather than a state flag: the picker must open exactly once per tap, and a plain
+   * state value the fragment re-reads on a configuration change would open it again — more so for
+   * a `StateFlow`, which replays its current value to every new collector.
    * Launching it is the fragment's job because only a `Fragment` owns an
    * `ActivityResultLauncher`.
    */
-  private var _exportFileRequest = MutableLiveData<Event<String>>()
-  val exportFileRequest: LiveData<Event<String>>
+  private val _exportFileRequest = MutableStateFlow<Event<String>?>(null)
+  val exportFileRequest: StateFlow<Event<String>?>
     get() = _exportFileRequest
 
   /** Asks the fragment to open the system "open document" picker. */
-  private var _importFileRequest = MutableLiveData<Event<Unit>>()
-  val importFileRequest: LiveData<Event<Unit>>
+  private val _importFileRequest = MutableStateFlow<Event<Unit>?>(null)
+  val importFileRequest: StateFlow<Event<Unit>?>
     get() = _importFileRequest
 
   private fun showOptionsMenu(
@@ -159,20 +160,19 @@ class SettingsViewModel(
     title: FormattableString,
     listener: BottomChooserListener,
   ) {
-    _bottomChooserState.postValue(
+    _bottomChooserState.value =
       BottomChooserState(
         options = options,
         title = title,
         listener = listener,
         shouldShow = true,
-      ),
-    )
+      )
   }
 
   private val prefsListener =
     OnSharedPreferenceChangeListener { _, _ ->
       // Rebuild the prefs list whenever any prefs change
-      _preferences.postValue(makePreferences())
+      _preferences.value = makePreferences()
     }
 
   init {
@@ -430,7 +430,7 @@ class SettingsViewModel(
               override fun onClick() {
                 // Export needs no confirmation: it writes a new file the user names, and
                 // overwriting is the picker's own prompt to make.
-                _exportFileRequest.postEvent(defaultBackupFileName())
+                _exportFileRequest.setEvent(defaultBackupFileName())
               }
             },
         ),
@@ -450,7 +450,7 @@ class SettingsViewModel(
                     object : BottomChooserItemListener() {
                       override fun onItemClicked(formattableString: FormattableString) {
                         if (formattableString == FormattableString.yes) {
-                          _importFileRequest.postEvent(Unit)
+                          _importFileRequest.setEvent(Unit)
                         }
                         setBottomSheetVisibility(false)
                       }
@@ -816,7 +816,7 @@ class SettingsViewModel(
           click =
             object : PreferenceClick {
               override fun onClick() {
-                _webLink.postEvent("https://github.com/alebianco/chronicle")
+                _webLink.setEvent("https://github.com/alebianco/chronicle")
               }
             },
         ),
@@ -834,7 +834,7 @@ class SettingsViewModel(
                     object : BottomChooserItemListener() {
                       override fun onItemClicked(formattableString: FormattableString) {
                         // Informational only — dismissing is the only action.
-                        _bottomChooserState.postValue(EMPTY_BOTTOM_CHOOSER)
+                        _bottomChooserState.value = EMPTY_BOTTOM_CHOOSER
                       }
                     },
                 )
@@ -853,7 +853,7 @@ class SettingsViewModel(
           click =
             object : PreferenceClick {
               override fun onClick() {
-                _showLicenseActivity.postValue(true)
+                _showLicenseActivity.value = true
               }
             },
         ),
@@ -990,11 +990,11 @@ class SettingsViewModel(
   }
 
   fun showUserMessage(formattableString: FormattableString) {
-    _messageForUser.postEvent(formattableString)
+    _messageForUser.setEvent(formattableString)
   }
 
   fun setShowLicenseActivity(showLicense: Boolean) {
-    _showLicenseActivity.postValue(showLicense)
+    _showLicenseActivity.value = showLicense
   }
 
   /**
@@ -1055,7 +1055,7 @@ class SettingsViewModel(
           // The prefs listener rebuilds the list on each individual write, but it is
           // registered against the same file this just edited in one commit, so refresh
           // explicitly rather than relying on the callback's timing.
-          _preferences.postValue(makePreferences())
+          _preferences.value = makePreferences()
         }
 
         is SettingsBackupRepo.ImportResult.WrongVersion ->

@@ -13,13 +13,13 @@ import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.FEATURE_FLAG_IS_AUTO_ENABLED
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.OnboardingLoginBinding
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import timber.log.Timber
 import javax.inject.Inject
@@ -77,60 +77,52 @@ class LoginFragment : Fragment() {
       prefsRepo.allowAuto = isChecked
     }
 
-    loginViewModel.authEvent.observe(
-      viewLifecycleOwner,
-      Observer { authRequestEvent ->
-        val oAuthPin = authRequestEvent.getContentIfNotHandled()
-        if (oAuthPin != null) {
-          val backButton =
-            resources.getDrawable(
-              R.drawable.ic_arrow_back_white,
-              requireActivity().theme,
-            )
-              .apply { setTint(Color.BLACK) }
-          val backButtonBitmap: Bitmap? =
-            if (backButton is BitmapDrawable) backButton.bitmap else null
+    // `collectEventsWhileStarted` already drops a null payload, so the guard the observer needed is
+    // the operator's job now.
+    viewLifecycleOwner.collectEventsWhileStarted(loginViewModel.authEvent) { oAuthPin ->
+      if (oAuthPin != null) {
+        val backButton =
+          resources.getDrawable(
+            R.drawable.ic_arrow_back_white,
+            requireActivity().theme,
+          )
+            .apply { setTint(Color.BLACK) }
+        val backButtonBitmap: Bitmap? =
+          if (backButton is BitmapDrawable) backButton.bitmap else null
 
-          val toolbarColor = ContextCompat.getColor(requireContext(), R.color.colorPrimary)
-          val colorSchemeParams =
-            CustomTabColorSchemeParams.Builder()
-              .setToolbarColor(toolbarColor)
-              .build()
+        val toolbarColor = ContextCompat.getColor(requireContext(), R.color.colorPrimary)
+        val colorSchemeParams =
+          CustomTabColorSchemeParams.Builder()
+            .setToolbarColor(toolbarColor)
+            .build()
 
-          val customTabsIntentBuilder =
-            CustomTabsIntent.Builder()
-              .setDefaultColorSchemeParams(colorSchemeParams)
-              .setShowTitle(true)
+        val customTabsIntentBuilder =
+          CustomTabsIntent.Builder()
+            .setDefaultColorSchemeParams(colorSchemeParams)
+            .setShowTitle(true)
 
-          if (backButtonBitmap != null) {
-            customTabsIntentBuilder.setCloseButtonIcon(backButtonBitmap)
-          }
-
-          val customTabsIntent = customTabsIntentBuilder.build()
-
-          // make login url
-          val url =
-            loginViewModel.makeOAuthLoginUrl(
-              oAuthPin.clientIdentifier,
-              oAuthPin.code,
-            )
-
-          loginViewModel.setLaunched(true)
-          customTabsIntent.launchUrl(requireContext(), url)
+        if (backButtonBitmap != null) {
+          customTabsIntentBuilder.setCloseButtonIcon(backButtonBitmap)
         }
-      },
-    )
 
-    loginViewModel.errorEvent.observe(
-      viewLifecycleOwner,
-      Observer { errorEvent ->
-        val error = errorEvent.getContentIfNotHandled()
-        if (error != null) {
-          android.widget.Toast.makeText(requireContext(), error, android.widget.Toast.LENGTH_LONG).show()
-          Timber.e("Login error: $error")
-        }
-      },
-    )
+        val customTabsIntent = customTabsIntentBuilder.build()
+
+        // make login url
+        val url =
+          loginViewModel.makeOAuthLoginUrl(
+            oAuthPin.clientIdentifier,
+            oAuthPin.code,
+          )
+
+        loginViewModel.setLaunched(true)
+        customTabsIntent.launchUrl(requireContext(), url)
+      }
+    }
+
+    viewLifecycleOwner.collectEventsWhileStarted(loginViewModel.errorEvent) { error ->
+      android.widget.Toast.makeText(requireContext(), error, android.widget.Toast.LENGTH_LONG).show()
+      Timber.e("Login error: $error")
+    }
 
     return binding.root
   }

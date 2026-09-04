@@ -10,12 +10,13 @@ import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseServerBinding
+import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 class ChooseServerFragment : Fragment() {
@@ -64,31 +65,20 @@ class ChooseServerFragment : Fragment() {
     binding.serverList.adapter = serverAdapter
     binding.refresh.setOnClickListener { viewModel.refresh() }
 
-    viewModel.servers.observe(
-      viewLifecycleOwner,
-      Observer { servers ->
-        servers?.let {
-          serverAdapter.submitList(it)
-        }
-      },
-    )
+    viewLifecycleOwner.collectWhileStarted(viewModel.servers) { servers ->
+      serverAdapter.submitList(servers)
+    }
 
     // Was three `app:loadingStatus` bindings in XML, one per view type.
-    viewModel.loadingStatus.observe(viewLifecycleOwner) { status ->
+    viewLifecycleOwner.collectWhileStarted(viewModel.loadingStatus) { status ->
       binding.serverList.isVisible = status == LoadingStatus.DONE
       binding.noServersFound.isVisible = status == LoadingStatus.ERROR
       binding.loadingIcon.isVisible = status == LoadingStatus.LOADING
     }
 
-    viewModel.userMessage.observe(
-      viewLifecycleOwner,
-      Observer {
-        if (it.hasBeenHandled) {
-          return@Observer
-        }
-        Toast.makeText(requireContext(), it.getContentIfNotHandled(), LENGTH_SHORT).show()
-      },
-    )
+    viewLifecycleOwner.collectEventsWhileStarted(viewModel.userMessage) { message ->
+      Toast.makeText(requireContext(), message, LENGTH_SHORT).show()
+    }
 
     return binding.root
   }
