@@ -61,9 +61,9 @@ class HomeFragment : Fragment() {
     // XML re-ran the whole condition when any source changed; in Kotlin every
     // contributing source has to drive the shared refresh explicitly.
     fun refreshShelves() {
-      val added = viewModel.recentlyAdded.value.orEmpty()
-      val listened = viewModel.recentlyListened.value.orEmpty()
-      val downloaded = viewModel.downloaded.value.orEmpty()
+      val added = viewModel.recentlyAdded.value
+      val listened = viewModel.recentlyListened.value
+      val downloaded = viewModel.downloaded.value
       val offline = viewModel.offlineMode.value
       val allEmpty = added.isEmpty() && listened.isEmpty() && downloaded.isEmpty()
 

@@ -302,7 +302,7 @@ class CurrentlyPlayingFragment :
       val progress = viewModel.playerProgress.value
       binding.progress.setTextIfChanged(bookProgressText(progress))
       binding.progressPercentage.setTextIfChanged(
-        viewModel.progressPercentageString.value.orEmpty(),
+        viewModel.progressPercentageString.value,
       )
       binding.chapterProgress.setTextIfChanged(chapterPositionText(progress))
       binding.chapterDuration.setTextIfChanged(chapterRemainingText(progress))
@@ -340,7 +340,7 @@ class CurrentlyPlayingFragment :
 
       binding.bookTitle.setTextIfChanged(title)
       binding.detailsArtwork.contentDescription = title
-      bindImageRounded(binding.detailsArtwork, thumb, plexConfig.isConnected.value == true, plexConfig::toServerString)
+      bindImageRounded(binding.detailsArtwork, thumb, plexConfig.isConnected.value, plexConfig::toServerString)
     }
 
     // The slider falls back to track values when there is no chapter. valueTo
@@ -372,9 +372,16 @@ class CurrentlyPlayingFragment :
       val chapterDuration = viewModel.chapterDuration.value
       val trackDuration = viewModel.currentTrack.value.duration
       val max = (if (chapterDuration == 0L) trackDuration else chapterDuration).toFloat()
-      val chapterProgress = viewModel.chapterProgressForSlider.value ?: -1L
-      val trackProgress = viewModel.trackProgressForSlider.value ?: 0L
-      val current = if (chapterProgress == -1L) trackProgress else chapterProgress
+      // Chapter progress when there is a chapter to be inside, track progress otherwise. As
+      // `LiveData` the "no chapter" case was a null coalesced to -1; as a non-null `StateFlow` it
+      // is expressed directly, by asking whether the chapter has a duration at all. Coalescing to
+      // 0 instead would have made this fall back never — a chapter-less book would read 0 forever.
+      val current =
+        if (chapterDuration == 0L) {
+          viewModel.trackProgressForSlider.value
+        } else {
+          viewModel.chapterProgressForSlider.value
+        }
 
       val newMax = if (max > 0f) max else 1f
       val newValue = current.toFloat().coerceIn(0f, newMax)

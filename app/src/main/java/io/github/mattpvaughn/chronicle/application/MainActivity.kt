@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
     // Debug-only: `--el play_book <id>` starts playback once the media service is
     // connected. connect{} is required — transportControls is null until then,
     // which is why driving playback from a bare intent alone does not work.
-    if (mediaServiceConnection.isConnected.value == true) {
+    if (mediaServiceConnection.isConnected.value) {
       DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
     } else {
       mediaServiceConnection.connect {
@@ -316,7 +316,7 @@ class MainActivity : AppCompatActivity() {
           //
           // Leaving the app is the honest response: nothing was chosen, so there is nothing to
           // show. The user re-enters onboarding on next launch, or finishes it now.
-          if (viewModel.isOnboarding.value == true) {
+          if (viewModel.isOnboarding.value) {
             isEnabled = false
             onBackPressedDispatcher.onBackPressed()
             return
@@ -451,7 +451,7 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onShowBrowseIntent(intent, this, navigator)
     DebugHooks.onMoveSyncLocationIntent(intent, this)
     DebugHooks.onShowSettingsIntent(intent, this, navigator)
-    if (mediaServiceConnection.isConnected.value == true) {
+    if (mediaServiceConnection.isConnected.value) {
       DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
     } else {
       mediaServiceConnection.connect {

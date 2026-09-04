@@ -262,9 +262,9 @@ class CollectionsFragment : Fragment() {
    * re-evaluates the pair rather than each observer owning one view.
    */
   private fun updateSearchVisibility(binding: FragmentCollectionsBinding) {
-    val isSearchActive = viewModel.isSearchActive.value ?: false
-    val isQueryEmpty = viewModel.isQueryEmpty.value ?: false
-    val hasNoResults = viewModel.searchRows.value.isNullOrEmpty()
+    val isSearchActive = viewModel.isSearchActive.value
+    val isQueryEmpty = viewModel.isQueryEmpty.value
+    val hasNoResults = viewModel.searchRows.value.isEmpty()
 
     binding.searchResultsList.isVisible = isSearchActive
     binding.noSearchResultsMessage.isVisible = hasNoResults && isSearchActive && !isQueryEmpty

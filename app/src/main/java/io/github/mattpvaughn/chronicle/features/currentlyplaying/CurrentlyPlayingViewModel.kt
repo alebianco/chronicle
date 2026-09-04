@@ -589,7 +589,7 @@ class CurrentlyPlayingViewModel(
   }
 
   fun play() {
-    if (mediaServiceConnection.isConnected.value == true) {
+    if (mediaServiceConnection.isConnected.value) {
       if (audiobook.value == null) {
         Timber.e("Tried to play null audiobook!")
         _showUserMessage.setEvent(
@@ -850,7 +850,7 @@ class CurrentlyPlayingViewModel(
         )
       }
     }
-    if (mediaServiceConnection.isConnected.value != true) {
+    if (!mediaServiceConnection.isConnected.value) {
       mediaServiceConnection.connect(onConnected = jumpToChapterAction)
     } else {
       jumpToChapterAction()
@@ -860,11 +860,11 @@ class CurrentlyPlayingViewModel(
   fun showSleepTimerOptions() {
     val title =
       sleepTimerTitle(
-        isActive = isSleepTimerActive.value == true,
-        remainingMillis = sleepTimerTimeRemaining.value ?: 0L,
+        isActive = isSleepTimerActive.value,
+        remainingMillis = sleepTimerTimeRemaining.value,
       )
     val options =
-      if (isSleepTimerActive.value == true) {
+      if (isSleepTimerActive.value) {
         listOf(
           FormattableString.from(R.string.sleep_timer_append),
           FormattableString.from(R.string.sleep_timer_duration_end_of_chapter),
@@ -1165,12 +1165,18 @@ class CurrentlyPlayingViewModel(
     bookOffset: BookOffset,
     trackId: String,
   ): TrackOffset {
-    val loaded = tracks.value ?: return TrackOffset(bookOffset.millis)
+    // Emptiness, not nullity: `tracks` is a non-null StateFlow whose seed is an empty list, so
+    // "not loaded yet" and "no tracks" are the same observable state and both mean the book-frame
+    // offset is the best answer available.
+    val loaded = tracks.value
+    if (loaded.isEmpty()) {
+      return TrackOffset(bookOffset.millis)
+    }
     return inTrackOffsetOf(bookOffset, trackId, loaded) ?: TrackOffset(bookOffset.millis)
   }
 
   fun seekTo(percentProgress: Double) {
-    val id: String = (audiobookId.value ?: TRACK_NOT_FOUND).toString()
+    val id: String = audiobookId.value
     if (currentChapter.value == EMPTY_CHAPTER) {
       // Seeking by track length
       currentTrack.value?.let { curr ->

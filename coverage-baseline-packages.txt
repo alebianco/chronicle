@@ -1,4 +1,4 @@
-io/github/mattpvaughn/chronicle/application 31.70
+io/github/mattpvaughn/chronicle/application 31.73
 io/github/mattpvaughn/chronicle/data/local 61.46
 io/github/mattpvaughn/chronicle/data/model 88.06
 io/github/mattpvaughn/chronicle/data/sources 86.40
@@ -9,9 +9,9 @@ io/github/mattpvaughn/chronicle/debug 2.12
 io/github/mattpvaughn/chronicle/features/bookdetails 27.89
 io/github/mattpvaughn/chronicle/features/browse 0.00
 io/github/mattpvaughn/chronicle/features/collections 0.00
-io/github/mattpvaughn/chronicle/features/currentlyplaying 25.57
+io/github/mattpvaughn/chronicle/features/currentlyplaying 25.69
 io/github/mattpvaughn/chronicle/features/download 14.72
-io/github/mattpvaughn/chronicle/features/home 18.40
+io/github/mattpvaughn/chronicle/features/home 18.44
 io/github/mattpvaughn/chronicle/features/library 2.35
 io/github/mattpvaughn/chronicle/features/login 15.06
 io/github/mattpvaughn/chronicle/features/player 35.59

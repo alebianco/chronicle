@@ -202,7 +202,7 @@ class HomeViewModel(
    * about.
    */
   fun resume(audiobook: Audiobook) {
-    if (plexConfig.isConnected.value != true && !audiobook.isCached) {
+    if (!plexConfig.isConnected.value && !audiobook.isCached) {
       // Main thread: `resume` is a click handler. See `setSearchActive` above.
       _resumeError.value = Event(R.string.cannot_play_media_no_server)
       return
@@ -215,7 +215,7 @@ class HomeViewModel(
       )
       Unit
     }
-    if (mediaServiceConnection.isConnected.value != true) {
+    if (!mediaServiceConnection.isConnected.value) {
       mediaServiceConnection.connect(onConnected = play)
     } else {
       play()

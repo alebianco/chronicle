@@ -57,7 +57,7 @@ class BrowseFragment : Fragment() {
 
     val adapter =
       FacetListAdapter { facet ->
-        val kind = viewModel.kind.value ?: FacetKind.Author
+        val kind = viewModel.kind.value
         navigator.showFacetBooks(kind, facet.value)
       }
     binding.facetList.adapter = adapter
