@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -337,6 +338,7 @@ class MainActivityViewModelTest {
       bookRepository = bookRepository,
       mediaServiceConnection = mediaServiceConnection,
       collectionsRepository = collectionsRepository,
+      exceptionHandler = testExceptionHandler(),
     )
 
   /**

@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
+import android.content.Context
 import android.content.SharedPreferences
 import android.text.format.DateUtils
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
@@ -24,6 +25,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -356,5 +358,7 @@ class CurrentlyPlayingViewModelTest {
       workManager = workManager,
       bookmarkRepository = bookmarkRepository,
       sharedPrefs = sharedPrefs,
+      exceptionHandler = testExceptionHandler(),
+      appContext = mockk<Context>(relaxed = true),
     )
 }

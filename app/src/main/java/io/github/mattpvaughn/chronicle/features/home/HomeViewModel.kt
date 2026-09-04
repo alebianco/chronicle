@@ -4,7 +4,6 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.lifecycle.*
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
@@ -21,6 +20,7 @@ import io.github.mattpvaughn.chronicle.util.DoubleLiveData
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.booksKey
 import io.github.mattpvaughn.chronicle.util.distinctBy
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -31,6 +31,7 @@ class HomeViewModel(
   private val librarySyncRepository: LibrarySyncRepository,
   private val prefsRepo: PrefsRepo,
   private val mediaServiceConnection: MediaServiceConnection,
+  private val exceptionHandler: CoroutineExceptionHandler,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -41,6 +42,7 @@ class HomeViewModel(
       private val librarySyncRepository: LibrarySyncRepository,
       private val prefsRepo: PrefsRepo,
       private val mediaServiceConnection: MediaServiceConnection,
+      private val exceptionHandler: CoroutineExceptionHandler,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
@@ -50,6 +52,7 @@ class HomeViewModel(
             librarySyncRepository,
             prefsRepo,
             mediaServiceConnection,
+            exceptionHandler,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -150,7 +153,7 @@ class HomeViewModel(
   private val serverConnectionObserver =
     Observer<Boolean> { isConnectedToServer ->
       if (isConnectedToServer) {
-        viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+        viewModelScope.launch(exceptionHandler) {
           val millisSinceLastRefresh =
             System.currentTimeMillis() - prefsRepo.lastRefreshTimeStamp
           val minutesSinceLastRefresh = millisSinceLastRefresh / 1000 / 60

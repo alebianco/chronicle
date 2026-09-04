@@ -1,10 +1,10 @@
 package io.github.mattpvaughn.chronicle.features.library
 
+import android.content.Context
 import android.content.SharedPreferences
 import android.text.format.Formatter
 import androidx.lifecycle.*
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
@@ -35,6 +35,7 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserLis
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString.ResourceString
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -46,6 +47,8 @@ class LibraryViewModel(
   private val cachedFileManager: ICachedFileManager,
   private val librarySyncRepository: LibrarySyncRepository,
   sharedPreferences: SharedPreferences,
+  private val exceptionHandler: CoroutineExceptionHandler,
+  private val appContext: Context,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -57,6 +60,8 @@ class LibraryViewModel(
       private val cachedFileManager: ICachedFileManager,
       private val librarySyncRepository: LibrarySyncRepository,
       private val sharedPreferences: SharedPreferences,
+      private val exceptionHandler: CoroutineExceptionHandler,
+      private val appContext: Context,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
@@ -67,6 +72,8 @@ class LibraryViewModel(
             cachedFileManager,
             librarySyncRepository,
             sharedPreferences,
+            exceptionHandler,
+            appContext,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -235,7 +242,7 @@ class LibraryViewModel(
   private val serverConnectionObserver =
     Observer<Boolean> { isConnectedToServer ->
       if (isConnectedToServer) {
-        viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+        viewModelScope.launch(exceptionHandler) {
           val millisSinceLastRefresh =
             System.currentTimeMillis() - prefsRepo.lastRefreshTimeStamp
           val minutesSinceLastRefresh = millisSinceLastRefresh / 1000 / 60
@@ -267,7 +274,7 @@ class LibraryViewModel(
     val bytesAvailable = prefsRepo.cachedMediaDir.bytesAvailable()
 
     // Calculate space required
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       val tracks =
         try {
           trackRepository.loadAllTracksAsync()
@@ -278,9 +285,9 @@ class LibraryViewModel(
       var bytesToBeUsed = 0L
       tracks.forEach { bytesToBeUsed += it.size }
       val downloadSize =
-        Formatter.formatFileSize(Injector.get().applicationContext(), bytesToBeUsed)
+        Formatter.formatFileSize(appContext, bytesToBeUsed)
       val availableStorage =
-        Formatter.formatFileSize(Injector.get().applicationContext(), bytesAvailable)
+        Formatter.formatFileSize(appContext, bytesAvailable)
       val prompt =
         ResourceString(
           stringRes = R.string.download_all_prompt,

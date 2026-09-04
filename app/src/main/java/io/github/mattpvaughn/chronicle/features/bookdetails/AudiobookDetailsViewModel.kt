@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
+import android.content.Context
 import android.media.session.MediaController
 import android.media.session.PlaybackState.*
 import android.os.Bundle
@@ -10,7 +11,6 @@ import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.lifecycle.*
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
@@ -48,6 +48,7 @@ class AudiobookDetailsViewModel(
   private val plexConfig: PlexConfig,
   private val plexMediaService: PlexMediaService,
   currentlyPlaying: CurrentlyPlaying,
+  private val appContext: Context,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -60,6 +61,7 @@ class AudiobookDetailsViewModel(
       private val plexConfig: PlexConfig,
       private val plexMediaService: PlexMediaService,
       private val currentlyPlaying: CurrentlyPlaying,
+      private val appContext: Context,
     ) : ViewModelProvider.Factory {
       lateinit var inputAudiobook: Audiobook
 
@@ -75,6 +77,7 @@ class AudiobookDetailsViewModel(
             plexConfig,
             plexMediaService,
             currentlyPlaying,
+            appContext,
           ) as T
         } else {
           throw IllegalStateException("Wrong class provided to ${this.javaClass.name}")
@@ -602,7 +605,7 @@ class AudiobookDetailsViewModel(
   ) {
     val toast =
       Toast.makeText(
-        Injector.get().applicationContext(),
+        appContext,
         message,
         Toast.LENGTH_LONG,
       )

@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
+import android.content.Context
 import android.os.Bundle
 import android.support.v4.media.session.MediaControllerCompat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
@@ -126,5 +127,6 @@ class AudiobookDetailsPlaybackTest {
         },
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
+      appContext = mockk<Context>(relaxed = true),
     )
 }

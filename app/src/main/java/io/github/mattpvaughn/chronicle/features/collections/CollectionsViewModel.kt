@@ -2,7 +2,6 @@ package io.github.mattpvaughn.chronicle.features.collections
 
 import android.content.SharedPreferences
 import androidx.lifecycle.*
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.BookRepository
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
@@ -18,6 +17,7 @@ import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.util.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -28,6 +28,7 @@ class CollectionsViewModel(
   collectionsRepository: CollectionsRepository,
   sharedPreferences: SharedPreferences,
   private val bookRepository: BookRepository,
+  private val exceptionHandler: CoroutineExceptionHandler,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -38,6 +39,7 @@ class CollectionsViewModel(
       private val librarySyncRepository: LibrarySyncRepository,
       private val sharedPreferences: SharedPreferences,
       private val bookRepository: BookRepository,
+      private val exceptionHandler: CoroutineExceptionHandler,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CollectionsViewModel::class.java)) {
@@ -47,6 +49,7 @@ class CollectionsViewModel(
             collectionsRepository,
             sharedPreferences,
             bookRepository,
+            exceptionHandler,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -168,7 +171,7 @@ class CollectionsViewModel(
   private val serverConnectionObserver =
     Observer<Boolean> { isConnectedToServer ->
       if (isConnectedToServer) {
-        viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+        viewModelScope.launch(exceptionHandler) {
           val millisSinceLastRefresh =
             System.currentTimeMillis() - prefsRepo.lastRefreshTimeStamp
           val minutesSinceLastRefresh = millisSinceLastRefresh / 1000 / 60

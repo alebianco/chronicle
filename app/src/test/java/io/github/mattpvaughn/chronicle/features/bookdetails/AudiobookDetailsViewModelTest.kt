@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
+import android.content.Context
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.MutableLiveData
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -268,5 +269,6 @@ class AudiobookDetailsViewModelTest {
       plexConfig = plexConfig,
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
+      appContext = mockk<Context>(relaxed = true),
     )
 }

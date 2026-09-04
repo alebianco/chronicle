@@ -14,6 +14,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -151,5 +152,6 @@ class HomeResumeTest {
         every { offlineMode } returns false
       },
     mediaServiceConnection = connection,
+    exceptionHandler = testExceptionHandler(),
   )
 }

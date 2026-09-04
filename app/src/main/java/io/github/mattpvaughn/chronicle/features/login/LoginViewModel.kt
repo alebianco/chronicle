@@ -2,23 +2,28 @@ package io.github.mattpvaughn.chronicle.features.login
 
 import android.net.Uri
 import androidx.lifecycle.*
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.OAuthResponse
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.postEvent
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-class LoginViewModel(private val plexLoginRepo: IPlexLoginRepo) : ViewModel() {
+class LoginViewModel(
+  private val plexLoginRepo: IPlexLoginRepo,
+  private val exceptionHandler: CoroutineExceptionHandler,
+) : ViewModel() {
   class Factory
     @Inject
-    constructor(private val plexLoginRepo: IPlexLoginRepo) :
-    ViewModelProvider.Factory {
+    constructor(
+      private val plexLoginRepo: IPlexLoginRepo,
+      private val exceptionHandler: CoroutineExceptionHandler,
+    ) : ViewModelProvider.Factory {
       @Suppress("UNCHECKED_CAST")
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LoginViewModel::class.java)) {
-          return LoginViewModel(plexLoginRepo) as T
+          return LoginViewModel(plexLoginRepo, exceptionHandler) as T
         }
         throw IllegalArgumentException("Unknown ViewHolder class")
       }
@@ -40,7 +45,7 @@ class LoginViewModel(private val plexLoginRepo: IPlexLoginRepo) : ViewModel() {
     }
 
   fun loginWithOAuth() {
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       try {
         val pin = plexLoginRepo.postOAuthPin()
         _authEvent.postEvent(pin)
@@ -65,7 +70,7 @@ class LoginViewModel(private val plexLoginRepo: IPlexLoginRepo) : ViewModel() {
 
   fun checkForAccess() {
     if (hasLaunched) {
-      viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+      viewModelScope.launch(exceptionHandler) {
         // Check for access, if the login repo gains access, then our observer in
         // MainActivity will handle navigation
         plexLoginRepo.checkForOAuthAccessToken()

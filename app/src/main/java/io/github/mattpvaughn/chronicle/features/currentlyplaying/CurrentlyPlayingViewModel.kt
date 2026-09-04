@@ -15,7 +15,6 @@ import androidx.lifecycle.*
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
 import io.github.mattpvaughn.chronicle.application.SECONDS_PER_MINUTE
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -39,6 +38,7 @@ import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerActi
 import io.github.mattpvaughn.chronicle.util.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.combine
@@ -106,6 +106,8 @@ class CurrentlyPlayingViewModel(
   private val workManager: WorkManager,
   private val bookmarkRepository: IBookmarkRepository,
   sharedPrefs: SharedPreferences,
+  private val exceptionHandler: CoroutineExceptionHandler,
+  private val appContext: Context,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -121,6 +123,8 @@ class CurrentlyPlayingViewModel(
       private val workManager: WorkManager,
       private val bookmarkRepository: IBookmarkRepository,
       private val sharedPrefs: SharedPreferences,
+      private val exceptionHandler: CoroutineExceptionHandler,
+      private val appContext: Context,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CurrentlyPlayingViewModel::class.java)) {
@@ -135,6 +139,8 @@ class CurrentlyPlayingViewModel(
             workManager,
             bookmarkRepository,
             sharedPrefs,
+            exceptionHandler,
+            appContext,
           ) as T
         } else {
           throw IllegalArgumentException("Incorrect class type provided")
@@ -526,7 +532,7 @@ class CurrentlyPlayingViewModel(
 
   private fun setAudiobook(trackId: String) {
     val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       // only update [audiobookId] when we see a new audiobook
       val potentiallyNewAudiobookId = trackRepository.getBookIdForTrack(trackId)
       if (potentiallyNewAudiobookId != previousAudiobookId) {
@@ -547,7 +553,7 @@ class CurrentlyPlayingViewModel(
     if (bookId == NO_AUDIOBOOK_FOUND_ID) {
       return
     }
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       try {
         // Only replace track view w/ loading view if we have no tracks
         if (tracks.value?.size == null) {
@@ -682,7 +688,7 @@ class CurrentlyPlayingViewModel(
           } else {
             val toast =
               Toast.makeText(
-                Injector.get().applicationContext(),
+                appContext,
                 R.string.skip_forwards_reached_last_chapter,
                 Toast.LENGTH_LONG,
               )
@@ -752,7 +758,7 @@ class CurrentlyPlayingViewModel(
         Timber.i("Updating DB progress!")
         // Service is not alive, so update track repo directly
         tracks.observeOnce { _tracks ->
-          viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+          viewModelScope.launch(exceptionHandler) {
             // don't bother seeking if there aren't any files
             if (_tracks.isEmpty()) {
               return@launch

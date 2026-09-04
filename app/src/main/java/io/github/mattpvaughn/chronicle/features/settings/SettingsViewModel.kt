@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.settings
 
+import android.content.Context
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.net.Uri
 import android.text.format.Formatter
@@ -11,7 +12,6 @@ import coil3.SingletonImageLoader
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.FEATURE_FLAG_IS_AUTO_ENABLED
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
@@ -29,6 +29,7 @@ import io.github.mattpvaughn.chronicle.util.bytesAvailable
 import io.github.mattpvaughn.chronicle.util.postEvent
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +62,9 @@ class SettingsViewModel(
   private val plexPrefs: PlexPrefsRepo,
   private val collectionsRepository: CollectionsRepository,
   private val settingsBackupRepo: SettingsBackupRepo,
+  private val appContext: Context,
+  private val externalDeviceDirs: List<@JvmSuppressWildcards File>,
+  private val exceptionHandler: CoroutineExceptionHandler,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -77,6 +81,9 @@ class SettingsViewModel(
       private val plexPrefs: PlexPrefsRepo,
       private val collectionsRepository: CollectionsRepository,
       private val settingsBackupRepo: SettingsBackupRepo,
+      private val appContext: Context,
+      private val externalDeviceDirs: List<@JvmSuppressWildcards File>,
+      private val exceptionHandler: CoroutineExceptionHandler,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
@@ -92,6 +99,9 @@ class SettingsViewModel(
             plexPrefs = plexPrefs,
             collectionsRepository = collectionsRepository,
             settingsBackupRepo = settingsBackupRepo,
+            appContext = appContext,
+            externalDeviceDirs = externalDeviceDirs,
+            exceptionHandler = exceptionHandler,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -181,7 +191,7 @@ class SettingsViewModel(
    * service locator's reach (cu-101).
    */
   private fun formatRefreshRate(minutes: Long): String {
-    val resources = Injector.get().applicationContext().resources
+    val resources = appContext.resources
     return when (val label = refreshRateLabel(minutes)) {
       is RefreshRateLabel.Named -> resources.getString(label.stringRes)
       is RefreshRateLabel.Quantity -> "${label.count} ${resources.getString(label.unitRes)}"
@@ -196,7 +206,7 @@ class SettingsViewModel(
    * hold `"Rectangle"`, and the key is importable with no value validation (cu-133).
    */
   private fun formatBookCoverStyle(stored: String): String =
-    Injector.get().applicationContext().resources
+    appContext.resources
       .getString(BookCoverStyle.ofStoredOrDefault(stored).choiceRes)
 
   private fun makePreferences(): List<PreferenceModel> {
@@ -309,7 +319,7 @@ class SettingsViewModel(
               placeHolderStrings =
                 listOf(
                   Formatter.formatFileSize(
-                    Injector.get().applicationContext(),
+                    appContext,
                     prefsRepo.cachedMediaDir.bytesAvailable(),
                   ),
                 ),
@@ -323,14 +333,14 @@ class SettingsViewModel(
               override fun onClick() {
                 showOptionsMenu(
                   options =
-                    Injector.get().externalDeviceDirs().map {
+                    externalDeviceDirs.map {
                       FormattableString.ResourceString(
                         stringRes = R.string.settings_sync_space_available,
                         placeHolderStrings =
                           listOf(
                             it.path,
                             Formatter.formatFileSize(
-                              Injector.get().applicationContext(),
+                              appContext,
                               it.bytesAvailable(),
                             ),
                           ),
@@ -349,7 +359,7 @@ class SettingsViewModel(
 
                         val chosen = formattableString.placeHolderStrings[0]
                         val syncLoc =
-                          Injector.get().externalDeviceDirs().firstOrNull {
+                          externalDeviceDirs.firstOrNull {
                             chosen.contains(it.path)
                           }
                         if (syncLoc != null) {
@@ -511,8 +521,7 @@ class SettingsViewModel(
               placeHolderStrings =
                 listOf(
                   "${prefsRepo.jumpForwardSeconds} " +
-                    Injector.get()
-                      .applicationContext().resources.getString(R.string.seconds),
+                    appContext.resources.getString(R.string.seconds),
                 ),
             ),
           explanation =
@@ -558,8 +567,7 @@ class SettingsViewModel(
               placeHolderStrings =
                 listOf(
                   "${prefsRepo.jumpBackwardSeconds} " +
-                    Injector.get()
-                      .applicationContext().resources.getString(R.string.seconds),
+                    appContext.resources.getString(R.string.seconds),
                 ),
             ),
           explanation =
@@ -886,7 +894,7 @@ class SettingsViewModel(
                 override fun onClick() {
                   viewModelScope.launch {
                     withContext(Dispatchers.IO) {
-                      SingletonImageLoader.get(Injector.get().applicationContext()).let { loader ->
+                      SingletonImageLoader.get(appContext).let { loader ->
                         loader.memoryCache?.clear()
                         loader.diskCache?.clear()
                       }
@@ -959,7 +967,7 @@ class SettingsViewModel(
     navigateTo: NavigationDestination = DO_NOT_NAVIGATE,
     clearDownloads: Boolean = true,
   ) {
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       if (clearDownloads) {
         cachedFileManager.uncacheAllInLibrary()
       }
@@ -997,13 +1005,13 @@ class SettingsViewModel(
    */
   private fun defaultBackupFileName(): String {
     val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-    return Injector.get().applicationContext()
+    return appContext
       .getString(R.string.settings_backup_export_filename, today)
   }
 
   /** Writes the backup to the document the user just picked. */
   fun onExportFileChosen(destination: Uri) {
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       when (val result = settingsBackupRepo.exportTo(destination)) {
         is SettingsBackupRepo.ExportResult.Written ->
           showUserMessage(
@@ -1027,7 +1035,7 @@ class SettingsViewModel(
    * out to avoid.
    */
   fun onImportFileChosen(source: Uri) {
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       when (val result = settingsBackupRepo.importFrom(source)) {
         is SettingsBackupRepo.ImportResult.Applied -> {
           showUserMessage(

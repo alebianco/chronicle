@@ -23,6 +23,7 @@ import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.TripleLiveData
 import io.github.mattpvaughn.chronicle.util.mapAsync
 import io.github.mattpvaughn.chronicle.util.postEvent
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -33,6 +34,7 @@ class MainActivityViewModel(
   private val bookRepository: IBookRepository,
   private val mediaServiceConnection: MediaServiceConnection,
   collectionsRepository: CollectionsRepository,
+  private val exceptionHandler: CoroutineExceptionHandler,
 ) : ViewModel(), MainActivity.CurrentlyPlayingInterface {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -43,6 +45,7 @@ class MainActivityViewModel(
       private val bookRepository: IBookRepository,
       private val mediaServiceConnection: MediaServiceConnection,
       private val collectionsRepository: CollectionsRepository,
+      private val exceptionHandler: CoroutineExceptionHandler,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainActivityViewModel::class.java)) {
@@ -52,6 +55,7 @@ class MainActivityViewModel(
             bookRepository,
             mediaServiceConnection,
             collectionsRepository,
+            exceptionHandler,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -194,7 +198,7 @@ class MainActivityViewModel(
     Observer<MediaMetadataCompat> { metadata ->
       metadata.id?.let { trackId ->
         if (trackId.isNotEmpty()) {
-          viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+          viewModelScope.launch(exceptionHandler) {
             setAudiobook(trackId)
           }
         }
@@ -245,7 +249,7 @@ class MainActivityViewModel(
     lastResolvedTrackId = trackId
 
     val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
-    viewModelScope.launch(Injector.get().unhandledExceptionHandler()) {
+    viewModelScope.launch(exceptionHandler) {
       val bookId = trackRepository.getBookIdForTrack(trackId)
       if (bookId == NO_AUDIOBOOK_FOUND_ID) {
         return@launch
