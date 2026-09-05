@@ -7,6 +7,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -27,7 +28,7 @@ import java.io.IOException
 class SourceManagerIngestionTest {
   /** A backend that is not Plex, declaring only what a file-based source can answer. */
   private class FakeSource(
-    override val id: Long,
+    override val id: SourceId,
     private val books: Result<List<Audiobook>, Throwable>,
     override val hasNarrator: Boolean = false,
     override val hasSeries: Boolean = false,
@@ -51,13 +52,13 @@ class SourceManagerIngestionTest {
     runTest {
       val repo = mockk<IBookRepository>(relaxed = true)
       val books = slot<List<Audiobook>>()
-      val sourceId = slot<Long>()
+      val sourceId = slot<SourceId>()
       coEvery { repo.ingest(capture(books), capture(sourceId), any()) } returns 0
 
-      manager(repo).apply { addSource(FakeSource(id = 7L, books = Ok(listOf(book("a"), book("b"))))) }
+      manager(repo).apply { addSource(FakeSource(id = SourceId.forPlexServer("fake-7"), books = Ok(listOf(book("a"), book("b"))))) }
 
       assertEquals(listOf("a", "b"), books.captured.map { it.id })
-      assertEquals(7L, sourceId.captured)
+      assertEquals(SourceId.forPlexServer("fake-7"), sourceId.captured)
     }
 
   /** The capability flags reach the repository as declared, rather than being assumed true. */
@@ -69,7 +70,7 @@ class SourceManagerIngestionTest {
       coEvery { repo.ingest(any(), any(), capture(caps)) } returns 0
 
       manager(repo).apply {
-        addSource(FakeSource(id = 7L, books = Ok(listOf(book("a"))), hasNarrator = true))
+        addSource(FakeSource(id = SourceId.forPlexServer("fake-7"), books = Ok(listOf(book("a"))), hasNarrator = true))
       }
 
       assertEquals(true, caps.captured.hasNarrator)
@@ -89,7 +90,7 @@ class SourceManagerIngestionTest {
     runTest {
       val repo = mockk<IBookRepository>(relaxed = true)
 
-      manager(repo).apply { addSource(FakeSource(id = 7L, books = Err(IOException("offline")))) }
+      manager(repo).apply { addSource(FakeSource(id = SourceId.forPlexServer("fake-7"), books = Err(IOException("offline")))) }
 
       coVerify(exactly = 0) { repo.ingest(any(), any(), any()) }
     }
@@ -99,14 +100,14 @@ class SourceManagerIngestionTest {
   fun `a healthy source still ingests when another fails`() =
     runTest {
       val repo = mockk<IBookRepository>(relaxed = true)
-      val ids = mutableListOf<Long>()
+      val ids = mutableListOf<SourceId>()
       coEvery { repo.ingest(any(), capture(ids), any()) } returns 0
 
       manager(repo).apply {
-        addSource(FakeSource(id = 1L, books = Err(IOException("offline"))))
-        addSource(FakeSource(id = 2L, books = Ok(listOf(book("a")))))
+        addSource(FakeSource(id = SourceId.forPlexServer("fake-1"), books = Err(IOException("offline"))))
+        addSource(FakeSource(id = SourceId.forPlexServer("fake-2"), books = Ok(listOf(book("a")))))
       }
 
-      assertEquals("only the healthy source should ingest", listOf(2L), ids.distinct())
+      assertEquals("only the healthy source should ingest", listOf(SourceId.forPlexServer("fake-2")), ids.distinct())
     }
 }

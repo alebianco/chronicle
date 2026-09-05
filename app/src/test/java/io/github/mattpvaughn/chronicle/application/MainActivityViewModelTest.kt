@@ -13,6 +13,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.settledValue
@@ -81,7 +82,7 @@ class MainActivityViewModelTest {
 
   private val mediaServiceConnection = mockk<MediaServiceConnection>(relaxed = true)
 
-  private val book = Audiobook(id = "1001", source = 1L, title = "Dune")
+  private val book = Audiobook(id = "1001", source = TEST_SOURCE, title = "Dune")
 
   private val bookRepository =
     mockk<IBookRepository>(relaxed = true) {

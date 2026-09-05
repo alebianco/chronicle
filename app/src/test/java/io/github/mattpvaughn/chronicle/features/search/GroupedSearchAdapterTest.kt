@@ -9,6 +9,7 @@ import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.SearchField
 import io.github.mattpvaughn.chronicle.data.model.groupedSearch
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -49,7 +50,7 @@ class GroupedSearchAdapterTest {
     series: String = "",
   ) = Audiobook(
     id = id,
-    source = 1L,
+    source = TEST_SOURCE,
     title = title,
     author = author,
     narrator = narrator,

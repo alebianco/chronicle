@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -354,6 +355,97 @@ class RoomSchemaTest {
           Audiobook.NO_SERIES_INDEX,
           cursor.getInt(1),
         )
+      }
+    db.close()
+  }
+
+  /**
+   * The v12 -> v13 migration retypes `source` from INTEGER to TEXT (cu-127, decision-21).
+   *
+   * The load-bearing assertion is the **value**, not the type. Every existing row holds the old
+   * per-type constant `0`, and a plain `CAST(source AS TEXT)` would yield the string `"0"` — a
+   * scope that no `SourceId` the app can construct will ever equal, leaving every book invisible
+   * to the scoped reads and un-prunable by cu-80's removal rule. Nothing else can catch that: the
+   * column would be correctly typed, the row count right, and the schema would validate.
+   *
+   * Progress is asserted alongside because this is a full table rebuild, and a column omitted from
+   * the copy list is dropped with no error at all (the BOOK_MIGRATION_8_9 lesson).
+   */
+  @Test
+  fun `the book database retypes source when migrating from v12`() {
+    val db =
+      migrated(
+        klass = BookDatabase::class.java,
+        oldVersion = 12,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook` (`id` TEXT NOT NULL, " +
+            "`source` INTEGER NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, " +
+            "`author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, " +
+            "`genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, " +
+            "`addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+            "`lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, " +
+            "`isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, " +
+            "`favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, " +
+            "`leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, " +
+            "`chapters` TEXT NOT NULL, `playbackSpeed` REAL NOT NULL, " +
+            "`narrator` TEXT NOT NULL, `series` TEXT NOT NULL, " +
+            "`seriesIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        seedSql =
+          "INSERT INTO Audiobook (id, source, title, titleSort, author, thumb, parentId, " +
+            "genre, summary, year, addedAt, updatedAt, lastViewedAt, duration, isCached, " +
+            "progress, favorited, viewedLeafCount, leafCount, viewCount, chapters, " +
+            "playbackSpeed, narrator, series, seriesIndex) " +
+            "VALUES ('1001', 0, 'The Hobbit', 'Hobbit, The', 'Tolkien', '', '0', " +
+            "'', '', 1937, 0, 0, 1700000000000, 3600000, 1, 1234567, 0, 0, 3, 0, '', 1.5, " +
+            "'Rob Inglis', 'Middle-earth', 100)",
+        migrations = BOOK_MIGRATIONS,
+      )
+
+    db.query("SELECT id, source, progress, playbackSpeed, narrator FROM Audiobook", emptyArray())
+      .use { cursor ->
+        assertTrue("the pre-existing row must survive the upgrade", cursor.moveToFirst())
+        assertEquals("1001", cursor.getString(0))
+        assertEquals(
+          "the legacy constant 0 must become a SourceId the app can construct, not the text \"0\"",
+          SourceId.LEGACY_PLEX.value,
+          cursor.getString(1),
+        )
+        assertEquals("a rebuild must not drop another column's data", 1_234_567L, cursor.getLong(2))
+        assertEquals(1.5f, cursor.getFloat(3), 0.001f)
+        assertEquals("Rob Inglis", cursor.getString(4))
+      }
+    db.close()
+  }
+
+  /**
+   * The v2 -> v3 collections migration, the same retype as the book one above and for the same
+   * reason (cu-127).
+   */
+  @Test
+  fun `the collections database retypes source when migrating from v2`() {
+    val db =
+      migrated(
+        klass = CollectionsDatabase::class.java,
+        oldVersion = 2,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `Collection` (`id` TEXT NOT NULL, " +
+            "`source` INTEGER NOT NULL, `title` TEXT NOT NULL, `childCount` INTEGER NOT NULL, " +
+            "`sortType` TEXT NOT NULL, `isCached` INTEGER NOT NULL, `thumb` TEXT NOT NULL, " +
+            "`childIds` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        seedSql =
+          "INSERT INTO Collection (id, source, title, childCount, sortType, isCached, thumb, " +
+            "childIds) VALUES ('c1', 0, 'Favourites', 3, 'RELEASE_DATE', 0, '', '1001,1002')",
+        migrations = COLLECTIONS_MIGRATIONS,
+      )
+
+    db.query("SELECT id, source, title, childCount, childIds FROM Collection", emptyArray())
+      .use { cursor ->
+        assertTrue("the pre-existing row must survive the upgrade", cursor.moveToFirst())
+        assertEquals("c1", cursor.getString(0))
+        assertEquals(SourceId.LEGACY_PLEX.value, cursor.getString(1))
+        assertEquals("Favourites", cursor.getString(2))
+        assertEquals("a rebuild must not drop another column's data", 3L, cursor.getLong(3))
+        assertEquals("1001,1002", cursor.getString(4))
       }
     db.close()
   }

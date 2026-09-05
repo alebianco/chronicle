@@ -4,6 +4,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -37,7 +38,7 @@ class CurrentlyPlayingChapterSourceOrderingTest {
   fun `a progress tick without table rows does not downgrade an already-resolved list`() {
     val s = CurrentlyPlayingSingleton()
     val tracks = listOf(track("1"))
-    val book = Audiobook(id = "b1", source = 1L, title = "Book", chapters = listOf(chapter("c-col", "from column")))
+    val book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book", chapters = listOf(chapter("c-col", "from column")))
 
     // OnMediaChangedCallback: rows available, so the table wins.
     s.update(book = book, track = tracks[0], tracks = tracks, chaptersFromTable = listOf(chapter("c-tab", "from table")))

@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.util
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -35,7 +36,7 @@ class BooksKeyDedupTest {
     title: String = "Dune",
   ) = Audiobook(
     id = id,
-    source = 1L,
+    source = TEST_SOURCE,
     title = title,
     progress = progress,
     isCached = isCached,

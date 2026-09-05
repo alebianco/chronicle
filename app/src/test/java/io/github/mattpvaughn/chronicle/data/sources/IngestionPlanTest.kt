@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.data.sources
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,12 +15,12 @@ import org.junit.Test
  * `BookRepository.refreshData` next to a Plex network call, so neither could be asserted at all.
  */
 class IngestionPlanTest {
-  private val plex = 0L
-  private val other = 7L
+  private val plex = SourceId.forPlexServer("server-a")
+  private val other = SourceId.forPlexServer("server-b")
 
   private fun book(
     id: String,
-    source: Long = plex,
+    source: SourceId = plex,
     title: String = "Book $id",
     progress: Long = 0L,
   ) = EMPTY_AUDIOBOOK.copy(id = id, source = source, title = title, progress = progress)
@@ -103,5 +104,26 @@ class IngestionPlanTest {
 
     assertTrue(plan.toRemove.isEmpty())
     assertEquals(2, plan.toUpsert.size)
+  }
+
+  /**
+   * An unresolved scope must be inert, not a wildcard.
+   *
+   * [SourceId.UNKNOWN] reaches ingestion when no server is chosen — mid-login, or after a
+   * `PlexConfig.clear()`. Stamping rows with it would file them under a key no later refresh
+   * matches, so neither the removal rule nor any scoped read would ever see them again: a
+   * catalogue that grows and can never be pruned.
+   */
+  @Test
+  fun `an unresolved source writes nothing`() {
+    val plan =
+      planIngestion(
+        fetched = listOf(book("1"), book("2")),
+        local = listOf(book("3")),
+        sourceId = SourceId.UNKNOWN,
+      )
+
+    assertEquals(emptyList<Audiobook>(), plan.toUpsert)
+    assertEquals("an unresolved scope must not delete either", emptyList<String>(), plan.toRemove)
   }
 }

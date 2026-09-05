@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.model
 
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -36,7 +37,7 @@ class BookProgressDerivationTest {
     lastViewedAt: Long,
   ) = Audiobook(
     id = "1001",
-    source = 1L,
+    source = TEST_SOURCE,
     title = "Dune",
     progress = progress,
     lastViewedAt = lastViewedAt,

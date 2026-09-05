@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
@@ -19,7 +20,7 @@ class TagIndexSeederTest {
     id: String,
     narrator: String = "",
     series: String = "",
-  ) = Audiobook(id = id, source = 1L, title = "Book $id", narrator = narrator, series = series)
+  ) = Audiobook(id = id, source = TEST_SOURCE, title = "Book $id", narrator = narrator, series = series)
 
   private fun narrators(
     value: String,

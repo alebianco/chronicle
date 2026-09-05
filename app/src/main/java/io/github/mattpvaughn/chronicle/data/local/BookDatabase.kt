@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookTrackData
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import kotlinx.coroutines.flow.Flow
 
 private const val BOOK_DATABASE_NAME = "book_db"
@@ -156,6 +157,41 @@ val BOOK_MIGRATION_11_12 =
   }
 
 /**
+ * Retypes `source` from INTEGER to TEXT so it can hold a per-instance [SourceId] (cu-127,
+ * decision-21).
+ *
+ * A table rebuild, because SQLite cannot alter a column's type. The column list comes from the
+ * exported v12 schema, which is the authority — a column omitted here is dropped with no error at
+ * all (the BOOK_MIGRATION_8_9 lesson).
+ *
+ * **Existing rows are mapped to [SourceId.LEGACY_PLEX], not to the text `"0"`.** Every row today
+ * carries the old per-type constant `0`, and a plain `CAST(source AS TEXT)` would produce a scope
+ * that no [SourceId] the app can construct will ever equal — so every book would be permanently
+ * invisible to the scoped reads and un-prunable by the removal rule. The real server id is not
+ * knowable from inside a migration; `BookRepository.adoptLegacyRows` claims these on the first
+ * refresh that knows which server it is talking to.
+ */
+val BOOK_MIGRATION_12_13 =
+  object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.rebuildTable(
+        table = "Audiobook",
+        createNewTableSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook_new` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `chapters` TEXT NOT NULL, `playbackSpeed` REAL NOT NULL, `narrator` TEXT NOT NULL, `series` TEXT NOT NULL, `seriesIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        columns =
+          listOf(
+            "id", "source", "title", "titleSort", "author", "thumb", "parentId", "genre",
+            "summary", "year", "addedAt", "updatedAt", "lastViewedAt", "duration", "isCached",
+            "progress", "favorited", "viewedLeafCount", "leafCount", "viewCount", "chapters",
+            "playbackSpeed", "narrator", "series", "seriesIndex",
+          ),
+        textColumns = emptySet(),
+        columnExpressions = mapOf("source" to "'${SourceId.LEGACY_PLEX.value}'"),
+      )
+    }
+  }
+
+/**
  * Every migration, in order, as one list.
  *
  * Named rather than inlined into the builder so a test can open a real database file at an older
@@ -175,9 +211,10 @@ val BOOK_MIGRATIONS =
     BOOK_MIGRATION_9_10,
     BOOK_MIGRATION_10_11,
     BOOK_MIGRATION_11_12,
+    BOOK_MIGRATION_12_13,
   )
 
-@Database(entities = [Audiobook::class], version = 12, exportSchema = true)
+@Database(entities = [Audiobook::class], version = 13, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract val bookDao: BookDao
 }

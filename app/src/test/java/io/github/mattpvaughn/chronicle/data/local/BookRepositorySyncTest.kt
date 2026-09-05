@@ -9,6 +9,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexChapter
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainer
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -51,7 +52,7 @@ class BookRepositorySyncTest {
   private val book =
     Audiobook(
       id = "1001",
-      source = 1L,
+      source = TEST_SOURCE,
       title = "Dune",
       progress = 0L,
       duration = 0L,

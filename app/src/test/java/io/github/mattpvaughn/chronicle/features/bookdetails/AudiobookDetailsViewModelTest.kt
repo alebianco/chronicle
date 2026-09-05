@@ -13,6 +13,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.keepCollected
@@ -45,7 +46,7 @@ class AudiobookDetailsViewModelTest {
   @get:Rule
   val mainDispatcherRule = MainDispatcherRule()
 
-  private val book = Audiobook(id = "1001", source = 1L, title = "Dune")
+  private val book = Audiobook(id = "1001", source = TEST_SOURCE, title = "Dune")
   private val tracksFlow = MutableStateFlow<List<MediaItemTrack>>(emptyList())
 
   private val bookRepository =

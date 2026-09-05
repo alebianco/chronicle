@@ -4,6 +4,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -46,7 +47,7 @@ class CurrentlyPlayingChapterSourceTest {
     val s = CurrentlyPlayingSingleton()
     val tracks = listOf(track("1"))
     s.update(
-      book = Audiobook(id = "b1", source = 1L, title = "Book", chapters = fromColumn),
+      book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book", chapters = fromColumn),
       track = tracks[0],
       tracks = tracks,
       chaptersFromTable = fromTable,
@@ -60,7 +61,7 @@ class CurrentlyPlayingChapterSourceTest {
     val s = CurrentlyPlayingSingleton()
     val tracks = listOf(track("1"))
     s.update(
-      book = Audiobook(id = "b1", source = 1L, title = "Book", chapters = fromColumn),
+      book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book", chapters = fromColumn),
       track = tracks[0],
       tracks = tracks,
       chaptersFromTable = emptyList(),
@@ -74,7 +75,7 @@ class CurrentlyPlayingChapterSourceTest {
     val s = CurrentlyPlayingSingleton()
     val tracks = listOf(track("1"))
     s.update(
-      book = Audiobook(id = "b1", source = 1L, title = "Book"),
+      book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book"),
       track = tracks[0],
       tracks = tracks,
       chaptersFromTable = emptyList(),

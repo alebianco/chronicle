@@ -10,6 +10,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
@@ -166,7 +167,7 @@ class PlayBookGuardsTest {
       MediaSessionCompat(ApplicationProvider.getApplicationContext(), "PlayBookGuardsTest")
     val bookRepo =
       mockk<IBookRepository>(relaxed = true) {
-        coEvery { getAudiobookAsync(any()) } returns Audiobook(id = bookId, source = 1L, title = "Book")
+        coEvery { getAudiobookAsync(any()) } returns Audiobook(id = bookId, source = TEST_SOURCE, title = "Book")
         coEvery { syncAudiobook(any(), any(), any()) } answers
           {
             @Suppress("UNCHECKED_CAST")

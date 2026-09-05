@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -22,7 +23,7 @@ class BookMetadataLinesTest {
     seriesIndex: Int = Audiobook.NO_SERIES_INDEX,
   ) = Audiobook(
     id = "1",
-    source = 1L,
+    source = TEST_SOURCE,
     title = "A Book",
     narrator = narrator,
     series = series,

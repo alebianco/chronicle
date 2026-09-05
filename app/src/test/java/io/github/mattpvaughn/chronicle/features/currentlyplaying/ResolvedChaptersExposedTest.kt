@@ -4,6 +4,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -43,7 +44,7 @@ class ResolvedChaptersExposedTest {
     val rows = listOf(chapter("c1", 1), chapter("c2", 2), chapter("c3", 3))
 
     s.update(
-      book = Audiobook(id = "b1", source = 1L, title = "Book", chapters = emptyList()),
+      book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book", chapters = emptyList()),
       track = tracks[0],
       tracks = tracks,
       chaptersFromTable = rows,

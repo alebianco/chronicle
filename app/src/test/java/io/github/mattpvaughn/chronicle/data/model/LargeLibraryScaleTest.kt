@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.model
 
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.system.measureNanoTime
@@ -35,7 +36,7 @@ class LargeLibraryScaleTest {
     (1..size).map { i ->
       Audiobook(
         id = i.toString(),
-        source = 0L,
+        source = TEST_SOURCE,
         title = "Book $i of the Long Series",
         titleSort = "Long Series ${i / 8}, Book ${i % 8 + 1} - Book $i",
         author = "Author ${i % 120}",

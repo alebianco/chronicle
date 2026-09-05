@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
@@ -21,7 +22,7 @@ class PerTickRepublishTest {
     duration: Long = 180_000L,
   ) = MediaItemTrack(id = id, parentKey = "b1", title = "t$id", index = id.toInt(), progress = progress, duration = duration)
 
-  private val book = Audiobook(id = "b1", source = 1L, title = "Book")
+  private val book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book")
 
   private fun singleton() = CurrentlyPlayingSingleton()
 

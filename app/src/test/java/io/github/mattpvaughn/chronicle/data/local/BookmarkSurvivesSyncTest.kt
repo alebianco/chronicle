@@ -6,13 +6,15 @@ import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
+import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainer
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
+import io.github.mattpvaughn.chronicle.testing.TEST_SERVER_ID
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.coEvery
 import io.mockk.every
@@ -60,6 +62,10 @@ class BookmarkSurvivesSyncTest {
   private val plexPrefsRepo =
     mockk<PlexPrefsRepo>(relaxed = true) {
       every { library } returns PlexLibrary(name = "Books", type = MediaType.ARTIST, id = "1")
+      // Without this the repository's scoping key is SourceId.UNKNOWN, no fixture row matches it,
+      // and the refresh deletes nothing — which would make this test pass while proving nothing
+      // (cu-127). The assertion it would defeat is the one that says the book *was* deleted.
+      every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)
     }
 
   @Before
@@ -100,7 +106,7 @@ class BookmarkSurvivesSyncTest {
   @Test
   fun `a bookmark survives an ordinary refresh`() =
     runTest {
-      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX, title = "The Hobbit")))
+      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = TEST_SOURCE, title = "The Hobbit")))
       bookmarks.add(bookId = "1001", position = BookOffset(90_000L), note = "the riddle game")
       serverHas(PlexDirectory(ratingKey = "1001", title = "The Hobbit"))
 
@@ -121,7 +127,7 @@ class BookmarkSurvivesSyncTest {
   @Test
   fun `a bookmark survives its book being deleted by a refresh`() =
     runTest {
-      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX, title = "The Hobbit")))
+      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = TEST_SOURCE, title = "The Hobbit")))
       bookmarks.add(bookId = "1001", position = BookOffset(90_000L), note = "the riddle game")
       // The server no longer lists it.
       serverHas(PlexDirectory(ratingKey = "1002", title = "Dune"))
@@ -167,7 +173,7 @@ class BookmarkSurvivesSyncTest {
   @Test
   fun `clearing the catalogue does not clear bookmarks`() =
     runTest {
-      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX, title = "The Hobbit")))
+      bookDb.bookDao.insertAll(listOf(Audiobook(id = "1001", source = TEST_SOURCE, title = "The Hobbit")))
       bookmarks.add(bookId = "1001", position = BookOffset(90_000L), note = "the riddle game")
 
       bookRepository().clear()

@@ -8,9 +8,7 @@ import android.support.v4.media.MediaMetadataCompat
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
-import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource.Companion.NO_SOURCE_FOUND
-import io.github.mattpvaughn.chronicle.data.sources.SourceManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.narrators
@@ -18,13 +16,23 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.seriesName
 import io.github.mattpvaughn.chronicle.features.player.*
 import kotlin.time.Duration.Companion.minutes
 
-@TypeConverters(ChapterListConverter::class)
+@TypeConverters(ChapterListConverter::class, SourceIdConverters::class)
 @Entity
 data class Audiobook(
   @PrimaryKey
   val id: String,
-  /** Unique long representing a [MediaSource] in [SourceManager] */
-  val source: Long,
+  /**
+   * Which backend installation this book came from — see [SourceId] and decision-21.
+   *
+   * Written by [io.github.mattpvaughn.chronicle.data.sources.planIngestion], not by [from]: a
+   * parsed response does not know which server it arrived from, only the repository doing the
+   * fetching does. [from] therefore leaves this [SourceId.UNKNOWN] and ingestion stamps it.
+   *
+   * **This is a local-only column in [merge]'s sense** (cu-20): the network copy never carries a
+   * meaningful value, so both arms of [merge] must name it or a refresh would blank the scope of
+   * every book — which is exactly the union this field exists to prevent.
+   */
+  val source: SourceId,
   val title: String = "",
   val titleSort: String = "",
   val author: String = "",
@@ -129,7 +137,7 @@ data class Audiobook(
     fun from(dir: PlexDirectory) =
       Audiobook(
         id = dir.ratingKey,
-        source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX,
+        source = SourceId.UNKNOWN,
         title = dir.title,
         titleSort = dir.titleSort.takeIf { it.isNotEmpty() } ?: dir.title,
         author = dir.parentTitle,

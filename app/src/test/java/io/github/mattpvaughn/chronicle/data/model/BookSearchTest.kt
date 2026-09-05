@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.model
 
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -24,7 +25,7 @@ class BookSearchTest {
     isCached: Boolean = false,
   ) = Audiobook(
     id = id,
-    source = 1L,
+    source = TEST_SOURCE,
     title = title,
     titleSort = title,
     author = author,

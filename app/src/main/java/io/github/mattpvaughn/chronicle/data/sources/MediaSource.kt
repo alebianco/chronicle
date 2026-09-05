@@ -4,10 +4,17 @@ import androidx.media3.datasource.DefaultDataSource
 import com.github.michaelbull.result.Result
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 
 interface MediaSource {
-  /** An ID uniquely representing a specific source. */
-  val id: Long
+  /**
+   * The specific backend **installation** this source represents — one Plex server, not "Plex"
+   * as a category (decision-21).
+   *
+   * Was a per-type constant (`0L` for Plex) until cu-127, which is why `Audiobook.source` could
+   * exist for years without scoping anything: every row carried the same value.
+   */
+  val id: SourceId
 
   /**
    * Expose a [DefaultDataSource.Factory] which can transform a [List<MediaItemTrack>] into a
@@ -50,6 +57,6 @@ interface MediaSource {
   val hasServerProgress: Boolean
 
   companion object {
-    const val NO_SOURCE_FOUND = -1L
+    val NO_SOURCE_FOUND = SourceId.UNKNOWN
   }
 }

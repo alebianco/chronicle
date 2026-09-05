@@ -4,6 +4,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.every
 import io.mockk.mockk
@@ -80,7 +81,13 @@ class MultiIdTagSeedingTest {
     runTest {
       val associations = seeder().readAssociationsByIds(ALL_FIXTURE_IDS)
       val known =
-        Audiobook(id = "151171", source = 1L, title = "The Wisdom of Crowds", narrator = "A Real Narrator", series = "A Real Series")
+        Audiobook(
+          id = "151171",
+          source = TEST_SOURCE,
+          title = "The Wisdom of Crowds",
+          narrator = "A Real Narrator",
+          series = "A Real Series",
+        )
 
       val seeded = listOf(known).withSeededTags(associations).single()
 
@@ -94,7 +101,7 @@ class MultiIdTagSeedingTest {
       // The fake server answers the whole captured fixture whatever ids are asked for, so this
       // asks for the full set and asserts on 151171, which really does carry both tags.
       val associations = seeder().readAssociationsByIds(ALL_FIXTURE_IDS)
-      val blank = Audiobook(id = "151171", source = 1L, title = "The Wisdom of Crowds")
+      val blank = Audiobook(id = "151171", source = TEST_SOURCE, title = "The Wisdom of Crowds")
 
       val seeded = listOf(blank).withSeededTags(associations).single()
 

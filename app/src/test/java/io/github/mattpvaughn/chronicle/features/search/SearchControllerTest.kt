@@ -6,6 +6,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.GroupedSearchResults
 import io.github.mattpvaughn.chronicle.data.model.SearchField
 import io.github.mattpvaughn.chronicle.data.model.groupedSearch
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,11 +32,11 @@ class SearchControllerTest {
 
   private val library =
     listOf(
-      Audiobook(id = "1", source = 1L, title = "The Hobbit", author = "J R R Tolkien"),
-      Audiobook(id = "2", source = 1L, title = "Dune", author = "Frank Herbert"),
+      Audiobook(id = "1", source = TEST_SOURCE, title = "The Hobbit", author = "J R R Tolkien"),
+      Audiobook(id = "2", source = TEST_SOURCE, title = "Dune", author = "Frank Herbert"),
       Audiobook(
         id = "3",
-        source = 1L,
+        source = TEST_SOURCE,
         title = "Mistborn",
         author = "Brandon Sanderson",
         narrator = "Michael Kramer",

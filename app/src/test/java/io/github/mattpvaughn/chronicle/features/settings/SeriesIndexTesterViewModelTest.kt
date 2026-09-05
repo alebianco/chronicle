@@ -5,6 +5,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.PatternOrder
 import io.github.mattpvaughn.chronicle.data.model.SeriesIndexPattern
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.keepCollected
@@ -38,7 +39,7 @@ class SeriesIndexTesterViewModelTest {
   private fun book(
     id: String,
     titleSort: String,
-  ) = Audiobook(id = id, source = 0L, title = "T$id", titleSort = titleSort)
+  ) = Audiobook(id = id, source = TEST_SOURCE, title = "T$id", titleSort = titleSort)
 
   private fun TestScope.viewModel(books: List<Audiobook> = emptyList()): SeriesIndexTesterViewModel {
     val repo =

@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.data.model
 
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingSingleton
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingViewModel
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.views.SpeedChooserState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -17,7 +18,8 @@ import java.io.File
  * must survive a merge with a network copy that cannot carry it.
  */
 class PerBookSpeedTest {
-  private fun book(speed: Float = Audiobook.NO_SPEED_OVERRIDE) = Audiobook(id = "1001", source = 1L, title = "Dune", playbackSpeed = speed)
+  private fun book(speed: Float = Audiobook.NO_SPEED_OVERRIDE) =
+    Audiobook(id = "1001", source = TEST_SOURCE, title = "Dune", playbackSpeed = speed)
 
   @Test
   fun `a book with no override follows the global speed`() {
@@ -34,7 +36,7 @@ class PerBookSpeedTest {
 
   @Test
   fun `a new book defaults to no override`() {
-    assertEquals(Audiobook.NO_SPEED_OVERRIDE, Audiobook(id = "1", source = 1L).playbackSpeed, 0f)
+    assertEquals(Audiobook.NO_SPEED_OVERRIDE, Audiobook(id = "1", source = TEST_SOURCE).playbackSpeed, 0f)
   }
 
   /**

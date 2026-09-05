@@ -4,14 +4,19 @@ import androidx.media3.datasource.DefaultDataSource
 import com.github.michaelbull.result.Result
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 
 /** A [MediaSource] wrapping files on the local filesystem */
 class LocalMediaSource : MediaSource {
-  override val id: Long = MEDIA_SOURCE_ID_LOCAL
+  /**
+   * The device's own storage is a single installation, so unlike a Plex server there is nothing
+   * to key on — one device has one local source (decision-21, cu-33.2).
+   */
+  override val id: SourceId = MEDIA_SOURCE_ID_LOCAL
 
   companion object {
-    const val MEDIA_SOURCE_ID_LOCAL: Long = 2L
+    val MEDIA_SOURCE_ID_LOCAL = SourceId("local:device")
   }
 
   // TODO: acquire the permissions needed somehow

@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.views
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,7 +17,8 @@ import org.junit.Test
  * enumerable here.
  */
 class SpeedChooserStateTest {
-  private fun book(speed: Float = Audiobook.NO_SPEED_OVERRIDE) = Audiobook(id = "1001", source = 1L, title = "Dune", playbackSpeed = speed)
+  private fun book(speed: Float = Audiobook.NO_SPEED_OVERRIDE) =
+    Audiobook(id = "1001", source = TEST_SOURCE, title = "Dune", playbackSpeed = speed)
 
   @Test
   fun `a book with no override shows the global speed with the switch off`() {

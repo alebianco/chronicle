@@ -6,18 +6,15 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
-import io.github.mattpvaughn.chronicle.data.sources.MediaSource
-import io.github.mattpvaughn.chronicle.data.sources.SourceManager
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 
-@TypeConverters(CollectionIdConverter::class)
+@TypeConverters(CollectionIdConverter::class, SourceIdConverters::class)
 @Entity
 data class Collection(
   @PrimaryKey
   val id: String,
-  /** Unique long representing a [MediaSource] in [SourceManager] */
-  val source: Long,
+  /** Which backend installation this collection came from — see [SourceId], decision-21. */
+  val source: SourceId,
   val title: String,
   val childCount: Long = 0L,
   val sortType: SortType = SortType.RELEASE_DATE,
@@ -29,7 +26,7 @@ data class Collection(
     fun from(dir: PlexDirectory) =
       Collection(
         id = dir.ratingKey,
-        source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX,
+        source = SourceId.UNKNOWN,
         title = dir.title,
         childCount = dir.childCount,
         sortType = SortType.fromPlexCode(dir.collectionSort.toInt()),

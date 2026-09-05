@@ -7,6 +7,7 @@ import com.github.michaelbull.result.Result
 import com.tonyodev.fetch2.Request
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.github.mattpvaughn.chronicle.data.sources.HttpMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import okhttp3.ResponseBody
@@ -19,14 +20,20 @@ class PlexMediaSource
     private val plexConfig: PlexConfig,
     private val plexMediaService: PlexMediaService,
     private val plexLoginRepo: IPlexLoginRepo,
+    private val plexPrefsRepo: PlexPrefsRepo,
     private val appContext: Context,
     defaultDataSourceFactory: DefaultHttpDataSource.Factory,
   ) : HttpMediaSource {
-    override val id: Long = MEDIA_SOURCE_ID_PLEX
-
-    companion object {
-      const val MEDIA_SOURCE_ID_PLEX: Long = 0L
-    }
+    /**
+     * The connected Plex **server**, not "Plex" (decision-21).
+     *
+     * Read from prefs on each access rather than captured once: the user can switch servers
+     * without this object being rebuilt, and a stale id would scope writes to the previous
+     * server — filing the new server's books where the next refresh of the old one would delete
+     * them (cu-80's removal rule).
+     */
+    override val id: SourceId
+      get() = SourceId.forPlexServer(plexPrefsRepo.server?.serverId.orEmpty())
 
     override val dataSourceFactory: DefaultDataSource.Factory =
       DefaultDataSource.Factory(

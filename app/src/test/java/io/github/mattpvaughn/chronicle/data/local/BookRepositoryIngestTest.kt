@@ -1,10 +1,12 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.github.mattpvaughn.chronicle.data.sources.SourceCapabilities
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
+import io.github.mattpvaughn.chronicle.testing.OTHER_TEST_SOURCE
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.coVerify
 import io.mockk.every
@@ -34,12 +36,12 @@ class BookRepositoryIngestTest {
   private val plexPrefsRepo =
     mockk<PlexPrefsRepo>(relaxed = true) { every { library } returns null }
 
-  private val plex = PlexMediaSource.MEDIA_SOURCE_ID_PLEX
-  private val other = 7L
+  private val plex = TEST_SOURCE
+  private val other = OTHER_TEST_SOURCE
 
   private fun book(
     id: String,
-    source: Long = plex,
+    source: SourceId = plex,
     progress: Long = 0L,
   ) = Audiobook(id = id, source = source, title = "Book $id", progress = progress)
 

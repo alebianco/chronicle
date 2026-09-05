@@ -7,10 +7,13 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
+import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
+import io.github.mattpvaughn.chronicle.testing.TEST_SERVER_ID
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.every
 import io.mockk.mockk
@@ -56,6 +59,9 @@ class TagIndexSeedingRefreshTest {
   private val plexPrefsRepo =
     mockk<PlexPrefsRepo>(relaxed = true) {
       every { library } returns PlexLibrary(name = "Books", type = MediaType.ARTIST, id = "1")
+      // The repository's scoping key (cu-127). Without it ingestion writes nothing at all, so
+      // every seeding assertion below would fail on an empty table rather than on a tag bug.
+      every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)
     }
 
   @Before
@@ -148,7 +154,7 @@ class TagIndexSeedingRefreshTest {
     runTest {
       bookDb.bookDao.insertAll(
         listOf(
-          Audiobook(id = "1003", source = 1L, title = "Mistborn Book 10", narrator = "Kate Reading"),
+          Audiobook(id = "1003", source = TEST_SOURCE, title = "Mistborn Book 10", narrator = "Kate Reading"),
         ),
       )
 

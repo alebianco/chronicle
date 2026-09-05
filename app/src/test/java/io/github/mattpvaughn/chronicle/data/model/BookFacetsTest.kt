@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.model
 
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,7 +23,7 @@ class BookFacetsTest {
     titleSort: String = "",
   ) = Audiobook(
     id = id,
-    source = 1L,
+    source = TEST_SOURCE,
     title = title,
     titleSort = titleSort,
     author = author,

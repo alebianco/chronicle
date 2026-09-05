@@ -23,17 +23,30 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   exported schema in `app/schemas/`, which is the authority.
  * @param textColumns columns to wrap in `CAST(... AS TEXT)`; empty for a rebuild that keeps every
  *   column's type, such as a primary-key change.
+ * @param columnExpressions replaces a column's value with a SQL expression instead of copying it.
+ *   For a retype whose old values do not *mean* the same thing in the new type — cu-127's `source`,
+ *   where every existing row holds the per-type constant `0` and copying it would yield a scope no
+ *   [io.github.mattpvaughn.chronicle.data.model.SourceId] can ever equal. A literal must be quoted
+ *   by the caller; this is migration code with no user input reaching it.
  */
 fun SupportSQLiteDatabase.rebuildTable(
   table: String,
   createNewTableSql: String,
   columns: List<String>,
   textColumns: Set<String>,
+  columnExpressions: Map<String, String> = emptyMap(),
 ) {
+  require(columnExpressions.keys.all { it in columns }) {
+    "columnExpressions names a column not in the rebuild: ${columnExpressions.keys - columns.toSet()}"
+  }
   execSQL(createNewTableSql)
   val select =
     columns.joinToString(", ") { column ->
-      if (column in textColumns) "CAST(`$column` AS TEXT)" else "`$column`"
+      when {
+        column in columnExpressions -> columnExpressions.getValue(column)
+        column in textColumns -> "CAST(`$column` AS TEXT)"
+        else -> "`$column`"
+      }
     }
   val insert = columns.joinToString(", ") { "`$it`" }
   execSQL("INSERT INTO `${table}_new` ($insert) SELECT $select FROM `$table`")

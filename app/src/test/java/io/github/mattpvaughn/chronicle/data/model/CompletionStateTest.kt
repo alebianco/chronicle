@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.model
 
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,7 +32,7 @@ class CompletionStateTest {
     viewCount: Long = 0L,
   ) = Audiobook(
     id = "1001",
-    source = 1L,
+    source = TEST_SOURCE,
     title = "Dune",
     progress = progress,
     duration = duration,

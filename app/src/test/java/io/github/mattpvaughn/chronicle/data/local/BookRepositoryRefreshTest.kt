@@ -2,13 +2,15 @@ package io.github.mattpvaughn.chronicle.data.local
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
+import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainer
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
+import io.github.mattpvaughn.chronicle.testing.TEST_SERVER_ID
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -48,6 +50,10 @@ class BookRepositoryRefreshTest {
   private val plexPrefsRepo =
     mockk<PlexPrefsRepo>(relaxed = true) {
       every { library } returns PlexLibrary(name = "Books", type = MediaType.ARTIST, id = "1")
+      // The scoping key the repository resolves (cu-127). Without it `currentSourceId` is
+      // SourceId.UNKNOWN, which matches no fixture row, and every removal assertion below would
+      // pass vacuously by removing nothing.
+      every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)
     }
 
   @Test
@@ -109,7 +115,7 @@ class BookRepositoryRefreshTest {
     // against the household server's 196 rows — and a fixture with a different source is invisible
     // to the source-scoped removal a refresh now performs, so these tests silently stopped
     // exercising deletion at all. The cu-24 fixture trap in a new field.
-    source = PlexMediaSource.MEDIA_SOURCE_ID_PLEX,
+    source = TEST_SOURCE,
     title = title,
     progress = progress,
     lastViewedAt = lastViewedAt,

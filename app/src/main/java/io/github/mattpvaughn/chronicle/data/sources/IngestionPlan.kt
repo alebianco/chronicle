@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.sources
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 
 /**
  * What a refresh should write and delete, decided without touching a database (cu-80).
@@ -42,8 +43,17 @@ data class IngestionPlan(
 fun planIngestion(
   fetched: List<Audiobook>,
   local: List<Audiobook>,
-  sourceId: Long,
+  sourceId: SourceId,
 ): IngestionPlan {
+  // An unresolved scope writes nothing rather than filing rows under a key no later refresh can
+  // match (cu-127). [SourceId.UNKNOWN] reaches here when no server is chosen — mid-login, or after
+  // a `clear()` — and stamping rows with it would put them beyond the reach of both the removal
+  // rule below and every scoped read, leaving a catalogue nothing can prune. Silent, and it
+  // accumulates.
+  if (!sourceId.isKnown) {
+    return IngestionPlan(toUpsert = emptyList(), toRemove = emptyList())
+  }
+
   val stamped = fetched.map { if (it.source == sourceId) it else it.copy(source = sourceId) }
   val localById = local.associateBy { it.id }
   val merged =

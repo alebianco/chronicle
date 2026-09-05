@@ -8,6 +8,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -51,7 +52,7 @@ class ProgressUpdaterTest {
   private val bookRepo =
     mockk<IBookRepository>(relaxed = true) {
       coEvery { getAudiobookAsync(BOOK_ID) } returns
-        Audiobook(id = BOOK_ID, source = PLEX_SOURCE, title = "Book")
+        Audiobook(id = BOOK_ID, source = TEST_SOURCE, title = "Book")
     }
 
   private val prefsRepo =
@@ -271,6 +272,5 @@ class ProgressUpdaterTest {
     /** A position only the cast receiver would report, so a frozen supplier fails on the number. */
     const val CAST_FRAME_POSITION = 5_200_000L
     const val BOOK_ID = "1001"
-    const val PLEX_SOURCE = 1L
   }
 }

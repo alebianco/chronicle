@@ -5,6 +5,7 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.Collection
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import kotlinx.coroutines.flow.Flow
 
 private const val COLLECTIONS_DATABASE_NAME = "collections_db"
@@ -25,7 +26,36 @@ fun getCollectionsDatabase(context: Context): CollectionsDatabase {
   return INSTANCE
 }
 
-@Database(entities = [Collection::class], version = 2, exportSchema = true)
+/**
+ * Retypes `source` from INTEGER to TEXT so it can hold a per-instance [SourceId] (cu-127,
+ * decision-21). The [io.github.mattpvaughn.chronicle.data.local.BOOK_MIGRATION_12_13] reasoning
+ * applies verbatim, including why existing rows become [SourceId.LEGACY_PLEX] rather than `"0"`.
+ */
+val COLLECTIONS_MIGRATION_2_3 =
+  object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.rebuildTable(
+        table = "Collection",
+        createNewTableSql =
+          "CREATE TABLE IF NOT EXISTS `Collection_new` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `childCount` INTEGER NOT NULL, `sortType` TEXT NOT NULL, `isCached` INTEGER NOT NULL, `thumb` TEXT NOT NULL, `childIds` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        columns =
+          listOf(
+            "id",
+            "source",
+            "title",
+            "childCount",
+            "sortType",
+            "isCached",
+            "thumb",
+            "childIds",
+          ),
+        textColumns = emptySet(),
+        columnExpressions = mapOf("source" to "'${SourceId.LEGACY_PLEX.value}'"),
+      )
+    }
+  }
+
+@Database(entities = [Collection::class], version = 3, exportSchema = true)
 abstract class CollectionsDatabase : RoomDatabase() {
   abstract val collectionsDao: CollectionsDao
 }
@@ -93,4 +123,4 @@ val COLLECTIONS_MIGRATION_1_2 =
   }
 
 /** Every migration, in order. Named so `RoomSchemaTest` runs exactly what production runs. */
-val COLLECTIONS_MIGRATIONS = arrayOf(COLLECTIONS_MIGRATION_1_2)
+val COLLECTIONS_MIGRATIONS = arrayOf(COLLECTIONS_MIGRATION_1_2, COLLECTIONS_MIGRATION_2_3)

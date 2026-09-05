@@ -9,6 +9,7 @@ import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -41,7 +42,7 @@ import org.robolectric.RobolectricTestRunner
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ForegroundDeadlineTest {
-  private val book = Audiobook(id = "1", source = 0L, title = "Ender's Game", author = "Card")
+  private val book = Audiobook(id = "1", source = TEST_SOURCE, title = "Ender's Game", author = "Card")
 
   private val currentlyPlaying =
     mockk<CurrentlyPlaying>(relaxed = true).also {

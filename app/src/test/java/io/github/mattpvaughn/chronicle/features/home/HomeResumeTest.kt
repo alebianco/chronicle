@@ -12,6 +12,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.every
@@ -43,7 +44,7 @@ class HomeResumeTest {
   @get:Rule
   val mainDispatcherRule = MainDispatcherRule()
 
-  private val book = Audiobook(id = "1001", source = 1L, title = "The Hobbit", progress = 74_008L)
+  private val book = Audiobook(id = "1001", source = TEST_SOURCE, title = "The Hobbit", progress = 74_008L)
 
   private val transportControls = mockk<MediaControllerCompat.TransportControls>(relaxed = true)
 

@@ -6,7 +6,6 @@ import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.SourceCapabilities
 import io.github.mattpvaughn.chronicle.data.sources.planIngestion
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.TagAssociation
 import io.github.mattpvaughn.chronicle.data.sources.plex.TagFilter
@@ -48,7 +47,7 @@ interface IBookRepository {
    */
   suspend fun ingest(
     books: List<Audiobook>,
-    sourceId: Long,
+    sourceId: SourceId,
     capabilities: SourceCapabilities,
   ): Int
 
@@ -238,6 +237,20 @@ class BookRepository
      */
     private val limitReturnCount = 25
 
+    /**
+     * The Plex server this repository is currently talking to, as a scoping key (decision-21).
+     *
+     * One accessor rather than the expression inlined at each ingestion site, for the reason
+     * `PlaybackSession.authToken` exists: the token precedence was written out twice and both
+     * copies were wrong the same way (cu-33). Read fresh each time — the user can switch servers
+     * between a refresh and the next.
+     *
+     * [SourceId.UNKNOWN] when no server is chosen. Ingestion refuses to run in that state rather
+     * than filing rows under a scope no later refresh will match; see [refreshData].
+     */
+    private val currentSourceId: SourceId
+      get() = SourceId.forPlexServer(plexPrefsRepo.server?.serverId.orEmpty())
+
     override fun getAllBooks(): Flow<List<Audiobook>> {
       return bookDao.getAllRows(prefsRepo.offlineMode)
     }
@@ -250,7 +263,7 @@ class BookRepository
 
     override suspend fun ingest(
       books: List<Audiobook>,
-      sourceId: Long,
+      sourceId: SourceId,
       capabilities: SourceCapabilities,
     ): Int {
       val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
@@ -320,7 +333,7 @@ class BookRepository
       // `refreshDataPaginated`, which is the cu-20 shape exactly: a rule fixed in one copy and
       // missed in the other looks correct in every test that takes the fixed path. cu-156 already
       // had to add tag seeding to both.
-      writeIngestion(planIngestion(seededBooks, localBooks, PlexMediaSource.MEDIA_SOURCE_ID_PLEX))
+      writeIngestion(planIngestion(seededBooks, localBooks, currentSourceId))
     }
 
     @Throws(Throwable::class)
@@ -452,7 +465,7 @@ class BookRepository
       // `refreshDataPaginated`, which is the cu-20 shape exactly: a rule fixed in one copy and
       // missed in the other looks correct in every test that takes the fixed path. cu-156 already
       // had to add tag seeding to both.
-      writeIngestion(planIngestion(seededBooks, localBooks, PlexMediaSource.MEDIA_SOURCE_ID_PLEX))
+      writeIngestion(planIngestion(seededBooks, localBooks, currentSourceId))
     }
 
     override suspend fun clear() {

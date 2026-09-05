@@ -7,6 +7,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.SearchField
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.every
 import io.mockk.mockk
@@ -82,7 +83,7 @@ class SearchGroupedTest {
     isCached: Boolean = false,
   ) = Audiobook(
     id = id,
-    source = 1L,
+    source = TEST_SOURCE,
     title = title,
     author = author,
     narrator = narrator,

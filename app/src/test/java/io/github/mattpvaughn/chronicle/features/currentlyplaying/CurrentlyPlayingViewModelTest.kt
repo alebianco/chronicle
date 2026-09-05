@@ -21,6 +21,7 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.settledValue
 import io.github.mattpvaughn.chronicle.util.settledValues
@@ -84,7 +85,7 @@ class CurrentlyPlayingViewModelTest {
     unmockkStatic(DateUtils::class)
   }
 
-  private val book = Audiobook(id = "1001", source = 1L, title = "Dune")
+  private val book = Audiobook(id = "1001", source = TEST_SOURCE, title = "Dune")
 
   private val currentlyPlaying =
     mockk<CurrentlyPlaying>(relaxed = true) {

@@ -17,6 +17,7 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayin
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.keepCollected
@@ -52,7 +53,7 @@ class AudiobookDetailsPlaybackTest {
   @get:Rule
   val mainDispatcherRule = MainDispatcherRule()
 
-  private val book = Audiobook(id = "1001", source = 1L, title = "Dune")
+  private val book = Audiobook(id = "1001", source = TEST_SOURCE, title = "Dune")
 
   private val transportControls = mockk<MediaControllerCompat.TransportControls>(relaxed = true)
 
