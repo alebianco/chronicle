@@ -54,6 +54,16 @@ interface IBookRepository {
   /** Returns the number of books in the repository */
   suspend fun getBookCount(): Int
 
+  /**
+   * Claims rows written before cu-127 for the connected server.
+   *
+   * The v12->v13 migration cannot know which server it is running on, so it marks every existing
+   * row [SourceId.LEGACY_PLEX]. Until something adopts them, an upgrading user's whole library is
+   * invisible to every scoped read — present in the database, absent from the screen. Idempotent,
+   * and a no-op when no server is chosen.
+   */
+  suspend fun adoptLegacyRows()
+
   /** Removes all books from the local database */
   suspend fun clear()
 
@@ -253,6 +263,17 @@ class BookRepository
 
     override fun getAllBooks(): Flow<List<Audiobook>> {
       return bookDao.getAllRows(currentSourceId, prefsRepo.offlineMode)
+    }
+
+    override suspend fun adoptLegacyRows() {
+      val scope = currentSourceId
+      if (!scope.isKnown) return
+      withContext(dispatchers.io) {
+        val adopted = bookDao.adoptLegacyRows(newSource = scope, legacySource = SourceId.LEGACY_PLEX)
+        if (adopted > 0) {
+          Timber.i("Adopted $adopted pre-cu-127 books into the connected server's scope")
+        }
+      }
     }
 
     override suspend fun getBookCount(): Int {

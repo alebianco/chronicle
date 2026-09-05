@@ -77,6 +77,13 @@ interface CollectionsDao {
   @Query("SELECT Count(id) FROM Collection WHERE source = :source")
   fun countCollections(source: SourceId): Flow<Long>
 
+  /** Claims collections written before cu-127 for [newSource]. See `BookDao.adoptLegacyRows`. */
+  @Query("UPDATE Collection SET source = :newSource WHERE source = :legacySource")
+  suspend fun adoptLegacyRows(
+    newSource: SourceId,
+    legacySource: SourceId,
+  ): Int
+
   @Query("DELETE FROM Collection")
   suspend fun clear()
 

@@ -86,6 +86,9 @@ interface ITrackRepository {
    */
   suspend fun getBookIdForTrack(trackId: String): String
 
+  /** Claims tracks written before cu-127 for the connected server. See `IBookRepository`. */
+  suspend fun adoptLegacyRows()
+
   /** Remove all [MediaItemTrack] from the [TrackDatabase] */
   suspend fun clear()
 
@@ -183,6 +186,17 @@ class TrackRepository
      */
     private val currentSourceId: SourceId
       get() = SourceId.forPlexServer(plexPrefs.server?.serverId.orEmpty())
+
+    override suspend fun adoptLegacyRows() {
+      val scope = currentSourceId
+      if (!scope.isKnown) return
+      withContext(dispatchers.io) {
+        val adopted = trackDao.adoptLegacyRows(newSource = scope, legacySource = SourceId.LEGACY_PLEX)
+        if (adopted > 0) {
+          Timber.i("Adopted $adopted pre-cu-127 tracks into the connected server's scope")
+        }
+      }
+    }
 
     @Throws(Throwable::class)
     override suspend fun refreshData() {

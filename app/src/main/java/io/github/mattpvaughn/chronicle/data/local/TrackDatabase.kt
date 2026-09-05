@@ -179,6 +179,13 @@ interface TrackDao {
     index: Int,
   ): Int
 
+  /** Claims tracks written before cu-127 for [newSource]. See `BookDao.adoptLegacyRows`. */
+  @Query("UPDATE MediaItemTrack SET source = :newSource WHERE source = :legacySource")
+  suspend fun adoptLegacyRows(
+    newSource: SourceId,
+    legacySource: SourceId,
+  ): Int
+
   @Query("DELETE FROM MediaItemTrack")
   fun clear()
 

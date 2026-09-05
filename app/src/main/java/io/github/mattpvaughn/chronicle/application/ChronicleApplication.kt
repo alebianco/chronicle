@@ -16,6 +16,7 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.SeriesIndexRulesLoader
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
@@ -80,6 +81,9 @@ open class ChronicleApplication :
 
   @Inject
   lateinit var bookRepository: IBookRepository
+
+  @Inject
+  lateinit var trackRepository: ITrackRepository
 
   @Inject
   lateinit var unhandledExceptionHandler: CoroutineExceptionHandler
@@ -147,6 +151,7 @@ open class ChronicleApplication :
     DebugHooks.onApplicationCreate(this)
     installSeriesIndexRules()
 
+    adoptLegacyRows()
     backfillChapterTable()
     setupNetwork(plexPrefs)
     updateDownloadedFileState()
@@ -194,6 +199,28 @@ open class ChronicleApplication :
   private fun backfillChapterTable() {
     applicationScope.launch(unhandledExceptionHandler) {
       bookRepository.backfillChapterTable()
+    }
+  }
+
+  /**
+   * Claims rows written before cu-127 for the connected server (decision-21).
+   *
+   * The v12->v13 and v6->v7 migrations mark every pre-existing row [SourceId.LEGACY_PLEX], because
+   * a `SupportSQLiteDatabase` cannot know which server the app is configured for. Until they are
+   * adopted, every scoped read filters them out — an upgrading user opens the app to an empty
+   * library with their listening positions intact but invisible.
+   *
+   * Launched rather than awaited, like the chapter backfill: `onCreate` must not block on disk.
+   * The consequence is a brief window on the first launch after upgrading where the library reads
+   * empty and then fills — the same shape as cu-158's backfill, and the same trade.
+   *
+   * Idempotent and a no-op once no row carries the marker, so running it on every start is
+   * cheaper than recording whether it has run.
+   */
+  private fun adoptLegacyRows() {
+    applicationScope.launch(unhandledExceptionHandler) {
+      bookRepository.adoptLegacyRows()
+      trackRepository.adoptLegacyRows()
     }
   }
 

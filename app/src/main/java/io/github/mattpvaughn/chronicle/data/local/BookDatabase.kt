@@ -367,6 +367,18 @@ interface BookDao {
     offlineModeActive: Boolean,
   ): List<Audiobook>
 
+  /**
+   * Claims rows written before cu-127 for [newSource].
+   *
+   * Scoped to the legacy marker on purpose: adopting anything else would let a second server take
+   * over the first's library, which is what the scoping exists to prevent.
+   */
+  @Query("UPDATE Audiobook SET source = :newSource WHERE source = :legacySource")
+  suspend fun adoptLegacyRows(
+    newSource: SourceId,
+    legacySource: SourceId,
+  ): Int
+
   @Query("DELETE FROM Audiobook")
   suspend fun clear()
 
