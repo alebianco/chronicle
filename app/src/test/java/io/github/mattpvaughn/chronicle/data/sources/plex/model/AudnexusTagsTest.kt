@@ -154,4 +154,56 @@ class AudnexusTagsTest {
 
     assertEquals("Mistborn", book.seriesName())
   }
+
+  // ---- Mood also carries authors, not just series ----
+
+  /**
+   * The defect this preference guards against. Audnexus's `add_authors_to_moods` writes a **bare**
+   * author name into `Mood` while `add_series_to_moods` writes `"Series: <name>"`, and Plex returns
+   * moods alphabetically — so "Brandon Sanderson" arrives before "Series: Mistborn" and a
+   * first-non-empty read filed the book under a series named after its author.
+   */
+  @Test
+  fun `an author mood does not beat a prefixed series`() {
+    val book =
+      PlexDirectory(
+        plexMoods = listOf(PlexTag("Brandon Sanderson"), PlexTag("Series: Mistborn")),
+      )
+
+    assertEquals("Mistborn", book.seriesName())
+  }
+
+  /**
+   * Audnexus emits `seriesPrimary` and `seriesSecondary` as two prefixed tags. Order is the only
+   * signal distinguishing them, so the first prefixed tag wins — stably between syncs.
+   */
+  @Test
+  fun `the first prefixed tag wins when several are prefixed`() {
+    val book =
+      PlexDirectory(
+        plexMoods = listOf(PlexTag("Series: Mistborn"), PlexTag("Series: The Cosmere")),
+      )
+
+    assertEquals("Mistborn", book.seriesName())
+  }
+
+  /**
+   * Taggers that omit the prefix are the reason `stripSeriesPrefix` is lenient, so an unprefixed
+   * tag is still accepted when nothing is labelled — the alternative is losing the series entirely
+   * for those libraries.
+   */
+  @Test
+  fun `an unprefixed tag is still used when no tag is prefixed`() {
+    val book = PlexDirectory(plexMoods = listOf(PlexTag("Mistborn")))
+
+    assertEquals("Mistborn", book.seriesName())
+  }
+
+  /** A prefixed tag that is only the prefix is not a series, so an unprefixed tag may still win. */
+  @Test
+  fun `a bare prefix does not shadow an unprefixed tag`() {
+    val book = PlexDirectory(plexMoods = listOf(PlexTag("Series:"), PlexTag("Mistborn")))
+
+    assertEquals("Mistborn", book.seriesName())
+  }
 }

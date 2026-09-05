@@ -3,10 +3,13 @@ package io.github.mattpvaughn.chronicle.data.sources.plex.model
 //
 // Narrator and series, read out of Plex's `Style` and `Mood` tags (cu-24).
 //
-// Plex's music schema carries no narrator or series field. The Audnexus/seanap tagging convention
-// borrows two music fields for them, so **these are not music semantics** — a "style" here is a
-// person and a "mood" is a book series. Kept in one file so the convention is written down once
+// Plex's music schema carries no narrator or series field. The Audnexus tagging convention borrows
+// two music fields for them, so **these are not music semantics** — a "style" here is a person, and
+// a "mood" is a book series *or an author*. Kept in one file so the convention is written down once
 // and every reader goes through it.
+//
+// Note it is Audnexus, not seanap, that produces these: the seanap guide is a file/ID3 convention
+// (narrator in `TCOM`/`TPE1`) and never touches Plex's Style/Mood fields.
 //
 // Both tags are only present on the per-book **detail** response (`/library/metadata/{id}`), not
 // on the library listing — verified against fixtures captured from a real Plex 1.43.3 server. A
@@ -33,15 +36,36 @@ fun PlexDirectory.narrators(): List<String> = plexStyles.map { it.tag.trim() }.f
 /**
  * The series this book belongs to, or an empty string when no `Mood` tag names one.
  *
- * The **first** usable tag wins. Plex allows several moods and a book belongs to one series in this
- * convention, so taking the first is the honest reading of an ambiguous library; picking arbitrarily
- * from a set would make the facet list unstable between syncs.
+ * **A prefixed tag always beats an unprefixed one.** `Mood` is not a series-only field: Audnexus
+ * writes series as `"Series: <name>"` (`add_series_to_moods`, unconditional) but *also* writes bare
+ * **author** names into the same field (`add_authors_to_moods`, gated on its `store_author_as_mood`
+ * preference — verified in `Contents/Code/update_tools.py`). Plex returns moods alphabetically, so
+ * simply taking the first non-empty tag filed any book whose author sorts before its series under a
+ * series named after the author — silently, and only on servers with that preference enabled, which
+ * is why fixtures written to match this code never showed it (the cu-24 trap).
+ *
+ * Among equals the **first** still wins: a book belongs to one series in this convention, and
+ * picking arbitrarily from a set would make the facet list unstable between syncs. Audnexus can emit
+ * both `seriesPrimary` and `seriesSecondary` as prefixed tags, so that tie is real and order is the
+ * only signal available.
  */
-fun PlexDirectory.seriesName(): String =
-  plexMoods.asSequence()
-    .map { stripSeriesPrefix(it.tag) }
-    .firstOrNull { it.isNotEmpty() }
-    .orEmpty()
+fun PlexDirectory.seriesName(): String {
+  val candidates = plexMoods.map { it.tag.trim() }.filter { it.isNotEmpty() }
+
+  // Only a prefixed tag is *known* to be a series; an unprefixed one may be an author. Fall back to
+  // it regardless, since taggers that omit the prefix are the reason stripSeriesPrefix is lenient.
+  val prefixed = candidates.firstOrNull { hasSeriesPrefix(it) }?.let { stripSeriesPrefix(it) }
+
+  return prefixed?.takeIf { it.isNotEmpty() }
+    ?: candidates.firstNotNullOfOrNull { stripSeriesPrefix(it).takeIf(String::isNotEmpty) }
+      .orEmpty()
+}
+
+/** Whether [raw] carries one of the [SERIES_PREFIXES], i.e. is explicitly labelled a series. */
+internal fun hasSeriesPrefix(raw: String): Boolean {
+  val lower = raw.trim().lowercase()
+  return SERIES_PREFIXES.any { lower.startsWith(it) }
+}
 
 /**
  * Removes a `Series:`-style prefix and surrounding whitespace.
