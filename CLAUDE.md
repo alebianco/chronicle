@@ -359,6 +359,28 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   and the plumbing. Note `isTicking` is tracked **separately** from the state: `BEGIN` is
   `update(duration)` then `start(true)`, and `update` already leaves the state `Running`, so a
   guard that asks the state whether it is active makes every `BEGIN` a silent no-op.
+- **The progress tick stops the moment playback pauses, so every pause path must flush** (2026-09-05).
+  `ProgressUpdater.startRegularProgressUpdates` is gated on `isPlaying`, so pausing silently ends
+  the per-second write: without an explicit flush the saved position is whatever the previous tick
+  captured, and no `PLEX_STATE_PAUSED` ever reaches the server. Three paths now flush —
+  `flushOutgoingBookProgress` on a book switch (cu-91), `onSeekTo` on a seek (cu-93), and `onPause`
+  — and a **fourth pause route added later would need its own**. Same defect class as
+  advplyr/audiobookshelf-app#1847 and PaulWoitaschek/Voice#3351.
+  **Read the position from the player, never from the session**: `MediaSessionCompat`'s playback
+  state lags a frame, so `updateProgressWithoutParameters` on a pause or seek path reports the
+  *pre-action* position as still PLAYING — worse than not flushing, since it overwrites a good
+  position with a stale one. That is what cu-93 hit; `PauseFlushesProgressTest` seeds a deliberately
+  stale session position so the regression fails loudly instead of passing by luck.
+- **Embedded cover art is never decoded** (2026-09-05). An audiobook is one very large file with a
+  single APIC/`covr` frame, and ExoPlayer's default copies it into a heap byte array per media item
+  — upstream's `OutOfMemoryError` in `MediaMetadata.maybeSetArtworkData`
+  (mattttvaughn/chronicle#83, #16, both still open). `artworkFreeExtractorsFactory` disables it for
+  mp3 and mp4; artwork comes from Plex via `getBitmapFromServer(book.thumb)`, so nothing reads it.
+  It is a **top-level function, not a member of `ServiceModule`**, because the provider needs a live
+  `Service` and cannot be reached from a unit test at all — a test that rebuilt the same flags would
+  pass while the player was built with different ones. `EmbeddedArtworkTest` runs a real MP3 with a
+  real PNG cover through the production function, plus a second test asserting the fixture still
+  carries a frame under stock flags so the first cannot pass vacuously.
 - **Do not do per-second work whose result cannot change** (cu-110). `ProgressUpdater` writes once
   a second during playback and Room invalidates **per table**, so every query on `Audiobook`
   or `MediaItemTrack` re-emits at tick rate. The measured damage was not computation but
@@ -446,7 +468,19 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   a transposition rewrites every adjacent pair, so a bigram prefilter silently discards the very
   matches the fuzziness exists for. Fuzzy matching is floored at 4 characters; below that only
   prefix/substring match, or the first keystroke answers the whole library.
-- **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags (Audnexus/seanap). Never treat these as music semantics.
+- **Plex audiobook metadata is a convention hack**: narrator = `Style` tags, series = `Mood` tags.
+  Never treat these as music semantics. The convention is **Audnexus's, not seanap's** — seanap's
+  guide is an *ID3* convention (`TCOM` = narrator, `TPE1` = author/narrator) and never touches
+  Plex's Style/Mood fields; only the Audnexus.bundle agent writes them. An earlier version of this
+  line credited both.
+  **`Mood` carries authors as well as series** (2026-09-05). `add_series_to_moods` writes
+  `"Series: <name>"` unconditionally, while `add_authors_to_moods` writes a **bare** author name
+  and is gated on the agent's `store_author_as_mood` preference — verified in
+  `Contents/Code/update_tools.py`. Plex returns moods alphabetically, so taking the first non-empty
+  tag filed any book whose author sorts before its series under a series named after the author.
+  `seriesName()` prefers a **prefixed** tag for that reason and falls back to an unprefixed one only
+  when nothing is labelled. It reproduces only on servers with that preference enabled, which is why
+  fixtures written to match the code never showed it — the cu-24 trap in a new field.
   Both are **detail-only** (cu-24): `/library/metadata/{id}` carries them, the library listing
   `/library/sections/{id}/all` does **not** — verified against fixtures captured from a real Plex
   1.43.3 server, and there is no `includeFields`/`includeTags` that would add them. So today the
