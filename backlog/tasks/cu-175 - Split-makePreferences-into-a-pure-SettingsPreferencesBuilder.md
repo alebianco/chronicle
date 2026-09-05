@@ -1,10 +1,13 @@
 ---
-id: DRAFT-175
+id: cu-175
 title: Split makePreferences into a pure SettingsPreferencesBuilder
-status: Draft
+status: To Do
+assignee: []
+created_date: ''
 labels:
   - R2
   - maintainability
+dependencies: []
 priority: medium
 ---
 

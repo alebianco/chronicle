@@ -45,14 +45,21 @@ class RawDurationFormatTest {
       )
     }
 
-    // And the helpers those calls name do use the human formatters.
+    // And the helpers those calls name do use the human formatters. Those helpers moved out of
+    // the fragment into `PlayerText` (cu-173) — they never needed a view, and inside a 408-line
+    // `onCreateView` no unit test could reach them. The rule is unchanged; only its address is.
+    val playerText = File(PLAYER_TEXT).readText().withoutComments()
     assertTrue(
       "the readout must go through formatCoarseDuration",
-      fragment.contains("formatCoarseDuration("),
+      playerText.contains("formatCoarseDuration("),
     )
     assertTrue(
       "the readout must go through formatPrecisePosition",
-      fragment.contains("formatPrecisePosition("),
+      playerText.contains("formatPrecisePosition("),
+    )
+    assertFalse(
+      "the extracted formatters must not reach for DateUtils either",
+      RAW_FORMAT.containsMatchIn(playerText),
     )
   }
 
@@ -124,6 +131,9 @@ class RawDurationFormatTest {
     const val PLAYER_FRAGMENT =
       "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/" +
         "CurrentlyPlayingFragment.kt"
+
+    const val PLAYER_TEXT =
+      "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/PlayerText.kt"
 
     const val PLAYER_VIEW_MODEL =
       "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/" +

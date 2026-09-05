@@ -28,7 +28,6 @@ import io.github.mattpvaughn.chronicle.features.player.SleepTimer
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
-import io.github.mattpvaughn.chronicle.util.formatCoarseDuration
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
@@ -221,53 +220,10 @@ class CurrentlyPlayingFragment :
       binding.sleepTimerCountdown.setTextIfChanged(it)
     }
 
-    /**
-     * The book half of the readout: `6h 12m left in book`.
-     *
-     * The wording lives in `strings.xml` and the arithmetic in the ViewModel, so this only joins
-     * them — which is why it takes a `PlayerProgress` rather than reading the ViewModel itself.
-     */
-    fun bookProgressText(progress: CurrentlyPlayingViewModel.PlayerProgress?): String {
-      if (progress == null) return ""
-      return getString(
-        R.string.player_left_in_book,
-        formatCoarseDuration(progress.millisLeftInBook),
-      )
-    }
-
-    /**
-     * The chapter's place in the book: `Ch 3 of 6`, or `No chapters` when the book has none.
-     *
-     * Not blank in that case: the old readout fell back to the track's raw position here, and
-     * leaving it empty would drop information rather than reformat it. "Ch 0 of 0" would read as
-     * a bug, so the state is named instead — the chapter title beside it already falls back to
-     * the track's title.
-     */
-    fun chapterPositionText(progress: CurrentlyPlayingViewModel.PlayerProgress?): String {
-      if (progress == null) return ""
-      if (!progress.hasChapters) return getString(R.string.player_no_chapters)
-      return getString(
-        R.string.player_chapter_of,
-        progress.chapterNumber,
-        progress.chapterCount,
-      )
-    }
-
-    /**
-     * How much of the current chapter is left: `2:30 left in chapter`.
-     *
-     * With no chapters there is no chapter to count down, so this falls back to the **book**'s
-     * remaining time rather than going blank — which is the more useful of the two anyway, and
-     * keeps the line populated for a chapter-less book where the old readout showed the track's.
-     */
-    fun chapterRemainingText(progress: CurrentlyPlayingViewModel.PlayerProgress?): String {
-      if (progress == null) return ""
-      if (!progress.hasChapters) return bookProgressText(progress)
-      return getString(
-        R.string.player_left_in_chapter,
-        formatPrecisePosition(progress.millisLeftInChapter),
-      )
-    }
+    // The three text formatters live in `PlayerText` (cu-173). They need no `binding` — a
+    // progress snapshot in, a string out — and inside this function they were unreachable by any
+    // unit test. `strings` is the one capability they do need.
+    val strings: StringResolver = { resId, args -> getString(resId, *args) }
 
     /**
      * Writes the expanded player's text, but only while it is on screen.
@@ -309,12 +265,12 @@ class CurrentlyPlayingFragment :
       // Two-level, human-formatted progress, never raw h:mm:ss/h:mm:ss (§3.1 rule 3, cu-19):
       // "Ch 3 of 6" · "2:30 left in chapter" on one line, "6h 12m left in book" on the other.
       val progress = viewModel.playerProgress.value
-      binding.progress.setTextIfChanged(bookProgressText(progress))
+      binding.progress.setTextIfChanged(PlayerText.bookProgress(progress, strings))
       binding.progressPercentage.setTextIfChanged(
         viewModel.progressPercentageString.value,
       )
-      binding.chapterProgress.setTextIfChanged(chapterPositionText(progress))
-      binding.chapterDuration.setTextIfChanged(chapterRemainingText(progress))
+      binding.chapterProgress.setTextIfChanged(PlayerText.chapterPosition(progress, strings))
+      binding.chapterDuration.setTextIfChanged(PlayerText.chapterRemaining(progress, strings))
 
       val currentChapter = viewModel.currentChapter.value
       binding.chapterTitle.setTextIfChanged(

@@ -1,10 +1,13 @@
 ---
-id: DRAFT-174
+id: cu-174
 title: Extract fragment renderers as private methods taking binding
-status: Draft
+status: To Do
+assignee: []
+created_date: ''
 labels:
   - R2
   - maintainability
+dependencies: []
 priority: medium
 ---
 
