@@ -35,8 +35,12 @@ the R1 risk surface there is a suite worth auditing.
   AGP 8.8+; 0.2.26 handled Gradle 9) and generates a `pitestDebug` task with the classpath already
   wired, including AGP's mockable android.jar.
 - **Arcmutate is rejected.** It is the only tool with working Robolectric support and proper Kotlin
-  handling, but it is proprietary and licence-gated — excluded by D12 rule 7 (no proprietary SDKs),
-  independent of cost. Do not revisit unless that rule changes.
+  handling, but it is proprietary and **licence-gated**. Originally excluded by D12 rule 7's flat
+  "no proprietary SDKs". **That rule was re-stated on 2026-09-05 ([[decision-19]]) and the rejection
+  survives it** — the new carve-out is only for a *device capability the platform exposes no other
+  way*, which a build-time tool is not, and licence-gating is exactly the "gates functionality
+  behind a third party" the new wording still bans outright. Do not revisit; the condition this note
+  once made ("unless that rule changes") has now occurred and did not change the answer.
 - **Robolectric tests must be excluded from scope.** PIT + Robolectric is broken and unfixed:
   koral--/gradle-pitest-plugin#80 (open since 2022), #58 (2020), upstream pitest#1065 (closed
   2026-08-17 by pointing at Arcmutate, not by a fix). It fails *silently*, reporting false

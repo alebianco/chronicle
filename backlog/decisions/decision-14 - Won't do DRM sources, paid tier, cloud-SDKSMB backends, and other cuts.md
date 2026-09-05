@@ -16,3 +16,5 @@ Permanently out: DRM sources (Audible AAX/AAXC, Kobo, Play Books, Storytel — n
 ## Consequences
 
 Keeps the roadmap focused on the household daily-driver; each cut is revisitable if the named condition changes.
+
+**Re-checked 2026-09-05 against [[decision-19]]**, which re-stated D12 rule 7 (the authority several of these cuts lean on) so that the ban targets *data extraction* rather than proprietary code as such. **Nothing here becomes allowed.** DRM fails on circumvention exposure and the absent playback API, which is not an SDK question at all; cloud-drive SDKs fail the data-extraction test independently, and WebDAV ([[cu-33.3]]) is the open alternative reaching the same storage; paid tier and ads are barred by [[decision-9]]/[[decision-15]]. The item-by-item table is in decision-19.

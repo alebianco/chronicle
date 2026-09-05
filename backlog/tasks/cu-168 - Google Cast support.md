@@ -67,7 +67,7 @@ still open).
 - [ ] Starting a cast moves playback to the receiver and keeps the notification and Auto controls working
 - [x] Listening position continues to be saved while casting, and survives ending the cast — pinned by a test, since the frame bug above is silent
 - [x] A downloaded book either streams or refuses with a clear message, never fails opaquely
-- [ ] The Play-services dependency is recorded as a decision against principle 7
+- [x] The Play-services dependency is recorded as a decision against principle 7 — [[decision-19]], which re-states the principle rather than granting an exception to it
 - [x] `./test_release_build.sh` passes — the Cast SDK is reflection-adjacent and needs keep rules
 
 ## Implementation Notes
@@ -128,11 +128,11 @@ site rather than guessed at.
 
 ### What the owner needs to do
 
-1. **The Play-services decision (principle 7).** Left unwritten on purpose — `backlog/decisions/` is
-   owner-only for product decisions, and this is one: `media3-cast` pulls in the proprietary Cast
-   SDK. Relevant fact for that call: the app **already** ships a GMS dependency
-   (`play-services-oss-licenses`), so this is not the first such dependency, and Cast degrades
-   cleanly to absent on de-Googled devices.
+1. ~~The Play-services decision~~ — **settled 2026-09-05**. The owner chose to *narrow principle 7*
+   rather than grant it an exception: [[decision-19]] re-states the rule so that what is banned is
+   **data extraction**, not proprietary code as such. Cast qualifies under its four conditions, and
+   `play-services-oss-licenses` (already shipping, rendering the licence list) qualifies
+   retroactively. Nothing in [[decision-14]] becomes allowed — re-checked item by item there.
 2. **Every on-device criterion above**, on hardware with Play services and a real receiver — the
    button appearing and hiding, a session starting, notification and Auto controls surviving it, and
    whether the mid-playback handover gap is worth closing before release.

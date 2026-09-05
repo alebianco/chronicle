@@ -1,3 +1,10 @@
+---
+id: doc-r2-review-guide
+title: R2 review guide
+type: reference
+created_date: '2026-09-05'
+---
+
 # R2 review guide
 
 **What this is.** Everything in milestone `m-2` that is waiting for you, what it does, and how to
@@ -134,9 +141,10 @@ to different endpoints, one of them a write. CLAUDE.md now records the negative 
 
 ## Two things worth your decision, not filed
 
-- **`play-services-oss-licenses` is proprietary** (Android SDK licence, not Apache-2.0), which sits
-  awkwardly against principle 7's "no proprietary SDKs". It renders the open-source licence list.
-  Replaceable with a generated static list — but that's a product call.
+- ~~**`play-services-oss-licenses` is proprietary**~~ — **settled 2026-09-05 by decision-19.**
+  Principle 7 was re-stated: the ban is on *data extraction*, not on proprietary code as such. This
+  SDK sends nothing outward and renders the open-source licence list, so it now passes on its
+  merits rather than sitting awkwardly. No action needed.
 - **kotlin-result is barely earning its place**: 7 imports across 5 files, with `Ok`/`Err`
   constructed in exactly one, while ~6 hand-rolled sealed outcome types coexist elsewhere. Either
   adopt it more widely or scope it deliberately.
