@@ -470,6 +470,83 @@ collaborator to be made to fail.
 
 ---
 
+## Should the pure-module extraction be done? (2026-09-06)
+
+Three questions, answered with what this codebase shows rather than with general advice.
+
+### 1. Did the session's work make changes and debugging easier?
+
+Yes, and the evidence is that **the tests found four real defects while being written**, none of
+which any existing test or the type system caught:
+
+| defect | how it would have surfaced otherwise |
+|---|---|
+| `SORT_KEYS` advertised 4 keys with no comparator branch | a **crash on the library screen** after a settings import, unrecoverable through the UI |
+| the sync-location row opened an **empty chooser** | a dialog with nothing in it on a device with no available volume |
+| `mediaController.metadata` dereferenced unguarded (cu-23) | process death whenever Auto browsed without playing |
+| the collapsed-sheet `isShown` guard (cu-141) | seven attempts, and it needed a *source-scanning* test to pin |
+
+That is the honest measure of whether tests help: not the percentage, but whether writing them
+surfaces things. It did, four times.
+
+The structural work is separately defensible. `onCreateView` at 408 lines/CC 49 and
+`makePreferences` at 748/CC 30 both exceeded what a reviewer can hold at once — which is what made
+cu-141 cost seven attempts, since the guard and the listener sat inside a function nobody could
+read end to end.
+
+### 2. Is the pure-module extraction achievable?
+
+**More achievable than expected, and the measurement is the argument.** `data/model` at 94.43%
+already behaves like a pure module. Counting its Android dependencies:
+
+- 13 of 20 files have **zero** `android.*`/`androidx.*` imports.
+- Of the 7 that do, **most are Room annotations only** (`@Entity`, `@PrimaryKey`,
+  `@TypeConverter`) — which a KMP-style module keeps, since Room supports it.
+- **Only 8 imports in the whole package are genuine framework use**, and they cluster in three
+  known places:
+  - `Audiobook.toMediaItem` / `toAlbumMediaMetadata` — `MediaBrowserCompat`, `Bundle` (the Android
+    Auto conversions, now tested under Robolectric)
+  - `MediaItemTrack` — `Uri`, `MediaMetadataCompat`
+  - `Chapter` — one `DateUtils` call
+
+So the extraction is not "rewrite the model layer". It is **move three conversion functions into
+the layer that consumes them**, which is where they arguably belong anyway: `toMediaItem` is a
+presentation concern of the media-browser code, not a property of a book.
+
+### 3. Is it a well-established pattern?
+
+Yes — it is the standard Android architecture guidance (a `:domain` or `:core:model` module with
+no framework dependencies), and it is the mechanism behind most "95% coverage" claims. It is not
+novel or risky.
+
+But two things temper it here:
+
+- **The benefit is mostly the metric, not the code.** Those 13 files are *already* pure and already
+  at 94%. A module boundary would enforce that they stay pure — real value — but would not make
+  them more testable, because nothing is stopping them being tested today.
+- **It is a one-way door on build structure**, and this is a single-module app by deliberate
+  simplicity (D12 rule 6: any CI system should be a thin wrapper). Multi-module Gradle is more
+  configuration for an agent to maintain.
+
+### Recommendation
+
+**Do the small version, skip the big one.**
+
+Worth doing: move the three media conversions out of `data/model` into the player/browse layer.
+That is a few hours, removes 8 of the package's framework imports, puts each function beside its
+consumer, and needs no new Gradle module. It also makes the "`data/model` is pure" claim true
+rather than nearly true.
+
+Not worth doing now: a `:domain` Gradle module. The purity it would enforce is already achieved by
+convention and measured at 94.43%; the cost is permanent build complexity in a project whose stated
+principle is that plain git and a shell script should be enough. Revisit it if a second app target
+appears (a Wear or TV surface), which is when a shared pure module starts paying for itself.
+
+**And do not chase 75%.** Per the section above it implies covering 92% of everything reachable.
+65-70% is the target that still means something.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
