@@ -378,6 +378,27 @@ ViewModel under Robolectric and exercise its public surface*, rather than huntin
 DRAFT-175 stays open but is **rescoped** — still worth doing for readability, no longer justified
 as an unblocker.
 
+### Where the weight actually is (measured 2026-09-05, after the first round)
+
+Picking targets by convenience rather than by weight was costing progress. Ranked by share of all
+43,125 missed instructions:
+
+| package | missed | share | coverage |
+|---|---:|---:|---:|
+| `features/player` | 7,163 | **16.6%** | 37.8% |
+| `features/currentlyplaying` | 4,183 | 9.7% | 27.5% |
+| `data/sources/plex` | 3,681 | 8.5% | 55.1% |
+| `features/bookdetails` | 3,393 | 7.9% | 27.7% |
+| `data/local` | 2,854 | 6.6% | 65.5% |
+
+The top three are **35%** of everything missing. Two lessons from working them:
+
+- **Adapters and diff callbacks are Robolectric-reachable and were being written off.**
+  `ChapterListAdapter` (621) and `CollectionsAdapter` (556) both sat at 0% and are ordinary Kotlin.
+- **Workers genuinely are not.** `DownloadNotificationWorker` (1,420, the largest reachable-looking
+  file) resolves `Injector.get()` in a *field initialiser*, so construction needs the whole DI
+  graph. That is the documented cu-152 exemption, and it stands.
+
 ### What the remaining gap looks like
 
 Of the top reachable targets left, the largest are `SettingsViewModel` (1,300 missed, 0% — blocked
