@@ -295,6 +295,76 @@ per package, so coverage cannot drift down, with a deliberate 0.05% tolerance fo
 
 ---
 
+## Fakes versus mocks: what this repo already does
+
+Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
+follows it in the places that matter, and there is one concrete gap.**
+
+### The current split, measured
+
+| approach | reach |
+|---|---|
+| MockK | **43** of 200 test files |
+| Hand-written fakes | 10 classes, each declared once, no duplicates |
+| **Real Room databases** (in-memory) | **9** test files |
+
+The nine using a real `Room.inMemoryDatabaseBuilder` are the strongest form of the advice — a real
+implementation against a test-only backing store, not a stand-in. `RoomSchemaTest` goes further
+still and opens a **real file** at an old schema, because an in-memory database is created fresh at
+the current version and never migrated: a migration bug is invisible to the in-memory variant.
+
+The shared fakes (`FakePlexServer`, `FakePlexPrefsRepo`, `FakeProgressApi`, `FakeBookmarkRepository`,
+`TestDispatcherProvider`) live in `chronicle/testing/` and are used by 54 files.
+
+### Where mocks are the right call, and why
+
+Two cases in this codebase genuinely warrant MockK, both already documented in the tests
+themselves:
+
+- **Final classes with large surfaces.** `AudiobookDetailsViewModelTest` mocks
+  `MediaServiceConnection` and `PlexConfig` and says why: MockK handles final classes on the JVM,
+  and extracting interfaces across 653 lines to avoid it "would risk far more than it buys."
+- **Verifying that something did *not* happen.** `coVerify(exactly = 0) { … }` is the natural way
+  to assert that picking a password-protected user sends no request. A fake would need to grow a
+  call log to answer the same question.
+
+### The gap: a `relaxed` mock can make a test pass vacuously
+
+This is the real risk, and it bit twice while writing tests for this review.
+
+`CollectionsViewModel` reads its state through `SharedPreferences.booleanFlow`/`stringFlow`, which
+`callbackFlow` builds by **registering a listener** and emitting on callback. A
+`mockk<SharedPreferences>(relaxed = true)` returns `false`/`null` from the getters and silently
+drops the registration — so the flow never emits, `combine` never fires, and **every assertion
+about the resulting list passes against a flow that produced nothing.** The test would be green and
+would prove nothing.
+
+`CollectionsViewModelTest` therefore uses a hand-written `FakePrefs` with a real listener list. The
+rule worth generalising:
+
+> **Mock a collaborator you only call. Fake a collaborator that calls you back.**
+
+Anything callback-, listener- or flow-shaped needs a fake, because a relaxed mock's silence is
+indistinguishable from correct behaviour. That covers `SharedPreferences`, `Fetch2` listeners, and
+the `MediaControllerCompat.Callback` surface.
+
+### What this does *not* explain
+
+`data/model` sits at **88.43%** while using MockK in only 1 of 35 test files, and it is tempting to
+read that as fakes causing high coverage. **That inference is backwards.** `data/model` is pure
+logic — `BookSearch.kt`, `SeriesIndexDiagnostics.kt`, `LoadingStatus.kt` have *zero* Android
+imports — so it needs no test doubles at all. Purity is the cause; the low mock count is a
+symptom. Introducing fakes into `features/currentlyplaying` would not move it to 88%; extracting
+its logic out of `onCreateView` (DRAFT-173/174) would.
+
+### Verdict
+
+No action needed on the mock/fake balance itself — it is already well judged, and the ratio is not
+a problem to fix. The one thing worth adding is the rule above as a written convention, so the
+`relaxed`-mock trap is not rediscovered a third time.
+
+---
+
 ## Suggested follow-ups
 
 Filed as drafts for owner triage rather than actioned here, since each changes structure across

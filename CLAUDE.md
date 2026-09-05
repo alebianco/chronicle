@@ -149,6 +149,18 @@ This file is the **single source of truth for agents and humans**. `.github/copi
      like broken arithmetic. `util/FlowTestExt.kt` has `keepCollected`, `settledValue` and
      `settledValues`; use `settledValues` when one assertion compares two flows, because
      subscribing to them one at a time makes whichever is second read its seed.
+   - **Mock a collaborator you only call; fake a collaborator that calls *you* back.** MockK is
+     right for a final class with a large surface (`MediaServiceConnection`, `PlexConfig`) and for
+     asserting something did *not* happen (`coVerify(exactly = 0)`). It is **wrong for anything
+     callback-, listener- or flow-shaped**, because a `relaxed` mock's silence is indistinguishable
+     from correct behaviour: `mockk<SharedPreferences>(relaxed = true)` returns `false`/`null` from
+     the getters and drops the listener registration, so a `preferenceFlow` built on it never
+     emits, the `combine` downstream never fires, and every assertion about the result passes
+     against a flow that produced nothing. `CollectionsViewModelTest` uses a hand-written
+     `FakePrefs` with a real listener list for exactly that reason. The data layer already goes
+     further and tests against **real in-memory Room databases** (nine suites) rather than mocked
+     DAOs — and `RoomSchemaTest` against a real *file*, since an in-memory database is created
+     fresh at the current version and never migrated.
 4. Coroutines: **inject `DispatcherProvider`** (cu-15) rather than referencing `Dispatchers.*` directly; UI on Main via `viewModelScope`. `GlobalScope` is gone and stays gone — three tests pin this (`CachedFileManagerScopeTest`, `RepositoryDispatcherTest`, `InternalApiUsageTest`). The five repositories, the player layer (cu-72) **and the ViewModel/Fragment/`application/` layer (cu-169)** are all converted, and `RepositoryDispatcherTest` scans all three — a fourth list, `UI_AND_APPLICATION_SOURCES`, was what let ten hardcoded sites stay green before. **Exactly two hardcoded dispatchers remain, both field initialisers that cannot read an injected one**: `MediaPlayerService.serviceScope` and `ChronicleApplication.applicationScope`, the latter because it runs *before* the Dagger graph it would inject from exists. Each is pinned at an exact count by its own test, so neither can become a precedent. **Workers are a deliberate exemption** (cu-152): WorkManager builds them reflectively with a fixed `(Context, WorkerParameters)` signature, so a constructor cannot take a `DispatcherProvider` without a `WorkerFactory` and a `Configuration.Provider` — and that plumbing would buy nothing while no worker is unit-tested and `TestListenableWorkerBuilder` supplies its own executor anyway. The two `withContext(Dispatchers.IO)` calls that remain are *correct*: `doWork` runs on `Dispatchers.Default` and both wrap real blocking file I/O. `WorkerDispatcherTest` pins the exemption list and asserts every file on it really is a `CoroutineWorker`.
 5. **Never call `Injector.get()`** (cu-33). Take dependencies as constructor parameters — a class
    that fetches its own at runtime **cannot be constructed in a unit test at all**, because
