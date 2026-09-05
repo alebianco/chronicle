@@ -198,6 +198,95 @@ keeps disturbing it.
   metadata block at negative y otherwise, which reads like a constraint bug and is not one.
 - `settings put system user_rotation 0|1` rotates reliably, but only once an app is foregrounded.
 
+## Fifth attempt, 2026-09-05 — reverted, and the cause is now cornered
+
+**Nothing committed.** The one useful outcome is that the remaining hypothesis space is small.
+
+### The measurement that rules out everything previously theorised
+
+A probe printing text, width and visibility together, on the tablet, portrait, playing, player
+expanded, chapter 10 of 107:
+
+```
+cu141b: chapterProgress.text='Ch 10 of 107'        w=0 vis=0
+        progress.text='10h 10m left in book'       pw=0
+        pct.text='9%'                              pctw=0
+```
+
+`vis=0` is VISIBLE. The text is correct on all three. **Width is zero anyway.** And this was with
+`chapter_progress` carrying *two* horizontal constraints — `Start_toStartOf=left_gutter` and
+`End_toStartOf=chapter_duration`, plus `bias=0` — so it was positioned exactly at the gutter
+(`24,401-24,430`) with no width.
+
+That eliminates, with evidence:
+
+- ~~the text is never written~~ — it is, correctly, on every tick
+- ~~the view is GONE / the visibility integer~~ — `vis=0`, and this holds in portrait where the
+  integer is 0 anyway
+- ~~a single horizontal constraint collapses `wrap_content`~~ — two constraints, still zero
+- ~~a vertical cycle~~ — the graph was verified acyclic programmatically *before* building
+- ~~`setTextIfChanged` swallowing the write~~ — it is a plain `if (this.text != text)` guard
+- ~~the style~~ — `chapter_duration` uses the identical `TextAppearance.Body2` and renders 182px
+
+### The one structural difference left
+
+`chapter_duration` is the only one of the four that renders, and the only one anchored
+`Right_toRightOf` a **real-width** view (`chapter_progress_seekbar`, `0dp` across the gutters).
+Every failing view either anchors to `details_artwork` or, in the fifth attempt, to a guideline.
+A `wrap_content` TextView measuring zero while holding text points at the **parent's** measure
+pass rather than at any one view's constraints — the enclosing `ConstraintLayout` inside a
+`NestedScrollView`/`CollapsingToolbarLayout` is the next thing to look at, not the child.
+
+### The parent is fine — checked, so that theory is dead too
+
+The ancestor chain measures correctly; nothing is collapsing from above:
+
+```
+ConstraintLayout            0,0-1200,796     <- the players own root
+CollapsingToolbarLayout     0,0-1200,796
+AppBarLayout                0,0-1200,796
+CoordinatorLayout           0,0-1200,1710
+```
+
+### The sharpest clue, and where a sixth attempt must start
+
+`chapter_duration` renders at **182px**. `chapter_progress` renders at **0**. Their XML is
+*identical* apart from one attribute:
+
+```xml
+<!-- renders -->
+app:layout_constraintRight_toRightOf="@id/chapter_progress_seekbar"
+<!-- zero width -->
+app:layout_constraintLeft_toLeftOf="@id/chapter_progress_seekbar"
+```
+
+Same style, same `wrap_content` on both axes, same `Top_toBottomOf` anchor, same parent, both
+holding text. **A `Right_toRightOf` works and the mirrored `Left_toLeftOf` does not.**
+
+That is not a plausible ConstraintLayout behaviour on its face, which means something not visible
+in these two elements is differentiating them. Candidates, in the order worth testing:
+
+1. **RTL/`layoutDirection` resolution.** `Left`/`Right` are absolute; `Start`/`End` are
+   direction-aware. If something in the tree resolves direction oddly, absolute and relative edges
+   can disagree. The device is `ldltr` (from the config dump), so this should be inert — but it is
+   the only asymmetry between the two attributes.
+2. ~~A duplicate id shadowing this view~~ — **checked and ruled out.** `id/chapter_progress"`
+   appears exactly twice in the layout: one declaration (line 216) and one reference from
+   `chapter_title`'s top constraint (line 243).
+3. ~~Something writing a layout param at runtime~~ — **checked and ruled out.** The only code near
+   this geometry is `addOnLayoutChangeListener` on `chapter_progress_seekbar` (~line 414), and it
+   re-runs `renderPlayerText()` on a visibility transition. It sets text, never layout params.
+   Nothing in `app/src/main` assigns `chapterProgress.layoutParams` or `.width`.
+
+So **candidate 1, direction resolution, is the only one of the three left standing**, and it is a
+weak candidate on a `ldltr` device. Something outside these two elements is differentiating an
+otherwise-identical pair, and five constraint-level attempts plus three ruled-out theories have not
+found it.
+
+**This needs eyes on the running layout — Layout Inspector, or `setWillNotDraw`/measure logging on
+the parent — rather than another blind edit.** That is the honest state; a sixth attempt of the
+same kind is not worth the churn.
+
 ## Acceptance Criteria
 
 - [ ] The book-level progress line is visible in the landscape player
