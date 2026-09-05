@@ -236,62 +236,79 @@ directories is not something to do unattended.
 
 ---
 
-## Coverage: why 40.69% is the wrong number to compare against 95%
+## Coverage: what the ceiling actually is
 
-Asked directly: *is a coverage ceiling this low normal on Android, when elsewhere we strive for
-95%?* Measured rather than asserted.
+### A correction to the first version of this section
 
-### The arithmetic
+The first draft claimed a hard **72.4% ceiling** and called 95% "arithmetically impossible on this
+platform." That overstated the case by treating a property of *this build configuration* as a
+property of Android. Three specific mechanisms move the boundary, and **two are already partly in
+use in this repo**:
 
-| | instructions | share |
+**1. Exclusion rules.** `app/build.gradle.kts` already excludes Dagger factories, Room `_Impl`,
+DataBinding and `R` classes — but **not Moshi's generated `*JsonAdapter` classes**, which are
+**7,882 instructions, 9.2% of the measured codebase**. That is generated code nobody writes or
+reviews, sitting in the denominator and dragging the number down. Excluding it is a config change,
+not a testing effort.
+
+**2. Robolectric.** The first draft called Fragments and adapters "unreachable by a JVM unit test."
+That is wrong here: **Robolectric is already used in 40 test files**, including
+`GroupedSearchAdapterTest`, `SpeedChooserLayoutTest`, `ExpandedBottomSheetTest` and
+`BookmarkListAdapterTest`. Adapters, ViewHolders and bottom sheets — **4,544 instructions, 5.3%**
+— are therefore JVM-reachable *today*, not blocked. Robolectric carries real cost (it is slow, and
+PIT cannot mutate through it — see the `pitestDebug` allowlist), so covering 100% of UI through it
+is not the goal; but "unreachable" was the wrong word.
+
+**3. Instrumented tests.** The suite exists (cu-54, two managed devices) and `jacocoTestReport`'s
+`executionData` already globs `**/*.ec`. Counting them makes the ceiling ~100% by definition.
+
+### The revised numbers
+
+| scope | instructions | ceiling |
 |---|---:|---:|
-| Total | 85,963 | 100% |
-| Covered today | 34,971 | **40.68%** |
-| **Unreachable by unit tests** | 23,715 | **27.6%** |
-| Unit-testable | 62,248 | 72.4% |
+| Measured today | 85,963 | 72.4% |
+| **After excluding Moshi generated code** | 78,081 | — |
+| Of that, Fragments + Activities | 9,193 | **11.8%** |
+| **Unit + Robolectric ceiling** | | **≈88%** |
+| With instrumented runs counted | | ≈100% |
 
-The unreachable 27.6% is Fragments, Activities, adapters, `Navigator`, Moshi/Dagger **generated**
-code, and the debug-only mock server. None of it can be executed by a JVM unit test — it needs an
-instrumented device.
+So **≈88% is reachable without a single instrumented test**, once generated code is excluded and
+Robolectric is used as widely as it already is in places. Only Fragments and Activities — 10.7% of
+today's measurement — genuinely need an emulator.
 
-**So covering every testable instruction in the codebase yields 72.4% overall.** Reaching 95%
-would require covering 131% of the reachable half. It is not a stretch goal; it is arithmetically
-impossible with this tool on this platform.
+### What that means for a target
 
-### Is that normal for Android?
+95% remains a stretch for a monolithic `:app` module, and the fourth strategy that makes it routine
+elsewhere — **pure domain modules with zero `android.*` imports** — is a real architectural option
+this project has not taken. It is worth noting that `data/model` already behaves like one (88.43%
+coverage, zero Android imports in its core files); the difference is that it lives inside `:app`
+rather than in its own module.
 
-Yes, and for a structural reason that does not apply to a backend service. A typical Android app
-carries a large body of framework-bound code — lifecycle callbacks, view binding, adapters — that
-JVM tests cannot instantiate. Teams reporting "95%" are almost always either measuring a pure
-domain module, or counting instrumented tests in the same figure. **40.69% is nonetheless low even
-by Android standards** — the honest reading is that this codebase is under-covered *and* that its
-ceiling is far below 95%.
+A revised, defensible target: **65–70% overall** after the Moshi exclusion, rising as the
+`onCreateView` extractions (DRAFT-173/174) move logic out of the instrumentation-bound 10.7%.
+That is a real target rather than a permanently-failing one, and it no longer rests on a ceiling
+figure that was an artifact of the build config.
 
-### The two levers, in order
+### Applied — and it moved the number the *other* way
 
-1. **Raise coverage of the testable 72.4%.** This is where the value is, and the two findings
-   above are the blockers: logic buried in `onCreateView` closures is *inside* the unreachable
-   27.6% purely because of where it sits, and `SettingsViewModel`'s 15 dependencies make its 737
-   testable lines impractical to reach. Extracting them (DRAFT-173/174/175) converts unreachable
-   instructions into reachable ones — the ceiling itself rises.
-2. **Count instrumented tests toward coverage.** The suite exists (cu-54, two managed devices),
-   and — checked before recommending it — the plumbing is *already there*: `jacocoTestReport`'s
-   `executionData` includes `**/*.ec`, the instrumented format, alongside the unit tests' `.exec`.
-   But the task only `dependsOn("testDebugUnitTest")`, and `verify.sh` never runs the instrumented
-   stage, so in practice no `.ec` file exists when the report is generated and every instrumented
-   assertion is invisible to the ratchet. Running `./verify.sh --instrumented` before the report
-   would fold them in with no new plumbing. Worth confirming the actual gain before setting a
-   numeric target, since the suite is deliberately small (10 tests) and may move the figure less
-   than its existence suggests.
+The Moshi exclusion was applied rather than filed, and the result is worth recording because it
+contradicts the reasoning that motivated it:
 
-### What a realistic target looks like
+```
+before: 85,963 instructions, 40.68% covered
+after : 78,065 instructions, 40.47% covered
+```
 
-Given a 72.4% ceiling, **55-60% overall** is a strong, defensible target for this codebase — it
-implies roughly 80% of everything a unit test can reach. Setting 95% would guarantee permanent
-failure and teach the team to ignore the number, which is worse than having no target.
+**Coverage went down.** The generated adapters were **51.7% covered** — better than the 40.7%
+codebase average — because the `*-real-shape.json` fixture tests (cu-24) genuinely parse through
+them. Removing them removed proportionally more *covered* instructions than missed ones.
 
-The existing ratchet is the right mechanism and is already correctly designed: a high-water mark
-per package, so coverage cannot drift down, with a deliberate 0.05% tolerance for codegen jitter.
+The exclusion is kept anyway, because the metric should measure code someone wrote and can fix; a
+generated `fromJson` body being well covered is a side effect of testing the models, not a signal
+about the codebase. But the general lesson stands against the assumption that produced it:
+**excluding generated code raises the number only when that code is worse-covered than average**,
+and here it was better. Anyone reaching for exclusions to improve a percentage should measure the
+excluded set's own coverage first.
 
 ---
 

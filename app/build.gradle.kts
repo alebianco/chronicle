@@ -286,6 +286,12 @@ val coverageExclusions =
     "**/*Module_*Factory*.*",
     "**/*_Impl*.*",
     "**/*_Provide*Factory*.*",
+    // Moshi codegen (cu-62 moved every model to `@JsonClass(generateAdapter = true)`). These are
+    // generated `fromJson`/`toJson` bodies nobody writes or reviews — 7,882 instructions, 9.2% of
+    // the measured codebase, sitting in the denominator. The *models* they serialize stay
+    // measured, and the real-shape fixture tests (cu-24) still exercise the parsing through them;
+    // what is excluded is the generated plumbing, exactly as the Dagger and Room entries above do.
+    "**/*JsonAdapter*.*",
   )
 
 tasks.register<JacocoReport>("jacocoTestReport") {
