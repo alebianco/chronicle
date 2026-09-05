@@ -166,6 +166,76 @@ These are strengths worth stating, because a review that only lists problems mis
 
 ---
 
+## Second scope: tests, scripts and hooks (added 2026-09-05)
+
+The first pass covered only `app/src/main`. Test code, build scripts and git hooks rot the same
+way and are maintained by the same people, so they were measured too.
+
+**Verdict: clean.** This scope produced no code findings — only a housekeeping one.
+
+### Test suite — 203 files, 29,271 lines (a 0.91:1 ratio against production)
+
+| signal | result |
+|---|---|
+| Tests with **zero assertions** (vacuous pass risk) | **0** |
+| `@Ignore`d / disabled tests | **0** |
+| `Thread.sleep` (flake risk) | **0** |
+| Hardcoded absolute paths | **0** (one match was the Plex route `/home/users`) |
+| Largest test file | 950 lines (`RoomSchemaTest`), only one over 500 |
+| Duplicated fake/stub classes | **0** — nine fakes, each declared once |
+| `runTest` vs `runBlocking` | 40 files vs 4, and all four bridge a suspend call inside a
+non-suspend assertion rather than waiting on timing |
+| Mocking libraries | **one** (MockK), in 41 of 200 files; the rest use real fakes |
+
+A shared `chronicle/testing/` package (`FakePlexServer`, `MultiTrackBook`, `TestSources`,
+`PlexFixtureContractTest`) is used by **54 files**. That is the thing most test suites lack and
+the reason there is no fixture duplication here.
+
+Notably the test tree does **not** have the production tree's problem: no 400-line functions, no
+nested-closure structure, and file sizes cluster tightly.
+
+### Scripts — 860 lines across six files
+
+Five of six use `set -euo pipefail`. The exception is `test_release_build.sh`, which is also the
+only script on `#!/bin/zsh` and uses bare `set -e` — no `-u`, no `pipefail`. It contains 13 pipes,
+including the load-bearing R8 assertion at line 52 that greps the dex for class descriptors.
+
+**This is not a live defect**: that specific pipeline is guarded by an explicit
+`[[ ! -s ${DESCRIPTORS} ]]` emptiness check immediately after, so a failing `dexdump` is caught by
+content rather than by exit status. Deliberate, not accidental. Adding `pipefail` would still be
+cheap insurance if the file is touched for another reason — not worth a task on its own.
+
+Minor: the debug package id is repeated as a literal in three scripts with no shared helper.
+CLAUDE.md already documents the `.debug` suffix trap prominently, so this is known-and-flagged
+duplication rather than a hidden one.
+
+### Git hook
+
+`pre-commit` runs `./gradlew ktlintCheck` and branches on `$?` correctly. It **is** version
+controlled — tracked at the repo root and byte-identical to the installed
+`.git/hooks/pre-commit`.
+
+### The one real finding: `.worktree/` is 4.1 GB
+
+`git worktree list` reports **12** registered worktrees; `.worktree/` holds **41** directories.
+So 29 are orphaned leftovers from completed tasks (`task-cu-22-bookmarks`, `task-25-fuzzy-search`,
+`task-52-stateflow`, …), and all 12 registered ones belong to tasks that are `Done` or
+`In Review` with their work merged.
+
+Checked before recommending anything — **nothing would be lost**:
+
+- 11 of 12 have no uncommitted changes and no unmerged commits.
+- `task-33-interface-carve` has 2 modified files: stale `coverage-baseline*.txt`, superseded.
+- `task-141-landscape-progress` shows "2 unmerged commits", but the branch is **339 files behind**
+  `feature/agentic-dev` — the commits are parked WIP on a stale base, superseded by `a9ba05a`.
+  Its diff is mostly *deletions* of files that exist now.
+
+`git worktree prune` clears the orphan registrations; the 29 empty directories and the 12 merged
+worktrees are then safe to remove. **Left for the owner to run** — reclaiming 4.1 GB by deleting
+directories is not something to do unattended.
+
+---
+
 ## Suggested follow-ups
 
 Filed as drafts for owner triage rather than actioned here, since each changes structure across
