@@ -360,6 +360,16 @@ class SettingsViewModel(
           click =
             object : PreferenceClick {
               override fun onClick() {
+                // `provideExternalDeviceDirs` filters nulls out of `getExternalFilesDirs`, so a
+                // device whose volumes are all unavailable yields an empty list — and an empty
+                // chooser is a dialog with nothing in it and no way out but back. Say so instead
+                // (found by SettingsClickHandlerTest, which taps every row).
+                if (externalDeviceDirs.isEmpty()) {
+                  showUserMessage(
+                    FormattableString.from(R.string.settings_sync_location_none_available),
+                  )
+                  return
+                }
                 showOptionsMenu(
                   options =
                     externalDeviceDirs.map {

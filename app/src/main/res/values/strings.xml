@@ -269,6 +269,7 @@
     <string name="settings_sync_location_title">Sync location</string>
     <string name="settings_sync_space_available">%1$s: %2$s free</string>
     <string name="settings_sync_location_explanation">Choose where synced books will be stored</string>
+    <string name="settings_sync_location_none_available">No storage available. Insert an SD card or restart the device, then try again.</string>
     <string name="settings_delete_synced_title">Delete synced files</string>
     <string name="settings_delete_synced_explanation">Remove all downloaded files from your device</string>
     <string name="settings_delete_synced_confirm">Delete all downloaded files?</string>
