@@ -408,6 +408,68 @@ genuinely needs instrumentation.
 
 ---
 
+## What stands between 45.7% and 75% (measured 2026-09-06)
+
+Asked directly, and worth answering with arithmetic because the intuitive answer is wrong.
+
+### 75% is roughly the ceiling, not a midpoint
+
+| | instructions | |
+|---|---:|---:|
+| Total measured | 78,179 | |
+| Covered today | 35,727 | **45.70%** |
+| **Needs an emulator, or is debug-only** | 17,609 | **22.5%** |
+| Reachable but not yet covered | 24,843 | |
+
+Fragments, Activities, `Navigator`, bound Services, Workers and the debug mock server are 22.5% of
+the codebase and cannot be executed by a JVM test. So **covering every reachable instruction in
+the app yields 77.5%.**
+
+Reaching 75% therefore means covering **92% of everything reachable that is not yet covered** —
+not "more of the same", but very nearly all of it, including every error branch and every
+defensive guard. That is the honest headline: 75% is not a stretch target on this configuration,
+it is within 2.5 points of the maximum.
+
+### The single biggest cause, and it is not what it looks like
+
+Ranked by missed instructions, the largest category is "plain Kotlin" at 37.8%. Opening it up:
+
+**65% of it is anonymous and inner classes**, and 82% of *those* are named inner classes of the
+form `Owner$methodName$1`:
+
+```
+  172  CurrentlyPlayingViewModel$refreshTracks$1
+  138  ChapterRepository$loadChapterData$2
+  138  AudiobookDetailsViewModel$forceSyncBook$1
+  173  LibrarySyncRepository$refreshLibrary$1
+```
+
+These are **coroutine bodies**. Every `viewModelScope.launch { … }` and every `suspend` function
+compiles its body into a separate class, and JaCoCo counts it as its own uncovered unit. A test
+that calls `forceSyncBook()` but does not drive the dispatcher to completion covers the *method*
+and leaves the continuation at 0%.
+
+So the main cause is not untestable architecture. It is that **a large share of the remaining
+misses sits inside asynchronous bodies that only run when a test advances the scheduler far
+enough and exercises every branch inside them** — including the `catch` arms, which need the
+collaborator to be made to fail.
+
+### What follows from that
+
+- **The cheap wins are gone.** The work so far took whole classes from 0% by constructing them;
+  what is left is branch-level coverage inside async code, which costs roughly one test per
+  branch.
+- **`advanceUntilIdle` is not enough on its own.** Covering a `launch` body's error arm means
+  stubbing the collaborator to throw, per arm.
+- **A realistic target remains 65-70%**, restated from the earlier section and now with a firmer
+  basis: it implies covering roughly 75-80% of the reachable half, which is demanding but not
+  absurd. 75% overall implies 92% and would mean writing tests whose only purpose is the metric.
+- **The one structural lever left** is the fourth strategy noted above — moving pure logic into
+  modules with no `android.*` imports, which shrinks the unreachable 22.5% rather than fighting
+  it. That is an architectural decision, not a testing task.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
