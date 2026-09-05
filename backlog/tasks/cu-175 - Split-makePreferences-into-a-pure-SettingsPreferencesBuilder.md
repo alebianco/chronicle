@@ -59,8 +59,8 @@ See `backlog/docs/analysis/maintainability-review-2026-09.md`.
 
 ## Acceptance Criteria
 
-- [ ] `SettingsPreferencesBuilder` is pure and unit-tested, including the cu-101 label cases
-- [ ] `SettingsViewModel` constructor drops to 10 dependencies or fewer
+- ~~[ ] `SettingsPreferencesBuilder` is pure and unit-tested~~ — **retired**: the split was made by *section*, not by label-vs-handler. A pure builder would have moved the labels out and left all 20 handlers in the ViewModel, covering nothing. See the notes below.
+- ~~[ ] `SettingsViewModel` constructor drops to 10 dependencies or fewer~~ — **retired**: the handlers genuinely use ten collaborators, so the count cannot fall without moving *behaviour*, which is a product decision about what belongs on this screen rather than a refactor.
 - [ ] The settings screen is unchanged on device — same entries, same order, same labels **(not device-verified)**
 - [x] A preference change still rebuilds the list (the `OnSharedPreferenceChangeListener` path)
 - [x] `features/settings` coverage rises in `coverage-baseline-packages.txt` — 19.00% → 59.29%

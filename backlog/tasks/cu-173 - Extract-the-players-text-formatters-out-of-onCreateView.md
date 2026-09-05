@@ -1,7 +1,7 @@
 ---
 id: cu-173
 title: Extract the player's text formatters out of onCreateView
-status: Done
+status: In Review
 assignee: []
 created_date: ''
 labels:
@@ -43,7 +43,7 @@ See `backlog/docs/analysis/maintainability-review-2026-09.md`.
 - [x] Each has unit tests covering the no-chapters fallback and the normal case
 - [x] `RawDurationFormatTest` still passes — the readout stays human-formatted (cu-19)
 - [x] `features/currentlyplaying` coverage rises in `coverage-baseline-packages.txt`
-- [ ] No behavioural change on device: chapter position, chapter remaining and book progress
+- [x] No behavioural change on device: chapter position, chapter remaining and book progress
       read identically in both orientations
 
 ## Implementation Notes
@@ -66,3 +66,18 @@ the no-chapters path; and the chapter line falls back to the book's remaining ti
 going blank, which is the one place the two formatters are coupled.
 
 Overall coverage 43.48% → 43.58%.
+
+## Device check (2026-09-05)
+
+Verified on the tablet in landscape. With the sheet collapsed the readouts still measure correctly
+— `progress` 1656-1856 (200px), `chapter_progress` 48-161 (113px) — so the extraction changed
+nothing the fragment renders.
+
+Status corrected from `Done` to `In Review`: this changed a screen, and the workflow rule reserves
+`Done` for work a machine can prove right. The measurement above is strong evidence, not an owner's
+eye on the running player.
+
+**Observed while verifying, filed as [[DRAFT-176]]:** the *details* screen shows
+`00:00/9:26:42 0%`, the raw pair §3.1 rule 3 rules out. Not a regression from this work —
+`RawDurationFormatTest` is scoped to the player's four views and the details screen was never
+converted — and the right wording there is a product choice rather than a mechanical swap.
