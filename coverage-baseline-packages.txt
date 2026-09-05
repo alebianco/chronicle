@@ -10,7 +10,7 @@ io/github/mattpvaughn/chronicle/features/bookdetails 33.43
 io/github/mattpvaughn/chronicle/features/browse 0.00
 io/github/mattpvaughn/chronicle/features/collections 35.86
 io/github/mattpvaughn/chronicle/features/currentlyplaying 27.52
-io/github/mattpvaughn/chronicle/features/download 14.72
+io/github/mattpvaughn/chronicle/features/download 22.05
 io/github/mattpvaughn/chronicle/features/home 18.44
 io/github/mattpvaughn/chronicle/features/library 15.34
 io/github/mattpvaughn/chronicle/features/login 29.63

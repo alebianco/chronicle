@@ -10,6 +10,7 @@ import android.net.Network
 import android.os.Build
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
+import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -24,6 +25,7 @@ import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.model.mergeServerRefresh
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
+import io.github.mattpvaughn.chronicle.features.download.ChronicleWorkerFactory
 import io.github.mattpvaughn.chronicle.injection.components.AppComponent
 import io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
@@ -41,7 +43,26 @@ import javax.inject.Singleton
 @Singleton
 open class ChronicleApplication :
   Application(),
+  Configuration.Provider,
   SingletonImageLoader.Factory {
+  /**
+   * Builds workers with their dependencies passed in rather than fetched (cu-179).
+   *
+   * `Configuration.Provider` replaces WorkManager's default initialisation, which is what lets a
+   * `WorkerFactory` be installed at all. Lazy because it reads the Dagger graph, which does not
+   * exist until `onCreate` has run.
+   */
+  override val workManagerConfiguration: Configuration
+    get() =
+      Configuration.Builder()
+        .setWorkerFactory(
+          ChronicleWorkerFactory(
+            fetch = { appComponent.fetch() },
+            prefsRepo = appComponent.prefsRepo(),
+            externalDeviceDirs = { appComponent.externalDeviceDirs() },
+          ),
+        ).build()
+
   // Instance of the AppComponent that will be used by all the Activities in the project
   val appComponent by lazy {
     initializeComponent()

@@ -36,8 +36,8 @@ import kotlin.math.min
 class DownloadNotificationWorker(
   context: Context,
   parameters: WorkerParameters,
+  private val fetch: Fetch,
 ) : CoroutineWorker(context, parameters) {
-  private val fetch: Fetch = Injector.get().fetch()
   private val notificationManager = NotificationManagerCompat.from(applicationContext)
 
   private val cancelAllDesc =

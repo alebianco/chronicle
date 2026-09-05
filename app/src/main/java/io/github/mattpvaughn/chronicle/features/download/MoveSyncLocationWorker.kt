@@ -10,7 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.*
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.Injector
+import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import kotlinx.coroutines.*
 import timber.log.Timber
@@ -19,12 +19,21 @@ import java.io.IOException
 import java.nio.file.Files
 import kotlin.math.roundToInt
 
+/**
+ * Moves downloaded audio when the sync location changes.
+ *
+ * Dependencies arrive through the constructor via [ChronicleWorkerFactory] (cu-179). They used to
+ * be `Injector.get()` calls in field initialisers, which made this class unconstructable in a unit
+ * test — `Injector.get()` is `ChronicleApplication.get()`, whose `INSTANCE!!` throws before the
+ * constructor finishes.
+ */
 class MoveSyncLocationWorker(
   context: Context,
   parameters: WorkerParameters,
+  private val prefsRepo: PrefsRepo,
+  private val externalDeviceDirs: List<File>,
 ) : CoroutineWorker(context, parameters) {
   private val notificationManager = NotificationManagerCompat.from(applicationContext)
-  private val prefsRepo = Injector.get().prefsRepo()
 
   /** Moves all previously downloaded files to [PrefsRepo.cachedMediaDir] */
   override suspend fun doWork() =
@@ -34,7 +43,7 @@ class MoveSyncLocationWorker(
 
       val activeDownloadDir = prefsRepo.cachedMediaDir
       val inactiveSyncLocations =
-        Injector.get().externalDeviceDirs().filter {
+        externalDeviceDirs.filter {
           it.path != activeDownloadDir.path
         }
 

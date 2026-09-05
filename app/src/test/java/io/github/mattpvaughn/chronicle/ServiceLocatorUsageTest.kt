@@ -103,14 +103,27 @@ class ServiceLocatorUsageTest {
     const val MAIN_SOURCE_ROOT = "src/main/java"
 
     /**
-     * Workers, exempt for the cu-152 reason: WorkManager builds them reflectively with a fixed
-     * `(Context, WorkerParameters)` signature, so they have no constructor to inject into. Adding
-     * a `WorkerFactory` would buy nothing while no worker is unit-tested.
+     * Workers still reaching the locator.
+     *
+     * cu-152 exempted **all** workers, reasoning that WorkManager builds them reflectively through
+     * a fixed `(Context, WorkerParameters)` signature so they have no constructor to inject into,
+     * and that a `WorkerFactory` "would buy nothing while no worker is unit-tested".
+     *
+     * cu-179 re-decided that on new facts — `androidx.work:work-testing` was already in the build
+     * and unused, and the workers were among the largest untested bodies left. `ChronicleWorkerFactory`
+     * now passes their dependencies in, `ChronicleApplication` installs it through
+     * `Configuration.Provider`, and `MoveSyncLocationWorker` came off this list entirely.
+     *
+     * The two that remain are not constructor injection:
+     *
+     * - `DownloadNotificationWorker` keeps one call in its **companion** `enqueue` helper, which
+     *   reaches `workManager()` to schedule itself. That is a static entry point, not a dependency
+     *   of the instance, and injecting it would mean threading a `WorkManager` through every caller.
+     * - `PlexSyncScrobbleWorker` has not been converted; it is a candidate for the same treatment.
      */
     val EXEMPT_WORKERS =
       setOf(
         "DownloadNotificationWorker.kt",
-        "MoveSyncLocationWorker.kt",
         "PlexSyncScrobbleWorker.kt",
       )
 
