@@ -643,11 +643,26 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   which is what Auto does when it browses.
   **Mock mode seeds the login, not a refresh**, so a freshly-provisioned emulator browses an empty
   library. That is correct, not a bug — a test asserting books exist is testing provisioning.
-- **The bottom navigation cannot be driven by `adb shell input tap`** — a `BottomNavigationItemView`
-  sits under the system bars (the obstacle recorded in cu-54). Screens behind a tab need a debug
-  hook to be reachable from a script: `--ez show_browse true` is one (cu-24). Such a hook must
-  **post** rather than navigate immediately — called from `onCreate` a `commit()` throws
-  `FragmentManager has not been attached to a host`.
+- **The bottom navigation *can* be driven by `adb shell input tap` — the trick is the menu inset**
+  (measured 2026-09-05, correcting an earlier claim that it could not).
+  `BottomNavigationView` spans the full width, but `BottomNavigationMenuView` inside it is
+  **centred and narrower**: on the 1200px tablet the bar is `0–1200` while the menu is `220–979`,
+  so a tap at x=200 or x=1000 lands on the bar and does nothing — which is what "cannot be driven"
+  was really describing. Read the geometry rather than guessing at it:
+  ```
+  adb shell dumpsys activity top | grep -A 2 "id/bottom_nav}"   # bar bounds, then menu bounds
+  ```
+  Each `BottomNavigationItemView` is `menuWidth / tabCount` wide; here the three centres are
+  x≈347, 600, 853 at y≈1758 — the bar's own vertical centre, **not** the screen bottom, since a
+  114px system nav bar sits below it. Verified: those land on Home, Library and Settings, and a
+  book row tap from Library opens `AudiobookDetailsFragment` with its download button reachable.
+  **Espresso genuinely does refuse** — `click()` rejects a view the system bars overlap by more
+  than 10% (cu-54). That is a different mechanism and still stands, so instrumented tests need
+  another route; shell scripts do not.
+  Debug hooks stay worth having for what a coordinate cannot survive — a different screen size, a
+  scrolled list. `--ez show_browse true` (cu-24) and `--el download_book <id>` (cu-132) are those.
+  Such a hook must **post** rather than navigate immediately: called from `onCreate` a `commit()`
+  throws `FragmentManager has not been attached to a host`.
 - `NOTES.md` history: the old `freeAsInBeer` product flavor **no longer exists**; there are no flavors. Release signing per CONTRIBUTING.md.
 - **Cleartext HTTP is refused app-wide** (cu-42). `res/xml/network_security_config.xml` sets
   `cleartextTrafficPermitted="false"` with **no exceptions**; a debug-only override in
