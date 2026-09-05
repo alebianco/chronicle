@@ -8,6 +8,18 @@ labels:
 priority: medium
 ---
 
+## Status note (2026-09-05): rescoped — the premise was wrong
+
+This draft argued the split was needed because 15 dependencies made the class untestable. It is
+not: nothing calls the service locator, `init` only registers a prefs listener, and it constructs
+from fifteen mocks. The real blocker was `makePreferences` reading a string resource per row during
+construction — solved by `@RunWith(RobolectricTestRunner::class)`, one annotation.
+
+`SettingsViewModelTest` now covers it (0% → 47.6%), so the refactor is no longer an unblocker and
+should not be justified as one. **It remains worth doing for readability** — a 737-line function is
+hard to review, which is the finding that actually stands — and it now has tests to refactor
+against, which is the right order.
+
 ## Description
 
 `SettingsViewModel` has **15 constructor dependencies** — the most in the codebase, against a

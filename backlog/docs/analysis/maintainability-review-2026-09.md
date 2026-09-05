@@ -351,6 +351,33 @@ Worth recording, because both look attractive in a coverage report and neither i
 `equals`/`hashCode`.** Another 112 are Android media builders. Chasing either would be gaming the
 metric.
 
+### The lever, found by attempting DRAFT-175
+
+DRAFT-175 said `SettingsViewModel`'s **15 constructor dependencies** made it untestable and that a
+pure `SettingsPreferencesBuilder` had to be extracted first. **Checked before starting the
+refactor, and the premise was wrong.** Nothing in the class calls the service locator, `init` only
+registers a prefs listener, and it constructs fine from fifteen mocks.
+
+The actual blocker was one line: `makePreferences` reads a string resource per row during
+construction, so the test needs `@RunWith(RobolectricTestRunner::class)`. **One annotation, not a
+737-line restructuring** — and restructuring that function with no tests to catch a mistake would
+have been the wrong order anyway.
+
+The result, from a single 12-test suite:
+
+| | before | after |
+|---|---:|---:|
+| `SettingsViewModel.kt` | 0% | **47.6%** |
+| `features/settings` | 19.00% | **43.14%** |
+| overall | 41.59% | **43.45%** |
+
+**That is the lever.** Nearly two points of overall coverage from one file, against ~1.1 points
+from the five careful `data/model` suites before it. The pattern generalises: *construct the
+ViewModel under Robolectric and exercise its public surface*, rather than hunting uncovered lines.
+
+DRAFT-175 stays open but is **rescoped** — still worth doing for readability, no longer justified
+as an unblocker.
+
 ### What the remaining gap looks like
 
 Of the top reachable targets left, the largest are `SettingsViewModel` (1,300 missed, 0% — blocked
