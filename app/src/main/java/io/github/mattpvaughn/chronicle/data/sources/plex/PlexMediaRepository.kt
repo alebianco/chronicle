@@ -3,8 +3,8 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 import android.support.v4.media.MediaMetadataCompat
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import io.github.mattpvaughn.chronicle.data.model.toAlbumMediaMetadata
 import io.github.mattpvaughn.chronicle.features.player.AbstractMediaSource
+import io.github.mattpvaughn.chronicle.features.player.toAlbumMediaMetadata
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 

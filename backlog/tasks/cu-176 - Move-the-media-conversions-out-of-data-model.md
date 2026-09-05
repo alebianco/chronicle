@@ -1,10 +1,13 @@
 ---
-id: DRAFT-177
+id: cu-176
 title: Move the media conversions out of data/model
-status: Draft
+status: In Review
+assignee: []
+created_date: ''
 labels:
   - R2
   - maintainability
+dependencies: []
 priority: low
 ---
 
@@ -41,8 +44,37 @@ paying for itself.
 
 ## Acceptance Criteria
 
-- [ ] `data/model` has no `android.*` or non-Room `androidx.*` imports
-- [ ] Each moved conversion sits beside its consumer
-- [ ] `AudiobookMediaItemTest` still passes, relocated if needed
+- [~] `data/model` has no `android.*` or non-Room `androidx.*` imports — **8 down to 2**; see notes
+- [x] Each moved conversion sits beside its consumer
+- [x] `AudiobookMediaItemTest` still passes, relocated as `AudiobookMediaConversionsTest`
 - [ ] No behavioural change: Android Auto still browses, the player still resolves track URIs
 - [ ] Verified on device (Auto browse is the risky half)
+
+## Implementation Notes
+
+`features/player/AudiobookMediaConversions.kt` now holds the three conversions that made
+`data/model` import the media framework: `Audiobook.toAlbumMediaMetadata`, `Audiobook.toMediaItem`
+and `MediaItemTrack.toMediaMetadata`. Each sits beside its only caller —
+`MediaPlayerService.onLoadChildren`, `PlexMediaRepository`, `AudiobookPlaybackPreparer`.
+
+Also removed: `MediaItemTrack.from(metadata)`, which had **no callers** and was the file's other
+reason to import `MediaMetadataCompat`.
+
+`AudiobookMediaItemTest` moved with the code as `AudiobookMediaConversionsTest`.
+
+### Two imports remain, deliberately
+
+`data/model` went from **8 framework imports to 2**, and the last two are arguably in the right
+place:
+
+- `MediaItemTrack` uses `android.net.Uri` in `cachedTrackUri`, which exists precisely to enforce
+  cu-83's rule — `Uri.fromFile`, never `"file://" + path`, because the latter skips
+  percent-encoding. Replacing it with string concatenation to win a purity argument would
+  reintroduce the bug the function was written to prevent.
+- `Chapter.durationStr` uses `DateUtils.formatElapsedTime`. This *is* presentation and could move,
+  but it is one property consumed by `ChapterListAdapter`, and DRAFT-176 already proposes revisiting
+  the details screen's duration formatting — better done there, once, with the owner's call on
+  wording.
+
+So the criterion is marked partial rather than ticked. Whether those last two move is a judgement
+call, not a mechanical step.

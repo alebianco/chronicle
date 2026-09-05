@@ -1,10 +1,13 @@
 ---
-id: DRAFT-180
+id: cu-179
 title: Give the workers a WorkerFactory so they can be tested
-status: Draft
+status: To Do
+assignee: []
+created_date: ''
 labels:
   - R2
   - maintainability
+dependencies: []
 priority: medium
 ---
 

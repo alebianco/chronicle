@@ -1,8 +1,9 @@
-package io.github.mattpvaughn.chronicle.data.model
+package io.github.mattpvaughn.chronicle.features.player
 
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaMetadataCompat
 import androidx.core.net.toUri
+import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.EXTRA_IS_DOWNLOADED
 import io.github.mattpvaughn.chronicle.data.sources.plex.EXTRA_PLAY_COMPLETION_STATE
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -33,7 +34,7 @@ import org.robolectric.RobolectricTestRunner
  * dimension resource and the server's token.
  */
 @RunWith(RobolectricTestRunner::class)
-class AudiobookMediaItemTest {
+class AudiobookMediaConversionsTest {
   private fun book(
     progress: Long = 0L,
     isCached: Boolean = false,

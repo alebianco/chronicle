@@ -1,10 +1,13 @@
 ---
-id: DRAFT-178
+id: cu-177
 title: Guard the framework-free core against drift
-status: Draft
+status: To Do
+assignee: []
+created_date: ''
 labels:
   - R2
   - maintainability
+dependencies: []
 priority: medium
 ---
 

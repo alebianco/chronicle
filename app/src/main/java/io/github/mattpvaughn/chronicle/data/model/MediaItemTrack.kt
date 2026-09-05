@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.model
 
 import android.net.Uri
-import android.support.v4.media.MediaMetadataCompat
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -66,22 +65,6 @@ data class MediaItemTrack(
   val size: Long = 0L,
 ) : Comparable<MediaItemTrack> {
   companion object {
-    fun from(metadata: MediaMetadataCompat): MediaItemTrack {
-      return MediaItemTrack(
-        id = metadata.id ?: "-1",
-        title = metadata.title ?: "",
-        playQueueItemID = metadata.trackNumber,
-        thumb = metadata.artUri.toString(),
-        media = metadata.mediaUri.toString(),
-        index = metadata.trackNumber.toInt(),
-        duration = metadata.duration,
-        album = metadata.album ?: "",
-        artist = metadata.artist ?: "",
-        genre = metadata.genre ?: "",
-        artwork = metadata.artUri.toString(),
-      )
-    }
-
     val EMPTY_TRACK = MediaItemTrack(TRACK_NOT_FOUND)
 
     /**
@@ -354,27 +337,6 @@ fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
  * either finished (see [Audiobook.isCompleted]) or back at its start.
  */
 private fun MediaItemTrack.hasProgress(): Boolean = progress > 0L
-
-/** Converts the metadata of a [MediaItemTrack] to a [MediaMetadataCompat]. */
-fun MediaItemTrack.toMediaMetadata(
-  plexConfig: PlexConfig,
-  cachedMediaDir: File,
-): MediaMetadataCompat {
-  val metadataBuilder = MediaMetadataCompat.Builder()
-  metadataBuilder.id = this.id
-  metadataBuilder.title = this.title
-  metadataBuilder.displayTitle = this.album
-  metadataBuilder.displaySubtitle = this.artist
-  metadataBuilder.trackNumber = this.playQueueItemID
-  metadataBuilder.mediaUri = getTrackSource(cachedMediaDir, plexConfig)
-  metadataBuilder.albumArtUri = plexConfig.makeThumbUri(this.thumb ?: "").toString()
-  metadataBuilder.trackNumber = this.index.toLong()
-  metadataBuilder.duration = this.duration
-  metadataBuilder.album = this.album
-  metadataBuilder.artist = this.artist
-  metadataBuilder.genre = this.genre
-  return metadataBuilder.build()
-}
 
 /**
  * One chapter per track, for a book with no embedded chapter data.

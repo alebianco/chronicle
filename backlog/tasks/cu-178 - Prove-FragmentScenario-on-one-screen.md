@@ -1,10 +1,13 @@
 ---
-id: DRAFT-179
+id: cu-178
 title: Prove FragmentScenario on one screen
-status: Draft
+status: To Do
+assignee: []
+created_date: ''
 labels:
   - R2
   - maintainability
+dependencies: []
 priority: high
 ---
 

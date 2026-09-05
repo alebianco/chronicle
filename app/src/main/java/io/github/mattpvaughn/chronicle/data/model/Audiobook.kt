@@ -1,10 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.model
 
-import android.os.Bundle
-import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
-import android.support.v4.media.MediaDescriptionCompat
-import android.support.v4.media.MediaMetadataCompat
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
@@ -323,44 +318,6 @@ data class Audiobook(
         SORT_KEY_DURATION,
       )
   }
-}
-
-fun Audiobook.toAlbumMediaMetadata(): MediaMetadataCompat {
-  val metadataBuilder = MediaMetadataCompat.Builder()
-  metadataBuilder.id = this.id
-  metadataBuilder.title = this.title
-  metadataBuilder.displayTitle = this.title
-  metadataBuilder.albumArtUri = this.thumb
-  metadataBuilder.album = this.title
-  metadataBuilder.artist = this.author
-  metadataBuilder.genre = this.genre
-  return metadataBuilder.build()
-}
-
-/**
- * Converts an audiobook to a [MediaBrowserCompat.MediaItem] for use in
- * [androidx.media.MediaBrowserServiceCompat.onSearch] and
- * [androidx.media.MediaBrowserServiceCompat.onLoadChildren], and respective clients
- */
-fun Audiobook.toMediaItem(plexConfig: PlexConfig): MediaBrowserCompat.MediaItem {
-  val mediaDescription = MediaDescriptionCompat.Builder()
-  mediaDescription.setTitle(title)
-  mediaDescription.setMediaId(id)
-  mediaDescription.setSubtitle(author)
-  mediaDescription.setIconUri(plexConfig.makeThumbUri(this.thumb))
-  val extras = Bundle()
-  extras.putBoolean(EXTRA_IS_DOWNLOADED, isCached)
-  extras.putInt(
-    EXTRA_PLAY_COMPLETION_STATE,
-    if (progress == 0L) {
-      STATUS_NOT_PLAYED
-    } else {
-      STATUS_PARTIALLY_PLAYED
-    },
-  )
-  mediaDescription.setExtras(extras)
-
-  return MediaBrowserCompat.MediaItem(mediaDescription.build(), FLAG_PLAYABLE)
 }
 
 /**
