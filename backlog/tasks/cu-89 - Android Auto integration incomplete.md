@@ -117,11 +117,57 @@ then `--es play_book <id>` to start playback without tapping.
 
 Only after that evidence exists should any further code change be made.
 
+## Device findings, 2026-09-05 — the central question is answered, and the answer is "it wins"
+
+**Chronicle holds the media session, on the phone and on the tablet.** `dumpsys media_session`
+captured *while playing* (the evidence criterion 2 asks for), against the real library:
+
+```
+Sessions Stack - have 2 sessions:
+  Chronicle io.github.mattpvaughn.chronicle.debug/Chronicle   active=true   flags=7
+    state=PlaybackState {state=3, position=14231, speed=1.0, ...}
+    controllers: 8      metadata: Ender's Game, Orson Scott Card
+    queueTitle=Ender's Game, size=107
+  PocketCastsMediaSession au.com.shiftyjelly.pocketcasts       active=false
+    state=PlaybackState {state=0, position=0, speed=0.0, ...}
+
+Media button session is io.github.mattpvaughn.chronicle.debug/Chronicle
+```
+
+Chronicle is **first in the stack**, active, PLAYING, holds the media button session, and carries
+correct metadata and a 107-item queue. Pocket Casts is inactive and stopped. So **lead 1 (two
+competing sessions) and lead 2 (audio focus not held) are both ruled out**, and so is lead 4 — the
+notification binds, since 8 controllers are attached.
+
+This does **not** yet reproduce the owner's report. Either it was fixed by something since
+2026-08-31 (the session claims media buttons now — the one ticked criterion), or the failure is
+specific to the head unit rather than to the session, which is where the remaining leads live.
+
+### An Android Automotive emulator now exists, and Chronicle runs on it
+
+Set up headlessly this session — see the `chronicle-auto-emulator` memory for the exact route, and
+note **Gradle Managed Devices cannot do this**: AGP refuses with *"TV and Auto devices are presently
+not supported with Gradle Managed Devices."* A manual AVD (`chronicle_auto`, API 33
+`android-automotive` arm64) boots in ~10s and reports `ro.build.characteristics=automotive`.
+
+What it establishes so far:
+
+- The system enumerates Chronicle as a media app — `cmd package query-services -a
+  android.media.browse.MediaBrowserService` lists it as **Service #0, `isDefault=true`**, ahead of
+  the built-in local player.
+- Auto connects to the browse tree: `MediaPlayerService: Getting root!` in logcat.
+- No crash on an Automotive image.
+
+**Still unverified there**: the four browse categories rendering with content, playing from Auto,
+and the card/icon appearance — the emulator boots to user 10 and `com.android.car.media` threw when
+launched from the shell, so the browse tree was reached but not driven. That is the next step, not
+a blocker.
+
 ## Acceptance Criteria
 
-- [ ] Established whether the bug reproduces **on the phone** (lockscreen/shade media controls) or
+- [x] Established whether the bug reproduces **on the phone** (lockscreen/shade media controls) or
       only in Auto — this decides whether it is a session problem or an Auto-specific one
-- [ ] Diagnosis recorded with `dumpsys media_session` evidence *captured while playing*: whether
+- [x] Diagnosis recorded with `dumpsys media_session` evidence *captured while playing*: whether
       Chronicle's session is registered, active, and which app owns the media button session
 - [ ] Chronicle holds the media playback card while it is playing, displacing any previously active
       app
