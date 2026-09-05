@@ -528,19 +528,74 @@ But two things temper it here:
   simplicity (D12 rule 6: any CI system should be a thin wrapper). Multi-module Gradle is more
   configuration for an agent to maintain.
 
+### Correction (2026-09-06): it is not only `data/model`
+
+The section above scoped the question to `data/model` because that was the package in hand. Asked
+whether anything else benefits, and measured across the whole tree — **it is much bigger than one
+package**:
+
+**86 of 209 files (41%), ~8,000 lines, are already framework-free** (no `android.*`/`androidx.*`
+beyond Room annotations). They are spread across most packages, and they are not trivia — they are
+the decision logic:
+
+| package | framework-free files | examples |
+|---|---:|---|
+| `data/model` | 17 | `BookSearch`, `SeriesIndexPatterns`, `Offsets`, `SourceId` |
+| `features/player` | **10** | `SleepTimerState`, `ChapterSeekTarget`, `TrackListStateManager`, `CastEligibility` |
+| `data/local` | 9 | all five repositories, `SettingsBackup` |
+| `features/download` | 5 | `CacheReconciliation`, `ResumePlan`, `DownloadGroupId` |
+| `util` | 5 | `DurationFormat`, `FlowCombinators` |
+| `data/sources` | 4 | `IngestionPlan`, `SourceCapabilities` |
+
+That this exists is not an accident. It is the result of years of deliberate extractions —
+cu-21 pulled `SleepTimerLogic` out of the timer, cu-101 pulled `RefreshRate`/`BookCoverStyle` out of
+settings, cu-136 made offsets value classes, cu-19 made the formatters pure. **The domain layer is
+already there; it simply has no boundary around it.**
+
+### The number that decides the question
+
+| | coverage | instructions | missed |
+|---|---:|---:|---:|
+| **framework-free files** | **80.8%** | 17,835 | 3,432 |
+| everything else | 35.7% | 59,585 | 38,296 |
+
+The pure code is *already* at 80.8% with no module boundary at all. So a `:domain` module would
+**not unlock testability** — the thing it is usually adopted for. Every one of those files is
+testable today, and most are tested.
+
+What a boundary would actually buy:
+
+1. **It stops the drift.** Nothing currently prevents someone adding `import android.os.Bundle` to
+   `SleepTimerState`. Today's purity is convention, enforced only by review — and this session
+   found that review misses things.
+2. **It makes the coverage number honest.** A `:domain` module reporting 80.8% and an `:app`
+   module reporting 35.7% is a far more useful pair of signals than one blended 45.7%, which
+   flatters the framework layer and hides the domain layer's real quality.
+3. **It would speed the build**, since a pure module compiles and tests without the Android
+   toolchain.
+
+What it would not buy: any test that cannot be written today.
+
 ### Recommendation
 
-**Do the small version, skip the big one.**
+**Do the small version now, and treat the module as a real option rather than a deferred one.**
 
 Worth doing: move the three media conversions out of `data/model` into the player/browse layer.
 That is a few hours, removes 8 of the package's framework imports, puts each function beside its
 consumer, and needs no new Gradle module. It also makes the "`data/model` is pure" claim true
 rather than nearly true.
 
-Not worth doing now: a `:domain` Gradle module. The purity it would enforce is already achieved by
-convention and measured at 94.43%; the cost is permanent build complexity in a project whose stated
-principle is that plain git and a shell script should be enough. Revisit it if a second app target
-appears (a Wear or TV surface), which is when a shared pure module starts paying for itself.
+On the `:domain` module, the earlier "not worth doing" was based on the wrong scope. With 86 files
+and 8,000 lines in scope rather than one package, the case is genuinely arguable — but the reason
+to do it is **enforcement and signal**, not testability, and that should be stated plainly rather
+than sold as a coverage win. The cost is permanent multi-module build configuration in a project
+whose D12 rule 6 says plain git and a shell script should be enough.
+
+A cheaper 80% of the benefit: a **source-scanning guard test** in the existing style
+(`ModelsWithoutDiTest`, `ScopedQueryTest`, `RepositoryDispatcherTest` all do this) that fails the
+build when a file on a curated framework-free list grows an `android.*` import. That buys the
+anti-drift enforcement for an afternoon and no build complexity. If the list proves stable and
+useful, promoting it to a real module later is a smaller step, taken with evidence.
 
 **And do not chase 75%.** Per the section above it implies covering 92% of everything reachable.
 65-70% is the target that still means something.
