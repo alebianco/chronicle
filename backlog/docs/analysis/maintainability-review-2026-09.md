@@ -677,6 +677,49 @@ allowlist). But "unreachable" was the wrong word, twice now.
 
 ---
 
+## Autonomous run, 2026-09-06 — what shipped and what did not
+
+Four tasks taken in the order the owner set: domain separation, then Fragments, then Workers.
+
+### Done
+
+| task | outcome |
+|---|---|
+| **cu-176** media conversions | `data/model` from 8 framework imports to **2**. `toMediaItem`, `toAlbumMediaMetadata` and `toMediaMetadata` moved beside their only callers in `features/player`; dead `MediaItemTrack.from` removed. |
+| **cu-177** drift guard | `FrameworkFreeCoreTest` pins **87 files**, sabotage-verified twice (added import; missing file). Convention rule 6 in CLAUDE.md. |
+| **cu-179** WorkerFactory | Both workers constructor-injected, `Configuration.Provider` installed, App Startup initialiser removed. `DownloadOutcomes.kt` extracted and tested. `features/download` **14.72% → 30.83%**. |
+
+**Overall coverage 45.70% → 46.89%** this run; **40.47% → 46.89%** across the session.
+
+### Not done, and why
+
+**cu-178 (FragmentScenario) is back at `To Do`, half-solved.** Attempting it found *two* layers of
+host coupling, not one:
+
+1. **DI — solved and permanent.** `(activity as MainActivity).activityComponent!!` named a concrete
+   Activity, so `EmptyFragmentActivity` failed in `onAttach`. `ActivityComponentHost` inverts it;
+   `MainActivity` implements it; verified on device.
+2. **AppCompat — not invertible.** Six of ten fragments call
+   `(activity as AppCompatActivity).setSupportActionBar`. That is AppCompat's own API, so the host
+   genuinely must be an `AppCompatActivity`, and `fragment-testing` 1.8.9 offers **no overload
+   accepting a host class** — its four `launch`/`launchInContainer` signatures take only a fragment
+   class, args, a theme and a factory.
+
+The remaining route is a **debug-manifest `AppCompatActivity` host** plus `ActivityScenario`. That
+ships an activity in the debug build, which is more visible than a proof of concept should decide
+unattended. **The 9,000 Fragment instructions therefore remain untouched**, and they are still the
+largest single body.
+
+### Two things needing the owner
+
+- **A download was never exercised** after the WorkManager change (cu-179). That is the risky half
+  — cu-81, cu-85 and cu-153 are all downloads failing quietly — and it needs a real book fetched to
+  a real volume.
+- **cu-174, cu-175, cu-176, cu-179 are all `In Review`**, each because a screen changed or a
+  criterion needs eyes.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
