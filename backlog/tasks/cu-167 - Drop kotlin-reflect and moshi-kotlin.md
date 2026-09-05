@@ -1,7 +1,7 @@
 ---
 id: cu-167
 title: 'Drop kotlin-reflect and moshi-kotlin from the production APK'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-05'
 updated_date: '2026-09-05'
@@ -39,10 +39,27 @@ Switching drops both `moshi-kotlin` and the explicit `kotlin-reflect` pin, remov
 `kotlin.reflect.jvm.internal` classes that the ProGuard rules already comment on. Tests that need
 reflection take it as `testImplementation`.
 
+## Implementation Notes
+
+The catalogue's `moshi` alias pointed at `moshi-kotlin` — the *reflection* artifact — whose POM
+hard-depends on `kotlin-reflect`. Production is codegen-only since cu-62, so the alias now points at
+plain `com.squareup.moshi:moshi`, and `moshi-kotlin` plus `kotlin-reflect` moved to
+`testImplementation` under a new `moshi-kotlin-reflect` alias (tests do genuinely build adapters for
+types with no `@JsonClass`).
+
+**Measured, not assumed.** `:app:dependencies --configuration releaseRuntimeClasspath` reported
+`kotlin-reflect` three times before and **zero** after. The release APK went from 7,016,700 to
+6,792,992 bytes — **218 KB smaller**. `./test_release_build.sh` passes its R8 assertions: all
+reflection-dependent classes survive in the dex. (Its step 3 install failed on `more than one
+device/emulator`, which is environmental; the build and dex checks are the parts that matter here.)
+
+The false comment claiming Moshi ran in reflection mode is gone, along with a second stale line
+("Moshi will use reflection-based adapters instead") directly under the codegen declaration.
+
 ## Acceptance Criteria
 
-- [ ] Catalogue declares `com.squareup.moshi:moshi`, not `moshi-kotlin`
-- [ ] The explicit `kotlin-reflect` production dependency is gone; tests declare it themselves
-- [ ] The false comment at `app/build.gradle.kts:199-201` is corrected
-- [ ] `./test_release_build.sh` passes — Moshi adapters are reflection-adjacent and R8-sensitive
-- [ ] APK/dex size change recorded in the closing notes
+- [x] Catalogue declares `com.squareup.moshi:moshi`, not `moshi-kotlin`
+- [x] The explicit `kotlin-reflect` production dependency is gone; tests declare it themselves
+- [x] The false comment at `app/build.gradle.kts:199-201` is corrected
+- [x] `./test_release_build.sh` passes — Moshi adapters are reflection-adjacent and R8-sensitive
+- [x] APK/dex size change recorded in the closing notes

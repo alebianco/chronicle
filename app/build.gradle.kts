@@ -178,7 +178,6 @@ dependencies {
   // Codegen, not reflection (cu-62). The old KAPT processor was dropped in cu-8; this is the KSP
   // one, which is what `@JsonClass(generateAdapter = true)` has been asking for ever since.
   ksp(libs.moshi.codegen)
-  // Moshi will use reflection-based adapters instead
 
   implementation(libs.coil)
   implementation(libs.coil.network.okhttp)
@@ -196,9 +195,6 @@ dependencies {
   // that compat bridge, so the release that drops it would break playback wholesale
   // — the same failure mode as cu-60 (lifecycle) and cu-65 (localbroadcastmanager).
   implementation(libs.media)
-  // Moshi runs in reflection mode (no codegen), so all @JsonClass models need this
-  // at runtime; it was resolving to 1.8.22 under a 2.2.10 compiler.
-  implementation(libs.kotlin.reflect)
   implementation(libs.media3.exoplayer)
   implementation(libs.media3.ui)
   implementation(libs.media3.session)
@@ -225,6 +221,10 @@ dependencies {
   testImplementation(libs.retrofit)
   testImplementation(libs.retrofit.converter)
   testImplementation(libs.moshi)
+  // Reflection, for tests that build adapters for types with no @JsonClass. Production is
+  // codegen-only (cu-62), so `moshi-kotlin` and the kotlin-reflect it drags in stay out of the APK.
+  testImplementation(libs.moshi.kotlin.reflect)
+  testImplementation(libs.kotlin.reflect)
   testImplementation(libs.robolectric)
   testImplementation(libs.androidx.test.core)
   testImplementation(libs.work.testing)

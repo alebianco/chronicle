@@ -62,7 +62,9 @@ coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp"
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 dagger = { group = "com.google.dagger", name = "dagger", version.ref = "dagger" }
 dagger-compiler = { group = "com.google.dagger", name = "dagger-compiler", version.ref = "dagger" }
-moshi = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshi" }
+moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
+# Reflection-based adapters. Tests only — production is codegen (cu-62).
+moshi-kotlin-reflect = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshi" }
 moshi-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version.ref = "moshi" }
 media = { group = "androidx.media", name = "media", version.ref = "media" }
 kotlin-reflect = { group = "org.jetbrains.kotlin", name = "kotlin-reflect", version.ref = "kotlinReflect" }
