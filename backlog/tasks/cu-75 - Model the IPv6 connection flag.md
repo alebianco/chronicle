@@ -1,8 +1,9 @@
 ---
 id: cu-75
 title: Model the IPv6 connection flag
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-08-31'
 labels: [R2, architecture]
 dependencies: [cu-11]
@@ -80,9 +81,37 @@ To re-check: launch a debug build against the real server and
 
 ## Acceptance Criteria
 
-- [ ] `Connection` carries `iPv6`, parsed from the real response shape (check the JSON key
-      casing against a live capture — the XML attribute is `IPv6`, and Moshi is
-      case-sensitive)
-- [ ] A concrete failing network documented before any preference logic is written
-- [ ] Preference implemented as an intra-tier filter unless the evidence says otherwise
-- [ ] `ConnectionChooserTest` extended; existing tier tests unchanged
+- [x] `Connection` carries `iPv6`, parsed from the real response shape, with `@Json(name = "IPv6")`
+      and `ConnectionIPv6Test` pinning the casing (sabotage-verified)
+- [x] ~~A concrete failing network documented before any preference logic is written~~ — none exists; **no preference logic was written**, which is the point
+- [x] ~~Preference implemented as an intra-tier filter~~ — retired: the evidence says *do not implement it*, see notes
+- [x] `ConnectionChooserTest` **deliberately unchanged** — no tier or filter behaviour changed, so there is nothing there to extend
+
+
+## Implementation Notes — the flag is parsed, and nothing acts on it
+
+**Half this task was to build something, and the evidence says not to.** Closing it as Done means:
+the modelling gap is closed, and the preference logic is recorded as a deliberate non-decision
+rather than left as an open invitation to guess.
+
+**Done.** `Connection.iPv6`, with `@Json(name = "IPv6")` — the wire key is `IPv6`, Moshi is
+case-sensitive, and the inferred `iPv6` would have matched nothing while every test stayed green,
+because the `resources.json` fixture omits the key entirely. That is precisely the `plexGenres`
+defect from cu-24, so `ConnectionIPv6Test` pins the casing and **sabotage-verifies it**: removing
+the annotation fails two of its four cases.
+
+**Deliberately not done.** No tier, no filter, no ordering change. `ConnectionChooser` is untouched
+and `ConnectionChooserTest` is unchanged — there is nothing to extend, because nothing behaves
+differently. The research above checked the one trigger that could be checked and found the
+household's server advertises **three connections, all `"IPv6": false`, none an IPv6 literal**. On
+the only network this app is judged against (principle 5), a preference rule would be pure
+guesswork, and a wrong guess degrades the networks that already work — the same reasoning cu-11
+used when it deferred this.
+
+**What carrying the flag buys.** It shows up in a log the moment a connection problem *is* reported,
+which is what the other two triggers would need as evidence. Before, the field was discarded at
+parse time, so a future investigation would have started by adding it.
+
+**If it ever needs revisiting**, the two untested triggers stand as written in the draft, and both
+need a *failing* network that cannot be manufactured honestly. The re-check is two lines and is in
+the research section above.

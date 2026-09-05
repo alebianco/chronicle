@@ -3,8 +3,8 @@ io/github/mattpvaughn/chronicle/data/local 61.29
 io/github/mattpvaughn/chronicle/data/model 88.36
 io/github/mattpvaughn/chronicle/data/sources 86.40
 io/github/mattpvaughn/chronicle/data/sources/local 73.02
-io/github/mattpvaughn/chronicle/data/sources/plex 54.90
-io/github/mattpvaughn/chronicle/data/sources/plex/model 54.25
+io/github/mattpvaughn/chronicle/data/sources/plex 54.91
+io/github/mattpvaughn/chronicle/data/sources/plex/model 55.52
 io/github/mattpvaughn/chronicle/debug 2.12
 io/github/mattpvaughn/chronicle/features/bookdetails 27.89
 io/github/mattpvaughn/chronicle/features/browse 0.00
