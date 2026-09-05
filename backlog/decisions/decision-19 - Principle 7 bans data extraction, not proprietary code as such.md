@@ -70,6 +70,13 @@ The replacement text, which supersedes the rule 7 quoted above:
 > Anything admitted this way is recorded as an ADR naming which capability and how the four
 > conditions are met.
 
+> **Amended 2026-09-05 by [[decision-20]].** The clause above bans crash reporting and anything
+> needing a cloud account outright. That was too broad in one direction: it drew a single line
+> (*does data leave?*) where two are needed (*does data leave, **and did the user ask?***).
+> decision-20 adds a second admission route for **data the user explicitly opts into sending** —
+> consent-gated crash reporting and settings cloud sync — while making the ads/analytics/telemetry
+> ban *stronger*, since those are barred regardless of consent. Read the two together.
+
 Google Cast (cu-168) qualifies: media flows from the household's own Plex server to a receiver on
 the household's own network; a de-Googled device shows no Cast button and is otherwise unaffected;
 every Cast SDK reference is confined to `CastPlayerProvider`; and no open protocol reaches a
