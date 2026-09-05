@@ -172,12 +172,23 @@ This file is the **single source of truth for agents and humans**. `.github/copi
    itself, which *is* the DI root. A framework-inflated `View`, a binding adapter or an extension
    function has no constructor either — pass what it needs at the call site, as `SettingsList`,
    `bindImageRounded` and `Player.skipToNext` now do.
-6. User-facing text in `res/values/strings.xml`, always.
-7. Room schema change ⇒ bump DB version + write a migration in the same PR.
-8. Navigation through `Navigator.kt`; data via Bundles/args.
-9. Playback via `MediaServiceConnection`/`MediaPlayerService` — never touch ExoPlayer from UI.
-10. Network endpoints in `PlexService.kt`; errors handled in repositories; log with Timber (`Timber.e(e, "context")`).
-11. ktlint style; no wildcard imports; new libraries needing keep rules ⇒ update `app/proguard-rules.pro` **and** run `./test_release_build.sh`.
+6. **The framework-free core is a fence, not an accident** (cu-177). **87 files** carry no
+   `android.*`/`androidx.*` import beyond Room annotations — the decision logic: `SleepTimerState`,
+   `ChapterSeekTarget`, `CacheReconciliation`, `IngestionPlan`, `BookSearch`,
+   `SeriesIndexPatterns`, all five repositories, `DurationFormat`. They sit at **80.8% coverage
+   against 35.7% for everything else**, because a file testable without a framework gets tested.
+   `FrameworkFreeCoreTest` holds the list and **fails the build** when one grows a framework
+   import. Room annotations are permitted (they are compile-time metadata a pure module keeps).
+   The list is committed rather than computed, so a newly-impure file fails instead of silently
+   dropping out. When a listed file needs the framework, **move the framework-facing part out** —
+   cu-176 did exactly that for `toMediaItem`/`toAlbumMediaMetadata`/`toMediaMetadata`, which are a
+   presentation concern of `features/player`, not properties of a book.
+7. User-facing text in `res/values/strings.xml`, always.
+8. Room schema change ⇒ bump DB version + write a migration in the same PR.
+9. Navigation through `Navigator.kt`; data via Bundles/args.
+10. Playback via `MediaServiceConnection`/`MediaPlayerService` — never touch ExoPlayer from UI.
+11. Network endpoints in `PlexService.kt`; errors handled in repositories; log with Timber (`Timber.e(e, "context")`).
+12. ktlint style; no wildcard imports; new libraries needing keep rules ⇒ update `app/proguard-rules.pro` **and** run `./test_release_build.sh`.
 
 ## Gotchas (things that waste agent runs)
 
