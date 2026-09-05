@@ -148,6 +148,9 @@ dependencies {
   implementation(libs.androidx.activity)
   implementation(libs.androidx.core)
   implementation(libs.androidx.fragment)
+  // FragmentScenario needs its empty host activity in the *debug* manifest (cu-178), so this is
+  // debugImplementation rather than testImplementation — Robolectric runs against the debug variant.
+  debugImplementation(libs.androidx.fragment.testing)
   implementation(libs.androidx.recyclerview)
   implementation(libs.androidx.constraintlayout)
   implementation(libs.androidx.transition)

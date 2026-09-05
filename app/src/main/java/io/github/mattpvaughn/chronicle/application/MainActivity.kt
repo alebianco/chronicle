@@ -45,6 +45,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.injection.components.ActivityComponent
+import io.github.mattpvaughn.chronicle.injection.components.ActivityComponentHost
 import io.github.mattpvaughn.chronicle.injection.components.DaggerActivityComponent
 import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
@@ -61,7 +62,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @ActivityScope
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), ActivityComponentHost {
   @Inject
   lateinit var localBroadcastManager: LocalBroadcastManager
 
@@ -109,7 +110,7 @@ class MainActivity : AppCompatActivity() {
   @Inject
   lateinit var accountAuthState: AccountAuthState
 
-  var activityComponent: ActivityComponent? = null
+  override var activityComponent: ActivityComponent? = null
 
   override fun onDestroy() {
     activityComponent = null

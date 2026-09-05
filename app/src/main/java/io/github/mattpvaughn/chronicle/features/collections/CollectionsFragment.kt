@@ -17,7 +17,6 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView.Adapter.StateRestorationPolicy
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.BOOK_COVER_STYLE_SQUARE
 import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
@@ -26,6 +25,7 @@ import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionsBinding
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
+import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
@@ -259,7 +259,11 @@ class CollectionsFragment : Fragment() {
   }
 
   override fun onAttach(context: Context) {
-    (activity as MainActivity).activityComponent!!.inject(this)
+    // Asks the host for a graph rather than casting to `MainActivity` (cu-178). The cast named a
+    // concrete Activity, so this Fragment could not be hosted by anything else — including
+    // `FragmentScenario`'s empty activity, which failed in `onAttach` before a line of the screen
+    // ran. `error` rather than a silent skip: in production a missing graph is a wiring bug.
+    check(injectFromHost { it.inject(this) }) { "CollectionsFragment needs an ActivityComponentHost" }
     super.onAttach(context)
     Timber.i("Reattached!")
   }
