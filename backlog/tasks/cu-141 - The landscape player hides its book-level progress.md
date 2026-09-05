@@ -61,6 +61,46 @@ dropped, and are the way to tell them apart.
 So landscape is missing **two** of the four readout lines, both for layout reasons, both needing
 the same landscape constraint set.
 
+## Device findings (2026-09-05) — confirmed, and three failed fixes
+
+Reproduced on the 800dp tablet against the real ANTARES library, portrait *and* landscape, with
+screenshots. The task's diagnosis is **correct**: in landscape the player shows `3:43 left in
+chapter` and nothing else; portrait shows `6h 11m left in book` in the same build, so the data and
+the render path are fine and this is purely the constraint set.
+
+**Three approaches were tried and all three failed. Recording them so the next attempt does not
+repeat them:**
+
+1. **Re-anchor `progress`/`progressPercentage` to the gutters + a `Barrier` over
+   `details_artwork`.** The barrier resolved to the spacer rather than the artwork, and the result
+   **regressed portrait** — the book line disappeared there too. Caught only by screenshotting
+   portrait on unmodified code afterwards; the landscape screenshot alone looked like progress.
+2. **`currently_playing_artwork_max_size` = `0dp` in `values-land`.** Crashes at inflation:
+   `InflateException` on the `ImageView`, because the view carries
+   `layout_constraintDimensionRatio="1:1"` over a `wrap_content` height and a zero max makes that
+   degenerate.
+3. **Artwork `INVISIBLE` instead of `GONE` via the integer.** Crashes with
+   `ArrayIndexOutOfBoundsException: length=3; index=4`. **`android:visibility` in XML is an enum
+   ordinal — 0 visible, 1 invisible, 2 gone — not `View.INVISIBLE`, which is 4.** Using 1 inflates
+   fine, and with the artwork capped small it *did* make `progressPercentage` appear in landscape
+   at the right gutter. But `progress` stayed empty, because it also carries
+   `layout_constraintEnd_toStartOf="@+id/progressPercentage"` with no left anchor, so it collapses
+   to zero width once the artwork is not there to give it one.
+
+### What the next attempt should know
+
+- **A `uiautomator` dump omits an empty `TextView` entirely**, so "absent from the dump" and
+  "rendering blank" look identical. Screenshot, and check *both* orientations against unmodified
+  code before believing a fix.
+- The real shape of the problem is that `progress` has **two competing horizontal constraints**
+  (`End_toStartOf` the percentage, `Right_toRightOf` the artwork) and a vertical one to the
+  artwork. All three need a landscape answer together; fixing one at a time produces a view that
+  is present but zero-sized, which reads as "still broken".
+- A full `layout-land` copy is 385 lines and would drift. Worth considering a `<merge>`/`<include>`
+  split of just the metadata block instead, so only the differing constraints are duplicated.
+
+**Nothing was committed** — the working tree was restored to the unmodified layout, verified green.
+
 ## Acceptance Criteria
 
 - [ ] The book-level progress line is visible in the landscape player

@@ -1,7 +1,7 @@
 ---
 id: cu-164
 title: The library tab ANRs on a loaded device
-status: To Do
+status: In Review
 assignee: []
 labels:
   - R2
@@ -53,12 +53,64 @@ Do not treat it as a confirmed defect until that is done.
 - **Profile, do not read** — the cu-110 lesson. `am profile start --sampling` named that cause at
   once where four rounds of inspection produced plausible wrong answers.
 
+## Findings (2026-09-05, cool idle device)
+
+Device state measured before testing, not assumed: **35.6 °C** CPU/GPU and **96.7% idle** over a
+2-second `/proc/stat` sample, against 58.5 °C when the ANR was first seen. (`uptime` reports a load
+average of ~24 on this GSI and is simply wrong — `top` showed 734% of 800% idle.)
+
+**It reproduced, so it is not a thermal artefact — but the task's description of it is wrong twice.**
+
+1. **It is not the Library tab.** The ANR fires during *launch*, before any tab is touched. Tapping
+   Library afterwards produces no ANR at all: 59 skipped frames, then the full 196-book grid renders
+   correctly (screenshot taken).
+2. **It is not row inflation.** The ANR reason is `Input dispatching timed out (Application does not
+   have a focused window)` — the app had not presented a window yet. The main thread stack is
+   entirely framework toolbar-menu inflation with **no Chronicle frame in it**, and a
+   599k-record `am profile` sample attributes **zero self-time to our own code** on the main thread.
+   The top costs are ConstraintLayout solving (`LinearSystem.addEquality`, `ArrayLinkedVariables.*`).
+
+### The real number
+
+Cold start to first frame, three runs each, `am start -W`:
+
+| build state | TotalTime |
+|---|---|
+| debug, JIT (as installed) | **5.47 s** (5468 / 5465 / 5463) |
+| debug, after `cmd package compile -m speed -f` | **3.33 s** (3329 / 3354 / 3334) |
+
+So **~2.1 s is JIT warmup that a release build would not pay**, and the app is `DEBUGGABLE`, which
+also forces `-Xcheck:jni`. The remaining ~3.3 s is real and is spread evenly rather than sitting in
+one hotspot — timeline from logcat, AOT run:
+
+```
++0.000  process start
++0.534  Fetch2 listener added   (DI graph built)
++1.093  first layout inflation
++1.860  Room opens
++2.595  "Skipped 135 frames"
++2.949  first network call
+```
+
+### What is still unknown
+
+**The release figure.** There is no signing config in this repo (owner-only), so the release APK
+cannot be installed and the user-facing number cannot be measured here. AOT compilation is the
+closest available proxy and it is not the same thing.
+
+### Recommended next step
+
+Not a fix yet — a decision. 3.3 s is slow but there is no single cause to attack, so the work is
+either (a) accept it as the cost of a cold start on this hardware, or (b) a startup task that
+defers `backfillChapterTable`/`updateDownloadedFileState`/network setup behind the first frame. That
+is a scope call, and the honest input to it is that **no Chronicle code appears in the profile**.
+
 ## Acceptance Criteria
 
-- [ ] Reproduced (or not) on a cool, idle device, with the result recorded either way
-- [ ] If it reproduces: the dominant cost named from a profile, not from reading
-- [ ] If it does not: closed as a thermal artefact, with the trace kept here so the next sighting
-      starts from evidence rather than from scratch
+- [x] Reproduced (or not) on a cool, idle device, with the result recorded either way
+- [x] If it reproduces: the dominant cost named from a profile, not from reading
+- [x] ~~If it does not: closed as a thermal artefact~~ — retired: it *does* reproduce cool and idle
+- [ ] Owner decides whether 3.3 s cold start is worth a startup-deferral task, or accepted as-is
 
 ## Related
 

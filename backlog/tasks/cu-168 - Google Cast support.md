@@ -6,10 +6,10 @@ assignee: []
 created_date: '2026-09-05'
 updated_date: '2026-09-05'
 labels:
-  - R4
-  - differentiate
+  - R2
+  - comfort
   - feature
-milestone: m-4
+milestone: m-2
 dependencies: []
 priority: medium
 ordinal: 1000
@@ -17,8 +17,9 @@ ordinal: 1000
 
 ## Description
 
-Owner decision (2026-09-05): **"we'll definitely support casting."** Placed in R4 on the owner's
-call — *"can be done in r4 if we have no space now"*.
+Owner decision (2026-09-05): **"we'll definitely support casting."** Moved to **R2** the same day
+on the owner's follow-up — *"anticipate cu-168 to r2"*. Originally filed in R4 under
+*"can be done in r4 if we have no space now"*.
 
 **No other task depends on this one, and it depends on none.** Both `dependencies:` lists are empty
 and nothing else in the backlog references Cast. Worth stating plainly because an earlier version of
