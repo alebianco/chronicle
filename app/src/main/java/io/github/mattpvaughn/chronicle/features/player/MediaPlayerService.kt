@@ -287,6 +287,9 @@ class MediaPlayerService :
 
     invalidatePlaybackParams()
     observeBookSpeedOverride()
+    // The session's position is chapter-relative for the scrubber (cu-165); progress is stored per
+    // track, so the updater reads the player instead.
+    (progressUpdater as? SimpleProgressUpdater)?.trackPosition = { currentPlayer?.currentPosition ?: 0L }
     progressUpdater.startRegularProgressUpdates()
 
     observeConnectionState()
@@ -481,7 +484,12 @@ class MediaPlayerService :
   private fun buildPlaybackState(player: Player): PlaybackStateCompat {
     val playbackState = mapPlayerState(player)
     val playbackSpeed = player.playbackParameters.speed
-    val position = if (player.playbackState == Player.STATE_IDLE) 0L else player.currentPosition
+    val trackPosition = if (player.playbackState == Player.STATE_IDLE) 0L else player.currentPosition
+    // Auto and the notification scrub against the *chapter*, matching the title they already show
+    // (cu-165). Falls back to the track position when the book has no usable chapter.
+    val position =
+      chapterScrubberWindow(currentlyPlaying.bookPosition.value, currentlyPlaying.chapter.value)
+        ?.positionMillis ?: trackPosition
     val builder =
       PlaybackStateCompat.Builder()
         .setActions(basePlaybackActions())

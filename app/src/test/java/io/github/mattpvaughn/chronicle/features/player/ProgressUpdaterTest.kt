@@ -1,5 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.player
 
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -131,6 +133,77 @@ class ProgressUpdaterTest {
       coVerify(exactly = 1) { bookRepo.setWatched(BOOK_ID) }
     }
 
+  /**
+   * Progress is stored **per track**, and since cu-165 the session's `PlaybackState.position` is
+   * *chapter*-relative so Auto's scrubber matches the chapter title beside it. Reading the session
+   * here would therefore save a chapter offset as a track offset — silently, and worse the further
+   * into a book the listener is.
+   *
+   * The session is seeded with a deliberately different value so a regression to reading it fails
+   * on the number rather than passing by coincidence.
+   */
+  @Test
+  fun `the saved position comes from the track, not the chapter-relative session`() =
+    runTest {
+      val dispatchers = TestDispatcherProvider(testScheduler)
+      val serviceScope = CoroutineScope(SupervisorJob() + dispatchers.io)
+      val updater = updater(serviceScope, dispatchers)
+      updater.trackPosition = { TRACK_FRAME_POSITION }
+      updater.mediaController =
+        mockk(relaxed = true) {
+          every { playbackState } returns
+            PlaybackStateCompat.Builder()
+              .setState(PlaybackStateCompat.STATE_PLAYING, CHAPTER_RELATIVE_POSITION, 1f)
+              .build()
+          every { metadata } returns
+            MediaMetadataCompat.Builder()
+              .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, TRACK_ID)
+              .build()
+        }
+
+      updater.startRegularProgressUpdates()
+      advanceUntilIdle()
+
+      coVerify { trackRepo.updateTrackProgress(TRACK_FRAME_POSITION, TRACK_ID, any()) }
+    }
+
+  /**
+   * Without a track-position source the session remains the fallback, so the updater keeps working
+   * before the service attaches one.
+   */
+  @Test
+  fun `with no track position source the session is still used`() =
+    runTest {
+      val dispatchers = TestDispatcherProvider(testScheduler)
+      val serviceScope = CoroutineScope(SupervisorJob() + dispatchers.io)
+      val updater = updater(serviceScope, dispatchers)
+      updater.mediaController =
+        mockk(relaxed = true) {
+          every { playbackState } returns
+            PlaybackStateCompat.Builder()
+              .setState(PlaybackStateCompat.STATE_PLAYING, CHAPTER_RELATIVE_POSITION, 1f)
+              .build()
+          every { metadata } returns
+            MediaMetadataCompat.Builder()
+              .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, TRACK_ID)
+              .build()
+        }
+
+      updater.startRegularProgressUpdates()
+      advanceUntilIdle()
+
+      // A range, not the exact value: `currentPlayBackPosition` extrapolates from
+      // `elapsedRealtime` while PLAYING, and the tick only runs at all while playing. The point is
+      // that it is the *session's* number and not the track source's, which is far away.
+      coVerify {
+        trackRepo.updateTrackProgress(
+          match { it >= CHAPTER_RELATIVE_POSITION && it < TRACK_FRAME_POSITION },
+          TRACK_ID,
+          any(),
+        )
+      }
+    }
+
   private fun updater(
     serviceScope: CoroutineScope,
     dispatchers: TestDispatcherProvider,
@@ -146,6 +219,12 @@ class ProgressUpdaterTest {
 
   private companion object {
     const val TRACK_ID = "3001"
+
+    /** Deep into a book: the frames differ by a lot, which is where the bug would show. */
+    const val TRACK_FRAME_POSITION = 4_500_000L
+
+    /** What Auto's scrubber sees for the same instant — an offset inside the current chapter. */
+    const val CHAPTER_RELATIVE_POSITION = 120_000L
     const val BOOK_ID = "1001"
     const val PLEX_SOURCE = 1L
   }

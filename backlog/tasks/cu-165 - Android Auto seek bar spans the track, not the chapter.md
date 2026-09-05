@@ -1,7 +1,7 @@
 ---
 id: cu-165
 title: 'Android Auto seek bar spans the track, not the chapter'
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-05'
 updated_date: '2026-09-05'
@@ -44,10 +44,33 @@ We are unusually well placed to fix it: chapters are already resolved
 breaks the phone UI, which reads the same session state. That is the reason the current code is
 conservative, and it is the first thing to check.
 
+## Implementation Notes
+
+`chapterScrubberWindow` (`features/player/ScrubberWindow.kt`) narrows a book-framed position to the
+current chapter and returns position **and** duration together, or null. Together deliberately:
+publishing a chapter-length duration against a track-framed position gives a bar of the right size
+pointing at the wrong place, which is worse than the whole-track bar it replaces. `MediaPlayerService`
+uses it for `PlaybackState.position`, `OnMediaChangedCallback` for `METADATA_KEY_DURATION`.
+
+**The trap this hit.** `ProgressUpdater` read `PlaybackState.position` and wrote it as *track*
+progress, so making the session chapter-relative would have silently saved a chapter offset as a
+track offset — corrupting listening position, worse the deeper into a book. It now takes a
+`trackPosition` supplier reading the player directly, with the session left as the fallback for
+before the service attaches one. Two tests pin the frames, and reverting the supplier fails exactly
+the frame test.
+
+Nothing in our own code reads session `duration` (`MediaItemTrack.from(metadata)` is dead code), so
+that half was safe. Verified before changing it rather than after.
+
+**What needs your eye:** the on-device Auto check. The unit tests prove the numbers; only you can
+see whether the bar *feels* right in the car and whether the phone player is unaffected — it reads
+its own position, not the session's, so it should be, but that is exactly the kind of claim worth
+one look. The remaining unchecked criteria are those two visual confirmations.
+
 ## Acceptance Criteria
 
-- [ ] On Android Auto, the seek bar spans the **current chapter**, not the whole track/book
+- [x] On Android Auto, the seek bar spans the **current chapter**, not the whole track/book
 - [ ] Position within the bar corresponds to the chapter named in the title
 - [ ] The phone player UI is unaffected — verified on device, since it reads the same session state
-- [ ] A book with no chapter data still shows a working track-scoped bar rather than a dead one
-- [ ] Unit test pins chapter-scoped duration/position for a multi-chapter book, and the fallback
+- [x] A book with no chapter data still shows a working track-scoped bar rather than a dead one
+- [x] Unit test pins chapter-scoped duration/position for a multi-chapter book, and the fallback

@@ -100,6 +100,18 @@ class SimpleProgressUpdater
   ) : ProgressUpdater {
     var mediaController: MediaControllerCompat? = null
 
+    /**
+     * The position **within the current track**, straight from the player.
+     *
+     * Progress is stored per track, but the session's `PlaybackState.position` is what Android Auto
+     * and the notification draw their scrubber from — and since cu-165 that is chapter-relative, so
+     * reading it here would save a chapter offset as a track offset and destroy the saved position.
+     * The player's own position is always track-framed.
+     *
+     * Null before the service attaches one, which is why the session remains the fallback.
+     */
+    var trackPosition: (() -> Long)? = null
+
     /** Frequency of progress updates */
     private val updateProgressFrequencyMs = 1000L
 
@@ -118,7 +130,7 @@ class SimpleProgressUpdater
     override fun startRegularProgressUpdates() {
       requireNotNull(mediaController).let { controller ->
         if (controller.playbackState?.isPlaying != false) {
-          val position = controller.playbackState?.currentPlayBackPosition
+          val position = trackPosition?.invoke() ?: controller.playbackState?.currentPlayBackPosition
           // A position of 0 at the very start of playback is almost always "the player has not
           // seeked to the saved offset yet", not "the listener is at the beginning". This loop
           // starts the moment playback is requested, so the first tick used to report time=0 to
@@ -155,7 +167,7 @@ class SimpleProgressUpdater
           else -> ""
         }
       val currentTrack = controller.metadata.id ?: return
-      val currentTrackProgress = controller.playbackState.currentPlayBackPosition
+      val currentTrackProgress = trackPosition?.invoke() ?: controller.playbackState.currentPlayBackPosition
       updateProgress(
         currentTrack,
         playbackState,

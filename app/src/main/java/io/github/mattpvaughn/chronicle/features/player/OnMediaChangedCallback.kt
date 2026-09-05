@@ -138,6 +138,12 @@ class OnMediaChangedCallback
       val builder =
         mediaController.metadata?.let { MediaMetadataCompat.Builder(it) }
           ?: MediaMetadataCompat.Builder()
+      // The duration must describe the same span as `PlaybackState.position`, which is
+      // chapter-relative since cu-165. Left at the track's, the bar would be the right shape and
+      // point at the wrong place — worse than the whole-track bar it replaced.
+      val chapterDuration =
+        chapterScrubberWindow(currentlyPlaying.bookPosition.value, chapter)?.durationMillis
+
       mediaSession.setMetadata(
         builder.apply {
           // The id must keep naming the *track*: see above.
@@ -145,6 +151,7 @@ class OnMediaChangedCallback
           this.title = title
           displayTitle = title
           displaySubtitle = book.title
+          chapterDuration?.let { duration = it }
         }.build(),
       )
     }

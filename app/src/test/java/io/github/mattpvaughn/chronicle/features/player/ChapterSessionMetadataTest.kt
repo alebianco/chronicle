@@ -9,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
@@ -169,6 +170,45 @@ class ChapterSessionMetadataTest {
     return captured.last()
   }
 
+  /**
+   * The scrubber must span the **chapter**, not the track (cu-165).
+   *
+   * `PlaybackState.position` is chapter-relative, so a track-length duration here would draw a bar
+   * of the wrong size with the marker in the wrong place — the title says "Chapter 4" while the bar
+   * says the listener is 8 minutes into a 12-hour file. It is the most-reported Android Auto
+   * complaint against both major competitors.
+   */
+  @Test
+  fun `the published duration is the chapter's, not the track's`() {
+    val session = spyk(sessionPlaying())
+    val chapter =
+      Chapter(
+        title = "Chapter 4",
+        bookStartTimeOffset = BookOffset(1_200_000L),
+        bookEndTimeOffset = BookOffset(1_800_000L),
+      )
+    val callback = callbackFor(session, chapter = chapter)
+
+    callback.onChapterChange(chapter)
+
+    assertEquals(600_000L, publishedMetadata(session).duration)
+  }
+
+  /**
+   * A book with no chapter data must keep whatever the track path published, so its bar still
+   * works. `Chapter()` has a zero-length span, which is also the shape of the "ghost chapters with
+   * 0 length" the Epilogue fork had to fix.
+   */
+  @Test
+  fun `a chapter with no span leaves the duration alone`() {
+    val session = spyk(sessionPlaying())
+    val callback = callbackFor(session, chapter = chapterNamed("Chapter 4"))
+
+    callback.onChapterChange(chapterNamed("Chapter 4"))
+
+    assertEquals(0L, publishedMetadata(session).duration)
+  }
+
   private fun chapterNamed(title: String) = Chapter(title = title)
 
   private fun sessionPlaying(): MediaSessionCompat =
@@ -197,6 +237,10 @@ class ChapterSessionMetadataTest {
         mockk(relaxed = true) {
           every { this@mockk.chapter } returns MutableStateFlow(chapter)
           every { book } returns MutableStateFlow(bookForTest)
+          // Stubbed because a relaxed mock cannot satisfy a `StateFlow` return: cu-165 reads this
+          // to scope the published duration to the chapter, and an unstubbed one throws
+          // ClassCastException inside the callback.
+          every { bookPosition } returns MutableStateFlow(chapter.bookStartTimeOffset)
           every { track } returns
             MutableStateFlow(
               io.github.mattpvaughn.chronicle.data.model.EMPTY_TRACK.copy(id = trackId),
