@@ -1,11 +1,13 @@
 package io.github.mattpvaughn.chronicle.features.login
 
 import androidx.lifecycle.*
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
+import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
@@ -16,6 +18,10 @@ import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import io.github.mattpvaughn.chronicle.util.combineDistinct
 import io.github.mattpvaughn.chronicle.util.setEvent
+import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserItemListener
+import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState
+import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
+import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +42,7 @@ class ChooseLibraryViewModel
     private val bookRepository: IBookRepository,
     private val trackRepository: ITrackRepository,
     private val collectionsRepository: CollectionsRepository,
+    private val cachedFileManager: ICachedFileManager,
   ) : ViewModel() {
     class Factory
       @Inject
@@ -47,6 +54,7 @@ class ChooseLibraryViewModel
         private val bookRepository: IBookRepository,
         private val trackRepository: ITrackRepository,
         private val collectionsRepository: CollectionsRepository,
+        private val cachedFileManager: ICachedFileManager,
       ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -59,6 +67,7 @@ class ChooseLibraryViewModel
               bookRepository,
               trackRepository,
               collectionsRepository,
+              cachedFileManager,
             ) as T
           }
           throw IllegalArgumentException("Unknown ViewHolder class")
@@ -68,6 +77,15 @@ class ChooseLibraryViewModel
     private val _userMessage = MutableStateFlow<Event<String>?>(null)
     val userMessage: StateFlow<Event<String>?>
       get() = _userMessage
+
+    private val _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+    val bottomChooserState: StateFlow<BottomChooserState>
+      get() = _bottomChooserState
+
+    /** Dismissal from the sheet itself, e.g. a tap outside it. */
+    fun setBottomSheetVisibility(shouldShow: Boolean) {
+      _bottomChooserState.value = _bottomChooserState.value.copy(shouldShow = shouldShow)
+    }
 
     private val _libraries = MutableStateFlow<List<PlexLibrary>>(emptyList())
     val libraries: StateFlow<List<PlexLibrary>>
@@ -200,9 +218,13 @@ class ChooseLibraryViewModel
      * next refresh pruned them the app showed a **union of two libraries**, and a download
      * belonging to a book no longer in the catalogue was reclaimed later with no warning (cu-126).
      *
-     * Downloaded *files* are deliberately left alone here — see the task notes. Deleting a
-     * multi-gigabyte download without asking is worse than leaving it to be reclaimed, and the
-     * prompt that Settings shows needs UI this screen does not have.
+     * Downloaded *files* are now asked about rather than silently reclaimed (cu-130), reusing
+     * Settings' wording so the same decision reads identically wherever it is met.
+     *
+     * **`replacedDifferentLibrary` is the only gate, and it already excludes both cases that must
+     * not prompt**: a first-ever choice (`previous == null`, so no download can exist yet) and a
+     * failed re-authentication (the library is unchanged, so the ids match). A second "was this a
+     * re-auth?" signal would be one more thing to keep in agreement with this one — see cu-130.
      */
     fun chooseLibrary(library: PlexLibrary) {
       val replacedDifferentLibrary = plexLoginRepo.chooseLibrary(library)
@@ -211,9 +233,46 @@ class ChooseLibraryViewModel
       }
       Timber.i("Library changed; clearing the previous library's cached catalogue")
       viewModelScope.launch {
-        bookRepository.clear()
-        trackRepository.clear()
-        collectionsRepository.clear()
+        clearCatalogue()
+        // Nothing downloaded means nothing to ask about — the same short-circuit Settings uses.
+        if (!cachedFileManager.hasUserCachedTracks()) {
+          return@launch
+        }
+        promptAboutDownloads()
       }
+    }
+
+    private suspend fun clearCatalogue() {
+      bookRepository.clear()
+      trackRepository.clear()
+      collectionsRepository.clear()
+    }
+
+    /**
+     * Asks whether to keep the previous library's downloads.
+     *
+     * The catalogue is already cleared by this point, so the files are orphans either way: keeping
+     * them means they stay on disk until the user removes them, and `CachedFileManager`'s orphan
+     * pass would otherwise have deleted them silently at some later launch. That silence is what
+     * cu-130 exists to remove.
+     */
+    private fun promptAboutDownloads() {
+      _bottomChooserState.value =
+        BottomChooserState(
+          title = FormattableString.from(R.string.prompt_clear_downloads_allow_retain),
+          options = listOf(FormattableString.yes, FormattableString.no),
+          listener =
+            object : BottomChooserItemListener() {
+              override fun onItemClicked(formattableString: FormattableString) {
+                check(formattableString is FormattableString.ResourceString)
+                // "Yes, keep them" is the do-nothing branch.
+                if (formattableString.stringRes != R.string.yes) {
+                  viewModelScope.launch { cachedFileManager.uncacheAllInLibrary() }
+                }
+                _bottomChooserState.value = EMPTY_BOTTOM_CHOOSER
+              }
+            },
+          shouldShow = true,
+        )
     }
   }

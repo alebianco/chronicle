@@ -19,6 +19,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseLibraryBinding
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
+import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -74,6 +75,12 @@ class ChooseLibraryFragment : Fragment() {
 
     binding.libraryList.adapter = libraryAdapter
     binding.refresh.setOnClickListener { viewModel.refresh() }
+
+    // Asks about the previous library's downloads on a genuine library change (cu-130). Reuses the
+    // shared renderer so the sheet looks and behaves exactly as it does in Settings.
+    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->
+      setBottomChooserState(binding.bottomSheetChooser, state)
+    }
 
     // Was three `app:loadingStatus` bindings in XML, one per view type.
     viewLifecycleOwner.collectWhileStarted(viewModel.loadingStatus) { status ->

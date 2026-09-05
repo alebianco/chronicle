@@ -1,8 +1,9 @@
 ---
 id: cu-130
 title: Ask about downloads when switching library at login
-status: To Do
-assignee: []
+status: In Review
+assignee:
+  - '@claude'
 created_date: '2026-09-03'
 labels: [R2, ux, downloads]
 dependencies: [cu-126]
@@ -80,14 +81,43 @@ actually happens, rather than at each screen that can lead there.
 
 ## Acceptance Criteria
 
-- [ ] A library switch never deletes downloaded files without the user having been asked, from any
+- [x] A library switch never deletes downloaded files without the user having been asked, from any
       entry point
 - [x] ~~Or: the decision is recorded that onboarding deliberately does not ask~~ — not taken; it prompts, gated on `replacedDifferentLibrary`
-- [ ] The wording matches Settings, wherever the question is asked
-- [ ] Test coverage for the chosen behaviour
+- [x] The wording matches Settings — the same `@string/prompt_clear_downloads_allow_retain`
+- [x] Test coverage for the chosen behaviour — `LibrarySwitchDownloadPromptTest`, 6 cases, gate sabotage-verified
+- [ ] Seen on device: the sheet appears over the picker and reads correctly
 
 ## Related
 
 - [[cu-126]] — fixed the catalogue half; this is the consent half it deferred
 - [[cu-124]] — a failed re-auth can drop a user into this picker without intending a switch
 - [[cu-85]] — the "do not silently un-cache" instinct
+
+
+## Implementation Notes
+
+The prompt lives in `ChooseLibraryViewModel.chooseLibrary`, gated on cu-126's existing
+`replacedDifferentLibrary` — **no second signal was added**, because that flag is already false for
+both cases that must stay silent (first-ever choice; re-auth into the same library). A `Settings`
+short-circuit is reused too: nothing downloaded means no question.
+
+- `onboarding_plex_choose_library.xml` gains a `BottomSheetChooser` as its last child, matching
+  `fragment_settings.xml` including the `1dp` elevation.
+- `ChooseLibraryFragment` renders it through the shared `setBottomChooserState`, so the sheet is
+  identical to Settings' rather than a second implementation.
+- "Yes, keep them" is the do-nothing branch; "No" calls `uncacheAllInLibrary()`.
+- `LibraryPickerEmptyReasonTest` needed one more `mockk` for the new constructor parameter.
+
+**Sabotage-verified**: forcing the gate open makes *"re-authenticating into the same library never
+asks"* fail, so the test cannot pass vacuously.
+
+Note the catalogue is cleared before the question is asked, so the files are orphans either way —
+keeping them means they stay on disk until the user removes them, rather than being deleted silently
+by `CachedFileManager`'s orphan pass at some later launch. That silence is what this removes.
+
+## What needs your eye
+
+The sheet **has not been seen on a device**. It is a new piece of UI on the onboarding picker, and
+`BottomSheetChooser` was only ever hosted by `fragment_settings.xml` before — worth one look that it
+sits correctly over the library list rather than under it.

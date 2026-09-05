@@ -53,6 +53,7 @@ class LibraryPickerEmptyReasonTest {
       mockk(relaxed = true),
       mockk(relaxed = true),
       mockk(relaxed = true),
+      mockk(relaxed = true),
     )
 
   private fun serviceReturning(directories: List<Any>) =
