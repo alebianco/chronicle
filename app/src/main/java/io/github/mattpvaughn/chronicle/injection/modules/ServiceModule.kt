@@ -13,10 +13,12 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.MediaSessionCompat.*
 import androidx.core.app.NotificationManagerCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import dagger.Module
 import dagger.Provides
 import io.github.mattpvaughn.chronicle.BuildConfig
@@ -29,6 +31,7 @@ import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_BACK_BUFFER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_MAX_BUFFER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_MIN_BUFFER_DURATION_MILLIS
+import io.github.mattpvaughn.chronicle.features.player.artworkFreeExtractorsFactory
 import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import io.github.mattpvaughn.chronicle.util.PackageValidator
 import kotlinx.coroutines.CompletableJob
@@ -55,11 +58,15 @@ class ServiceModule(private val service: MediaPlayerService) {
 
   @Provides
   @ServiceScope
+  // DefaultMediaSourceFactory and the extractor flags it carries are Media3 @UnstableApi, the same
+  // opt-in AudiobookRenderersFactory already takes.
+  @UnstableApi
   fun exoPlayer(): ExoPlayer =
     // AudiobookRenderersFactory retunes silence skipping for narration: ExoPlayer's defaults
     // collapse pauses shorter than the gaps between ordinary words (cu-88).
     ExoPlayer.Builder(service)
       .setRenderersFactory(AudiobookRenderersFactory(service))
+      .setMediaSourceFactory(DefaultMediaSourceFactory(service, artworkFreeExtractorsFactory()))
       .setLoadControl(
         // increase buffer size across the board as ExoPlayer defaults are set for video
         DefaultLoadControl.Builder().setBackBuffer(EXOPLAYER_BACK_BUFFER_DURATION_MILLIS, true)
