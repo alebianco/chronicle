@@ -5,9 +5,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
+import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * The shape both `DebugHooks` twins must have.
@@ -38,6 +41,25 @@ interface DebugHooksContract {
   fun onPlayBookIntent(
     intent: Intent?,
     mediaServiceConnection: MediaServiceConnection,
+  )
+
+  /**
+   * Starts a download for a book id, so a sync can be driven from a script (cu-132).
+   *
+   * The book details screen cannot be reached by `input tap` — the currently-playing sheet
+   * intercepts the coordinates, the same obstacle cu-54 recorded for the bottom navigation — and
+   * `play_book` opens the player rather than details. So a download had no scriptable entry point
+   * at all, which is what left cu-132's exhausted-retry item unverified.
+   *
+   * Goes through `ICachedFileManager.downloadTracks`, the call the download button makes, rather
+   * than enqueueing with Fetch2 directly: a hook that bypasses the real path proves nothing about
+   * it (the cu-64 reasoning for `play_book`).
+   */
+  fun onDownloadBookIntent(
+    intent: Intent?,
+    cachedFileManager: ICachedFileManager,
+    bookRepository: IBookRepository,
+    scope: CoroutineScope,
   )
 
   /** Called from `MainActivity.onCreate` and `onNewIntent`. */

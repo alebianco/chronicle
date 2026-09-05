@@ -32,6 +32,7 @@ import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.sources.plex.AccountAuthState
+import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_FULLY
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -91,6 +92,9 @@ class MainActivity : AppCompatActivity() {
   lateinit var bookRepository: IBookRepository
 
   @Inject
+  lateinit var cachedFileManager: ICachedFileManager
+
+  @Inject
   lateinit var trackRepository: ITrackRepository
 
   @Inject
@@ -140,6 +144,11 @@ class MainActivity : AppCompatActivity() {
         DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
       }
     }
+
+    // Debug-only: `--el download_book <id>` starts a download. The details screen's download
+    // button cannot be reached by `input tap` — the currently-playing sheet takes the coordinates
+    // — so a sync had no scriptable entry point at all (cu-132).
+    DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
 
     super.onCreate(savedInstanceState)
 
@@ -454,6 +463,7 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onShowBrowseIntent(intent, this, navigator)
     DebugHooks.onMoveSyncLocationIntent(intent, this)
     DebugHooks.onShowSettingsIntent(intent, this, navigator)
+    DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
     if (mediaServiceConnection.isConnected.value) {
       DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
     } else {

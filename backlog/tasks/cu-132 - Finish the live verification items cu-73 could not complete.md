@@ -106,9 +106,75 @@ observation, which is why the task exists at all rather than being a set of test
 Not a judgement that the items are unimportant — the method notes below are still the reason to
 keep the file.
 
+## Session 2026-09-05 — item 1 verified, and the method that made it possible
+
+### The `iptables` method works and is safe — verified, not assumed
+
+The tablet was attached over **USB** (`HVA067JE`) alongside its Wi-Fi transport
+(`192.168.1.95:5555`), both resolving to the same `ro.serialno`. With that in place:
+
+```
+adb -s HVA067JE shell "su -c 'iptables -I OUTPUT -d 192.168.1.54 -j DROP'"
+```
+
+`adb` stayed responsive throughout, the rule was confirmed present in the chain, and
+`iptables -D` removed it cleanly. `adb root` is **disabled by system setting** on this GSI, but
+`su -c` works, which is what matters. **This is the method to use** — it leaves the device
+reachable and needs no physical access.
+
+### An unplanned result: cu-11's connection tiering works on a real failure
+
+With the LAN address blackholed, a cold start logged:
+
+```
+ConnectionChooser$choose: Trying 1 LAN connection(s)
+ConnectionChooser$choose: Trying 1 DIRECT connection(s)
+ConnectionChooser$choose: Chose DIRECT connection: https://87-15-17-44...plex.direct:32400
+```
+
+The LAN tier failed, the DIRECT WAN tier was tried after its budget elapsed, and it won. That
+fallback had never been exercised against a genuinely dead route — only unit-tested. Worth
+recording against [[cu-11]].
+
+### Item 1 — **verified.** An exhausted download reports FAILED, and the resume path retries it
+
+The whole chain, on the tablet against the real server, USB attached throughout:
+
+1. All three server routes blackholed (`192.168.1.54` LAN, `87.15.17.44` direct,
+   `172.104.245.120` relay), so no tier can succeed.
+2. A 113-track download started. Fetch2 retried, logging 357 errors.
+3. After ~2 minutes three requests reached **`_status = 6`**. The Fetch2 `Status` ordinals, read
+   out of the bytecode rather than guessed, are
+   `NONE=0, QUEUED=1, DOWNLOADING=2, PAUSED=3, COMPLETED=4, CANCELLED=5, FAILED=6, REMOVED=7`.
+   So an exhausted download **is** `FAILED` — exactly what `ResumePlan.idsToRetry` filters on, and
+   neither `CANCELLED` nor `REMOVED`. That was the one thing this item existed to establish.
+4. Routes restored, app force-stopped and relaunched: FAILED went **6 → 0**, with 17 completed and
+   3 downloading. The resume-on-launch path picked up every one.
+
+**Read the ordinals before trusting a status number.** A first pass here misread `_status = 4` as
+FAILED and concluded downloads were failing when they had *completed* — the values are not in the
+order the class lists its constants.
+
+### The blocker that motivated a debug hook turned out not to exist
+
+`--el download_book <id>` was added (`DebugHooks.onDownloadBookIntent`, going through
+`ICachedFileManager.downloadTracks`, the call the download button makes) on the belief that the
+book details screen could not be reached by `input tap`. **That belief was wrong**, and CLAUDE.md
+carried it as fact. See the correction there: the bottom navigation *is* tappable — the menu is
+inset within the bar (`220–979` inside `0–1200` on this tablet), so a tap at the bar's own centre
+misses, which is what "cannot be driven" was really describing. Home, Library and Settings were
+each reached at x≈347/600/853, y≈1758, and a book row tap from Library opened
+`AudiobookDetailsFragment` with its download button at `24,426-72,474`.
+
+The hook is kept anyway: an id is more robust than coordinates that shift with screen size and
+scroll position, and it is the difference between a script that works on one device and one that
+works anywhere. But it was a convenience, not the unblocking it was written as.
+
 ## Acceptance Criteria
 
-- [ ] Item 1 verified with a method that keeps the device reachable
+- [x] Item 1 verified with a method that keeps the device reachable — `iptables ... -j DROP` on
+      all three server routes, USB adb attached; FAILED confirmed as `Status` ordinal 6 and the
+      resume path took it 6 → 0 on relaunch
 - [ ] Item 2 verified on a device with mobile data, or explicitly dropped as untestable here
 - [ ] Items 3–6 verified against the live library's multi-chapter books
 - [x] [[cu-74]] closed as a duplicate of [[cu-119]]

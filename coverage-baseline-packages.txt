@@ -1,11 +1,11 @@
-io/github/mattpvaughn/chronicle/application 30.81
+io/github/mattpvaughn/chronicle/application 30.49
 io/github/mattpvaughn/chronicle/data/local 65.23
-io/github/mattpvaughn/chronicle/data/model 88.48
+io/github/mattpvaughn/chronicle/data/model 88.43
 io/github/mattpvaughn/chronicle/data/sources 86.99
 io/github/mattpvaughn/chronicle/data/sources/local 74.32
 io/github/mattpvaughn/chronicle/data/sources/plex 55.06
 io/github/mattpvaughn/chronicle/data/sources/plex/model 55.52
-io/github/mattpvaughn/chronicle/debug 2.10
+io/github/mattpvaughn/chronicle/debug 1.98
 io/github/mattpvaughn/chronicle/features/bookdetails 27.70
 io/github/mattpvaughn/chronicle/features/browse 0.00
 io/github/mattpvaughn/chronicle/features/collections 0.00

@@ -101,6 +101,103 @@ repeat them:**
 
 **Nothing was committed** — the working tree was restored to the unmodified layout, verified green.
 
+## Fourth attempt, 2026-09-05 — reverted, but the diagnosis is now measured rather than inferred
+
+**Nothing committed.** The layout was restored to baseline and verified green. What this attempt
+produced is evidence, and it **contradicts this task's stated diagnosis** in one important way.
+
+### The task says portrait is fine. It is not.
+
+Probed with `dumpsys activity top`, which reports real view bounds — the tablet, the real ANTARES
+library, *Ender's Game* playing, player expanded and scrolled to top:
+
+```
+PORTRAIT (baseline, playing)
+  chapter_progress_seekbar   48,329-1152,401     ok
+  progress                  527,276- 672,305     145px wide   ok
+  progressPercentage        684,276- 684,305     ZERO WIDTH   broken
+  chapter_progress           48,401-  48,430     ZERO WIDTH   broken
+  chapter_duration          970,401-1152,430     ok
+
+LANDSCAPE (baseline, playing)
+  chapter_progress_seekbar   48,108-1872,180     ok
+  progress                     0,0-0,0  GONE     broken (visibility integer)
+  progressPercentage         960,0  - 960,29     ZERO WIDTH   broken
+  chapter_progress            48,180-  48,209    ZERO WIDTH   broken
+  chapter_duration          1690,180-1872,209    ok
+```
+
+So there are **three** distinct defects, not one:
+
+1. `progress` is GONE in landscape — the shared `currently_playing_artwork_visibility` integer,
+   which is what this task describes and the only part it gets right.
+2. `progressPercentage` is zero-width in **both** orientations.
+3. `chapter_progress` is zero-width in **both** orientations.
+
+Defects 2 and 3 are **not orientation bugs at all**. The screenshots confirm it: portrait shows
+only `1:20 left in chapter`, exactly like landscape — no percentage, no `Ch N of M`. This task's
+line *"portrait shows `6h 11m left in book` in the same build, so the data and the render path are
+fine and this is purely the constraint set"* is **false**, and cu-19 missed it too.
+
+### Why the fix attempted here failed
+
+Re-anchoring all four to `chapter_progress_seekbar` (present and full-width in both orientations)
+fixed `progress` in landscape — 145px, up from GONE — and did **nothing** for the other two, which
+stayed zero-width through three constraint variants: a packed chain, a two-edge span, and a
+single-edge anchor with bias. A view that measures zero under every constraint arrangement is not
+being squashed by its constraints.
+
+**The text is written correctly. Measured, not assumed.** A `Timber` probe inside
+`renderPlayerText`, run on the tablet with *Ender's Game* playing, printed all four strings
+non-empty on every tick while the views measured zero:
+
+```
+cu141 probe: book='1m left in book' pct='100%' chapterPos='Ch 107 of 107'
+             chapterDur='1:59 left in chapter' progressNull=false hasChapters=true
+```
+
+So `renderPlayerText`, its `isShown` guard and every string producer are **innocent**. This is
+purely a measure/constraint problem, which is what the task always said — the correction is only
+that it is not *only* a landscape one.
+
+**The likely mechanism, and the one thing every failed attempt has in common:** a `wrap_content`
+view with a **single** horizontal constraint resolves to zero width in ConstraintLayout.
+`progressPercentage` has only `Right_toRightOf`; `chapter_progress` has only `Left_toLeftOf`;
+`progress` has *two* (`End_toStartOf` + `Right_toRightOf`) and is the only one of the three that
+ever renders. That explains all four observations at baseline, in both orientations.
+
+**A fourth attempt applied that reading and still failed** — and made portrait worse. Adding the
+second edge to each view is necessary but not sufficient: re-parenting `progress` below
+`chapter_progress` while `chapter_progress` sits below the seekbar creates a vertical cycle, and
+ConstraintLayout resolves a cycle by collapsing members to zero rather than by reporting it. Three
+constraint arrangements were tried (packed chain, two-edge span, single-edge with bias); each fixed
+at most one view and broke another.
+
+**What the fifth attempt needs.** Draw the intended vertical order *first* and make it acyclic
+before touching horizontal edges:
+
+```
+chapter_progress_seekbar
+  ├─ chapter_progress   (left)     ─┐ same row
+  └─ chapter_duration   (right)    ─┘
+     └─ progress        (left)     ─┐ same row
+        progressPercentage (right) ─┘
+           └─ chapter_title
+```
+
+Every view in a row needs both edges named, and no view may anchor its top to something in its own
+row. `chapter_title` currently anchors to `chapter_progress`, which is why moving `progress` around
+keeps disturbing it.
+
+### Method notes that saved time
+
+- `uiautomator dump` omits **every** zero-bounds view, so all three defects are invisible to it —
+  in portrait as well. `dumpsys activity top | grep id/<name>` reports real bounds including
+  zero-size ones, and is the tool for this.
+- The player must be **scrolled to the top** before measuring: the collapsing toolbar leaves the
+  metadata block at negative y otherwise, which reads like a constraint bug and is not one.
+- `settings put system user_rotation 0|1` rotates reliably, but only once an app is foregrounded.
+
 ## Acceptance Criteria
 
 - [ ] The book-level progress line is visible in the landscape player

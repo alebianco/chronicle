@@ -11,6 +11,8 @@ import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
+import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.download.MoveSyncLocationWorker
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
@@ -18,6 +20,8 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.HttpException
@@ -41,6 +45,7 @@ object DebugHooks : DebugHooksContract {
   private const val KEY_MOCK_PLEX = "mock_plex"
   private const val EXTRA_MOCK_PLEX = "mock_plex"
   private const val EXTRA_PLAY_BOOK = "play_book"
+  private const val EXTRA_DOWNLOAD_BOOK = "download_book"
   private const val EXTRA_FAIL_SYNC = "fail_sync"
   private const val KEY_FAIL_SYNC = "fail_sync"
   private const val EXTRA_SHOW_PLAYER = "show_player"
@@ -109,16 +114,7 @@ object DebugHooks : DebugHooksContract {
     intent: Intent?,
     mediaServiceConnection: MediaServiceConnection,
   ) {
-    // Accepts both `--el play_book 123` (the documented form, kept working) and
-    // `--es play_book <id>`, since ids are Strings now and need not be numeric (cu-71).
-    val bookId =
-      intent?.takeIf { it.hasExtra(EXTRA_PLAY_BOOK) }?.let { source ->
-        source.getStringExtra(EXTRA_PLAY_BOOK)
-          ?: source.getLongExtra(EXTRA_PLAY_BOOK, -1L).takeIf { it > 0L }?.toString()
-      }
-    if (bookId.isNullOrEmpty()) {
-      return
-    }
+    val bookId = intent.bookIdExtra(EXTRA_PLAY_BOOK) ?: return
     val controls = mediaServiceConnection.transportControls
     if (controls == null) {
       Timber.w("play_book: media service not connected yet; ignoring")
@@ -153,6 +149,7 @@ object DebugHooks : DebugHooksContract {
    * enqueued before the next process death, which is exactly the kind of flakiness a debug hook
    * must not have.
    */
+
   override fun onFailSyncIntent(intent: Intent?) {
     if (intent == null || !intent.hasExtra(EXTRA_FAIL_SYNC)) {
       return
@@ -167,6 +164,42 @@ object DebugHooks : DebugHooksContract {
       .putBoolean(KEY_FAIL_SYNC, fail)
       .commit()
     Timber.i("Progress-report failure injection is now $fail (persisted)")
+  }
+
+  /**
+   * Starts a download for a book, so a sync is reachable from a script (cu-132).
+   *
+   * ```
+   * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \\
+   *   --el download_book 151180
+   * ```
+   *
+   * The book details screen — the only place with a download button — cannot be reached by
+   * `input tap`: the currently-playing sheet takes the coordinates, the obstacle cu-54 recorded
+   * for the bottom navigation. `play_book` opens the player instead. So an exhausted-retry
+   * download could not be produced from a script at all, which is what left cu-132's first item
+   * the one never run.
+   *
+   * The title is looked up rather than passed: `downloadTracks` uses it for the notification, and
+   * a hook that made one up would put a fictional name in front of the user. A book id that
+   * matches nothing logs and does nothing, rather than downloading something arbitrary.
+   */
+  override fun onDownloadBookIntent(
+    intent: Intent?,
+    cachedFileManager: ICachedFileManager,
+    bookRepository: IBookRepository,
+    scope: CoroutineScope,
+  ) {
+    val bookId = intent.bookIdExtra(EXTRA_DOWNLOAD_BOOK) ?: return
+    scope.launch {
+      val book = bookRepository.getAudiobookAsync(bookId)
+      if (book == null) {
+        Timber.w("Debug hook: no book with id $bookId; not downloading anything")
+        return@launch
+      }
+      Timber.i("Debug hook: downloading '${book.title}' ($bookId)")
+      cachedFileManager.downloadTracks(book.id, book.title)
+    }
   }
 
   /**
@@ -446,4 +479,20 @@ object DebugHooks : DebugHooksContract {
     target: String,
     candidates: List<java.io.File>,
   ): java.io.File? = candidates.firstOrNull { it.absolutePath == target }
+
+  /**
+   * A book id from an intent extra, accepting both `--el <name> 123` and `--es <name> <id>`.
+   *
+   * Both forms because ids are `String` since cu-71 and need not be numeric, while every existing
+   * `adb` line in the docs uses `--el`. Shared by `play_book` and `download_book` so the two
+   * cannot drift — the parsing was written out once per hook before.
+   */
+  private fun Intent?.bookIdExtra(name: String): String? {
+    val raw =
+      this?.takeIf { it.hasExtra(name) }?.let { source ->
+        source.getStringExtra(name)
+          ?: source.getLongExtra(name, -1L).takeIf { it > 0L }?.toString()
+      }
+    return raw?.takeIf { it.isNotEmpty() }
+  }
 }

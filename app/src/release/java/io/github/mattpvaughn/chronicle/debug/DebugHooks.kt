@@ -5,9 +5,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
+import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Release build: every debug hook is a no-op.
@@ -25,6 +28,13 @@ object DebugHooks : DebugHooksContract {
   override fun onPlayBookIntent(
     intent: Intent?,
     mediaServiceConnection: MediaServiceConnection,
+  ) = Unit
+
+  override fun onDownloadBookIntent(
+    intent: Intent?,
+    cachedFileManager: ICachedFileManager,
+    bookRepository: IBookRepository,
+    scope: CoroutineScope,
   ) = Unit
 
   override fun onFailSyncIntent(intent: Intent?) = Unit
