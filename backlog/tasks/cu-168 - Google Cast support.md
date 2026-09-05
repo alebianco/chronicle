@@ -18,9 +18,14 @@ ordinal: 1000
 ## Description
 
 Owner decision (2026-09-05): **"we'll definitely support casting."** Placed in R4 on the owner's
-call — *"can be done in r4 if we have no space now"*. Worth noting it is arguably an R3 item: it is
-comfort/delight rather than differentiation, and R3 already carries the widget, which is the same
-kind of feature. Moving it earlier is a scheduling decision, not a rework.
+call — *"can be done in r4 if we have no space now"*.
+
+**No other task depends on this one, and it depends on none.** Both `dependencies:` lists are empty
+and nothing else in the backlog references Cast. Worth stating plainly because an earlier version of
+this note observed that Cast and the widget (cu-31) are the same *kind* of feature — comfort/delight
+rather than differentiation — which read as though the widget needed Cast. It does not: cu-31 is
+one-tap resume from the launcher and touches no playback routing. Scheduling Cast is therefore a
+free choice, constrained only by capacity.
 
 ## Background
 
