@@ -106,7 +106,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1389 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1389 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **10 instrumented tests** on two managed emulators, which also run on an Automotive image (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -627,6 +627,22 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   copy+delete across them. `--es move_sync_location <dir>` is the debug hook that replays it; it
   validates the path against `externalDeviceDirs()` by **exact** match, since `cachedMediaDir`
   accepts any string and a bad one fails much later as "downloads don't work".
+- **Android Auto is testable without a car, but not through Gradle Managed Devices** (cu-23, cu-89).
+  AGP refuses: *"TV and Auto devices are presently not supported with Gradle Managed Devices."* The
+  config resolves and the task is generated, then `<device>Setup` fails — so do not add an
+  `android-automotive` `systemImageSource`. A manual AVD works and boots in ~10s; the exact route is
+  in the `chronicle-auto-emulator` memory. `getprop ro.build.characteristics` must read `automotive`,
+  which is how you know it is not a phone image.
+  `AutoBrowseTreeTest` binds a real `MediaBrowserCompat` and walks the tree — the only way to reach
+  `onGetRoot`/`onLoadChildren`, which need a bound service and a real `Result`. **Build and drive
+  the browser on the main thread**: its constructor creates a `Handler`, so building it on the
+  instrumentation thread throws *"Can't create handler inside thread…"*, and a `subscribe` from
+  there delivers to a looper that never runs. It found a live crash on its first run —
+  `mediaController.metadata` is `@Nullable` but platform-typed to Kotlin, so `.id` on it compiled
+  and killed the process in `onDestroy` for any client that bound and released without playing,
+  which is what Auto does when it browses.
+  **Mock mode seeds the login, not a refresh**, so a freshly-provisioned emulator browses an empty
+  library. That is correct, not a bug — a test asserting books exist is testing provisioning.
 - **The bottom navigation cannot be driven by `adb shell input tap`** — a `BottomNavigationItemView`
   sits under the system bars (the obstacle recorded in cu-54). Screens behind a tab need a debug
   hook to be reachable from a script: `--ez show_browse true` is one (cu-24). Such a hook must

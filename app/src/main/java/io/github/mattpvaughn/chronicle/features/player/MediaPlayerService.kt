@@ -579,8 +579,15 @@ class MediaPlayerService :
 
   override fun onDestroy() {
     Timber.i("Service destroyed")
-    // Send one last update to local/remote servers that playback has stopped
-    val trackId = mediaController.metadata.id
+    // Send one last update to local/remote servers that playback has stopped.
+    //
+    // `metadata` is **nullable** and is null until something has played: the platform's
+    // `MediaControllerCompat.getMetadata()` is annotated `@Nullable`, but Kotlin sees the
+    // unannotated compat signature as platform-typed, so `.id` on it compiled and then threw
+    // `NullPointerException: getMetadata(...) must not be null`. That crashed the whole process on
+    // teardown for any client that bound the service and released it without playing — which is
+    // exactly what Android Auto does when it browses (cu-23).
+    val trackId = mediaController.metadata?.id
     if (trackId != null && trackId != TRACK_NOT_FOUND) {
       val finalPosition = currentPlayer?.currentPosition ?: 0L
       // runBlocking, deliberately. onDestroy has no continuation to suspend into and the
