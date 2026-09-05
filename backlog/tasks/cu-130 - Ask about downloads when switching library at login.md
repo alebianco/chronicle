@@ -10,16 +10,39 @@ priority: medium
 milestone: m-2
 ---
 
+## Decision taken, 2026-09-05
+
+The owner chose: **prompt at the login picker, except after a failed re-auth.** Option 3 (warn at
+deletion time instead) was considered and not taken — the question belongs where the user makes the
+choice, not later when a background pass acts on it.
+
+**The signal already exists, so this is smaller than the task implies.** [[cu-126]] made
+`IPlexLoginRepo.chooseLibrary` return `replacedDifferentLibrary`, and `ChooseLibraryViewModel`
+already branches on it (`if (!replacedDifferentLibrary) return`) before clearing the catalogue. That
+flag is false in *both* cases that must not prompt:
+
+- **A first-ever choice** — `previous == null`, so there are no downloads to ask about. Already
+  documented in `chooseLibrary`.
+- **A failed re-auth** — the library is unchanged, so `previous.id == plexLibrary.id`. Note
+  [[cu-172]] (2026-09-05) makes this path rarer still: `showLogin()` no longer wipes the chosen
+  library, so a re-auth usually does not reach this picker at all.
+
+So the prompt slots into `ChooseLibraryViewModel.chooseLibrary` at the point it currently clears the
+repositories, gated on the flag that is already computed. **Do not add a second "was this a
+re-auth?" signal** — the existing one is sufficient, and a parallel flag would be one more thing to
+keep in agreement.
+
+**Reuse the Settings copy verbatim**: `@string/prompt_clear_downloads_allow_retain` — *"Would you
+like to keep your downloaded files?"* — so the decision reads identically wherever it is met.
+
 ## Promoted from a draft, 2026-09-05 — the factual half checked
 
 The reclamation claim holds: `CachedFileManager.refreshTrackDownloadedStatus` does delete files for
 `Audiobook`s no longer in the database, and it runs from `ChronicleApplication` on every launch. So
 an orphaned download really is reclaimed, silently, at the next start.
 
-**The open question is a product one and is left for the owner**: should the onboarding picker
-prompt at all? The draft's own first item asks it, and the answer decides whether this is UI work or
-a won't-do. Reaching that screen from a *failed re-auth* is the case that makes "always prompt" feel
-wrong — the user did not choose to switch anything.
+~~The open question is a product one and is left for the owner~~ — **answered above.** It is UI
+work, and the re-auth case is excluded by a flag that already exists.
 
 ## Description
 
@@ -59,7 +82,7 @@ actually happens, rather than at each screen that can lead there.
 
 - [ ] A library switch never deletes downloaded files without the user having been asked, from any
       entry point
-- [ ] Or: the decision is recorded that onboarding deliberately does not ask, with the reasoning
+- [x] ~~Or: the decision is recorded that onboarding deliberately does not ask~~ — not taken; it prompts, gated on `replacedDifferentLibrary`
 - [ ] The wording matches Settings, wherever the question is asked
 - [ ] Test coverage for the chosen behaviour
 

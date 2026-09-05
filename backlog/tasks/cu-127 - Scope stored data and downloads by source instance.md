@@ -1,6 +1,6 @@
 ---
 id: cu-127
-title: Scope stored data and downloads by source and library
+title: Scope stored data and downloads by source instance
 status: To Do
 assignee: []
 created_date: '2026-09-03'
@@ -9,6 +9,21 @@ dependencies: []
 priority: medium
 milestone: m-2
 ---
+
+## Decision taken, 2026-09-05 — [[decision-21]]
+
+The owner chose **scoping by source instance** (one Plex *server*), not by library and not by backend
+type. Option 1 of the three below, with option 3 explicitly rejected: a book can move between
+libraries on one server while keeping its rating key, so a library scope would invent a boundary
+Plex does not have. **"Different library" stays a refresh concern**, already handled by [[cu-126]].
+
+Read [[decision-21]] before starting — it carries two traps this task's analysis did not have:
+
+1. **`ServerModel.serverId` is a `String` while `Audiobook.source` is a `Long`.** A per-instance id
+   cannot simply be the Plex server id. The ADR prefers moving to a `String` source id (consistent
+   with [[cu-71]]), which makes this wider than "add a column".
+2. **A download path migration must degrade to "not cached", never "deleted"** — cu-85's failure
+   mode, plus cu-153's finding that a partial and a finished file are indistinguishable by name.
 
 ## Promoted from a draft, 2026-09-05 — with one correction
 
@@ -23,10 +38,7 @@ Claims re-verified against the tree. Two hold; one has moved:
   task's question, but it does mean the field is no longer inert and a design that repurposes it
   has an existing behaviour to preserve.
 
-**Still needs the owner**, which is why it is `To Do` rather than in progress: the draft itself says
-this "probably wants an ADR", the proposal is quoted from a question the owner asked, and picking a
-scoping key (source? library? both?) is a data-model decision with a Room migration behind it.
-Everything an agent could settle without you is above.
+~~Still needs the owner~~ — **settled 2026-09-05**, see the decision block at the top.
 
 ## Description
 
@@ -110,7 +122,7 @@ must degrade to "not cached", never to "deleted".
 
 ## Acceptance Criteria
 
-- [ ] Decision recorded — ADR in `backlog/decisions/`, since this constrains [[decision-11]]
+- [x] Decision recorded — [[decision-21]]: scope by **source instance**, not library
 - [ ] `source` is populated with a real per-instance id, not a per-type constant
 - [ ] Track-level entities carry the same scoping as book-level ones
 - [ ] Every DAO read is scoped, so two sources cannot merge into one list
