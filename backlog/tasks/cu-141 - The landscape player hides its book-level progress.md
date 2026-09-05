@@ -283,9 +283,173 @@ weak candidate on a `ldltr` device. Something outside these two elements is diff
 otherwise-identical pair, and five constraint-level attempts plus three ruled-out theories have not
 found it.
 
-**This needs eyes on the running layout — Layout Inspector, or `setWillNotDraw`/measure logging on
-the parent — rather than another blind edit.** That is the honest state; a sixth attempt of the
-same kind is not worth the churn.
+## Attempt 6 (2026-09-05) — instrumented, and the diagnosis is overturned
+
+Attempt 6 stopped editing constraints and **measured instead**, with a temporary probe logging
+both TextViews side by side from the seekbar's layout-change listener. Two experiments settled it.
+
+### 1. The probe: the views are never measured
+
+```
+CP text='No chapters'     w=0 mw=0 lpW=-2 lS=<seekbar> rE=-1 hBias=0.5 minW=0 maxW=MAX
+CD text='0m left in book' w=0 mw=0 lpW=-2 lS=-1 rE=<seekbar> hBias=0.5 minW=0 maxW=MAX
+parent=1920x575 pMW=1920 seek=1824 cpPaint=119.0 cdPaint=145.0 cpTextSize=21.0 cpLayoutW=null
+```
+
+Read it carefully — every previous theory dies here:
+
+- **The text is present and has real width.** `paint.measureText` says 119px and 145px.
+- **No width constraint is imposed.** `lpW=-2` is WRAP_CONTENT, `minW=0`, `maxW=Integer.MAX_VALUE`.
+- **The parent measures fine** at 1920, and the seekbar they anchor to is 1824 wide.
+- **`cpLayoutW=null`** — `TextView.layout` is null, meaning the view **has never completed an
+  `onMeasure` pass at all**. `measuredWidth=0` is not a squeezed result; it is an *absent* result.
+
+So this was never a constraint being violated. The view is not being measured.
+
+### 2. The swap: the bug follows the *view*, not the constraint
+
+The decisive experiment. Swap the two views' horizontal constraints — give `chapter_progress` the
+`Right_toRightOf` that works, and `chapter_duration` the `Left_toLeftOf` that fails:
+
+| build | `chapter_progress` | `chapter_duration` |
+|---|---|---|
+| original, landscape | `48,180-48,209` (**0px**) | `1690,180-1872,209` (182px) |
+| original, portrait | `48,401-173,430` (125px) | `970,401-1152,430` (182px) |
+| **sides swapped, portrait** | `1152,401-1152,430` (**0px**) | `48,401-230,430` (182px) |
+
+`chapter_progress` is zero-width **in portrait too** once swapped, while `chapter_duration` renders
+from the very constraint that had just "failed". The defect stayed with `chapter_progress`.
+
+That kills the entire framing of this task. It is **not** an orientation bug, **not** a
+`Left`-vs-`Right` bug, and **not** caused by `details_artwork` being GONE. Portrait only ever
+looked healthy by accident.
+
+### Also ruled out this attempt
+
+4. ~~`app:layout_optimizationLevel`~~ — set to `none` on the ConstraintLayout; no change.
+5. ~~RTL resolution~~ — `Start_toStartOf` behaves identically to `Left_toLeftOf`. Not a
+   direction-resolution issue, which retires candidate 1 as well.
+6. ~~Anchor target~~ — re-anchored both readouts to `left_gutter`/`right_gutter` instead of the
+   slider. The x origin moved correctly (24 / 1896) and `chapter_progress` stayed zero-width.
+7. ~~An opposing constraint~~ — adding `Right_toLeftOf="@id/chapter_duration"` with
+   `horizontal_bias="0"` made **both** views collapse, confirming the failure propagates along the
+   anchor chain rather than originating in one anchor.
+8. ~~The style, the strings, runtime writes~~ — `TextAppearance.Body2` is shared with the sibling
+   that renders; `player_chapter_of` / `player_no_chapters` have single definitions in `values/`;
+   `setTextIfChanged` is a plain `if (this.text != text)`; and nothing in `app/src/main` touches
+   `chapterProgress` beyond that one call.
+
+### Where this now points
+
+### 3. The identity check — the fragment being probed is not the one on screen
+
+Walking the whole view tree for both ids returned **exactly one of each**, under a common root,
+each matching its `binding` field:
+
+```
+binding.cp=36518034 binding.cd=215228000
+matches=2 -> [which=CP id=36518034 w=0 root=124371555,
+              which=CD id=215228000 w=0 root=124371555]
+```
+
+So **there is no duplicate id and no wrong ViewBinding reference** — that suspicion is retired.
+
+But comparing those identity hashes against `dumpsys` at the same moment is decisive
+(`dumpsys` prints `identityHashCode` in hex):
+
+| view | `binding` field | rendered per `dumpsys` |
+|---|---|---|
+| `chapter_progress` | `36518034` = `0x22d3892` | `e1416c3` |
+| `chapter_duration` | `215228000` = `0xcd41e60` | `d30ba79` |
+
+**Different instances entirely.** And the rendered pair measured `48,401-173,430` (125px) and
+`970,401-1152,430` (182px) — *both correct* — while the instances my probe held reported `w=0`,
+`mw=0`, `layout=null`.
+
+So the zero-width views are a **stale, detached fragment view hierarchy** that is still receiving
+text updates, while a second, live hierarchy renders correctly. The collapsed measurements are
+real but belong to a view tree nobody is showing.
+
+### Where this points now
+
+This is a **fragment view-lifecycle bug, not a layout bug**. The likely shapes:
+
+- a `CurrentlyPlayingFragment` view destroyed on configuration change while its `StateFlow`
+  collectors keep writing into the old `binding` (the CLAUDE.md rule is `collectWhileStarted` on
+  `viewLifecycleOwner`; a collector bound to the *fragment* rather than the view lifecycle would
+  do exactly this);
+- two instances of the fragment alive at once — one attached, one retained — after the
+  rotation/`CollapsingToolbarLayout` re-creation;
+- `binding` not nulled in `onDestroyView`, so the stale reference outlives its hierarchy.
+
+**Checked, and both of the obvious shapes are already correct:**
+
+- All 27 collectors use `viewLifecycleOwner.collectWhileStarted` / `collectEventsWhileStarted`.
+  None is bound to the fragment lifecycle.
+- `binding` is a **local `val` inside `onCreateView`** (line 140), captured by the lambdas, and
+  returned as `binding.root`. There is no `_binding` field and so nothing to null in
+  `onDestroyView` — the safe pattern, and each `onCreateView` gets a fresh capture.
+- `dumpsys` shows exactly **one** `CurrentlyPlayingFragment` instance, so there are not two
+  fragments running.
+
+That combination narrows it to: an **earlier `onCreateView`'s captured `binding` is still being
+written to** after its view hierarchy was replaced. With `viewLifecycleOwner` collectors that
+should not outlive the view — unless the listener doing the writing is not a collector.
+`addOnLayoutChangeListener` on `chapter_progress_seekbar` (~line 414) is registered per
+`onCreateView` and **never removed**; it captures that call's `binding` and re-runs
+`renderPlayerText()`. That is the one writer here with no lifecycle unregistration, and it is
+where the probe was attached — which is very likely why the probe saw a stale hierarchy.
+
+**That was checked, and the stale hierarchy WAS a probe artefact.** Re-attaching the probe to the
+`viewLifecycleOwner.collectWhileStarted(viewModel.playerProgress)` collector gives an identity hash
+that matches `dumpsys` exactly (`cp=132794761` = `0x7ea4989`, and `dumpsys` shows `7ea4989`). So
+ViewBinding, the fragment lifecycle and the collectors are all correct, and the "two hierarchies"
+line of enquiry is closed. The un-removed `addOnLayoutChangeListener` is still worth tidying, but
+it is not this bug.
+
+### The confirmed bug, on the live view
+
+With the probe on a proper collector, in landscape, on the same instance that `dumpsys` renders:
+
+```
+cp=132794761 w=0   text='Ch 13 of 107'
+cd=169819534 w=182
+```
+
+`chapter_duration` was `w=0` for three ticks and then became 182; `chapter_progress` holds correct
+text and **never** leaves zero. So the defect is real, it is on the live view, and one sibling
+recovers from the same initial state while the other does not.
+
+9. ~~`chapter_progress` being load-bearing for the vertical chain~~ — **ruled out.**
+   `chapter_title` is `Top_toBottomOf="@id/chapter_progress"`, making it the only one of the pair
+   that something below depends on. Re-anchoring `chapter_title` to `chapter_duration` instead, so
+   nothing references `chapter_progress` at all, left it at zero width.
+
+### State at the end of attempt 6
+
+Everything was reverted; no production change is committed. What is now known for certain:
+
+- it is **not** the text, the writer, the strings, or the style;
+- it is **not** the anchor, the side keyword, RTL, the optimizer, or an opposing constraint;
+- it is **not** a duplicate id, a stale binding, a second fragment, or a collector bound to the
+  wrong lifecycle;
+- it is **not** caused by other views depending on it;
+- it **is** reproducible in portrait too once the two views' constraints are swapped, so the
+  orientation framing in this task's title is wrong.
+
+The one property that has tracked the bug through every experiment is **the view itself**, not any
+of its relationships. That is a strange result and it is where a fresh attempt should start —
+ideally with Layout Inspector, which would show the resolved measure spec that no `dumpsys` field
+exposes.
+
+**Caveat on the original symptom.** All of attempt 6's measurements were taken with the probe
+attached and playback started via `--el play_book`; the user-visible landscape blankness reported
+in the task body was observed before that. Confirm the on-screen symptom still reproduces on a
+clean build before assuming this stale-hierarchy finding fully explains it — the two may be the
+same bug or two different ones.
+
+**Portrait may be affected too** (the swap experiment collapsed a view there), so the task title
+and acceptance criteria likely need rewriting once the cause is confirmed.
 
 ## Acceptance Criteria
 
