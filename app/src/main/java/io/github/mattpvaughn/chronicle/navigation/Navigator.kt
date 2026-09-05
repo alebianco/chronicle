@@ -70,8 +70,23 @@ class Navigator
       }
     }
 
+    /**
+     * Shows the login screen **without** discarding the user's configuration.
+     *
+     * This used to call `plexConfig.clear()` unconditionally, which wiped server, library and
+     * connections on every route here — including re-authentication, where
+     * `IPlexLoginRepo.beginReauthentication` has just gone out of its way to *keep* them
+     * (`clearCredentials`, cu-84/cu-122). So a user whose token was invalidated signed in again and
+     * was made to re-pick a library they had already picked, which is precisely what that work
+     * existed to prevent. `LoginStateFromTokenValidityTest` did not catch it because it asserts at
+     * the repository boundary, and the loss happened one layer further out.
+     *
+     * Clearing is the *caller's* job, and the only caller that should is an explicit logout —
+     * `SettingsViewModel` already calls `plexConfig.clear()` itself before navigating, so the wipe
+     * here was redundant there and wrong everywhere else. A genuinely tokenless start
+     * (`token.isEmpty()`) has nothing to clear.
+     */
     fun showLogin() {
-      plexConfig.clear()
       val frag = LoginFragment.newInstance()
       fragmentManager.beginTransaction()
         .replace(R.id.fragNavHost, frag)

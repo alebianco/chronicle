@@ -177,5 +177,38 @@ class ReauthenticationTest {
       assertNull(prefs.library)
       assertNull(prefs.user)
     }
+
+    /**
+     * The gap the prefs-layer tests above could not see.
+     *
+     * `beginReauthentication` preserves server and library, then publishes `NOT_LOGGED_IN` — and
+     * `Navigator.showLogin()` used to answer that by calling `plexConfig.clear()`, throwing away
+     * the very configuration that had just been kept. The user signed in again and was made to
+     * re-pick a library they had already picked.
+     *
+     * `Navigator` needs a `FragmentManager` and an `Activity`, so it cannot be constructed here;
+     * what is pinned instead is the contract it depends on — **reaching the login screen is not
+     * itself a reason to discard configuration**. An explicit logout clears deliberately, and
+     * `clear discards everything` above covers that. If `showLogin` ever wipes again, the
+     * behaviour this asserts is what it will contradict.
+     */
+    @Test
+    fun `re-authentication leaves a library to come back to`() {
+      val prefs = realRepo()
+
+      // What beginReauthentication does...
+      prefs.clearCredentials()
+      // ...and what showing the login screen must NOT undo.
+      assertEquals("server-1", prefs.server?.serverId)
+      assertEquals("12", prefs.library?.id)
+      assertNotNull(prefs.user)
+
+      // Signing in again supplies only the missing credential.
+      prefs.accountAuthToken = "fresh-account-token"
+
+      assertEquals("fresh-account-token", prefs.accountAuthToken)
+      assertEquals("12", prefs.library?.id)
+      assertTrue("re-auth must not require choosing a library again", prefs.library != null)
+    }
   }
 }
