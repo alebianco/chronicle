@@ -1,8 +1,8 @@
 ---
 id: cu-127
 title: Scope stored data and downloads by source instance
-status: To Do
-assignee: []
+status: In Progress
+assignee: ['@claude']
 created_date: '2026-09-03'
 labels: [R2, architecture, data, multi-backend]
 dependencies: []
@@ -119,6 +119,55 @@ concept, and it lines up with where decision-11 is going.
 migrated for files already on disk, and must not repeat cu-85's failure mode where an unreadable
 directory silently un-cached whole libraries. A partial migration that leaves files at the old path
 must degrade to "not cached", never to "deleted".
+
+## Implementation Plan
+
+Scope confirmed by reading the tree (2026-09-05), and it is **much narrower than the ADR feared**
+in one dimension and wider in another.
+
+**The good news: DAOs do not leak.** All 78 DAO call sites live in exactly four repositories
+(`BookRepository`, `TrackRepository`, `ChapterRepository`, `CollectionsRepository`). Nothing in
+`features/`, `application/` or the player touches a DAO — the only other references are Dagger
+provision methods and two doc comments. So **the repository is a real seam**, and the scoping can
+be enforced there rather than threaded through every caller. A test can pin that.
+
+**The correction: `MediaSource.id` is `Long` everywhere**, and a Plex `clientIdentifier` is a
+~40-char string. Storing it needs the `String` retype decision-21 prefers; a hash to `Long` would
+be a second identity to keep in sync, which is the thing cu-71 removed.
+
+### Design
+
+**A `SourceId` value class wrapping `String`.** Same shape as cu-136's `BookOffset` — `@JvmInline`,
+Room-converted to TEXT — so a raw `String` cannot be passed where a source id belongs. The
+per-instance value for Plex is `"plex:<clientIdentifier>"`, prefixed so a future backend cannot
+collide with a Plex server whose identifier happens to match.
+
+**Reads are scoped in the repository, not by adding a parameter to 40 DAO methods.** Two rules:
+
+- A query keyed on a **primary key** (`WHERE id = :bookId`) needs no scope — the id already is
+  one, and adding a filter would only mask a bug rather than prevent one.
+- A query returning a **list or a "pick one" ordering** is scoped. Those are the ones that can
+  show a union.
+
+**Downloads move to `<cachedMediaDir>/<sourceId>/<trackId>.<ext>`**, with the migration degrading
+to "not cached" and never deleting — cu-85 and cu-153's rules.
+
+### Tasks, in order
+
+1. `SourceId` value class + Room converter + tests. No behaviour change.
+2. `MediaSource.id` retyped `Long` → `SourceId`; `MEDIA_SOURCE_ID_PLEX` becomes per-instance,
+   derived from the connected server. `planIngestion` follows the type.
+3. `Audiobook.source` and `Collection.source` retyped, with migrations (Book v12→13,
+   Collections v2→3) that map the legacy `0` to the connected server's id, and `RoomSchemaTest`
+   cases opening real files.
+4. `MediaItemTrack` gains `source`, TrackDatabase v6→7, same migration shape.
+5. Repository-level read scoping + a guard test that no DAO escapes `data/local/`.
+6. Download path + one-time move, degrading to "not cached".
+
+### Sequencing note
+
+Steps 3 and 4 are where a mistake is unrecoverable, so each migration is sabotage-verified before
+moving on — CLAUDE.md's rule that a check which cannot fail proves nothing.
 
 ## Acceptance Criteria
 
