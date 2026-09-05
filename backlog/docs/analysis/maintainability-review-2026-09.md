@@ -236,6 +236,65 @@ directories is not something to do unattended.
 
 ---
 
+## Coverage: why 40.69% is the wrong number to compare against 95%
+
+Asked directly: *is a coverage ceiling this low normal on Android, when elsewhere we strive for
+95%?* Measured rather than asserted.
+
+### The arithmetic
+
+| | instructions | share |
+|---|---:|---:|
+| Total | 85,963 | 100% |
+| Covered today | 34,971 | **40.68%** |
+| **Unreachable by unit tests** | 23,715 | **27.6%** |
+| Unit-testable | 62,248 | 72.4% |
+
+The unreachable 27.6% is Fragments, Activities, adapters, `Navigator`, Moshi/Dagger **generated**
+code, and the debug-only mock server. None of it can be executed by a JVM unit test — it needs an
+instrumented device.
+
+**So covering every testable instruction in the codebase yields 72.4% overall.** Reaching 95%
+would require covering 131% of the reachable half. It is not a stretch goal; it is arithmetically
+impossible with this tool on this platform.
+
+### Is that normal for Android?
+
+Yes, and for a structural reason that does not apply to a backend service. A typical Android app
+carries a large body of framework-bound code — lifecycle callbacks, view binding, adapters — that
+JVM tests cannot instantiate. Teams reporting "95%" are almost always either measuring a pure
+domain module, or counting instrumented tests in the same figure. **40.69% is nonetheless low even
+by Android standards** — the honest reading is that this codebase is under-covered *and* that its
+ceiling is far below 95%.
+
+### The two levers, in order
+
+1. **Raise coverage of the testable 72.4%.** This is where the value is, and the two findings
+   above are the blockers: logic buried in `onCreateView` closures is *inside* the unreachable
+   27.6% purely because of where it sits, and `SettingsViewModel`'s 15 dependencies make its 737
+   testable lines impractical to reach. Extracting them (DRAFT-173/174/175) converts unreachable
+   instructions into reachable ones — the ceiling itself rises.
+2. **Count instrumented tests toward coverage.** The suite exists (cu-54, two managed devices),
+   and — checked before recommending it — the plumbing is *already there*: `jacocoTestReport`'s
+   `executionData` includes `**/*.ec`, the instrumented format, alongside the unit tests' `.exec`.
+   But the task only `dependsOn("testDebugUnitTest")`, and `verify.sh` never runs the instrumented
+   stage, so in practice no `.ec` file exists when the report is generated and every instrumented
+   assertion is invisible to the ratchet. Running `./verify.sh --instrumented` before the report
+   would fold them in with no new plumbing. Worth confirming the actual gain before setting a
+   numeric target, since the suite is deliberately small (10 tests) and may move the figure less
+   than its existence suggests.
+
+### What a realistic target looks like
+
+Given a 72.4% ceiling, **55-60% overall** is a strong, defensible target for this codebase — it
+implies roughly 80% of everything a unit test can reach. Setting 95% would guarantee permanent
+failure and teach the team to ignore the number, which is worse than having no target.
+
+The existing ratchet is the right mechanism and is already correctly designed: a high-water mark
+per package, so coverage cannot drift down, with a deliberate 0.05% tolerance for codegen jitter.
+
+---
+
 ## Suggested follow-ups
 
 Filed as drafts for owner triage rather than actioned here, since each changes structure across
