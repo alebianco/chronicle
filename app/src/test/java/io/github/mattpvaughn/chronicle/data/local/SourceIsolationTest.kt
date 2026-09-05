@@ -276,4 +276,32 @@ class SourceIsolationTest {
     assertEquals("a composite key would keep both; today the later insert wins", 1, all.size)
     assertEquals(OTHER_TEST_SOURCE, all.single().source)
   }
+
+  /**
+   * Deleting downloads and forgetting them must agree on scope.
+   *
+   * `CachedFileManager.uncacheAllInLibrary` deletes only files whose names come from
+   * `getCachedTracks()`, which is source-scoped — so clearing the `cached` flag for *every*
+   * source would report another server's downloads as absent while they sat on disk, invisible
+   * both to the user and to cu-81's prune, which only removes files it can account for.
+   */
+  @Test
+  fun `forgetting downloads leaves another source's downloads alone`() =
+    runTest {
+      bookDb.bookDao.insertAll(
+        listOf(
+          Audiobook(id = "1", source = TEST_SOURCE, title = "Ours", isCached = true),
+          Audiobook(id = "2", source = OTHER_TEST_SOURCE, title = "Theirs", isCached = true),
+        ),
+      )
+
+      bookRepository().uncacheAll()
+
+      assertEquals(
+        "another server's book must still know it is downloaded",
+        true,
+        bookDb.bookDao.getAudiobooks(OTHER_TEST_SOURCE).single().isCached,
+      )
+      assertEquals(false, bookDb.bookDao.getAudiobooks(TEST_SOURCE).single().isCached)
+    }
 }

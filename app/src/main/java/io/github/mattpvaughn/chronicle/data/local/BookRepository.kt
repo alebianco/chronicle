@@ -677,7 +677,7 @@ class BookRepository
 
     override suspend fun uncacheAll() {
       withContext(dispatchers.io) {
-        bookDao.uncacheAll()
+        bookDao.uncacheAll(currentSourceId)
       }
     }
 

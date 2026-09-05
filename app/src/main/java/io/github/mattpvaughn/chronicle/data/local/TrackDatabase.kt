@@ -207,8 +207,19 @@ interface TrackDao {
     isCached: Boolean = true,
   ): Int
 
-  @Query("UPDATE MediaItemTrack SET cached = :isCached")
-  suspend fun uncacheAll(isCached: Boolean = false)
+  /**
+   * Clears the cached flag for one source's tracks.
+   *
+   * Scoped since cu-127, to stay consistent with `CachedFileManager.uncacheAllInLibrary`, which
+   * deletes only the connected server's *files*. Unscoped, it would report another server's
+   * downloads as absent while they sat on disk — invisible to the user and to cu-81's prune,
+   * which only ever scans for files it can account for.
+   */
+  @Query("UPDATE MediaItemTrack SET cached = :isCached WHERE source = :source")
+  suspend fun uncacheAll(
+    source: SourceId,
+    isCached: Boolean = false,
+  )
 
   @Query("SELECT * FROM MediaItemTrack WHERE source = :source AND title LIKE :title")
   suspend fun findTrackByTitle(

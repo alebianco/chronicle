@@ -400,8 +400,12 @@ interface BookDao {
     isCached: Boolean = true,
   ): List<Audiobook>
 
-  @Query("UPDATE Audiobook SET isCached = :isCached")
-  suspend fun uncacheAll(isCached: Boolean = false)
+  /** Clears the cached flag for one source's books. See `TrackDao.uncacheAll` (cu-127). */
+  @Query("UPDATE Audiobook SET isCached = :isCached WHERE source = :source")
+  suspend fun uncacheAll(
+    source: SourceId,
+    isCached: Boolean = false,
+  )
 
   @Query(
     "SELECT * FROM Audiobook WHERE source = :source AND isCached >= :offlineModeActive ORDER BY titleSort ASC",

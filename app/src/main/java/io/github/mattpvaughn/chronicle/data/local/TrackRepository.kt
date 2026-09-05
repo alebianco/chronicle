@@ -426,7 +426,7 @@ class TrackRepository
 
     override suspend fun uncacheAll() {
       withContext(dispatchers.io) {
-        trackDao.uncacheAll()
+        trackDao.uncacheAll(currentSourceId)
       }
     }
 
