@@ -602,6 +602,81 @@ useful, promoting it to a real module later is a smaller step, taken with eviden
 
 ---
 
+## Testing the framework layer: the tools that exist and are not used (2026-09-06)
+
+A `:domain` module does nothing for the **59,585 instructions at 35.7%** that make up the rest of
+the app. Asked what covers *those*, and whether there is established guidance. There is, and most
+of it is **already in this repo's dependency list, unused**.
+
+### What the framework layer is made of
+
+| kind | missed | share of all misses |
+|---|---:|---:|
+| **Fragments** | **9,000** | **21%** |
+| Services | 2,975 | 7% |
+| Workers | 2,212 | 5% |
+| Activities | 1,359 | 3% |
+| — | **15,546** | **37%** |
+
+The single biggest untested body in the app is Fragments, and eight of them carry over 450
+instructions each (`CurrentlyPlayingFragment` 1,356; `AudiobookDetailsFragment` 1,305;
+`LibraryFragment` 1,259).
+
+### The three standard tools
+
+**1. `FragmentScenario` (`androidx.fragment:fragment-testing`) — the big one, and it is missing.**
+
+The official way to test a Fragment in isolation: `launchFragmentInContainer<LibraryFragment>()`
+drives the real lifecycle, and **under Robolectric it runs on the JVM** — no emulator. This is the
+tool that reaches the 9,000 instructions above, and the only one of the three not already declared
+in `libs.versions.toml`.
+
+Caveat worth stating up front: these Fragments take their dependencies through
+`ViewModelProvider.Factory` from the Dagger graph, so a scenario test needs a way to supply a test
+factory. That plumbing is the real cost of this route, not the library.
+
+**2. `TestListenableWorkerBuilder` (`androidx.work:work-testing`) — declared, wired, never used.**
+
+`testImplementation(libs.work.testing)` is already in `app/build.gradle.kts`. The only mention of
+`TestListenableWorkerBuilder` in the whole test tree is inside `WorkerDispatcherTest`'s *comment*.
+
+It would reach the 2,212 Worker instructions — **except** that `DownloadNotificationWorker` and
+`MoveSyncLocationWorker` both resolve `Injector.get()` in **field initialisers**, so construction
+needs the whole DI graph regardless of the builder. Using this tool requires first giving the
+workers a `WorkerFactory`, which cu-152 deliberately declined ("would buy nothing while no worker
+is unit-tested"). That reasoning is now inverted: the tool is present, so the plumbing would buy
+something.
+
+**3. Robolectric — present, used in 40 files, and under-applied.**
+
+Already the workhorse. This session used it to take `SettingsViewModel` 0% → 47.6%,
+`ChapterListAdapter` 0% → covered, and `MediaServiceConnection` 0% → covered. Nothing stops it
+being pointed at more.
+
+### Honest assessment of the ceiling this changes
+
+The earlier "77.5% ceiling" assumed Fragments, Services and Workers were unreachable. **With
+`FragmentScenario` under Robolectric, and a `WorkerFactory` for the workers, most of that 37%
+becomes reachable on the JVM.** The ceiling is not a property of Android; it is a property of
+which tools this project has adopted.
+
+That does not make 75% cheap — those tests are slower to write and slower to run than a pure unit
+test, and Robolectric has real costs (it is why PIT cannot mutate through it, per the `pitestDebug`
+allowlist). But "unreachable" was the wrong word, twice now.
+
+### Recommended order
+
+1. **`FragmentScenario` on one Fragment first** (DRAFT-179). Pick `CollectionsFragment` — 806
+   instructions, the simplest of the eight, and its ViewModel is already tested so a failure is
+   unambiguously the new plumbing. Prove the DI-factory approach on one screen before committing to
+   eight.
+2. **Then the workers** — a `WorkerFactory` plus `Configuration.Provider`, revisiting cu-152's
+   exemption with the note that its premise has changed.
+3. **The `:domain` module is orthogonal** and can happen whenever; it addresses enforcement and
+   signal, not this.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
