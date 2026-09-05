@@ -14,7 +14,6 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView.Adapter.StateRestorationPolicy
@@ -35,11 +34,9 @@ import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
+import io.github.mattpvaughn.chronicle.util.isDifferentListById
 import io.github.mattpvaughn.chronicle.views.checkRadioButtonWithTag
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -173,34 +170,17 @@ class LibraryFragment : Fragment() {
       // Sometimes [books] will be the same as [adapter.currentList] so don't do any
       // submission/diffing if that's the case
       //
-      // Check if the new list differs from the current. We really should be using a normal
-      // RecyclerView.Adapter and not a ListAdapter for this, as ListAdapter only provides
-      // access to an immutable copy of a list, not the list itself.
-      //
-      // This operation is worst case O(n), which is bad for users with huge libraries
-      lifecycleScope.launch {
-        val isNewList =
-          withContext(Dispatchers.IO) {
-            val currentList = adapter?.currentList ?: return@withContext true
-            if (books.size != currentList.size) {
-              Timber.i("Updating: different size!")
-              return@withContext true
-            }
-            // compare lists by id, faster than doing a full .equals() comparison
-            for (index in books.indices) {
-              if (books[index].id != currentList[index].id) {
-                Timber.i("Updating: different ids!")
-                return@withContext true
-              }
-            }
-            return@withContext false
-          }
-        if (isNewList) {
-          // submit an empty list to force a scroll-to-top, then when it is done, submit
-          // the real list
-          Timber.i("Updating book list: scroll to top")
-          adapter!!.submitList(null) { adapter?.submitList(books) }
-        }
+      // A ListAdapter hands back only an immutable copy of its list, so telling "actually new" from
+      // "same list, one field changed" means comparing. By **id**, not equals: the playing book's
+      // progress changes once a second (cu-110), and a full comparison would scroll to top on every
+      // tick. O(n), and synchronous — it used to sit in `withContext(Dispatchers.IO)` here and in
+      // its twin, which was neither IO nor safe, since `currentList` is a UI object (cu-169).
+      val isNewList = isDifferentListById(books, adapter?.currentList?.map { it.id }) { it.id }
+      if (isNewList) {
+        // submit an empty list to force a scroll-to-top, then when it is done, submit
+        // the real list
+        Timber.i("Updating book list: scroll to top")
+        adapter!!.submitList(null) { adapter?.submitList(books) }
       }
     }
 

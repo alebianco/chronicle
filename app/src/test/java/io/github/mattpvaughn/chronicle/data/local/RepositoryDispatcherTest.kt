@@ -92,9 +92,53 @@ class RepositoryDispatcherTest {
    */
   @Test
   fun `repository sources all resolve`() {
-    (REPOSITORY_SOURCES + PLAYER_SOURCES).forEach { path ->
+    (REPOSITORY_SOURCES + PLAYER_SOURCES + UI_AND_APPLICATION_SOURCES).forEach { path ->
       assertTrue("expected $path to exist", File(path).exists())
     }
+  }
+
+  /**
+   * The cu-169 layer: ViewModels, Fragments, `application/` and `PlexConfig`.
+   *
+   * `ChronicleApplication.applicationScope` is exempt and counted separately below, so this scan
+   * excludes that one declaration rather than the whole file — a file-level exemption would hide
+   * any *new* hardcoded dispatcher added to the DI root.
+   */
+  @Test
+  fun `the ui and application layer holds no hardcoded dispatchers`() {
+    val offenders =
+      UI_AND_APPLICATION_SOURCES.flatMap { path ->
+        File(path).readLines()
+          .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+          .filterNot { it.contains("applicationJob + Dispatchers.Main") }
+          .filter { Regex("""Dispatchers[.](IO|Main|Default)""").containsMatchIn(it) }
+          .map { path.substringAfterLast('/') + ": " + it.trim() }
+      }
+
+    assertEquals(
+      "dispatchers here must come from the injected provider (cu-169)",
+      emptyList<String>(),
+      offenders,
+    )
+  }
+
+  /**
+   * The DI root's own scope is the one exemption outside the player layer, pinned at an exact
+   * count so it cannot become a precedent.
+   *
+   * `applicationScope` is a **field initialiser on the class that builds the Dagger graph**, so an
+   * injected provider does not exist yet when it runs — the same circularity cu-72 recorded for
+   * `MediaPlayerService.serviceScope`.
+   */
+  @Test
+  fun `only the application scope may hardcode a dispatcher outside the player`() {
+    val hardcoded =
+      File("src/main/java/io/github/mattpvaughn/chronicle/application/ChronicleApplication.kt")
+        .readLines()
+        .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+        .count { Regex("""Dispatchers[.](IO|Main|Default)""").containsMatchIn(it) }
+
+    assertEquals("only applicationScope may hardcode a dispatcher; see cu-169", 1, hardcoded)
   }
 
   private companion object {
@@ -123,5 +167,23 @@ class RepositoryDispatcherTest {
         "OnMediaChangedCallback",
         "ProgressUpdater",
       ).map { "src/main/java/io/github/mattpvaughn/chronicle/features/player/$it.kt" }
+
+    /**
+     * The layer converted in cu-169 — ViewModels, Fragments, `application/` and `PlexConfig`.
+     *
+     * Unscanned until then, which is how ten hardcoded dispatchers stayed green: this test named
+     * only repositories and the player, and CLAUDE.md attributed the rest to cu-72, a *closed*
+     * task. A layer nothing scans is a layer that drifts.
+     */
+    val UI_AND_APPLICATION_SOURCES: List<String> =
+      listOf(
+        "features/settings/SettingsViewModel",
+        "features/bookdetails/AudiobookDetailsViewModel",
+        "features/library/LibraryFragment",
+        "features/collections/CollectionsFragment",
+        "application/MainActivity",
+        "application/ChronicleApplication",
+        "data/sources/plex/PlexConfig",
+      ).map { "src/main/java/io/github/mattpvaughn/chronicle/$it.kt" }
   }
 }

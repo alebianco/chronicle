@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
+import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -18,6 +19,7 @@ class PlexConfigUrlTest {
       plexPrefsRepo = FakePlexPrefsRepo(),
       connectionChooser = mockk(relaxed = true),
       appContext = mockk(relaxed = true),
+      dispatchers = TestDispatcherProvider(),
     ).apply { this.url = url }
 
   @Test

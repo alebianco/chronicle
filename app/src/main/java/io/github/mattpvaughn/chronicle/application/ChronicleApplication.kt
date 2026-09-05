@@ -26,6 +26,7 @@ import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.injection.components.AppComponent
 import io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import retrofit2.HttpException
 import timber.log.Timber
@@ -50,6 +51,16 @@ open class ChronicleApplication :
   }
 
   private var applicationJob = Job()
+
+  /**
+   * The one hardcoded dispatcher outside the player layer, and it cannot be otherwise (cu-169).
+   *
+   * This is a **field initialiser on the DI root itself**: `applicationComponent` is built inside
+   * `onCreate`, so an injected `DispatcherProvider` does not exist yet when this line runs. Reading
+   * one here would be a circular dependency — the same reasoning cu-72 recorded for
+   * `MediaPlayerService.serviceScope`. `DispatcherProviderExemptionTest` pins the count at one so
+   * this cannot quietly become a precedent.
+   */
   private val applicationScope = CoroutineScope(applicationJob + Dispatchers.Main)
 
   @Inject
@@ -75,6 +86,9 @@ open class ChronicleApplication :
 
   @Inject
   lateinit var cachedFileManager: ICachedFileManager
+
+  @Inject
+  lateinit var dispatchers: DispatcherProvider
 
   @Inject
   lateinit var plexLoginService: PlexLoginService
@@ -145,7 +159,7 @@ open class ChronicleApplication :
 
   private fun updateDownloadedFileState() {
     applicationScope.launch {
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         cachedFileManager.refreshTrackDownloadedStatus()
       }
       // A download interrupted by a Wi-Fi drop or a process death used to stay abandoned:
@@ -236,7 +250,7 @@ open class ChronicleApplication :
             // Prevent from running on ConnectivityThread, because onLost is apparently
             // called on ConnectivityThread with no warning
             applicationScope.launch {
-              withContext(Dispatchers.Main) {
+              withContext(dispatchers.main) {
                 plexConfig.connectionHasBeenLost()
               }
             }

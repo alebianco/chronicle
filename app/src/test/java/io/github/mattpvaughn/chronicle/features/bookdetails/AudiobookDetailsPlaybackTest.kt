@@ -18,6 +18,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.keepCollected
 import io.mockk.every
 import io.mockk.mockk
@@ -134,5 +135,6 @@ class AudiobookDetailsPlaybackTest {
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
       appContext = mockk<Context>(relaxed = true),
+      dispatchers = TestDispatcherProvider(),
     )
 }

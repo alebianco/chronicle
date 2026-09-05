@@ -48,12 +48,12 @@ import io.github.mattpvaughn.chronicle.injection.components.DaggerActivityCompon
 import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
 import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -95,6 +95,9 @@ class MainActivity : AppCompatActivity() {
 
   @Inject
   lateinit var plexConfig: PlexConfig
+
+  @Inject
+  lateinit var dispatchers: DispatcherProvider
 
   @Inject
   lateinit var mediaServiceConnection: MediaServiceConnection
@@ -475,11 +478,14 @@ class MainActivity : AppCompatActivity() {
         ?: NO_AUDIOBOOK_FOUND_ID
     if (openAudiobookWithId != NO_AUDIOBOOK_FOUND_ID) {
       lifecycleScope.launch {
-        withContext(Dispatchers.IO) {
-          val audiobook = bookRepository.getAudiobookAsync(openAudiobookWithId)
-          if (audiobook != null && audiobook != EMPTY_AUDIOBOOK) {
-            navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
+        // Only the DB read goes to IO. `showDetails` commits a FragmentManager transaction and
+        // must run on the main thread — it used to sit inside the IO block (cu-169).
+        val audiobook =
+          withContext(dispatchers.io) {
+            bookRepository.getAudiobookAsync(openAudiobookWithId)
           }
+        if (audiobook != null && audiobook != EMPTY_AUDIOBOOK) {
+          navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
         }
       }
     }

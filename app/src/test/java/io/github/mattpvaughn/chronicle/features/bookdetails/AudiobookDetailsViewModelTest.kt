@@ -14,6 +14,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
+import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.keepCollected
 import io.mockk.coVerify
 import io.mockk.every
@@ -293,5 +294,6 @@ class AudiobookDetailsViewModelTest {
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
       appContext = mockk<Context>(relaxed = true),
+      dispatchers = TestDispatcherProvider(),
     )
 }

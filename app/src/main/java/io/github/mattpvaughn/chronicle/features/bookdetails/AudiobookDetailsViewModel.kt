@@ -26,6 +26,7 @@ import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import io.github.mattpvaughn.chronicle.util.combineDistinct
@@ -55,6 +56,7 @@ class AudiobookDetailsViewModel(
   private val plexMediaService: PlexMediaService,
   currentlyPlaying: CurrentlyPlaying,
   private val appContext: Context,
+  private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -68,6 +70,7 @@ class AudiobookDetailsViewModel(
       private val plexMediaService: PlexMediaService,
       private val currentlyPlaying: CurrentlyPlaying,
       private val appContext: Context,
+      private val dispatchers: DispatcherProvider,
     ) : ViewModelProvider.Factory {
       lateinit var inputAudiobook: Audiobook
 
@@ -84,6 +87,7 @@ class AudiobookDetailsViewModel(
             plexMediaService,
             currentlyPlaying,
             appContext,
+            dispatchers,
           ) as T
         } else {
           throw IllegalStateException("Wrong class provided to ${this.javaClass.name}")
@@ -295,7 +299,7 @@ class AudiobookDetailsViewModel(
   }
 
   fun connectToServer() {
-    viewModelScope.launch(Dispatchers.IO) {
+    viewModelScope.launch(dispatchers.io) {
       plexConfig.connectToServer(plexMediaService)
     }
   }

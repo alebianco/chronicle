@@ -24,13 +24,13 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.features.download.MoveSyncLocationWorker
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.settings.SettingsViewModel.NavigationDestination.*
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.bytesAvailable
 import io.github.mattpvaughn.chronicle.util.setEvent
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -67,6 +67,7 @@ class SettingsViewModel(
   private val appContext: Context,
   private val externalDeviceDirs: List<@JvmSuppressWildcards File>,
   private val exceptionHandler: CoroutineExceptionHandler,
+  private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
   @Suppress("UNCHECKED_CAST")
   class Factory
@@ -86,6 +87,7 @@ class SettingsViewModel(
       private val appContext: Context,
       private val externalDeviceDirs: List<@JvmSuppressWildcards File>,
       private val exceptionHandler: CoroutineExceptionHandler,
+      private val dispatchers: DispatcherProvider,
     ) : ViewModelProvider.Factory {
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
@@ -104,6 +106,7 @@ class SettingsViewModel(
             appContext = appContext,
             externalDeviceDirs = externalDeviceDirs,
             exceptionHandler = exceptionHandler,
+            dispatchers = dispatchers,
           ) as T
         } else {
           throw IllegalArgumentException(
@@ -919,7 +922,7 @@ class SettingsViewModel(
               object : PreferenceClick {
                 override fun onClick() {
                   viewModelScope.launch {
-                    withContext(Dispatchers.IO) {
+                    withContext(dispatchers.io) {
                       SingletonImageLoader.get(appContext).let { loader ->
                         loader.memoryCache?.clear()
                         loader.diskCache?.clear()
@@ -997,7 +1000,7 @@ class SettingsViewModel(
       if (clearDownloads) {
         cachedFileManager.uncacheAllInLibrary()
       }
-      withContext(Dispatchers.IO) {
+      withContext(dispatchers.io) {
         bookRepository.clear()
         trackRepository.clear()
         collectionsRepository.clear()

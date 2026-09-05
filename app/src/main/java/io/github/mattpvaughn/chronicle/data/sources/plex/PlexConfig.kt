@@ -15,6 +15,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionSt
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.features.download.EXTRA_BOOK_ID
 import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.toUri
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,7 @@ class PlexConfig
     private val plexPrefsRepo: PlexPrefsRepo,
     private val connectionChooser: ConnectionChooser,
     private val appContext: Context,
+    private val dispatchers: DispatcherProvider,
   ) {
     /**
      * Scope for the derived [isConnected] only.
@@ -129,7 +131,7 @@ class PlexConfig
         }
 
       Timber.i("Notification thumb uri is: $uri")
-      return withContext(Dispatchers.IO) {
+      return withContext(dispatchers.io) {
         try {
           val request =
             ImageRequest.Builder(appContext)
@@ -205,7 +207,7 @@ class PlexConfig
       _connectionState.value = CONNECTING
       prevConnectToServerJob =
         Job().also {
-          val context = CoroutineScope(it + Dispatchers.Main)
+          val context = CoroutineScope(it + dispatchers.main)
           context.launch {
             val connectionResult = chooseViableConnections(plexMediaService)
             Timber.i("Returned connection $connectionResult")
