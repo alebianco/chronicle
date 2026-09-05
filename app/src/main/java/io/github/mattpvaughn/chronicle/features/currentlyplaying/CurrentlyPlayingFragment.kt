@@ -310,7 +310,7 @@ class CurrentlyPlayingFragment :
       val currentChapter = viewModel.currentChapter.value
       binding.chapterTitle.setTextIfChanged(
         if (currentChapter?.title.isNullOrEmpty()) {
-          viewModel.currentTrack.value?.title.orEmpty()
+          viewModel.currentTrack.value.title
         } else {
           currentChapter?.title.orEmpty()
         },

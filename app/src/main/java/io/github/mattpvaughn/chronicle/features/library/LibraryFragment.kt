@@ -361,9 +361,7 @@ class LibraryFragment : Fragment() {
               true
             }
             R.id.menu_filter -> {
-              viewModel.setFilterMenuVisible(
-                viewModel.isFilterShown.value?.not() ?: false,
-              )
+              viewModel.setFilterMenuVisible(!viewModel.isFilterShown.value)
               true
             }
             R.id.download_all -> {

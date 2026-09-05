@@ -738,7 +738,7 @@ class MediaPlayerService :
       Bundle().apply {
         putBoolean(
           CHRONICLE_MEDIA_SEARCH_SUPPORTED,
-          isClientLegal && prefsRepo.allowAuto && plexLoginRepo.loginEvent.value?.peekContent() == LOGGED_IN_FULLY,
+          isClientLegal && prefsRepo.allowAuto && plexLoginRepo.loginEvent.value.peekContent() == LOGGED_IN_FULLY,
         )
         mediaBrowserCompatStringField("EXTRA_MEDIA_SEARCH_SUPPORTED")?.let { putBoolean(it, true) }
         mediaBrowserCompatStringField("EXTRA_SUGGESTED_PRESENTATION_DISPLAY_HINT")?.let { putBoolean(it, true) }
@@ -762,25 +762,25 @@ class MediaPlayerService :
         )
         BrowserRoot(CHRONICLE_MEDIA_EMPTY_ROOT, extras)
       }
-      plexLoginRepo.loginEvent.value?.peekContent() == NOT_LOGGED_IN -> {
+      plexLoginRepo.loginEvent.value.peekContent() == NOT_LOGGED_IN -> {
         setSessionCustomErrorMessage(
           getString(R.string.auto_access_error_not_logged_in),
         )
         BrowserRoot(CHRONICLE_MEDIA_EMPTY_ROOT, extras)
       }
-      plexLoginRepo.loginEvent.value?.peekContent() == LOGGED_IN_NO_USER_CHOSEN -> {
+      plexLoginRepo.loginEvent.value.peekContent() == LOGGED_IN_NO_USER_CHOSEN -> {
         setSessionCustomErrorMessage(
           getString(R.string.auto_access_error_no_user_chosen),
         )
         BrowserRoot(CHRONICLE_MEDIA_EMPTY_ROOT, extras)
       }
-      plexLoginRepo.loginEvent.value?.peekContent() == LOGGED_IN_NO_SERVER_CHOSEN -> {
+      plexLoginRepo.loginEvent.value.peekContent() == LOGGED_IN_NO_SERVER_CHOSEN -> {
         setSessionCustomErrorMessage(
           getString(R.string.auto_access_error_no_server_chosen),
         )
         BrowserRoot(CHRONICLE_MEDIA_EMPTY_ROOT, extras)
       }
-      plexLoginRepo.loginEvent.value?.peekContent() == LOGGED_IN_NO_LIBRARY_CHOSEN -> {
+      plexLoginRepo.loginEvent.value.peekContent() == LOGGED_IN_NO_LIBRARY_CHOSEN -> {
         setSessionCustomErrorMessage(
           getString(R.string.auto_access_error_no_library_chosen),
         )

@@ -265,7 +265,7 @@ class MainActivity : AppCompatActivity() {
 
     if (savedInstanceState == null) {
       setupCurrentlyPlaying()
-      plexLoginRepo.loginEvent.value?.let {
+      plexLoginRepo.loginEvent.value.let {
         if (it.peekContent() == LOGGED_IN_FULLY) {
           navigator.showHome()
         }

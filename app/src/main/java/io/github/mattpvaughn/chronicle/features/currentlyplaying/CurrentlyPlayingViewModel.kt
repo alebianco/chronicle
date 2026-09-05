@@ -564,8 +564,12 @@ class CurrentlyPlayingViewModel(
     }
     viewModelScope.launch(exceptionHandler) {
       try {
-        // Only replace track view w/ loading view if we have no tracks
-        if (tracks.value?.size == null) {
+        // Only replace track view w/ loading view if we have no tracks.
+        //
+        // `isEmpty()`, not `?.size == null`: `tracks` is a non-null `StateFlow` since cu-52, so the
+        // safe call could never short-circuit and the spinner never showed. It read as a null check
+        // because it was one, against `LiveData<List<…>>?`.
+        if (tracks.value.isEmpty()) {
           _isLoadingTracks.value = true
         }
         val tracks = trackRepository.loadTracksForAudiobook(bookId)
@@ -1179,7 +1183,7 @@ class CurrentlyPlayingViewModel(
     val id: String = audiobookId.value
     if (currentChapter.value == EMPTY_CHAPTER) {
       // Seeking by track length
-      currentTrack.value?.let { curr ->
+      currentTrack.value.let { curr ->
         val extras =
           Bundle().apply {
             putString(KEY_SEEK_TO_TRACK_WITH_ID, curr.id)
@@ -1191,7 +1195,7 @@ class CurrentlyPlayingViewModel(
       }
     } else {
       // Seeking within the current chapter.
-      currentChapter.value?.let { chapter ->
+      currentChapter.value.let { chapter ->
         val chapterDuration = chapter.bookEndTimeOffset - chapter.bookStartTimeOffset
         // Book-absolute: where in the *book* the user asked to be.
         val bookOffset =

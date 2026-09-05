@@ -531,7 +531,7 @@ class AudiobookDetailsViewModel(
         // The offset arrives book-absolute from the chapter list, but is applied as an in-track
         // offset by the service (cu-96). One conversion, one home (cu-136).
         val inTrackOffset =
-          tracks.value?.let { loaded -> inTrackOffsetOf(bookStartTimeOffset, trackId, loaded) }
+          tracks.value.let { loaded -> inTrackOffsetOf(bookStartTimeOffset, trackId, loaded) }
             ?: TrackOffset(bookStartTimeOffset.millis)
         pausePlay(book.id, inTrackOffset.millis, trackId, forcePlayFromMediaId = true)
       }
