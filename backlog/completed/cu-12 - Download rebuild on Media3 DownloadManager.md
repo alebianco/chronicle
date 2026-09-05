@@ -34,7 +34,7 @@ migration for every already-downloaded book or a forced re-download.
 | Claim in the task | What the code shows |
 |---|---|
 | "kills 2GB OOM #83" | Nothing in the app reads a file into memory. The only `toByteArray()` is on a signing certificate. Fetch2 streams to a destination path. **No OOM mechanism is present in our code** — the claim is either about Fetch2 internals or is stale. |
-| "Replaces Fetch2" (implying it is abandoned) | Fetch2 is maintained: **3.4.1** is current and the app is pinned to **3.3.0**. |
+| "Replaces Fetch2" (implying it is abandoned) | Fetch2 was maintained when this was written: **3.4.1** was current and the app was pinned to **3.3.0**. **Superseded 2026-09-05 (cu-166): Fetch2 is now genuinely abandoned** — last commit 2024-12-03, no release after 3.4.1. The *conclusion* below is unaffected (the `SimpleCache` argument is about Media3 on-disk layout, not about Fetch2 health); only this premise died. cu-166 mirrors the artifact rather than migrating. |
 | "HTTP-Range resumable, chunked-to-disk" | Fetch2 already streams to disk and supports resume. What is missing is the app *asking* it to. |
 
 Media3's downloader is the better long-term home if downloads ever need to share ExoPlayer's

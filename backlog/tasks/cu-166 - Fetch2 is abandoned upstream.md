@@ -1,7 +1,7 @@
 ---
 id: cu-166
 title: 'Fetch2 is abandoned upstream; mirror the artifact'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-05'
 updated_date: '2026-09-05'
@@ -40,9 +40,26 @@ Two aggravating factors make this worth acting on anyway:
 Alternatives are genuinely poor: Media3 is rejected for the reason above, and Android's platform
 `DownloadManager` cannot attach per-request auth headers cleanly, which Plex requires.
 
+## Implementation Notes
+
+`libs/fetch2-mirror/` is a local Maven repository holding `fetch2`, `fetch2okhttp` and their shared
+`fetch2core` (427 KB, Apache-2.0), wired into `settings.gradle.kts` **before** JitPack so the local
+copy wins. Every other transitive dependency resolves from Google or Maven Central and is
+deliberately not mirrored.
+
+**Verified in both directions**, with the Gradle cache for the group moved aside so it could not
+mask the result: JitPack commented out → resolves from the mirror; mirror *also* moved away →
+resolution FAILS. The second half is what proves the copy is load-bearing rather than shadowed.
+
+`backlog/completed/cu-12` had a myth-vs-fact row asserting "Fetch2 is maintained". Corrected in
+place, with its conclusion left standing — the `SimpleCache` argument against Media3 is about
+Media3's on-disk layout, not about Fetch2's health, so only the premise died.
+
+No migration attempted, per the task's own last criterion.
+
 ## Acceptance Criteria
 
-- [ ] The Fetch2 artifact is mirrored/vendored so a JitPack outage cannot break the build
-- [ ] cu-12's stale "Fetch2 is maintained" premise is corrected in place, with its conclusion intact
-- [ ] `CLAUDE.md` records that Fetch2 is unmaintained, so no future agent re-derives this
-- [ ] No migration attempted — this task is explicitly about de-risking, not replacement
+- [x] The Fetch2 artifact is mirrored/vendored so a JitPack outage cannot break the build
+- [x] cu-12's stale "Fetch2 is maintained" premise is corrected in place, with its conclusion intact
+- [x] `CLAUDE.md` records that Fetch2 is unmaintained, so no future agent re-derives this
+- [x] No migration attempted — this task is explicitly about de-risking, not replacement
