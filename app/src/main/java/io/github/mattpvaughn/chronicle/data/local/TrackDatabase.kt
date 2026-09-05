@@ -106,15 +106,15 @@ val MIGRATION_3_4 =
 
 @Dao
 interface TrackDao {
-  @Query("SELECT * FROM MediaItemTrack")
-  fun getAllTracks(): Flow<List<MediaItemTrack>>
+  @Query("SELECT * FROM MediaItemTrack WHERE source = :source")
+  fun getAllTracks(source: SourceId): Flow<List<MediaItemTrack>>
 
   // Ordered, because callers derive book position from the result and `getTrackStartTime` sums
   // the tracks *before* the active one. It sorts defensively now (cu-115), but an unordered
   // whole-library read is a trap for anything else that groups or slices this list, and the
   // `parentKey, discNumber, index` index makes the ordering free.
-  @Query("SELECT * FROM MediaItemTrack ORDER BY `parentKey`, `discNumber` ASC, `index` ASC")
-  suspend fun getAllTracksAsync(): List<MediaItemTrack>
+  @Query("SELECT * FROM MediaItemTrack WHERE source = :source ORDER BY `parentKey`, `discNumber` ASC, `index` ASC")
+  suspend fun getAllTracksAsync(source: SourceId): List<MediaItemTrack>
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   fun insertAll(rows: List<MediaItemTrack>)
@@ -188,8 +188,11 @@ interface TrackDao {
     isCached: Boolean,
   ): Int
 
-  @Query("SELECT * FROM MediaItemTrack WHERE cached = :isCached")
-  fun getCachedTracksAsync(isCached: Boolean = true): List<MediaItemTrack>
+  @Query("SELECT * FROM MediaItemTrack WHERE source = :source AND cached = :isCached")
+  fun getCachedTracksAsync(
+    source: SourceId,
+    isCached: Boolean = true,
+  ): List<MediaItemTrack>
 
   @Query("SELECT COUNT(*) FROM MediaItemTrack WHERE cached = :isCached AND parentKey = :bookId")
   suspend fun getCachedTrackCountForBookAsync(
@@ -200,8 +203,11 @@ interface TrackDao {
   @Query("UPDATE MediaItemTrack SET cached = :isCached")
   suspend fun uncacheAll(isCached: Boolean = false)
 
-  @Query("SELECT * FROM MediaItemTrack WHERE title LIKE :title")
-  suspend fun findTrackByTitle(title: String): MediaItemTrack?
+  @Query("SELECT * FROM MediaItemTrack WHERE source = :source AND title LIKE :title")
+  suspend fun findTrackByTitle(
+    source: SourceId,
+    title: String,
+  ): MediaItemTrack?
 }
 
 /**

@@ -50,7 +50,7 @@ class RoomSchemaTest {
       ).allowMainThreadQueries().build()
 
     // Room defers validation until the database is actually used.
-    assertNotNull(db.bookDao.getAudiobooks())
+    assertNotNull(db.bookDao.getAudiobooks(SourceId.LEGACY_PLEX))
     db.close()
   }
 

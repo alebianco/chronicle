@@ -62,8 +62,8 @@ abstract class CollectionsDatabase : RoomDatabase() {
 
 @Dao
 interface CollectionsDao {
-  @Query("SELECT * FROM Collection ORDER BY title")
-  fun getAllRows(): Flow<List<Collection>>
+  @Query("SELECT * FROM Collection WHERE source = :source ORDER BY title")
+  fun getAllRows(source: SourceId): Flow<List<Collection>>
 
   @Query("SELECT * FROM Collection WHERE id = :id LIMIT 1")
   fun getCollection(id: String): Flow<Collection?>
@@ -71,11 +71,11 @@ interface CollectionsDao {
   @Query("SELECT * FROM Collection WHERE :collectionId = id")
   suspend fun getCollectionAsync(collectionId: String): Collection
 
-  @Query("SELECT * FROM Collection")
-  fun getCollections(): List<Collection>
+  @Query("SELECT * FROM Collection WHERE source = :source")
+  fun getCollections(source: SourceId): List<Collection>
 
-  @Query("SELECT Count(id) FROM Collection")
-  fun countCollections(): Flow<Long>
+  @Query("SELECT Count(id) FROM Collection WHERE source = :source")
+  fun countCollections(source: SourceId): Flow<Long>
 
   @Query("DELETE FROM Collection")
   suspend fun clear()

@@ -58,7 +58,7 @@ class BookRepositoryIngestTest {
   @Test
   fun `ingested books are written to the database`() =
     runTest {
-      every { bookDao.getAudiobooks() } returns emptyList()
+      every { bookDao.getAudiobooks(any()) } returns emptyList()
       val inserted = slot<List<Audiobook>>()
       every { bookDao.insertAll(capture(inserted)) } returns Unit
 
@@ -75,7 +75,7 @@ class BookRepositoryIngestTest {
   @Test
   fun `ingesting one source leaves another source's books alone`() =
     runTest {
-      every { bookDao.getAudiobooks() } returns listOf(book("a"), book("z", source = other))
+      every { bookDao.getAudiobooks(any()) } returns listOf(book("a"), book("z", source = other))
       val removed = slot<List<String>>()
       every { bookDao.removeAll(capture(removed)) } returns 0
 
@@ -87,7 +87,7 @@ class BookRepositoryIngestTest {
   @Test
   fun `a book this source no longer lists is removed and counted`() =
     runTest {
-      every { bookDao.getAudiobooks() } returns listOf(book("a"), book("gone"))
+      every { bookDao.getAudiobooks(any()) } returns listOf(book("a"), book("gone"))
       every { bookDao.removeAll(any()) } returns 1
 
       val count = repository().ingest(listOf(book("a")), plex, SourceCapabilities())
@@ -103,7 +103,7 @@ class BookRepositoryIngestTest {
   @Test
   fun `a source with no tag capabilities does not hit the tag endpoints`() =
     runTest {
-      every { bookDao.getAudiobooks() } returns emptyList()
+      every { bookDao.getAudiobooks(any()) } returns emptyList()
 
       repository().ingest(listOf(book("a")), other, SourceCapabilities())
 
@@ -114,7 +114,7 @@ class BookRepositoryIngestTest {
   @Test
   fun `local progress survives an ingest`() =
     runTest {
-      every { bookDao.getAudiobooks() } returns listOf(book("a", progress = 900_000L))
+      every { bookDao.getAudiobooks(any()) } returns listOf(book("a", progress = 900_000L))
       val inserted = slot<List<Audiobook>>()
       every { bookDao.insertAll(capture(inserted)) } returns Unit
 

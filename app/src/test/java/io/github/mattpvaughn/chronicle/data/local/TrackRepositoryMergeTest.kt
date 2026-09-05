@@ -123,7 +123,7 @@ class TrackRepositoryMergeTest {
   @Test
   fun `a newer local position survives a sync`() =
     runTest {
-      coEvery { trackDao.getAllTracksAsync() } returns
+      coEvery { trackDao.getAllTracksAsync(any()) } returns
         listOf(localTrack(id = "2001", progress = 8_000L, lastViewedAt = 9_000L))
       // Plex reports seconds; 3 seconds is older than the local 9_000ms.
       serverReturns(networkTrack(id = "2001", viewOffset = 500L, lastViewedAtSeconds = 3L))
@@ -141,7 +141,7 @@ class TrackRepositoryMergeTest {
   @Test
   fun `a newer network position is adopted`() =
     runTest {
-      coEvery { trackDao.getAllTracksAsync() } returns
+      coEvery { trackDao.getAllTracksAsync(any()) } returns
         listOf(localTrack(id = "2001", progress = 500L, lastViewedAt = 3_000L))
       serverReturns(networkTrack(id = "2001", viewOffset = 8_000L, lastViewedAtSeconds = 9L))
 
@@ -154,7 +154,7 @@ class TrackRepositoryMergeTest {
   @Test
   fun `forcing the network overrides a newer local position`() =
     runTest {
-      coEvery { trackDao.getAllTracksAsync() } returns
+      coEvery { trackDao.getAllTracksAsync(any()) } returns
         listOf(localTrack(id = "2001", progress = 8_000L, lastViewedAt = 9_000L))
       serverReturns(networkTrack(id = "2001", viewOffset = 500L, lastViewedAtSeconds = 3L))
 
@@ -171,7 +171,7 @@ class TrackRepositoryMergeTest {
   @Test
   fun `a brand new track is kept`() =
     runTest {
-      coEvery { trackDao.getAllTracksAsync() } returns emptyList()
+      coEvery { trackDao.getAllTracksAsync(any()) } returns emptyList()
       serverReturns(networkTrack(id = "2001"), networkTrack(id = "2002"))
 
       repository().loadTracksForAudiobook("1001", forceUseNetwork = false)
@@ -191,7 +191,7 @@ class TrackRepositoryMergeTest {
       every { prefsRepo.cachedMediaDir } returns cacheDir
       File(cacheDir, "2001.mp3").writeText("audio")
 
-      coEvery { trackDao.getAllTracksAsync() } returns
+      coEvery { trackDao.getAllTracksAsync(any()) } returns
         listOf(localTrack(id = "2001", title = "Chapter One", duration = 10_000L, cached = true))
       // Same book, title and duration — but a new ratingKey.
       serverReturns(networkTrack(id = "9001", title = "Chapter One", duration = 10_000L))
@@ -213,7 +213,7 @@ class TrackRepositoryMergeTest {
       every { prefsRepo.cachedMediaDir } returns cacheDir
       File(cacheDir, "2001.mp3").writeText("audio")
 
-      coEvery { trackDao.getAllTracksAsync() } returns
+      coEvery { trackDao.getAllTracksAsync(any()) } returns
         listOf(localTrack(id = "2001", title = "Chapter One", duration = 10_000L, cached = true))
       serverReturns(networkTrack(id = "9001", title = "Chapter Two", duration = 44_000L))
 
@@ -233,7 +233,7 @@ class TrackRepositoryMergeTest {
   @Test
   fun `a network failure is an error, not an empty success`() =
     runTest {
-      coEvery { trackDao.getAllTracksAsync() } returns listOf(localTrack(id = "2001"))
+      coEvery { trackDao.getAllTracksAsync(any()) } returns listOf(localTrack(id = "2001"))
       coEvery { plexMediaService.retrieveTracksForAlbum(any()) } throws IOException("offline")
 
       val result = repository().loadTracksForAudiobook("1001", forceUseNetwork = false)

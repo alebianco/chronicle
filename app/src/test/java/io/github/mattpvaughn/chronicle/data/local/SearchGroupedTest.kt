@@ -5,8 +5,10 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.SearchField
+import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
+import io.github.mattpvaughn.chronicle.testing.TEST_SERVER_ID
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.every
@@ -37,7 +39,13 @@ class SearchGroupedTest {
 
   private val plexMediaService = mockk<PlexMediaService>(relaxed = true)
   private val chapterDao = mockk<ChapterDao>(relaxed = true)
-  private val plexPrefsRepo = mockk<PlexPrefsRepo>(relaxed = true)
+  private val plexPrefsRepo =
+    mockk<PlexPrefsRepo>(relaxed = true) {
+      // The scoping key the repository's reads are filtered by (cu-127). Without it every search
+      // is scoped to SourceId.UNKNOWN and returns nothing, so these assertions would fail on an
+      // empty result rather than on a matching bug.
+      every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)
+    }
 
   private var offline = false
 

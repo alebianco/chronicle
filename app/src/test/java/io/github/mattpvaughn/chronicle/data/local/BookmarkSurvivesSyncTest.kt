@@ -178,7 +178,7 @@ class BookmarkSurvivesSyncTest {
 
       bookRepository().clear()
 
-      assertEquals(0, bookDb.bookDao.getBookCount())
+      assertEquals(0, bookDb.bookDao.getBookCount(TEST_SOURCE))
       assertEquals(1, bookmarkDb.bookmarkDao.count())
     }
 }

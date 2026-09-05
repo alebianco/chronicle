@@ -135,7 +135,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a book missing from the server is removed, and only that book`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns
+      coEvery { bookDao.getAudiobooks(any()) } returns
         listOf(localBook("1001"), localBook("1002", title = "Neuromancer"))
       serverHas(serverBook("1001"))
 
@@ -150,7 +150,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `no book is removed when the server still lists them all`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns listOf(localBook("1001"))
+      coEvery { bookDao.getAudiobooks(any()) } returns listOf(localBook("1001"))
       serverHas(serverBook("1001"))
 
       repository().refreshData()
@@ -168,7 +168,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a refresh preserves local progress`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns
+      coEvery { bookDao.getAudiobooks(any()) } returns
         listOf(localBook("1001", progress = 4_000L, lastViewedAt = 9_000L))
       serverHas(serverBook("1001", lastViewedAtSeconds = 3L))
 
@@ -185,7 +185,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a refresh preserves the cached flag`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns listOf(localBook("1001", isCached = true))
+      coEvery { bookDao.getAudiobooks(any()) } returns listOf(localBook("1001", isCached = true))
       serverHas(serverBook("1001"))
 
       repository().refreshData()
@@ -197,7 +197,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a new book from the server is added`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns emptyList()
+      coEvery { bookDao.getAudiobooks(any()) } returns emptyList()
       serverHas(serverBook("1001"), serverBook("1002", title = "Neuromancer"))
 
       repository().refreshData()
@@ -239,7 +239,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a paginated network failure leaves the local library untouched`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns
+      coEvery { bookDao.getAudiobooks(any()) } returns
         listOf(localBook("1001"), localBook("1002", title = "Neuromancer"))
       coEvery { plexMediaService.retrieveAlbumPage(any(), any(), any()) } throws
         IOException("offline")
@@ -257,7 +257,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a failure part way through pagination deletes nothing`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns
+      coEvery { bookDao.getAudiobooks(any()) } returns
         listOf(localBook("1001"), localBook("1002"), localBook("1003"))
       // Page 1 arrives and reports more to come; page 2 throws.
       coEvery { plexMediaService.retrieveAlbumPage(any(), 0, any()) } returns
@@ -278,7 +278,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `no configured library deletes nothing`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns listOf(localBook("1001"))
+      coEvery { bookDao.getAudiobooks(any()) } returns listOf(localBook("1001"))
       every { plexPrefsRepo.library } returns null
 
       repository().refreshDataPaginated()
@@ -303,7 +303,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a successful paginated refresh removes only the book the server dropped`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns
+      coEvery { bookDao.getAudiobooks(any()) } returns
         listOf(localBook("1001"), localBook("1002", title = "Neuromancer"))
       serverHasPaginated(serverBook("1001"))
 
@@ -318,7 +318,7 @@ class BookRepositoryRefreshTest {
   @Test
   fun `a successful paginated refresh preserves local progress`() =
     runTest {
-      coEvery { bookDao.getAudiobooks() } returns
+      coEvery { bookDao.getAudiobooks(any()) } returns
         listOf(localBook("1001", progress = 4_000L, lastViewedAt = 9_000L))
       serverHasPaginated(serverBook("1001", lastViewedAtSeconds = 3L))
 

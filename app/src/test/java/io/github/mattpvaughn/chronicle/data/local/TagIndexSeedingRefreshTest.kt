@@ -110,7 +110,7 @@ class TagIndexSeedingRefreshTest {
     runTest {
       repository().refreshData()
 
-      val mistborn = bookDb.bookDao.getAudiobooks().first { it.id == "1003" }
+      val mistborn = bookDb.bookDao.getAudiobooks(TEST_SOURCE).first { it.id == "1003" }
       assertEquals("Michael Kramer", mistborn.narrator)
     }
 
@@ -119,7 +119,7 @@ class TagIndexSeedingRefreshTest {
     runTest {
       repository().refreshData()
 
-      val mistborn = bookDb.bookDao.getAudiobooks().first { it.id == "1003" }
+      val mistborn = bookDb.bookDao.getAudiobooks(TEST_SOURCE).first { it.id == "1003" }
       assertEquals("Mistborn", mistborn.series)
     }
 
@@ -128,7 +128,7 @@ class TagIndexSeedingRefreshTest {
     runTest {
       repository().refreshData()
 
-      val hobbit = bookDb.bookDao.getAudiobooks().first { it.id == "1001" }
+      val hobbit = bookDb.bookDao.getAudiobooks(TEST_SOURCE).first { it.id == "1001" }
       assertEquals("Rob Inglis", hobbit.narrator)
     }
 
@@ -138,7 +138,7 @@ class TagIndexSeedingRefreshTest {
     runTest {
       repository().refreshData()
 
-      val dune = bookDb.bookDao.getAudiobooks().first { it.id == "1002" }
+      val dune = bookDb.bookDao.getAudiobooks(TEST_SOURCE).first { it.id == "1002" }
       assertEquals("", dune.narrator)
       assertEquals("", dune.series)
     }
@@ -160,7 +160,7 @@ class TagIndexSeedingRefreshTest {
 
       repository().refreshData()
 
-      val mistborn = bookDb.bookDao.getAudiobooks().first { it.id == "1003" }
+      val mistborn = bookDb.bookDao.getAudiobooks(TEST_SOURCE).first { it.id == "1003" }
       assertEquals("Kate Reading", mistborn.narrator)
     }
 
@@ -174,6 +174,6 @@ class TagIndexSeedingRefreshTest {
       repository().refreshData()
 
       // The books are still there — only the seeding was skipped.
-      assertEquals(3, bookDb.bookDao.getAudiobooks().size)
+      assertEquals(3, bookDb.bookDao.getAudiobooks(TEST_SOURCE).size)
     }
 }

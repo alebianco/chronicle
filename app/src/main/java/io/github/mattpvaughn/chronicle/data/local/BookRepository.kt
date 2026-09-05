@@ -252,12 +252,12 @@ class BookRepository
       get() = SourceId.forPlexServer(plexPrefsRepo.server?.serverId.orEmpty())
 
     override fun getAllBooks(): Flow<List<Audiobook>> {
-      return bookDao.getAllRows(prefsRepo.offlineMode)
+      return bookDao.getAllRows(currentSourceId, prefsRepo.offlineMode)
     }
 
     override suspend fun getBookCount(): Int {
       return withContext(dispatchers.io) {
-        bookDao.getBookCount()
+        bookDao.getBookCount(currentSourceId)
       }
     }
 
@@ -266,7 +266,7 @@ class BookRepository
       sourceId: SourceId,
       capabilities: SourceCapabilities,
     ): Int {
-      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
+      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks(currentSourceId) }
       // A source that reports neither field cannot answer the tag endpoints, and asking would cost
       // `1 + N` requests to learn nothing. The books keep whatever they already have — blanking a
       // narrator because *this* source cannot supply one is the cu-24/cu-143 mistake.
@@ -306,7 +306,7 @@ class BookRepository
         } ?: return
       //    ^^^ quit on network failure- nothing below matters without new books from server
 
-      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
+      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks(currentSourceId) }
 
       val mergedBooks =
         networkBooks.map { networkBook ->
@@ -357,7 +357,7 @@ class BookRepository
 
     override suspend fun backfillChapterTable(): Int =
       withContext(dispatchers.io) {
-        // Cheap gate first. `bookDao.getAudiobooks()` is a `SELECT *` that deserializes every
+        // Cheap gate first. `bookDao.getAudiobooks(currentSourceId)` is a `SELECT *` that deserializes every
         // book's `chapters` column — megabytes on a real library (cu-134) — so reading it on every
         // launch only to find nothing to do is exactly the cu-110 mistake. Once every book that
         // has chapters also has rows, the counts agree and this returns without that read.
@@ -368,7 +368,7 @@ class BookRepository
         }
 
         var written = 0
-        bookDao.getAudiobooks()
+        bookDao.getAudiobooks(currentSourceId)
           .filter { ChapterBackfill.mayNeedBackfill(it) }
           .forEach { book ->
             try {
@@ -441,7 +441,7 @@ class BookRepository
         } ?: return
       //    ^^^ quit on an incomplete fetch- deleting books because they did not arrive is data loss
 
-      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks() }
+      val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks(currentSourceId) }
 
       val mergedBooks =
         networkBooks.map { networkBook ->
@@ -497,22 +497,22 @@ class BookRepository
     }
 
     override fun getRecentlyAdded(): Flow<List<Audiobook>> {
-      return bookDao.getRecentlyAdded(limitReturnCount, prefsRepo.offlineMode)
+      return bookDao.getRecentlyAdded(currentSourceId, limitReturnCount, prefsRepo.offlineMode)
     }
 
     override suspend fun getRecentlyAddedAsync(): List<Audiobook> {
       return withContext(dispatchers.io) {
-        bookDao.getRecentlyAddedAsync(limitReturnCount, prefsRepo.offlineMode)
+        bookDao.getRecentlyAddedAsync(currentSourceId, limitReturnCount, prefsRepo.offlineMode)
       }
     }
 
     override fun getRecentlyListened(): Flow<List<Audiobook>> {
-      return bookDao.getRecentlyListened(limitReturnCount, prefsRepo.offlineMode)
+      return bookDao.getRecentlyListened(currentSourceId, limitReturnCount, prefsRepo.offlineMode)
     }
 
     override suspend fun getRecentlyListenedAsync(): List<Audiobook> {
       return withContext(dispatchers.io) {
-        bookDao.getRecentlyListenedAsync(limitReturnCount, prefsRepo.offlineMode)
+        bookDao.getRecentlyListenedAsync(currentSourceId, limitReturnCount, prefsRepo.offlineMode)
       }
     }
 
@@ -564,7 +564,7 @@ class BookRepository
 
     override suspend fun searchAsync(query: String): List<Audiobook> {
       return withContext(dispatchers.io) {
-        bookDao.searchAsync("%$query%", prefsRepo.offlineMode)
+        bookDao.searchAsync(currentSourceId, "%$query%", prefsRepo.offlineMode)
       }
     }
 
@@ -572,12 +572,12 @@ class BookRepository
       return withContext(dispatchers.io) {
         // getAllBooksAsync already applies offlineMode, so an offline search sees only cached
         // books — the contract every other read path here honours.
-        bookDao.getAllBooksAsync(prefsRepo.offlineMode).groupedSearch(query)
+        bookDao.getAllBooksAsync(currentSourceId, prefsRepo.offlineMode).groupedSearch(query)
       }
     }
 
     override fun search(query: String): Flow<List<Audiobook>> {
-      return bookDao.search("%$query%", prefsRepo.offlineMode)
+      return bookDao.search(currentSourceId, "%$query%", prefsRepo.offlineMode)
     }
 
     override suspend fun update(audiobook: Audiobook) {
@@ -635,7 +635,7 @@ class BookRepository
     }
 
     override suspend fun getMostRecentlyPlayed(): Audiobook {
-      return bookDao.getMostRecent() ?: EMPTY_AUDIOBOOK
+      return bookDao.getMostRecent(currentSourceId) ?: EMPTY_AUDIOBOOK
     }
 
     override suspend fun getAudiobookAsync(bookId: String): Audiobook? {
@@ -645,12 +645,12 @@ class BookRepository
     }
 
     override fun getCachedAudiobooks(): Flow<List<Audiobook>> {
-      return bookDao.getCachedAudiobooks()
+      return bookDao.getCachedAudiobooks(currentSourceId)
     }
 
     override suspend fun getCachedAudiobooksAsync(): List<Audiobook> {
       return withContext(dispatchers.io) {
-        bookDao.getCachedAudiobooksAsync()
+        bookDao.getCachedAudiobooksAsync(currentSourceId)
       }
     }
 
@@ -662,13 +662,13 @@ class BookRepository
 
     override suspend fun getAllBooksAsync(): List<Audiobook> {
       return withContext(dispatchers.io) {
-        bookDao.getAllBooksAsync(prefsRepo.offlineMode)
+        bookDao.getAllBooksAsync(currentSourceId, prefsRepo.offlineMode)
       }
     }
 
     override suspend fun getRandomBookAsync(): Audiobook {
       return withContext(dispatchers.io) {
-        bookDao.getRandomBookAsync() ?: EMPTY_AUDIOBOOK
+        bookDao.getRandomBookAsync(currentSourceId) ?: EMPTY_AUDIOBOOK
       }
     }
 

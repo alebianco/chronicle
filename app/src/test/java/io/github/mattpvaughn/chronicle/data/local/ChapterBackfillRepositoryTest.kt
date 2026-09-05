@@ -65,7 +65,7 @@ class ChapterBackfillRepositoryTest {
   fun `a book with chapters and no rows gets them written`() =
     runTest {
       gateOpen()
-      every { bookDao.getAudiobooks() } returns listOf(book("b1", listOf(chapter(1), chapter(2))))
+      every { bookDao.getAudiobooks(any()) } returns listOf(book("b1", listOf(chapter(1), chapter(2))))
       coEvery { chapterDao.getChaptersForBook("b1") } returns emptyList()
       val inserted = slot<List<Chapter>>()
       every { chapterDao.insertAll(capture(inserted)) } returns Unit
@@ -81,7 +81,7 @@ class ChapterBackfillRepositoryTest {
   fun `a book that already has rows is not rewritten`() =
     runTest {
       gateOpen()
-      every { bookDao.getAudiobooks() } returns listOf(book("b1", listOf(chapter(1))))
+      every { bookDao.getAudiobooks(any()) } returns listOf(book("b1", listOf(chapter(1))))
       coEvery { chapterDao.getChaptersForBook("b1") } returns listOf(chapter(1))
 
       val written = repository().backfillChapterTable()
@@ -93,7 +93,7 @@ class ChapterBackfillRepositoryTest {
   fun `a book with no chapter data is never queried`() =
     runTest {
       gateOpen()
-      every { bookDao.getAudiobooks() } returns listOf(book("b1", emptyList()))
+      every { bookDao.getAudiobooks(any()) } returns listOf(book("b1", emptyList()))
 
       val written = repository().backfillChapterTable()
 
@@ -111,7 +111,7 @@ class ChapterBackfillRepositoryTest {
   fun `one failing book does not stop the others`() =
     runTest {
       gateOpen()
-      every { bookDao.getAudiobooks() } returns
+      every { bookDao.getAudiobooks(any()) } returns
         listOf(
           book("bad", listOf(chapter(1))),
           book("good", listOf(chapter(1), chapter(2))),
@@ -132,7 +132,7 @@ class ChapterBackfillRepositoryTest {
     runTest {
       gateOpen()
       val subject = book("b1", listOf(chapter(1)))
-      every { bookDao.getAudiobooks() } returns listOf(subject)
+      every { bookDao.getAudiobooks(any()) } returns listOf(subject)
       // First pass sees nothing, second sees what the first wrote.
       coEvery { chapterDao.getChaptersForBook("b1") } returnsMany
         listOf(emptyList(), listOf(chapter(1).copy(bookId = "b1")))
@@ -155,19 +155,19 @@ class ChapterBackfillRepositoryTest {
       val written = repository().backfillChapterTable()
 
       assertEquals(0, written)
-      io.mockk.verify(exactly = 0) { bookDao.getAudiobooks() }
+      io.mockk.verify(exactly = 0) { bookDao.getAudiobooks(any()) }
     }
 
   @Test
   fun `the book table is read while any book still lacks rows`() =
     runTest {
       gateOpen(withRows = 11, withChapters = 12)
-      every { bookDao.getAudiobooks() } returns listOf(book("b1", listOf(chapter(1))))
+      every { bookDao.getAudiobooks(any()) } returns listOf(book("b1", listOf(chapter(1))))
       coEvery { chapterDao.getChaptersForBook("b1") } returns emptyList()
 
       repository().backfillChapterTable()
 
-      io.mockk.verify { bookDao.getAudiobooks() }
+      io.mockk.verify { bookDao.getAudiobooks(any()) }
     }
 
   private fun TestScope.repository(): BookRepository =

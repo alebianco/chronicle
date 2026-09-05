@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import io.github.mattpvaughn.chronicle.data.model.Collection
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
@@ -23,6 +24,10 @@ class CollectionsRepository
     private val collectionsDao: CollectionsDao,
     private val dispatchers: DispatcherProvider,
   ) {
+    /** The Plex server these collections belong to, as a scoping key (cu-127, decision-21). */
+    private val currentSourceId: SourceId
+      get() = SourceId.forPlexServer(plexPrefsRepo.server?.serverId.orEmpty())
+
     // TODO: handle collections sorting!
     suspend fun getChildIds(collectionId: String): List<String> {
       return collectionsDao.getCollectionAsync(collectionId).childIds
@@ -30,11 +35,11 @@ class CollectionsRepository
 
     fun getCollection(id: String): Flow<Collection?> = collectionsDao.getCollection(id)
 
-    fun getAllCollections(): Flow<List<Collection>> = collectionsDao.getAllRows()
+    fun getAllCollections(): Flow<List<Collection>> = collectionsDao.getAllRows(currentSourceId)
 
     fun hasCollections(): Flow<Boolean> =
       collectionsDao
-        .countCollections()
+        .countCollections(currentSourceId)
         .map { it > 0 }
 
     suspend fun refreshCollectionsPaginated() {

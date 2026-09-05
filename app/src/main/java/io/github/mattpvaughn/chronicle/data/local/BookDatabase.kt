@@ -227,11 +227,16 @@ abstract class BookDatabase : RoomDatabase() {
  */
 @Dao
 interface BookDao {
-  @Query("SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive ORDER BY titleSort")
-  fun getAllRows(offlineModeActive: Boolean): Flow<List<Audiobook>>
+  @Query(
+    "SELECT * FROM Audiobook WHERE source = :source AND isCached >= :offlineModeActive ORDER BY titleSort",
+  )
+  fun getAllRows(
+    source: SourceId,
+    offlineModeActive: Boolean,
+  ): Flow<List<Audiobook>>
 
-  @Query("SELECT * FROM Audiobook")
-  fun getAudiobooks(): List<Audiobook>
+  @Query("SELECT * FROM Audiobook WHERE source = :source")
+  fun getAudiobooks(source: SourceId): List<Audiobook>
 
   /**
    * How many books carry a non-empty serialized `chapters` column.
@@ -263,33 +268,36 @@ interface BookDao {
   ): Flow<Audiobook?>
 
   @Query(
-    "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive ORDER BY addedAt DESC LIMIT :bookCount",
+    "SELECT * FROM Audiobook WHERE source = :source AND isCached >= :offlineModeActive ORDER BY addedAt DESC LIMIT :bookCount",
   )
   fun getRecentlyAdded(
+    source: SourceId,
     bookCount: Int,
     offlineModeActive: Boolean,
   ): Flow<List<Audiobook>>
 
   @Query(
-    "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive ORDER BY addedAt DESC LIMIT :bookCount",
+    "SELECT * FROM Audiobook WHERE source = :source AND isCached >= :offlineModeActive ORDER BY addedAt DESC LIMIT :bookCount",
   )
   suspend fun getRecentlyAddedAsync(
+    source: SourceId,
     bookCount: Int,
     offlineModeActive: Boolean,
   ): List<Audiobook>
 
-  @Query("SELECT * FROM Audiobook ORDER BY updatedAt DESC LIMIT 25")
-  fun getOnDeck(): Flow<List<Audiobook>>
+  @Query("SELECT * FROM Audiobook WHERE source = :source ORDER BY updatedAt DESC LIMIT 25")
+  fun getOnDeck(source: SourceId): Flow<List<Audiobook>>
 
   @Query(
     """
         SELECT * FROM Audiobook 
-        WHERE isCached >= :offlineModeActive AND lastViewedAt != 0 AND progress > 10000 AND progress < duration - 120000 
+        WHERE source = :source AND isCached >= :offlineModeActive AND lastViewedAt != 0 AND progress > 10000 AND progress < duration - 120000 
         ORDER BY lastViewedAt DESC 
         LIMIT :bookCount
         """,
   )
   fun getRecentlyListened(
+    source: SourceId,
     bookCount: Int,
     offlineModeActive: Boolean,
   ): Flow<List<Audiobook>>
@@ -297,12 +305,13 @@ interface BookDao {
   @Query(
     """
         SELECT * FROM Audiobook 
-        WHERE isCached >= :offlineModeActive AND lastViewedAt != 0 AND progress > 10000 AND progress < duration - 120000 
+        WHERE source = :source AND isCached >= :offlineModeActive AND lastViewedAt != 0 AND progress > 10000 AND progress < duration - 120000 
         ORDER BY lastViewedAt DESC
         LIMIT :bookCount
         """,
   )
   suspend fun getRecentlyListenedAsync(
+    source: SourceId,
     bookCount: Int,
     offlineModeActive: Boolean,
   ): List<Audiobook>
@@ -341,17 +350,19 @@ interface BookDao {
   }
 
   @Query(
-    "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive AND (title LIKE :query OR author LIKE :query)",
+    "SELECT * FROM Audiobook WHERE source = :source AND isCached >= :offlineModeActive AND (title LIKE :query OR author LIKE :query)",
   )
   fun search(
+    source: SourceId,
     query: String,
     offlineModeActive: Boolean,
   ): Flow<List<Audiobook>>
 
   @Query(
-    "SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive AND (title LIKE :query OR author LIKE :query)",
+    "SELECT * FROM Audiobook WHERE source = :source AND isCached >= :offlineModeActive AND (title LIKE :query OR author LIKE :query)",
   )
   fun searchAsync(
+    source: SourceId,
     query: String,
     offlineModeActive: Boolean,
   ): List<Audiobook>
@@ -359,26 +370,37 @@ interface BookDao {
   @Query("DELETE FROM Audiobook")
   suspend fun clear()
 
-  @Query("SELECT * FROM Audiobook ORDER BY lastViewedAt DESC LIMIT 1")
-  suspend fun getMostRecent(): Audiobook?
+  @Query("SELECT * FROM Audiobook WHERE source = :source ORDER BY lastViewedAt DESC LIMIT 1")
+  suspend fun getMostRecent(source: SourceId): Audiobook?
 
   @Query("SELECT * FROM Audiobook WHERE id = :bookId LIMIT 1")
   suspend fun getAudiobookAsync(bookId: String): Audiobook?
 
-  @Query("SELECT * FROM Audiobook WHERE isCached >= :isCached")
-  fun getCachedAudiobooks(isCached: Boolean = true): Flow<List<Audiobook>>
+  @Query("SELECT * FROM Audiobook WHERE source = :source AND isCached >= :isCached")
+  fun getCachedAudiobooks(
+    source: SourceId,
+    isCached: Boolean = true,
+  ): Flow<List<Audiobook>>
 
-  @Query("SELECT * FROM Audiobook WHERE isCached >= :isCached")
-  fun getCachedAudiobooksAsync(isCached: Boolean = true): List<Audiobook>
+  @Query("SELECT * FROM Audiobook WHERE source = :source AND isCached >= :isCached")
+  fun getCachedAudiobooksAsync(
+    source: SourceId,
+    isCached: Boolean = true,
+  ): List<Audiobook>
 
   @Query("UPDATE Audiobook SET isCached = :isCached")
   suspend fun uncacheAll(isCached: Boolean = false)
 
-  @Query("SELECT * FROM Audiobook WHERE isCached >= :offlineModeActive ORDER BY titleSort ASC")
-  fun getAllBooksAsync(offlineModeActive: Boolean): List<Audiobook>
+  @Query(
+    "SELECT * FROM Audiobook WHERE source = :source AND isCached >= :offlineModeActive ORDER BY titleSort ASC",
+  )
+  fun getAllBooksAsync(
+    source: SourceId,
+    offlineModeActive: Boolean,
+  ): List<Audiobook>
 
-  @Query("SELECT COUNT(*) FROM Audiobook")
-  suspend fun getBookCount(): Int
+  @Query("SELECT COUNT(*) FROM Audiobook WHERE source = :source")
+  suspend fun getBookCount(source: SourceId): Int
 
   /**
    * Sets this book's speed override, or clears it with [Audiobook.NO_SPEED_OVERRIDE] (cu-20).
@@ -395,8 +417,8 @@ interface BookDao {
   @Query("DELETE FROM Audiobook WHERE id IN (:booksToRemove)")
   fun removeAll(booksToRemove: List<String>): Int
 
-  @Query("SELECT * FROM Audiobook ORDER BY RANDOM() LIMIT 1")
-  suspend fun getRandomBookAsync(): Audiobook?
+  @Query("SELECT * FROM Audiobook WHERE source = :source ORDER BY RANDOM() LIMIT 1")
+  suspend fun getRandomBookAsync(source: SourceId): Audiobook?
 
   @Query("UPDATE Audiobook SET progress = 0 WHERE id = :bookId")
   suspend fun resetBookProgress(bookId: String)

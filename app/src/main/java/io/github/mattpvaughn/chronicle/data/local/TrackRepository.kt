@@ -220,7 +220,7 @@ class TrackRepository
           Timber.e(t, "Failed to load tracks")
         }
 
-        val localTracks = trackDao.getAllTracksAsync()
+        val localTracks = trackDao.getAllTracksAsync(currentSourceId)
         val mergedTracks = mergeNetworkTracks(networkTracks, localTracks)
         trackDao.insertAll(mergedTracks)
       }
@@ -228,7 +228,7 @@ class TrackRepository
 
     override suspend fun findTrackByTitle(title: String): MediaItemTrack? {
       return withContext(dispatchers.io) {
-        trackDao.findTrackByTitle(title)
+        trackDao.findTrackByTitle(currentSourceId, title)
       }
     }
 
@@ -303,7 +303,7 @@ class TrackRepository
       forceUseNetwork: Boolean,
     ): Result<List<MediaItemTrack>, Throwable> {
       return withContext(dispatchers.io) {
-        val localTracks = trackDao.getAllTracksAsync()
+        val localTracks = trackDao.getAllTracksAsync(currentSourceId)
         try {
           val networkTracks =
             plexMediaService.retrieveTracksForAlbum(bookId)
@@ -333,12 +333,12 @@ class TrackRepository
     }
 
     override fun getAllTracks(): Flow<List<MediaItemTrack>> {
-      return trackDao.getAllTracks()
+      return trackDao.getAllTracks(currentSourceId)
     }
 
     override suspend fun getAllTracksAsync(): List<MediaItemTrack> {
       return withContext(dispatchers.io) {
-        trackDao.getAllTracksAsync()
+        trackDao.getAllTracksAsync(currentSourceId)
       }
     }
 
@@ -394,7 +394,7 @@ class TrackRepository
 
     override suspend fun getCachedTracks(): List<MediaItemTrack> {
       return withContext(dispatchers.io) {
-        trackDao.getCachedTracksAsync(isCached = true)
+        trackDao.getCachedTracksAsync(currentSourceId, isCached = true)
       }
     }
 
@@ -418,7 +418,7 @@ class TrackRepository
 
     override suspend fun loadAllTracksAsync() =
       withContext(dispatchers.io) {
-        val localTracks = trackDao.getAllTracksAsync()
+        val localTracks = trackDao.getAllTracksAsync(currentSourceId)
         try {
           val networkTracks =
             plexMediaService.retrieveAllTracksInLibrary(
