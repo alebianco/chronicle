@@ -550,11 +550,38 @@ class BookRepository
       }
     }
 
+    /**
+     * Matches over a five-column projection, then fetches only the books that matched (cu-161).
+     *
+     * `SELECT *` over the whole table was most of a search's cost — **70 ms at 10,000 books**,
+     * measured, against 13 ms for the projection plus 2 ms to fetch fifty hits by id. The matching
+     * itself is cheap and linear; the read was the expensive half (cu-51).
+     *
+     * The matching is **unchanged**: `groupedSearch` runs over the same four fields it always did,
+     * so cu-25's fuzzy tier, 4-character floor and character-count prefilter all behave
+     * identically. Only where the strings come from has changed.
+     *
+     * `offlineMode` is applied in the projection query, so an offline search still sees only
+     * cached books — the contract every other read path here honours.
+     */
     override suspend fun searchGrouped(query: String): GroupedSearchResults {
       return withContext(dispatchers.io) {
-        // getAllBooksAsync already applies offlineMode, so an offline search sees only cached
-        // books — the contract every other read path here honours.
-        bookDao.getAllBooksAsync(currentSourceId, prefsRepo.offlineMode).groupedSearch(query)
+        val source = currentSourceId
+        val matched =
+          bookDao.searchProjection(source, prefsRepo.offlineMode)
+            .map { it.asMatchCandidate() }
+            .groupedSearch(query)
+
+        if (matched.isEmpty) {
+          return@withContext matched
+        }
+
+        // One keyed read for every book that matched, across all groups, then each result's
+        // stub is swapped for the real row. A book can appear in two groups, so the fetch is
+        // deduplicated by id.
+        val ids = matched.groups.flatMap { group -> group.results.map { it.book.id } }.distinct()
+        val booksById = bookDao.getAudiobooksByIds(source, ids).associateBy { it.id }
+        matched.withRealBooks(booksById)
       }
     }
 

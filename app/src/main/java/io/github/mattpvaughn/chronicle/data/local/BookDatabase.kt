@@ -5,6 +5,7 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookSearchRow
 import io.github.mattpvaughn.chronicle.data.model.BookTrackData
 import io.github.mattpvaughn.chronicle.data.model.SourceId
 import kotlinx.coroutines.flow.Flow
@@ -440,6 +441,29 @@ interface BookDao {
   fun getAllBooksAsync(
     source: SourceId,
     offlineModeActive: Boolean,
+  ): List<Audiobook>
+
+  /**
+   * The five fields [io.github.mattpvaughn.chronicle.data.model.groupedSearch] actually reads
+   * (cu-161).
+   *
+   * `SELECT *` materialises every column of every row — summary, thumb, and twenty more that the
+   * matching never touches. cu-51 measured that read as most of a search's cost at 10,000 books.
+   */
+  @Query(
+    "SELECT id, title, author, narrator, series FROM Audiobook " +
+      "WHERE source = :source AND isCached >= :offlineModeActive",
+  )
+  suspend fun searchProjection(
+    source: SourceId,
+    offlineModeActive: Boolean,
+  ): List<BookSearchRow>
+
+  /** The books a search actually matched, fetched in full once the matching is done (cu-161). */
+  @Query("SELECT * FROM Audiobook WHERE source = :source AND id IN (:ids)")
+  suspend fun getAudiobooksByIds(
+    source: SourceId,
+    ids: List<String>,
   ): List<Audiobook>
 
   @Query("SELECT COUNT(*) FROM Audiobook WHERE source = :source")

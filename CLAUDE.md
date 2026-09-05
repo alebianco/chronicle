@@ -497,6 +497,16 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   track now has its own `track-<id>-chapters.json`. A chapter spanning a track boundary
   legitimately appears on **both** tracks, so a count above the distinct-chapter count is correct.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
+- **Search matches over a projection, then fetches the hits** (cu-161). `searchGrouped` reads five
+  columns (`BookDao.searchProjection`), matches, and fetches only the matched books by id —
+  **196.7 → 75.4 ms at 10,000 books, 62%**. `groupedSearch` itself is untouched, so cu-25's rules
+  are unchanged; the projection converts to an `Audiobook` stub carrying only the matched fields and
+  `withRealBooks` swaps the real rows back. **Do not make the matching generic** — the first attempt
+  did, and `GroupedSearchResults<T>` leaked into every UI call site for no benefit.
+  Two measurement traps cost real time here: a fixture of `"Series ${i % 200}"` makes any query
+  fuzzy-match hundreds of neighbours and reported the change as 2% *worse*; the rewritten fixture
+  then measured `hits=0`. Measure with a query that matches a realistic slice, and print the hit
+  count beside the timing. `SearchReadCostTest` re-runs it in one command.
 - **Search is local, not `/hubs/search`** (cu-25). `BookSearch.kt` scans the synced library in
   memory over four fields (title, author, narrator, series). The endpoint the task named cannot be
   the foundation: its results **omit `Style`/`Mood`**, so it cannot answer a narrator or series

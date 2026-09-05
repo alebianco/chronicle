@@ -130,6 +130,29 @@ fun List<Audiobook>.groupedSearch(query: String): GroupedSearchResults {
 }
 
 /**
+ * Replaces each result's projection stub with the real book (cu-161).
+ *
+ * The matching runs over a five-column projection, so every [SearchResult.book] is a stub carrying
+ * only the matched fields — enough to decide *whether* a book matched, not enough to render it.
+ * This swaps in the rows fetched by id afterwards.
+ *
+ * A result whose id is missing from [booksById] is **dropped**, not rendered as a stub: the book
+ * was deleted between the two reads, and showing a row with no cover, duration or progress is
+ * worse than showing one fewer result. Ordering is untouched — the swap is positional.
+ */
+fun GroupedSearchResults.withRealBooks(booksById: Map<String, Audiobook>): GroupedSearchResults =
+  GroupedSearchResults(
+    groups =
+      groups.mapNotNull { group ->
+        val resolved =
+          group.results.mapNotNull { result ->
+            booksById[result.book.id]?.let { result.copy(book = it) }
+          }
+        if (resolved.isEmpty()) null else group.copy(results = resolved)
+      },
+  )
+
+/**
  * Orders one group's results the way that group is read.
  *
  * Only the **series** group differs: reading order is the whole reason to search a series name, and
