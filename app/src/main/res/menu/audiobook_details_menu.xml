@@ -2,12 +2,15 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- TODO: bring back for casting -->
-    <!--    <item-->
-    <!--        android:id="@+id/media_route_menu_item"-->
-    <!--        app:actionProviderClass="androidx.mediarouter.app.MediaRouteActionProvider"-->
-    <!--        app:showAsAction="always"-->
-    <!--        android:title="@string/cast" />-->
+    <!-- Hidden unless a receiver is reachable: CastMenu.setUp() shows it only when Play services
+         is present and the Cast SDK resolves, so a de-Googled device never sees a dead button. -->
+    <item
+        android:id="@+id/media_route_menu_item"
+        android:icon="@drawable/ic_cast_white"
+        android:title="@string/cast"
+        android:visible="false"
+        app:actionProviderClass="androidx.mediarouter.app.MediaRouteActionProvider"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/toggle_watched"

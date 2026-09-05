@@ -217,6 +217,48 @@ class ProgressUpdaterTest {
     dispatchers = dispatchers,
   )
 
+  /**
+   * The cu-168 handover: when a cast session takes over, the position must keep being saved from
+   * whichever player is now current.
+   *
+   * The service supplies `trackPosition` as `{ currentPlayer?.currentPosition }` — a *read* of the
+   * mutable field, not a captured player — so a swap is followed automatically. A supplier that
+   * captured the local ExoPlayer instead would keep reporting a frozen position for the rest of the
+   * cast, writing a stale offset once a second, and nothing would surface the fault. Mutating the
+   * source here is what a `switchToPlayer` does from the updater's point of view.
+   */
+  @Test
+  fun `the saved position follows a player swap, as a cast handover performs`() =
+    runTest {
+      val dispatchers = TestDispatcherProvider(testScheduler)
+      val serviceScope = CoroutineScope(SupervisorJob() + dispatchers.io)
+      val updater = updater(serviceScope, dispatchers)
+      var activePlayerPosition = TRACK_FRAME_POSITION
+      updater.trackPosition = { activePlayerPosition }
+      updater.mediaController =
+        mockk(relaxed = true) {
+          every { playbackState } returns
+            PlaybackStateCompat.Builder()
+              .setState(PlaybackStateCompat.STATE_PLAYING, CHAPTER_RELATIVE_POSITION, 1f)
+              .build()
+          every { metadata } returns
+            MediaMetadataCompat.Builder()
+              .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, TRACK_ID)
+              .build()
+        }
+
+      updater.startRegularProgressUpdates()
+      advanceUntilIdle()
+      coVerify { trackRepo.updateTrackProgress(TRACK_FRAME_POSITION, TRACK_ID, any()) }
+
+      // The cast receiver takes over and reports its own, further-along position.
+      activePlayerPosition = CAST_FRAME_POSITION
+      updater.startRegularProgressUpdates()
+      advanceUntilIdle()
+
+      coVerify { trackRepo.updateTrackProgress(CAST_FRAME_POSITION, TRACK_ID, any()) }
+    }
+
   private companion object {
     const val TRACK_ID = "3001"
 
@@ -225,6 +267,9 @@ class ProgressUpdaterTest {
 
     /** What Auto's scrubber sees for the same instant — an offset inside the current chapter. */
     const val CHAPTER_RELATIVE_POSITION = 120_000L
+
+    /** A position only the cast receiver would report, so a frozen supplier fails on the number. */
+    const val CAST_FRAME_POSITION = 5_200_000L
     const val BOOK_ID = "1001"
     const val PLEX_SOURCE = 1L
   }

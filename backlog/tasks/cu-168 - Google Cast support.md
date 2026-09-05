@@ -1,8 +1,9 @@
 ---
 id: cu-168
 title: 'Google Cast support'
-status: To Do
-assignee: []
+status: In Review
+assignee:
+  - '@claude'
 created_date: '2026-09-05'
 updated_date: '2026-09-05'
 labels:
@@ -64,7 +65,74 @@ still open).
 
 - [ ] A Cast route button appears in the player and book details when a receiver is available, and is hidden when none is
 - [ ] Starting a cast moves playback to the receiver and keeps the notification and Auto controls working
-- [ ] Listening position continues to be saved while casting, and survives ending the cast — pinned by a test, since the frame bug above is silent
-- [ ] A downloaded book either streams or refuses with a clear message, never fails opaquely
+- [x] Listening position continues to be saved while casting, and survives ending the cast — pinned by a test, since the frame bug above is silent
+- [x] A downloaded book either streams or refuses with a clear message, never fails opaquely
 - [ ] The Play-services dependency is recorded as a decision against principle 7
-- [ ] `./test_release_build.sh` passes — the Cast SDK is reflection-adjacent and needs keep rules
+- [x] `./test_release_build.sh` passes — the Cast SDK is reflection-adjacent and needs keep rules
+
+## Implementation Notes
+
+**Status: the logic is written and tested; nothing has been seen working.** Read the blocker first.
+
+### The blocker, found while starting
+
+**Neither development device can run Cast at all.** Both the tablet (`192.168.1.95:5555`) and the
+second device are `Phh-Treble vanilla` GSIs with **zero** Google packages installed
+(`pm list packages | grep -c gms` returns 0 on both). Play services is required by the Cast SDK, so
+no part of the on-device behaviour — the button appearing, a session starting, playback moving to a
+receiver — can be verified here. That reframed the work: the code was written so the *unavailable*
+path is the safe, tested one, since it is the only path this setup exercises.
+
+### What was built
+
+- `CastAvailability` / `PlayServicesCastAvailability` — the gate. `CastContext.getSharedInstance`
+  **throws** without Play services, so nothing Cast-related is touched until this says yes.
+- `CastPlayerProvider` — the only file naming a Cast SDK type, with a `@file:UnstableApi` opt-in.
+  Returns `Player`, not `CastPlayer`, so the unstable opt-in stops at that boundary. Resolution is
+  remembered **including the null**, since the failure is permanent for the process.
+- `CastEligibility` + `buildCastPlaylist` — the substitution rule. A receiver cannot open a
+  downloaded `file://` URI (cu-83), so those tracks are streamed from the server instead, and the
+  caller is told (`streamedInsteadOfLocal`) so the user sees a message rather than silent mobile
+  data use.
+- `castMimeTypeOf` — a receiver does not sniff content the way ExoPlayer's extractors do; an absent
+  MIME type is refused with a generic load error. Derived from the extension, with the query string
+  stripped first so a `?X-Plex-Token=` tail is not read as one.
+- Token in the **query string**: a receiver cannot send the `X-Plex-Token` *header* the app's OkHttp
+  client uses. An empty token is omitted rather than sent empty (cu-33's "empty counts as absent").
+- The `else -> throw NoWhenBranchMatchedException("Unknown media player")` in
+  `AudiobookMediaSessionCallback` is replaced by the real Cast branch — that throw was the actual
+  blocker to a `CastPlayer` ever being usable.
+- Route button wired into `audiobook_details_menu.xml` via `MediaRouteActionProvider`, shipped
+  `android:visible="false"` and revealed only by `CastMenu.setUp` when Cast resolves — so a
+  de-Googled device never shows a dead button.
+
+### Known gap, deliberately not written blind
+
+`switchToPlayer` seeks the incoming player and copies `playWhenReady`, but **never sets its
+playlist** — only `AudiobookMediaSessionCallback` does, when playback *starts*. So starting a book
+while a cast session is connected works, but **handing over mid-playback gives the Cast player an
+empty queue**. Closing it means rebuilding the queue from `currentlyPlaying` inside
+`switchToPlayer`, which cannot be verified without a receiver. Documented in the KDoc at the call
+site rather than guessed at.
+
+### Verification actually performed
+
+- `./verify.sh` — all 6 stages green.
+- `./test_release_build.sh` — release build + R8 pass. The R8 mapping shows the new classes
+  **renamed** (`CastEligibility -> cd.l`), i.e. kept and reachable, and the manifest-referenced
+  `DefaultCastOptionsProvider` survives. **No keep rules were needed**; none were added, since a
+  speculative `-keep` silently exempts code from R8 (cu-45).
+- Two sabotage checks, both confirmed to fail before being restored: returning the `file://` URI
+  from the substitution branch, and capturing the player position instead of reading it.
+- `features/player` coverage rose 37.29% -> 37.78%.
+
+### What the owner needs to do
+
+1. **The Play-services decision (principle 7).** Left unwritten on purpose — `backlog/decisions/` is
+   owner-only for product decisions, and this is one: `media3-cast` pulls in the proprietary Cast
+   SDK. Relevant fact for that call: the app **already** ships a GMS dependency
+   (`play-services-oss-licenses`), so this is not the first such dependency, and Cast degrades
+   cleanly to absent on de-Googled devices.
+2. **Every on-device criterion above**, on hardware with Play services and a real receiver — the
+   button appearing and hiding, a session starting, notification and Auto controls surviving it, and
+   whether the mid-playback handover gap is worth closing before release.

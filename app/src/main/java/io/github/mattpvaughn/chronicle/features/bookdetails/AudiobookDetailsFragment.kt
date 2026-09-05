@@ -15,6 +15,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.media3.common.util.UnstableApi
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -29,7 +30,9 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.Cach
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState
 import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBinding
+import io.github.mattpvaughn.chronicle.features.player.CastMenu
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.features.player.PlayServicesCastAvailability
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
@@ -264,10 +267,6 @@ class AudiobookDetailsFragment : Fragment() {
       adapter.submitChapters(chapters)
     }
 
-    // No Cast button. Upstream left 16 lines of commented-out MediaRouteButton wiring here, dead in
-    // every build. Nothing in the app uses Cast at all — `media3-cast` is declared but never
-    // imported — so this was never one UI hook away from working. See mattttvaughn/chronicle#8.
-
     detailsToolbar = binding.detailsToolbar
     (activity as AppCompatActivity).setSupportActionBar(binding.detailsToolbar)
     binding.detailsToolbar.title = null
@@ -348,11 +347,17 @@ class AudiobookDetailsFragment : Fragment() {
     val menuHost: MenuHost = requireActivity()
     menuHost.addMenuProvider(
       object : MenuProvider {
+        // @UnstableApi for the Cast route button below; scoped to this callback rather than the
+        // Fragment so the opt-in does not silently cover unrelated screen code.
+        @UnstableApi
         override fun onCreateMenu(
           menu: Menu,
           menuInflater: MenuInflater,
         ) {
           menuInflater.inflate(R.menu.audiobook_details_menu, menu)
+          // Reveals the route button only where Cast can actually work; a no-op otherwise, which
+          // is why the menu item ships hidden (cu-168).
+          CastMenu.setUp(requireContext(), menu, PlayServicesCastAvailability(requireContext()))
         }
 
         /**

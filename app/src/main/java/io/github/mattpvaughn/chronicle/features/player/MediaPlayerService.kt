@@ -103,6 +103,13 @@ class MediaPlayerService :
   @Inject
   lateinit var exoPlayer: ExoPlayer
 
+  /**
+   * Built in [observeCastSessions] rather than injected: it needs only this `Service` as a
+   * `Context`, and a `@Provides` body that cannot be reached from a unit test erodes the
+   * `injection/modules` coverage floor for no benefit. Held so `onDestroy` can drop the listener.
+   */
+  private var castPlayerProvider: CastPlayerProvider? = null
+
   @Inject
   lateinit var bookRepository: IBookRepository
 
@@ -265,6 +272,7 @@ class MediaPlayerService :
 
     updateCustomActions()
     switchToPlayer(exoPlayer)
+    observeCastSessions()
 
     mediaController.registerCallback(onMediaChangedCallback)
 
@@ -591,6 +599,11 @@ class MediaPlayerService :
     progressUpdater.cancel()
     serviceJob.cancel()
 
+    // Drops the session listener, which otherwise outlives the service and calls switchToPlayer on
+    // a dead one.
+    castPlayerProvider?.release()
+    castPlayerProvider = null
+
     prefsRepo.unregisterPrefsListener(prefsListener)
     localBroadcastManager.unregisterReceiver(sleepTimerBroadcastReceiver)
     sleepTimer.cancel()
@@ -895,6 +908,58 @@ class MediaPlayerService :
         }
       }
     }
+
+  /**
+   * Moves playback onto the Cast receiver when a session starts, and back when it ends.
+   *
+   * The progress supplier set in `onCreate` reads `currentPlayer` on every tick rather than
+   * capturing a player, so it follows this swap without further wiring — the silent failure the
+   * task warned about (progress quietly stopping while casting) is avoided by that indirection.
+   * `ProgressUpdaterTest` pins it by moving the source under a live updater.
+   *
+   * A no-op on a device without Play services, which is every device this was developed on.
+   *
+   * **Known gap.** [switchToPlayer] seeks the incoming player and copies `playWhenReady`, but the
+   * playlist itself is only ever set in `AudiobookMediaSessionCallback` when playback *starts*, so
+   * handing over mid-playback gives the Cast player an empty queue. Starting a book while a session
+   * is already connected works, because that path builds the cast playlist. Closing the gap means
+   * rebuilding the queue here from `currentlyPlaying`, and it cannot be verified without a
+   * Play-services device and a receiver — neither of which exists in this development setup, so it
+   * is left explicit rather than written blind (cu-168).
+   */
+  private fun observeCastSessions() {
+    val provider = castPlayerProviderFor(this).also { castPlayerProvider = it }
+    provider.observeSessions(
+      onAvailable = { castPlayer ->
+        // Flush before the swap: switchToPlayer stops the outgoing player, and the per-second tick
+        // is gated on isPlaying, so an unflushed position would be lost exactly as on a pause
+        // (cu-93).
+        flushProgressFromCurrentPlayer()
+        switchToPlayer(castPlayer)
+      },
+      onUnavailable = {
+        flushProgressFromCurrentPlayer()
+        switchToPlayer(exoPlayer)
+      },
+    )
+  }
+
+  /**
+   * Writes the position the *player* reports, never the session's.
+   *
+   * `MediaSessionCompat`'s playback state lags a frame, so reading it here would overwrite a good
+   * position with a stale one — the cu-93 trap, repeated on the cast-handover path.
+   */
+  private fun flushProgressFromCurrentPlayer() {
+    val player = currentPlayer ?: return
+    val trackId = mediaController.metadata?.id ?: return
+    progressUpdater.updateProgress(
+      trackId,
+      PLEX_STATE_PAUSED,
+      player.currentPosition,
+      true,
+    )
+  }
 
   private fun switchToPlayer(player: Player) {
     if (player == currentPlayer) {

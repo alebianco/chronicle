@@ -457,7 +457,34 @@ class AudiobookMediaSessionCallback
             player.setMediaSources(mediaSources)
             player.prepare()
           }
-          else -> throw NoWhenBranchMatchedException("Unknown media player")
+          // A Cast receiver fetches the audio itself, so it needs plain MediaItems with a MIME type
+          // and the token in the URL rather than ExoPlayer's header-carrying media sources. It also
+          // cannot open a downloaded file:// URI, so those tracks stream instead (cu-168).
+          else -> {
+            val playlist =
+              buildCastPlaylist(
+                tracks.sorted().map { track ->
+                  CastSourceCandidate(
+                    preferredUri = track.getTrackSource(prefsRepo.cachedMediaDir, plexConfig),
+                    serverUri = plexConfig.toServerString(track.media),
+                    title = track.title,
+                  )
+                },
+                playbackSession.authToken,
+              )
+            if (playlist.items.size != tracks.size) {
+              Timber.w(
+                "Casting an incomplete playlist: ${playlist.items.size} of ${tracks.size} tracks " +
+                  "had a reachable URL",
+              )
+            }
+            if (playlist.streamedInsteadOfLocal) {
+              Timber.i("Casting a downloaded book: streaming from the server instead")
+              broadcastCastStreamingDownloadedBook()
+            }
+            player.setMediaItems(playlist.items.map { it.asMedia3Item() })
+            player.prepare()
+          }
         }
 
         currentlyPlaying.update(
@@ -526,6 +553,17 @@ class AudiobookMediaSessionCallback
         )
         broadcastPlaybackError(appContext.getString(R.string.playback_error_no_tracks))
       }
+    }
+
+    /**
+     * Tells the user a downloaded book is being streamed to the receiver.
+     *
+     * Not an error, but it travels on the error channel because that is the only path from the
+     * service to a visible message, and silence here would look like the download was ignored —
+     * or, on a metered connection, cost the user data with no warning.
+     */
+    private fun broadcastCastStreamingDownloadedBook() {
+      broadcastPlaybackError(appContext.getString(R.string.cast_streaming_downloaded_book))
     }
 
     /**

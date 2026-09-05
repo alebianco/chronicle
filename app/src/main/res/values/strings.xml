@@ -410,6 +410,7 @@
     <string name="pin">Pin</string>
     <string name="playback_error_unknown">Unknown playback error</string>
     <string name="playback_error_no_tracks">This book has no playable tracks</string>
+    <string name="cast_streaming_downloaded_book">Streaming this book to the cast device — downloaded files stay on this device.</string>
     <string name="toggle_watched">Toggle Watched</string>
     <string name="settings_version_title">Version information</string>
 
