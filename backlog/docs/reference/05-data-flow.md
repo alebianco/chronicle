@@ -35,11 +35,14 @@ This keeps data flow predictable and makes debugging easier.
 
 ## Key Concepts
 
-### LiveData
-- **Observable** data holder
-- **Lifecycle-aware**: Automatically stops sending updates when UI is inactive
-- **Main thread**: Always delivers updates on the UI thread
-- ViewModels expose LiveData, Views observe it
+### StateFlow
+- **Observable** state holder, always carrying a current value
+- **Replays to every new collector** — unlike `LiveData`, a late collector still sees the value
+- **Conflates equal consecutive values**: a repeated identical emission is dropped, so anything
+  that must fire each time needs `Event<T>`
+- **Not lifecycle-aware by itself**: ViewModels expose `StateFlow`, Views collect it through
+  `collectWhileStarted` (`util/FlowCollect.kt`), which wraps `repeatOnLifecycle(STARTED)`
+- There is **no `LiveData` in this codebase** (cu-52); `postValue` is banned by a build gate
 
 ### Coroutines
 - Handle **asynchronous** operations (network, database, file I/O)
@@ -65,25 +68,27 @@ sequenceDiagram
     Note over LibraryViewModel: books = bookRepository.getAllBooks()
     LibraryViewModel->>BookRepository: getAllBooks()
     BookRepository->>RoomDatabase: bookDao.getAllBooks()
-    RoomDatabase-->>BookRepository: LiveData<List<Audiobook>>
-    BookRepository-->>LibraryViewModel: LiveData
+    RoomDatabase-->>BookRepository: Flow<List<Audiobook>>
+    BookRepository-->>LibraryViewModel: Flow
     Note over RoomDatabase: Data changes, emits update
-    RoomDatabase-->>LibraryFragment: Observer callback triggered
+    RoomDatabase-->>LibraryFragment: collector invoked
     LibraryFragment->>LibraryFragment: Update RecyclerView
 ```
 
 **Code example**:
 ```kotlin
 // In LibraryFragment
-viewModel.books.observe(viewLifecycleOwner) { books ->
+collectWhileStarted(viewModel.books) { books ->
     adapter.submitList(books)  // Update UI
 }
 
 // In LibraryViewModel
-val books: LiveData<List<Audiobook>> = bookRepository.getAllBooks()
+val books: StateFlow<List<Audiobook>> =
+    bookRepository.getAllBooks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
 // In BookRepository
-fun getAllBooks(): LiveData<List<Audiobook>> {
+fun getAllBooks(): Flow<List<Audiobook>> {
     return bookDao.getAllBooks()  // Room automatically updates this
 }
 ```
@@ -108,8 +113,8 @@ sequenceDiagram
     PlexService-->>BookRepository: List<Audiobook>
     BookRepository->>RoomDatabase: insertAll(books)
     RoomDatabase-->>BookRepository: Data saved
-    Note over RoomDatabase: LiveData automatically notified
-    RoomDatabase-->>HomeFragment: Observer triggered
+    Note over RoomDatabase: Room re-emits on the Flow
+    RoomDatabase-->>HomeFragment: collector invoked
     HomeFragment->>User: UI updates with new data
 ```
 
@@ -120,7 +125,7 @@ binding.swipeToRefresh.setOnRefreshListener {
     viewModel.refreshData()
 }
 
-viewModel.isRefreshing.observe(viewLifecycleOwner) { isRefreshing ->
+collectWhileStarted(viewModel.isRefreshing) { isRefreshing ->
     binding.swipeToRefresh.isRefreshing = isRefreshing
 }
 
@@ -179,7 +184,7 @@ sequenceDiagram
     MediaPlayerService->>BookRepository: updateProgress(bookId, time, progress)
     Note over BookRepository: Launch coroutine
     BookRepository->>RoomDatabase: Update progress column
-    RoomDatabase-->>UIComponents: LiveData notifies observers
+    RoomDatabase-->>UIComponents: Flow re-emits to collectors
     UIComponents->>UIComponents: Progress bars update
     par Background sync
         BookRepository->>PlexService: scrobble(bookId, progress)
@@ -240,13 +245,13 @@ sequenceDiagram
     Note over FetchLibrary: Download files in background
     loop Progress updates
         FetchLibrary-->>CachedFileManager: Progress callbacks
-        CachedFileManager-->>AudiobookDetailsViewModel: LiveData<DownloadProgress>
+        CachedFileManager-->>AudiobookDetailsViewModel: StateFlow<DownloadProgress>
         AudiobookDetailsViewModel-->>AudiobookDetailsFragment: Update progress bar
     end
     Note over FetchLibrary: Downloads complete
     CachedFileManager->>BookRepository: markAsCached(bookId)
     BookRepository->>RoomDatabase: Update isCached = true
-    RoomDatabase-->>AudiobookDetailsFragment: LiveData updates
+    RoomDatabase-->>AudiobookDetailsFragment: Flow re-emits
     AudiobookDetailsFragment->>User: Show delete button
 ```
 
@@ -255,17 +260,17 @@ sequenceDiagram
 ### ViewModel State
 
 ViewModels hold UI state using:
-- **LiveData**: For observable data (lists, loading states)
-- **MutableLiveData**: Internal mutable version
+- **StateFlow**: For observable state (lists, loading states)
+- **MutableStateFlow**: Internal mutable version
 - **Private setters**: Only ViewModel can change state
 
 ```kotlin
 class HomeViewModel : ViewModel() {
     // Private mutable version
-    private val _isRefreshing = MutableLiveData(false)
+    private val _isRefreshing = MutableStateFlow(false)
     
     // Public immutable version exposed to UI
-    val isRefreshing: LiveData<Boolean>
+    val isRefreshing: StateFlow<Boolean>
         get() = _isRefreshing
     
     fun refreshData() {
@@ -286,7 +291,7 @@ Repositories manage data state:
 ```kotlin
 class BookRepository {
     // Database = source of truth
-    fun getAllBooks(): LiveData<List<Audiobook>> {
+    fun getAllBooks(): Flow<List<Audiobook>> {
         return bookDao.getAllBooks()
     }
     
@@ -302,11 +307,11 @@ class BookRepository {
 
 1. **UI Operations**: Must be on Main thread
    - Updating Views
-   - LiveData observations
+   - StateFlow collection
    - ViewModel property access
 
 2. **Database Operations**: Use IO thread
-   - Room queries (except LiveData, which handles threading automatically)
+   - Room queries (except `Flow` queries, which Room runs off the main thread)
    - File operations
 
 3. **Network Operations**: Use IO thread
@@ -375,7 +380,7 @@ Chronicle handles offline mode through the Repository pattern:
 
 ```kotlin
 // Repository decides source based on offline mode
-fun getAllBooks(): LiveData<List<Audiobook>> {
+fun getAllBooks(): Flow<List<Audiobook>> {
     return if (prefsRepo.offlineMode) {
         bookDao.getCachedBooks()  // Only cached books
     } else {
@@ -391,15 +396,15 @@ fun getAllBooks(): LiveData<List<Audiobook>> {
 3. **Events go up**: User actions flow up (View → ViewModel → Repository)
 4. **No direct DB access**: ViewModels never access database directly, always through Repository
 5. **Async in Repository**: All async work happens in Repository, ViewModels just call suspend functions
-6. **LiveData for UI**: Always use LiveData to expose data to UI
+6. **StateFlow for UI**: expose `StateFlow` and collect it with `collectWhileStarted`
 7. **Coroutines for work**: Use coroutines for async operations
 
 ## Summary
 
-- **Data down**: Repository → ViewModel → View (via LiveData)
+- **Data down**: Repository → ViewModel → View (via `StateFlow`)
 - **Events up**: View → ViewModel → Repository (via method calls)
 - **Async**: Use coroutines in Repositories
-- **Thread-safe**: Room and LiveData handle threading
+- **Thread-safe**: Room runs `Flow` queries off the main thread; ViewModels use `viewModelScope`
 - **Single source**: Database is source of truth
 - **Reactive**: UI automatically updates when data changes
 

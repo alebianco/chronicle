@@ -86,7 +86,7 @@ interface BookDao {
     suspend fun updateFavorited(bookId: Int, favorited: Boolean)
     
     @Query("SELECT * FROM Audiobook WHERE favorited = 1 ORDER BY titleSort")
-    fun getFavoritedBooks(): LiveData<List<Audiobook>>
+    fun getFavoritedBooks(): Flow<List<Audiobook>>
 }
 ```
 
@@ -112,7 +112,7 @@ class BookRepository @Inject constructor(
         }
     }
     
-    override fun getFavoritedBooks(): LiveData<List<Audiobook>> {
+    override fun getFavoritedBooks(): Flow<List<Audiobook>> {
         return bookDao.getFavoritedBooks()
     }
 }
@@ -121,7 +121,7 @@ class BookRepository @Inject constructor(
 interface IBookRepository {
     // ... existing methods ...
     suspend fun setFavorited(bookId: Int, favorited: Boolean)
-    fun getFavoritedBooks(): LiveData<List<Audiobook>>
+    fun getFavoritedBooks(): Flow<List<Audiobook>>
 }
 ```
 
@@ -436,7 +436,7 @@ data class NewEntity(
 @Dao
 interface NewEntityDao {
     @Query("SELECT * FROM NewEntity")
-    fun getAll(): LiveData<List<NewEntity>>
+    fun getAll(): Flow<List<NewEntity>>
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: NewEntity)
@@ -473,7 +473,9 @@ val BOOK_MIGRATION_9_10 = object : Migration(9, 10) {
 
 1. **Follow Existing Patterns**: Look at similar features for guidance
 2. **Keep ViewModels Thin**: Heavy logic goes in Repositories
-3. **Use LiveData for UI**: Always expose LiveData to Views
+3. **Use StateFlow for UI**: expose `StateFlow` from ViewModels and collect it with
+   `collectWhileStarted`. There is no `LiveData` in this codebase (cu-52), and `postValue` is
+   banned by `PostValueUsageTest`
 4. **Handle Errors**: Try-catch in Repositories, show messages in ViewModels
 5. **Test Incrementally**: Test each layer as you build it
 6. **Use Data Binding**: Bind data directly in XML when possible
@@ -494,7 +496,7 @@ Before submitting:
 - [ ] Resources in strings.xml (no hardcoded strings)
 - [ ] Dependency injection used correctly
 - [ ] Database migrations added if needed
-- [ ] LiveData used for UI updates
+- [ ] `StateFlow` used for UI state, collected via `collectWhileStarted`
 - [ ] Navigation follows existing patterns
 - [ ] Tested on physical device
 - [ ] No memory leaks (check lifecycle awareness)

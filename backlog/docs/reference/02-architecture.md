@@ -21,7 +21,7 @@ graph TD
     B[ViewModel<br/>Business Logic, UI State<br/>Presentation Layer]
     C[Model<br/>Repository, Data Sources, Database<br/>Data Layer]
     
-    A -->|observes LiveData<br/>calls methods| B
+    A -->|collects StateFlow<br/>calls methods| B
     B -->|uses| C
     
     style A fill:#e1f5ff
@@ -38,7 +38,7 @@ graph TD
 ### ViewModel (Presentation Layer)
 - **Purpose**: Holds UI state and handles UI logic
 - **Lifecycle**: Survives configuration changes (screen rotation)
-- **Communication**: Exposes `LiveData` to Views, calls Repository methods
+- **Communication**: Exposes `StateFlow` to Views, calls Repository methods
 - **Examples**: `HomeViewModel`, `LibraryViewModel`, `CurrentlyPlayingViewModel`
 
 ### Model (Data Layer)
@@ -99,14 +99,22 @@ graph LR
 **Example**: `BookRepository`
 - Fetches books from Plex API
 - Caches in Room database
-- Returns LiveData to ViewModels
+- Returns `Flow`/`StateFlow` to ViewModels
 - Handles offline mode
 
-### 3. Reactive Programming (LiveData + Coroutines)
+### 3. Reactive Programming (StateFlow + Coroutines)
 
-**LiveData**: Observable data holder
-- Lifecycle-aware (automatically stops updates when UI is inactive)
-- Used for UI updates
+**StateFlow**: Observable state holder (cu-52 — there is **no `LiveData` left in this codebase**)
+- Always has a current value, replayed to every new collector
+- **Not** lifecycle-aware by itself: collect via `collectWhileStarted` /
+  `collectEventsWhileStarted` (`util/FlowCollect.kt`), which wrap `repeatOnLifecycle(STARTED)`.
+  Never a bare `lifecycleScope.launch`, never the deprecated `launchWhenStarted`
+- **Conflates equal consecutive values**, where a `LiveData.map` used to re-emit. A one-shot signal
+  therefore needs `Event<T>`, not a plain value
+- `stateIn(viewModelScope, WhileSubscribed(STOP_TIMEOUT_MILLIS), initial)` is the default;
+  **`Eagerly`** is required when a click handler reads `.value` without anything collecting it,
+  or the read returns the seed
+- `postValue` is banned outright and `PostValueUsageTest` fails the build on it
 
 **Coroutines**: For asynchronous operations
 - Network calls
@@ -169,7 +177,7 @@ graph TD
 graph TD
     A[Main Thread]
     B[UI updates]
-    C[LiveData observations]
+    C[StateFlow collection]
     D[IO Dispatcher<br/>Background Threads]
     E[Network calls]
     F[Database operations]
@@ -191,7 +199,7 @@ graph TD
 
 ## State Management
 
-- **ViewModel State**: `LiveData` properties exposed by ViewModels
+- **ViewModel State**: `StateFlow` properties exposed by ViewModels
 - **SharedPreferences**: User settings and preferences (`PrefsRepo`)
 - **Database**: Persisted data state
 - **PlexConfig**: Plex-specific configuration and state
@@ -201,14 +209,14 @@ graph TD
 1. **Separation of Concerns**: Each layer has clear responsibilities
 2. **Testability**: Easy to mock dependencies and test in isolation
 3. **Maintainability**: Changes in one layer don't break others
-4. **Lifecycle Management**: ViewModels and LiveData handle Android lifecycle automatically
+4. **Lifecycle Management**: ViewModels scope work to `viewModelScope`; Views collect through `collectWhileStarted`, which is what makes collection lifecycle-aware
 5. **Offline Support**: Repository pattern makes it easy to switch between online/offline data
 6. **Scalability**: New features follow established patterns
 
 ## Common Patterns Used
 
 - **Factory Pattern**: For creating ViewModels with dependencies
-- **Observer Pattern**: LiveData observers in Views
+- **Observer Pattern**: `StateFlow` collectors in Views
 - **Repository Pattern**: Single source of truth for data
 - **Singleton Pattern**: Application-scoped objects (via Dagger)
 - **Service Pattern**: Background media playback

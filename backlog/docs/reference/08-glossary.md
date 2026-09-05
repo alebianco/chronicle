@@ -59,7 +59,7 @@ Design pattern where dependencies are provided to a class rather than the class 
 Design pattern ensuring only one instance of a class exists for the entire application lifetime.
 
 ### Observer Pattern
-Design pattern where objects (observers) watch another object (subject) for changes. LiveData uses this pattern.
+Design pattern where objects (observers) watch another object (subject) for changes. `StateFlow` collection uses this pattern.
 
 ## Kotlin Terms
 
@@ -87,7 +87,8 @@ A singleton object associated with a class, similar to static members in Java.
 ## Android Jetpack Terms
 
 ### LiveData
-An observable data holder that respects the lifecycle of Android components. Automatically stops updates when the UI is inactive.
+Android's lifecycle-aware observable holder. **Removed from this codebase in cu-52** — the entry is
+kept only so the term is recognisable in older commits and comments. Use `StateFlow`.
 
 ### ViewModel
 A class that holds UI-related data and survives configuration changes (like screen rotation).

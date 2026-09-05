@@ -60,7 +60,7 @@ This document explains the most important classes in Chronicle and what they do.
 - Single source of truth for all audiobook data
 - Fetches books from Plex API
 - Caches books in local Room database
-- Provides LiveData of books to ViewModels
+- Provides `Flow` of books to ViewModels
 
 **Key methods**:
 - `getAllBooks()` - Get all books
@@ -138,7 +138,7 @@ This document explains the most important classes in Chronicle and what they do.
 **What it does**:
 - Wrapper around SharedPreferences
 - Stores and retrieves user settings
-- Provides LiveData of settings for UI updates
+- Provides `Flow` of settings for UI updates (`util/PreferenceFlow.kt`)
 
 **Settings managed**:
 - Playback speed
@@ -178,7 +178,7 @@ This document explains the most important classes in Chronicle and what they do.
 - Connects Fragments/Activities to MediaPlayerService
 - Sends commands to the player (play, pause, seek)
 - Receives playback state updates
-- Provides LiveData of playback state to UI
+- Provides `StateFlow` of playback state to UI
 
 **Usage**: ViewModels use this to control playback
 
@@ -373,7 +373,7 @@ This document explains the most important classes in Chronicle and what they do.
 1. User taps download button in **AudiobookDetailsFragment**
 2. ViewModel calls **CachedFileManager**.downloadBook()
 3. **CachedFileManager** uses **Fetch** library to download tracks
-4. Download progress shown in UI via LiveData
+4. Download progress shown in UI via `StateFlow`
 5. When complete, **CachedFileManager** updates **BookRepository**
 6. Book's `isCached` property set to true
 7. UI updates to show downloaded state

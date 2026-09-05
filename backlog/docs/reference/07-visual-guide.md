@@ -38,10 +38,10 @@ graph TB
             L[File Cache]
         end
         
-        A -->|observes LiveData| E
-        B -->|observes LiveData| F
-        C -->|observes LiveData| E
-        D -->|observes LiveData| G
+        A -->|collects StateFlow| E
+        B -->|collects StateFlow| F
+        C -->|collects StateFlow| E
+        D -->|collects StateFlow| G
         
         E -->|calls methods| H
         F -->|calls methods| H
@@ -69,7 +69,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant User
-    participant View as VIEW (Fragment)<br/>• Displays UI<br/>• Handles input<br/>• Observes LiveData
+    participant View as VIEW (Fragment)<br/>• Displays UI<br/>• Handles input<br/>• Collects StateFlow
     participant VM as VIEWMODEL<br/>• Holds UI state<br/>• Business logic<br/>• Survives config changes
     participant Repo as REPOSITORY<br/>• Single source of truth<br/>• Manages data sources<br/>• Decides network vs cache
     participant DS as DATA SOURCES<br/>Plex API / Room / File System
@@ -80,7 +80,7 @@ sequenceDiagram
     Repo->>DS: (4) Fetch data
     DS-->>Repo: (5) Return data
     Repo-->>VM: Data flows back
-    VM-->>View: (6) Update UI via LiveData
+    VM-->>View: (6) Update UI via StateFlow
     View->>User: Display updated UI
 ```
 
@@ -141,12 +141,12 @@ features/home/
 │
 ├── HomeFragment.kt
 │   ├─ Inflates layout
-│   ├─ Observes ViewModel LiveData
+│   ├─ Collects ViewModel StateFlow
 │   ├─ Handles user interactions
 │   └─ Updates UI when data changes
 │
 ├── HomeViewModel.kt
-│   ├─ Holds UI state (LiveData properties)
+│   ├─ Holds UI state (StateFlow properties)
 │   ├─ Calls Repository methods
 │   ├─ Transforms data for UI
 │   └─ Factory for Dagger injection
@@ -168,12 +168,12 @@ sequenceDiagram
     
     User->>LibraryFragment: Opens App
     LibraryFragment->>LibraryFragment: onCreate()
-    LibraryFragment->>LibraryViewModel: observe(viewModel.books)
+    LibraryFragment->>LibraryViewModel: collectWhileStarted(viewModel.books)
     LibraryViewModel->>BookRepository: getAllBooks()
     BookRepository->>RoomDatabase: bookDao.getAllBooks()
-    Note over RoomDatabase: Query: SELECT * FROM Audiobook<br/>Returns: LiveData
+    Note over RoomDatabase: Query: SELECT * FROM Audiobook<br/>Returns: Flow
     Note over RoomDatabase: Room automatically emits data
-    RoomDatabase-->>LibraryFragment: Observer triggered
+    RoomDatabase-->>LibraryFragment: collector invoked
     LibraryFragment->>LibraryFragment: adapter.submitList()
     LibraryFragment->>User: UI Updated! ✓
 ```
@@ -239,7 +239,7 @@ graph TB
     subgraph Main Thread - UI
         A[View rendering]
         B[User input]
-        C[LiveData observations]
+        C[StateFlow collection]
         D[ViewModel access]
     end
     
