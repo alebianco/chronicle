@@ -106,7 +106,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1425 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1389 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -169,7 +169,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Five separate Room databases** (`BookDatabase` v13, `TrackDatabase` v7, `ChapterDatabase` v3, `CollectionsDatabase` v3, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
+- **Five separate Room databases** (`BookDatabase` v14, `TrackDatabase` v7, `ChapterDatabase` v3, `CollectionsDatabase` v3, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
 - **Listening position is owned by the *tracks*, never the book** (decision-16, cu-90). Plex stores
   no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a cache of a derivation.
   `merge` carries the local value and **never** adopts `network.progress`; only `syncAudiobook`,
@@ -223,22 +223,24 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   null for a missing or unreadable directory, and coalescing that to an empty list un-cached whole
   libraries. `cachedMediaDir` also returns the *stored* path even when unmounted, so an absent SD
   card reads as unavailable rather than silently resolving to a different, readable directory.
-- **Chapters are read table-first, and the column is now only a fallback** (cu-49, cu-82). They are
-  written to `ChapterDatabase` *and* still serialized into `Audiobook.chapters`, so **keep writing
-  to both** until cu-159 drops the column. Every read goes through `resolveChapters` /
-  `resolveChaptersFromCache` (`data/model/ChapterAssembly.kt`): table → column → `asChapterList()`.
-  The middle level is not redundant — `ChronicleApplication.backfillChapterTable()` (cu-158) is
-  **launched, not awaited**, so on the first launch after an upgrade the table is still filling
-  while the UI reads. Dropping the column before a released build has run the backfill shows no
-  chapters and destroys the data to recover them; that gate is cu-159.
-  **Read `currentlyPlaying.chapters`, never `currentlyPlaying.book.value.chapters`** — the book's
-  column is the legacy source and is **empty for any book synced since cu-49**, so ten call sites in
-  `PlayerExt` and `CurrentlyPlayingViewModel` were resolving `indexOf` to `-1` and chapter skip
-  silently did nothing. The singleton's resolved list is public for that reason.
+- **Chapters live in `ChapterDatabase` and nowhere else** (cu-49, cu-82, cu-159). The legacy
+  `Audiobook.chapters` column is **gone** as of v14 — do not reintroduce a serialized copy on the
+  book. Every read goes through `resolveChapters` / `resolveChaptersFromCache`
+  (`data/model/ChapterAssembly.kt`), now two levels: table → `asChapterList()`. The fallback is
+  permanent (cu-13): a server reporting no chapters has nothing to fall back *to*, so one chapter
+  per track is derived instead. A book with no rows repairs itself — `syncAudiobook` refetches
+  from `/library/metadata/{id}?includeChapters=1` whenever the book is opened.
+  **Dropping the column was safe because it was already empty**: nothing had written it since
+  cu-49, and both household installs read 0 of 196 books before the drop. The cu-158 backfill and
+  `ChapterListConverter` went with it. Verified on the tablet — v14, 196 books, 6 positions and
+  138 series indices intact, and a 107-chapter book playing with its chapters resolved.
+  **Read `currentlyPlaying.chapters`, never a chapter list off the book** — the singleton's
+  resolved list is public because ten call sites in `PlayerExt` and `CurrentlyPlayingViewModel`
+  were resolving `indexOf` to `-1` against the empty column, so chapter skip silently did nothing.
   **Rows are passed *into* `CurrentlyPlayingSingleton.update`, never read inside it**: it runs once
   a second from `ProgressUpdater`, so a DAO there is a blocking read per tick (cu-110). The callers
   that fire on the book *changing* supply them; the per-tick caller passes none, and a test pins
-  that a tick without rows cannot downgrade an already-resolved list back to the stale column.
+  that a tick without rows cannot downgrade an already-resolved list.
   Chapter offsets are *absolute within the book*, not per-track: two separate bugs came from a
   per-track `0L` (cu-13, cu-49), and `getChapterAt` silently resolves nothing when they are wrong.
   Since cu-136 the frame is a **type**, so that mistake no longer compiles — see below.

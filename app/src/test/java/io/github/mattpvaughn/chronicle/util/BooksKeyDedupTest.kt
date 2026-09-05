@@ -1,8 +1,6 @@
 package io.github.mattpvaughn.chronicle.util
 
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import io.github.mattpvaughn.chronicle.data.model.BookOffset
-import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flowOf
@@ -147,34 +145,4 @@ class BooksKeyDedupTest {
       assertEquals(1, seen.size)
       assertEquals(emptyList<Audiobook>(), seen.single())
     }
-
-  /**
-   * The key must be cheap: it must not touch `chapters`, the serialized column whose
-   * deserialization was the measured cost. Asserted by showing that two books differing *only* in
-   * chapters compare equal — if the key ever grows to include them, this fails and says why.
-   */
-  @Test
-  fun `the key ignores the serialized chapters column`() =
-    runTest {
-      val withChapters = book("1001").copy(chapters = List(108) { chapter(it) })
-      val withoutChapters = book("1001")
-
-      assertEquals(
-        "including chapters in the key reintroduces the per-tick deserialization cost",
-        listOf(withoutChapters).booksKey(),
-        listOf(withChapters).booksKey(),
-      )
-    }
-
-  private fun chapter(index: Int) =
-    Chapter(
-      id = index.toString(),
-      bookId = "1001",
-      trackId = "2001",
-      title = "Chapter $index",
-      index = index.toLong(),
-      discNumber = 1,
-      bookStartTimeOffset = BookOffset(index * 1000L),
-      bookEndTimeOffset = BookOffset((index + 1) * 1000L),
-    )
 }

@@ -177,16 +177,53 @@ val BOOK_MIGRATION_12_13 =
       db.rebuildTable(
         table = "Audiobook",
         createNewTableSql =
-          "CREATE TABLE IF NOT EXISTS `Audiobook_new` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `chapters` TEXT NOT NULL, `playbackSpeed` REAL NOT NULL, `narrator` TEXT NOT NULL, `series` TEXT NOT NULL, `seriesIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+          "CREATE TABLE IF NOT EXISTS `Audiobook_new` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `playbackSpeed` REAL NOT NULL, `narrator` TEXT NOT NULL, `series` TEXT NOT NULL, `seriesIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         columns =
           listOf(
             "id", "source", "title", "titleSort", "author", "thumb", "parentId", "genre",
             "summary", "year", "addedAt", "updatedAt", "lastViewedAt", "duration", "isCached",
-            "progress", "favorited", "viewedLeafCount", "leafCount", "viewCount", "chapters",
-            "playbackSpeed", "narrator", "series", "seriesIndex",
+            "progress", "favorited", "viewedLeafCount", "leafCount", "viewCount",
+            "playbackSpeed", "narrator", "series", "seriesIndex", "seriesIndex",
           ),
         textColumns = emptySet(),
         columnExpressions = mapOf("source" to "'${SourceId.LEGACY_PLEX.value}'"),
+      )
+    }
+  }
+
+/**
+ * Drops the legacy `chapters` column (cu-159, the last step of cu-49's chapter move).
+ *
+ * `ChapterDatabase` has been the source of truth since cu-82; this column was kept only as the
+ * middle level of `resolveChapters`'s table → column → `asChapterList()` fallback, so the read
+ * sites could migrate one at a time. They all have.
+ *
+ * **Verified empty before dropping** (2026-09-05): both household installs report 0 of 196 books
+ * with a non-empty column, because nothing has written it since cu-49 and both libraries were
+ * synced after that. So this drops no data. The permanent fallback also still covers every book —
+ * 1379 tracks across 197 books, and `asChapterList()` derives chapters from tracks — and any book
+ * whose chapters are genuinely missing is repaired by `syncAudiobook`, which refetches them from
+ * `/library/metadata/{id}?includeChapters=1` and writes the table directly.
+ *
+ * A table rebuild rather than SQLite's `DROP COLUMN`: that statement needs 3.35+, and minSdk 27
+ * ships 3.19. The column list comes from the exported v13 schema, which is the authority — a
+ * column omitted here is dropped with no error at all (the BOOK_MIGRATION_8_9 lesson).
+ */
+val BOOK_MIGRATION_13_14 =
+  object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.rebuildTable(
+        table = "Audiobook",
+        createNewTableSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook_new` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, `author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, `genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, `favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, `leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, `playbackSpeed` REAL NOT NULL, `narrator` TEXT NOT NULL, `series` TEXT NOT NULL, `seriesIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        columns =
+          listOf(
+            "id", "source", "title", "titleSort", "author", "thumb", "parentId", "genre",
+            "summary", "year", "addedAt", "updatedAt", "lastViewedAt", "duration", "isCached",
+            "progress", "favorited", "viewedLeafCount", "leafCount", "viewCount",
+            "playbackSpeed", "narrator", "series", "seriesIndex",
+          ),
+        textColumns = emptySet(),
       )
     }
   }
@@ -212,9 +249,10 @@ val BOOK_MIGRATIONS =
     BOOK_MIGRATION_10_11,
     BOOK_MIGRATION_11_12,
     BOOK_MIGRATION_12_13,
+    BOOK_MIGRATION_13_14,
   )
 
-@Database(entities = [Audiobook::class], version = 13, exportSchema = true)
+@Database(entities = [Audiobook::class], version = 14, exportSchema = true)
 abstract class BookDatabase : RoomDatabase() {
   abstract val bookDao: BookDao
 }
@@ -237,17 +275,6 @@ interface BookDao {
 
   @Query("SELECT * FROM Audiobook WHERE source = :source")
   fun getAudiobooks(source: SourceId): List<Audiobook>
-
-  /**
-   * How many books carry a non-empty serialized `chapters` column.
-   *
-   * Counted in SQL so the cu-158 backfill can compare it against
-   * `ChapterDao.countBooksWithChapters()` and skip the full `getAudiobooks()` read when the two
-   * agree. Tested against `''` as well as NULL because the column's converter writes an empty
-   * string for an empty list, not NULL.
-   */
-  @Query("SELECT COUNT(*) FROM Audiobook WHERE chapters IS NOT NULL AND chapters != ''")
-  suspend fun countBooksWithChapters(): Int
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   fun insertAll(rows: List<Audiobook>)

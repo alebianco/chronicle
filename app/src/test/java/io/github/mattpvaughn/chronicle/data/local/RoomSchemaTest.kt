@@ -505,6 +505,94 @@ class RoomSchemaTest {
   }
 
   /**
+   * The v13 -> v14 migration drops the legacy `chapters` column (cu-159).
+   *
+   * A full table rebuild, so the risk is not the dropped column — it is every *other* column
+   * silently going with it. `BOOK_MIGRATION_8_9` recorded that a column omitted from the copy list
+   * is discarded with no error at all, and a migration that dropped `parentKey` passed 201 other
+   * tests. So this seeds a row with a real value in every column that matters and reads them all
+   * back.
+   *
+   * The column itself carried nothing to lose: it was verified empty on both household installs
+   * (0 of 196 books) before the drop, because nothing has written it since cu-49.
+   */
+  @Test
+  fun `the book database drops the chapters column when migrating from v13`() {
+    val db =
+      migrated(
+        klass = BookDatabase::class.java,
+        oldVersion = 13,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `Audiobook` (`id` TEXT NOT NULL, " +
+            "`source` TEXT NOT NULL, `title` TEXT NOT NULL, `titleSort` TEXT NOT NULL, " +
+            "`author` TEXT NOT NULL, `thumb` TEXT NOT NULL, `parentId` TEXT NOT NULL, " +
+            "`genre` TEXT NOT NULL, `summary` TEXT NOT NULL, `year` INTEGER NOT NULL, " +
+            "`addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+            "`lastViewedAt` INTEGER NOT NULL, `duration` INTEGER NOT NULL, " +
+            "`isCached` INTEGER NOT NULL, `progress` INTEGER NOT NULL, " +
+            "`favorited` INTEGER NOT NULL, `viewedLeafCount` INTEGER NOT NULL, " +
+            "`leafCount` INTEGER NOT NULL, `viewCount` INTEGER NOT NULL, " +
+            "`chapters` TEXT NOT NULL, `playbackSpeed` REAL NOT NULL, " +
+            "`narrator` TEXT NOT NULL, `series` TEXT NOT NULL, " +
+            "`seriesIndex` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        seedSql =
+          "INSERT INTO Audiobook (id, source, title, titleSort, author, thumb, parentId, " +
+            "genre, summary, year, addedAt, updatedAt, lastViewedAt, duration, isCached, " +
+            "progress, favorited, viewedLeafCount, leafCount, viewCount, chapters, " +
+            "playbackSpeed, narrator, series, seriesIndex) " +
+            "VALUES ('1001', '${SourceId.LEGACY_PLEX.value}', 'The Hobbit', 'Hobbit, The', " +
+            "'Tolkien', '/thumb/1', '0', 'Fantasy', 'A summary', 1937, 11, 22, 1700000000000, " +
+            "3600000, 1, 1234567, 1, 2, 3, 4, 'legacy-chapter-blob', 1.5, 'Rob Inglis', " +
+            "'Middle-earth', 100)",
+        migrations = BOOK_MIGRATIONS,
+      )
+
+    db.query(
+      "SELECT id, source, title, titleSort, author, thumb, parentId, genre, summary, year, " +
+        "addedAt, updatedAt, lastViewedAt, duration, isCached, progress, favorited, " +
+        "viewedLeafCount, leafCount, viewCount, playbackSpeed, narrator, series, seriesIndex " +
+        "FROM Audiobook",
+      emptyArray(),
+    ).use { cursor ->
+      assertTrue("the pre-existing row must survive the upgrade", cursor.moveToFirst())
+      assertEquals("1001", cursor.getString(0))
+      assertEquals(SourceId.LEGACY_PLEX.value, cursor.getString(1))
+      assertEquals("The Hobbit", cursor.getString(2))
+      assertEquals("Hobbit, The", cursor.getString(3))
+      assertEquals("Tolkien", cursor.getString(4))
+      assertEquals("/thumb/1", cursor.getString(5))
+      assertEquals("0", cursor.getString(6))
+      assertEquals("Fantasy", cursor.getString(7))
+      assertEquals("A summary", cursor.getString(8))
+      assertEquals(1937, cursor.getInt(9))
+      assertEquals(11L, cursor.getLong(10))
+      assertEquals(22L, cursor.getLong(11))
+      assertEquals(1_700_000_000_000L, cursor.getLong(12))
+      assertEquals(3_600_000L, cursor.getLong(13))
+      assertEquals(1, cursor.getInt(14))
+      assertEquals("a rebuild that loses progress loses the user's place", 1_234_567L, cursor.getLong(15))
+      assertEquals(1, cursor.getInt(16))
+      assertEquals(2, cursor.getInt(17))
+      assertEquals(3, cursor.getInt(18))
+      assertEquals(4, cursor.getInt(19))
+      assertEquals(1.5f, cursor.getFloat(20), 0.001f)
+      assertEquals("Rob Inglis", cursor.getString(21))
+      assertEquals("Middle-earth", cursor.getString(22))
+      assertEquals(100, cursor.getInt(23))
+    }
+
+    // The column must actually be gone, not merely unread — a rebuild that forgot to omit it
+    // would leave the entity and the schema disagreeing in a way Room only notices on open.
+    db.query("PRAGMA table_info(Audiobook)", emptyArray()).use { cursor ->
+      val names = mutableListOf<String>()
+      while (cursor.moveToNext()) names.add(cursor.getString(1))
+      assertTrue("the chapters column must be dropped; found $names", !names.contains("chapters"))
+      assertTrue("every other column must survive; found $names", names.contains("seriesIndex"))
+    }
+    db.close()
+  }
+
+  /**
    * Creates a database file at an old schema, opens it through Room at the current version, and
    * hands back the opened database so a test can assert the rows survived.
    *

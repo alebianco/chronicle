@@ -16,7 +16,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.seriesName
 import io.github.mattpvaughn.chronicle.features.player.*
 import kotlin.time.Duration.Companion.minutes
 
-@TypeConverters(ChapterListConverter::class, SourceIdConverters::class)
+@TypeConverters(SourceIdConverters::class)
 @Entity
 data class Audiobook(
   @PrimaryKey
@@ -59,8 +59,6 @@ data class Audiobook(
   val leafCount: Long = 0L,
   /** The number of times the book has been listened to */
   val viewCount: Long = 0L,
-  /** Chapter metadata corresponding to m4b chapter metadata in the m4b files */
-  val chapters: List<Chapter> = emptyList(),
   /**
    * This book's own playback speed, or [NO_SPEED_OVERRIDE] to follow the global preference.
    *
@@ -229,8 +227,8 @@ data class Audiobook(
      * This is because even if the network copy is more up to date, retaining the most recent
      * [lastViewedAt] from the local copy is preferred.
      *
-     * Always retain fields from local copy: [duration], [isCached], [favorited], [chapters],
-     * [source], [playbackSpeed]. [playbackSpeed] is a local-only override the server knows nothing
+     * Always retain fields from local copy: [duration], [isCached], [favorited], [source],
+     * [playbackSpeed]. [playbackSpeed] is a local-only override the server knows nothing
      * about, so `network.playbackSpeed` is always the [NO_SPEED_OVERRIDE] default — adopting it
      * would silently drop the user's per-book speed on every library refresh.
      *
@@ -239,8 +237,8 @@ data class Audiobook(
      * where they are always absent — so they are taken from the network copy when it has a value
      * and kept from the local one when it does not. Preferring the network unconditionally would
      * blank a narrator on every refresh; preferring the local one unconditionally would make a
-     * re-tagged book impossible to correct. [chapters] and [duration] are retained because they can be calculated only when
-     * all child [MediaItemTrack]s are loaded; [duration], [source] and [isCached] because they are
+     * re-tagged book impossible to correct. [duration] is retained because it can be calculated
+     * only when all child [MediaItemTrack]s are loaded; [source] and [isCached] because they are
      * local values that do not exist on the server.
      *
      * **[progress] is carried from the local copy and never from the network.** Plex stores no
@@ -265,7 +263,6 @@ data class Audiobook(
           duration = local.duration,
           isCached = local.isCached,
           favorited = local.favorited,
-          chapters = local.chapters,
           source = local.source,
           playbackSpeed = local.playbackSpeed,
           narrator = network.narrator.ifEmpty { local.narrator },
@@ -280,7 +277,6 @@ data class Audiobook(
           isCached = local.isCached,
           lastViewedAt = local.lastViewedAt,
           favorited = local.favorited,
-          chapters = local.chapters,
           playbackSpeed = local.playbackSpeed,
           narrator = network.narrator.ifEmpty { local.narrator },
           series = network.series.ifEmpty { local.series },

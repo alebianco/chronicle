@@ -126,10 +126,9 @@ class AudiobookDetailsViewModel(
   val chapters: StateFlow<List<Chapter>> =
     combineDistinct(
       chaptersFromTable,
-      audiobook,
       tracksAsChaptersCache,
-    ) { fromTable, book, tracksAsChapters ->
-      resolveChaptersFromCache(fromTable, book, tracksAsChapters)
+    ) { fromTable, tracksAsChapters ->
+      resolveChaptersFromCache(fromTable, tracksAsChapters)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
   private val _messageForUser = MutableStateFlow<Event<FormattableString>?>(null)

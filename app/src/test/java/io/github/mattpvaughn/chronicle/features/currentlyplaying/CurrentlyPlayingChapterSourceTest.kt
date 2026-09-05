@@ -39,15 +39,21 @@ class CurrentlyPlayingChapterSourceTest {
     bookEndTimeOffset = BookOffset(180_000L),
   )
 
-  private val fromColumn = listOf(chapter("c-col", "from column"))
   private val fromTable = listOf(chapter("c-tab", "from table"))
 
+  /**
+   * Real chapter rows beat the per-track derivation.
+   *
+   * The legacy column was the middle level here until cu-159 dropped it; what is left is the
+   * distinction that still matters — a book with real chapters must not fall back to one chapter
+   * per track, which is what `asChapterList()` produces.
+   */
   @Test
-  fun `table rows win over the legacy column`() {
+  fun `table rows win over the per-track derivation`() {
     val s = CurrentlyPlayingSingleton()
     val tracks = listOf(track("1"))
     s.update(
-      book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book", chapters = fromColumn),
+      book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book"),
       track = tracks[0],
       tracks = tracks,
       chaptersFromTable = fromTable,
@@ -55,21 +61,7 @@ class CurrentlyPlayingChapterSourceTest {
     assertEquals("from table", s.chapter.value.title)
   }
 
-  /** The upgrade case: the backfill has not reached this book, so the column is all there is. */
-  @Test
-  fun `the column is used when the table has no rows for the book`() {
-    val s = CurrentlyPlayingSingleton()
-    val tracks = listOf(track("1"))
-    s.update(
-      book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book", chapters = fromColumn),
-      track = tracks[0],
-      tracks = tracks,
-      chaptersFromTable = emptyList(),
-    )
-    assertEquals("from column", s.chapter.value.title)
-  }
-
-  /** cu-13's fallback still applies when neither source has anything. */
+  /** cu-13's fallback, which is permanent: a server reporting no chapters has nothing to use. */
   @Test
   fun `tracks remain the last resort`() {
     val s = CurrentlyPlayingSingleton()

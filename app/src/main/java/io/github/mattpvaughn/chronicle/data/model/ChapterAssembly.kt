@@ -35,33 +35,25 @@ inline fun assembleChapters(
 }
 
 /**
- * Picks the best available chapter list, table first (cu-82).
+ * Picks the best available chapter list, table first (cu-82, cu-159).
  *
- * Three levels, in descending order of trust:
+ * Two levels since the legacy `Audiobook.chapters` column was dropped:
  *  1. `ChapterDatabase` rows — the source of truth since cu-49, and the only one a future backend
- *     has to populate.
- *  2. [Audiobook.chapters] — the legacy column. Still consulted because the backfill (cu-158) is
- *     *launched, not awaited* (`ChronicleApplication.backfillChapterTable`), so a book can still
- *     have no rows on the first launch after an upgrade. Retiring this level needs a released build
- *     that has run the backfill, which is why cu-82 does not drop the column.
- *  3. [asChapterList] — cu-13's no-chapter-data fallback, which is **permanent**: a book whose
- *     server reports no chapters has nothing to fall back *to*.
+ *     has to populate. `syncAudiobook` refetches them from Plex whenever a book is opened, so a
+ *     book with no rows repairs itself.
+ *  2. [asChapterList] — cu-13's no-chapter-data fallback, which is **permanent**: a book whose
+ *     server reports no chapters has nothing to fall back *to*, and this derives one chapter per
+ *     track instead.
  *
  * Kept pure and free of Room types so the precedence is testable without a database.
  */
 fun resolveChapters(
   fromTable: List<Chapter>,
-  fromBook: List<Chapter>,
   tracks: List<MediaItemTrack>,
-): List<Chapter> =
-  when {
-    fromTable.isNotEmpty() -> fromTable
-    fromBook.isNotEmpty() -> fromBook
-    else -> tracks.asChapterList()
-  }
+): List<Chapter> = if (fromTable.isNotEmpty()) fromTable else tracks.asChapterList()
 
 /**
- * [resolveChapters] over the nullable values a `LiveData` combine hands out (cu-82).
+ * [resolveChapters] over the nullable values a flow combine hands out (cu-82).
  *
  * The three ViewModels that combine a book with its tracks share this exact shape. A null source
  * has simply not emitted yet, so it is treated as "nothing from that level" — the resolution then
@@ -69,11 +61,5 @@ fun resolveChapters(
  */
 fun resolveChaptersFromCache(
   fromTable: List<Chapter>?,
-  book: Audiobook?,
   tracksAsChapters: List<Chapter>?,
-): List<Chapter> =
-  when {
-    !fromTable.isNullOrEmpty() -> fromTable
-    book?.chapters?.isNotEmpty() == true -> book.chapters
-    else -> tracksAsChapters ?: emptyList()
-  }
+): List<Chapter> = if (!fromTable.isNullOrEmpty()) fromTable else tracksAsChapters ?: emptyList()

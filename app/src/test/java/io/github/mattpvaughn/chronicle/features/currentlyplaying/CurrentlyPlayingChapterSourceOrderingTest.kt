@@ -38,7 +38,7 @@ class CurrentlyPlayingChapterSourceOrderingTest {
   fun `a progress tick without table rows does not downgrade an already-resolved list`() {
     val s = CurrentlyPlayingSingleton()
     val tracks = listOf(track("1"))
-    val book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book", chapters = listOf(chapter("c-col", "from column")))
+    val book = Audiobook(id = "b1", source = TEST_SOURCE, title = "Book")
 
     // OnMediaChangedCallback: rows available, so the table wins.
     s.update(book = book, track = tracks[0], tracks = tracks, chaptersFromTable = listOf(chapter("c-tab", "from table")))

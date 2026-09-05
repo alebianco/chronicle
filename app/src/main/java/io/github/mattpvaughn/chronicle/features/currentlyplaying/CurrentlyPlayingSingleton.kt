@@ -154,10 +154,10 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
     // none — now from either source, since the table can fill in after the backfill reaches this
     // book while the column stays empty (cu-82).
     val haveNewChapterData =
-      this.chapters.isEmpty() && (chaptersFromTable.isNotEmpty() || book.chapters.isNotEmpty())
+      this.chapters.isEmpty() && chaptersFromTable.isNotEmpty()
     if (shapeChanged || haveNewChapterData) {
       this.trackShape = trackShape
-      this.chapters = resolveChapters(chaptersFromTable, book.chapters, tracks)
+      this.chapters = resolveChapters(chaptersFromTable, tracks)
     }
 
     // Set before the chapter lookup below, which uses the same derivation. This one *does* change

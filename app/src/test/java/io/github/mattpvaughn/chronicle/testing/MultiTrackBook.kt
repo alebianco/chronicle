@@ -142,6 +142,5 @@ object MultiTrackBook {
       author = "A Narrator",
       duration = BOOK_DURATION,
       leafCount = TRACK_COUNT.toLong(),
-      chapters = chapters(),
     )
 }

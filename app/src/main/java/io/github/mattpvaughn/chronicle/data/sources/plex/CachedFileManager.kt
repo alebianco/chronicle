@@ -538,12 +538,9 @@ class CachedFileManager
         val isBookCached = isBookFullyCached(bookTrackCacheCount, bookTrackCount)
         val book = bookRepository.getAudiobookAsync(bookId)
         if (book != null) {
-          bookRepository.update(
-            book.copy(
-              isCached = isBookCached,
-              chapters = book.chapters.map { it.copy(downloaded = isBookCached) },
-            ),
-          )
+          // The chapter-level `downloaded` stamp went with the legacy column (cu-159); it was
+          // never read. The book's own flag is the one the UI and cache reconciliation use.
+          bookRepository.update(book.copy(isCached = isBookCached))
         }
       }
     }

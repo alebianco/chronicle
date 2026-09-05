@@ -207,10 +207,9 @@ class CurrentlyPlayingViewModel(
   val chapters: StateFlow<List<Chapter>> =
     combineDistinct(
       chaptersFromTable,
-      audiobook,
       tracksAsChaptersCache,
-    ) { fromTable, book, tracksAsChapters ->
-      resolveChaptersFromCache(fromTable, book, tracksAsChapters)
+    ) { fromTable, tracksAsChapters ->
+      resolveChaptersFromCache(fromTable, tracksAsChapters)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
   val speed: StateFlow<Float> =

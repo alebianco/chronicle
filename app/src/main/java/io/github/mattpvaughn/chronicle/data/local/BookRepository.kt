@@ -205,12 +205,6 @@ interface IBookRepository {
   suspend fun refreshDataPaginated()
 
   /**
-   * Copies chapters from `Audiobook.chapters` into `ChapterDatabase` for books that have none
-   * (cu-158). Idempotent; safe to call on every launch.
-   */
-  suspend fun backfillChapterTable(): Int
-
-  /**
    * The book's chapters from `ChapterDatabase`, the preferred source since cu-82.
    *
    * Empty for a book the cu-158 backfill has not reached yet, which is why callers resolve through
@@ -375,39 +369,6 @@ class BookRepository
 
     override suspend fun getChaptersForBook(bookId: String): List<Chapter> =
       withContext(dispatchers.io) { chapterDao.getChaptersForBook(bookId) }
-
-    override suspend fun backfillChapterTable(): Int =
-      withContext(dispatchers.io) {
-        // Cheap gate first. `bookDao.getAudiobooks(currentSourceId)` is a `SELECT *` that deserializes every
-        // book's `chapters` column — megabytes on a real library (cu-134) — so reading it on every
-        // launch only to find nothing to do is exactly the cu-110 mistake. Once every book that
-        // has chapters also has rows, the counts agree and this returns without that read.
-        val booksWithRows = chapterDao.countBooksWithChapters()
-        val booksWithChapters = bookDao.countBooksWithChapters()
-        if (booksWithRows >= booksWithChapters) {
-          return@withContext 0
-        }
-
-        var written = 0
-        bookDao.getAudiobooks(currentSourceId)
-          .filter { ChapterBackfill.mayNeedBackfill(it) }
-          .forEach { book ->
-            try {
-              val existing = chapterDao.getChaptersForBook(book.id)
-              val rows = ChapterBackfill.rowsFor(book, existing.size)
-              if (rows.isNotEmpty()) {
-                chapterDao.insertAll(rows)
-                written++
-              }
-            } catch (e: Exception) {
-              Timber.e(e, "Chapter backfill failed for book ${book.id}; leaving it unchanged")
-            }
-          }
-        if (written > 0) {
-          Timber.i("Chapter backfill wrote rows for $written book(s)")
-        }
-        written
-      }
 
     override suspend fun refreshDataPaginated() {
       if (prefsRepo.offlineMode) {
@@ -613,14 +574,12 @@ class BookRepository
       isCached: Boolean,
     ) {
       withContext(dispatchers.io) {
-        // set the chapters stored in the db to also be cached
+        // Only the book's own flag. This used to also stamp `downloaded` onto each of the
+        // serialized chapters, but that column is gone (cu-159) and **nothing ever read the
+        // flag** — `Chapter.downloaded` is written by the parser and consumed nowhere. Whether a
+        // book's audio is on disk is answered by `MediaItemTrack.cached`, which is what the cache
+        // reconciliation and the UI actually use.
         bookDao.updateCachedStatus(bookId, isCached)
-        val audiobook = bookDao.getAudiobookAsync(bookId)
-        audiobook?.let { book ->
-          bookDao.update(
-            book.copy(chapters = book.chapters.map { it.copy(downloaded = isCached) }),
-          )
-        }
       }
     }
 
@@ -759,7 +718,6 @@ class BookRepository
           ).copy(
             progress = tracks.getProgress().millis,
             duration = tracks.getDuration(),
-            chapters = chapters,
           )
         bookDao.update(merged)
         true

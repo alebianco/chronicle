@@ -152,7 +152,6 @@ open class ChronicleApplication :
     installSeriesIndexRules()
 
     adoptLegacyRows()
-    backfillChapterTable()
     setupNetwork(plexPrefs)
     updateDownloadedFileState()
     super.onCreate()
@@ -189,20 +188,6 @@ open class ChronicleApplication :
   }
 
   /**
-   * Copies chapters onto `ChapterDatabase` for books synced before cu-49 (cu-158).
-   *
-   * Launched rather than awaited, for the same reason as [installSeriesIndexRules]: nothing reads
-   * the table yet — every read site still goes through `Audiobook.chapters` (cu-82) — so this is
-   * pure preparation and a launch that finishes late costs nothing. It is idempotent per book, so
-   * running on every start is cheaper than tracking whether it has run.
-   */
-  private fun backfillChapterTable() {
-    applicationScope.launch(unhandledExceptionHandler) {
-      bookRepository.backfillChapterTable()
-    }
-  }
-
-  /**
    * Claims rows written before cu-127 for the connected server (decision-21).
    *
    * The v12->v13 and v6->v7 migrations mark every pre-existing row [SourceId.LEGACY_PLEX], because
@@ -210,9 +195,9 @@ open class ChronicleApplication :
    * adopted, every scoped read filters them out — an upgrading user opens the app to an empty
    * library with their listening positions intact but invisible.
    *
-   * Launched rather than awaited, like the chapter backfill: `onCreate` must not block on disk.
-   * The consequence is a brief window on the first launch after upgrading where the library reads
-   * empty and then fills — the same shape as cu-158's backfill, and the same trade.
+   * Launched rather than awaited: `onCreate` must not block on disk. The consequence is a brief
+   * window on the first launch after upgrading where the library reads empty and then fills — the
+   * same trade cu-158's chapter backfill made before cu-159 retired it.
    *
    * Idempotent and a no-op once no row carries the marker, so running it on every start is
    * cheaper than recording whether it has run.
