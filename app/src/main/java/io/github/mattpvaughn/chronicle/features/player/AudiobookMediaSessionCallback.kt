@@ -134,6 +134,27 @@ class AudiobookMediaSessionCallback
         resumePlayFromEmpty(false)
       } else {
         currentPlayer.playWhenReady = false
+        // Persist on the way down. `ProgressUpdater`'s per-second tick is gated on `isPlaying`, so
+        // pausing silently stops it: the saved position is whatever the previous tick captured, and
+        // no PAUSED state ever reaches Plex. A pause from the lock screen, notification or a headset
+        // had no other flush — the book-switch path has `flushOutgoingBookProgress` (cu-91) and a
+        // seek has the call below, but an ordinary pause had nothing — so a listener who paused and
+        // was then killed by the OS resumed up to a tick earlier, and other devices never saw the
+        // stop. Same defect class as advplyr/audiobookshelf-app#1847 and PaulWoitaschek/Voice#3351.
+        //
+        // Explicit parameters, **not** `updateProgressWithoutParameters`: that reads the session
+        // state, which the line above has not updated yet, so it would report the pre-pause position
+        // as still PLAYING. Exactly the staleness cu-93 hit on seek. ExoPlayer's own position and
+        // our own knowledge that this is a pause are both correct synchronously.
+        val pausedTrackId = mediaController.metadata?.id
+        if (pausedTrackId != null) {
+          progressUpdater.updateProgress(
+            pausedTrackId,
+            MediaPlayerService.PLEX_STATE_PAUSED,
+            currentPlayer.currentPosition,
+            true,
+          )
+        }
       }
     }
 
