@@ -1,7 +1,7 @@
 ---
 id: cu-174
 title: Extract fragment renderers as private methods taking binding
-status: To Do
+status: In Review
 assignee: []
 created_date: ''
 labels:
@@ -44,8 +44,28 @@ See `backlog/docs/analysis/maintainability-review-2026-09.md`.
 
 ## Acceptance Criteria
 
-- [ ] `CurrentlyPlayingFragment.onCreateView` below CC 20
-- [ ] `binding` remains a local `val`; no nullable `_binding` field is introduced
+- [x] `CurrentlyPlayingFragment.onCreateView` below CC 20 — now **14**
+- [x] `binding` remains a local `val`; no nullable `_binding` field is introduced
 - [ ] `LibraryFragment` and `CollectionsFragment` given the same treatment
-- [ ] `CollapsedSheetGuardTest` still passes and still locates both guards after the move
+- [x] `CollapsedSheetGuardTest` still passes and still locates both guards after the move
 - [ ] Verified on device in both orientations: player, library and collections screens unchanged
+
+## Implementation Notes
+
+The three renderers — `renderPlayerText`, `renderPlayerArtwork`, `refreshSlider` — are now private
+methods taking `binding: FragmentCurrentlyPlayingBinding` as a parameter.
+
+**Ownership is unchanged**, which was the constraint: `binding` stays a local `val` in
+`onCreateView` and is passed down, never stored. No nullable `_binding` field was introduced.
+
+| | before | after |
+|---|---:|---:|
+| `onCreateView` lines | 408 | **218** |
+| `onCreateView` CC | 49 | **14** |
+
+`renderPlayerText` builds its own `StringResolver` now that it is a member rather than a closure
+over `onCreateView`'s local one.
+
+`LibraryFragment` (CC 24, 4 nested funs) and `CollectionsFragment` (CC 15, 1) are **not** done —
+this covered the worst case only. Left `In Review` rather than `Done`: the task named all three,
+and the player is a screen, so the owner should confirm nothing shifted before it closes.

@@ -9,7 +9,7 @@ io/github/mattpvaughn/chronicle/debug 1.98
 io/github/mattpvaughn/chronicle/features/bookdetails 27.70
 io/github/mattpvaughn/chronicle/features/browse 0.00
 io/github/mattpvaughn/chronicle/features/collections 8.69
-io/github/mattpvaughn/chronicle/features/currentlyplaying 27.48
+io/github/mattpvaughn/chronicle/features/currentlyplaying 27.52
 io/github/mattpvaughn/chronicle/features/download 14.72
 io/github/mattpvaughn/chronicle/features/home 18.44
 io/github/mattpvaughn/chronicle/features/library 15.34

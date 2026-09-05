@@ -130,6 +130,149 @@ class CurrentlyPlayingFragment :
     super.onStop()
   }
 
+  /**
+   * Writes the expanded player's text, but only while it is on screen.
+   *
+   * Same reasoning as [refreshSlider]'s `isShown` guard (cu-110), applied to the five text
+   * observers that were left unguarded (cu-117). Each `TextView.text` write invalidates and
+   * re-measures; five of them on every 1 Hz tick, for a sheet the user cannot see, is the
+   * measured cause of the remaining playback jank.
+   *
+   * Uses the seekbar as the probe rather than each view in turn: they live in the same sheet, so
+   * one ancestor chain decides all of them. It must be a view that is present in **both**
+   * orientations — probing `binding.progress` blanked the whole block in landscape, where that
+   * view used to be GONE (cu-19). cu-141 has since stopped `progress` keying its visibility off
+   * the artwork, but the seekbar remains the right probe: it is the one view here that no
+   * orientation hides.
+   */
+  private fun renderPlayerText(binding: FragmentCurrentlyPlayingBinding) {
+    val strings: StringResolver = { resId, args -> getString(resId, *args) }
+    // Two things must hold before writing text, and `isShown` alone establishes neither.
+    //
+    // It reports only the visibility *flags* up the ancestor chain. The player lives in a
+    // bottom sheet whose container collapses to **zero height** rather than going GONE, and
+    // every child keeps `VISIBLE` with real bounds inside it — measured while collapsed:
+    // `seekShown=true seekW=1824` with the fragment root at `height=0`. So the guard passed,
+    // text was written into a hierarchy with no room, and `wrap_content` views below the
+    // collapsed region measured to zero width. That is why the book-progress line was blank
+    // in landscape *intermittently*: whether it recovered depended on which tick happened to
+    // land after an expand, not on any constraint (cu-141).
+    //
+    // Hence the height check. `binding.root.height` is the sheet's own resolved height, so it
+    // is zero exactly while collapsed and non-zero once expanded — in both orientations, and
+    // without naming any view that one of them hides.
+    if (!binding.chapterProgressSeekbar.isShown || binding.root.height == 0) {
+      return
+    }
+
+    // `setText` with an equal CharSequence still invalidates, so compare first — the strings
+    // genuinely repeat, since a second of a 47-hour book leaves the readout unchanged.
+    //
+    // Two-level, human-formatted progress, never raw h:mm:ss/h:mm:ss (§3.1 rule 3, cu-19):
+    // "Ch 3 of 6" · "2:30 left in chapter" on one line, "6h 12m left in book" on the other.
+    val progress = viewModel.playerProgress.value
+    binding.progress.setTextIfChanged(PlayerText.bookProgress(progress, strings))
+    binding.progressPercentage.setTextIfChanged(
+      viewModel.progressPercentageString.value,
+    )
+    binding.chapterProgress.setTextIfChanged(PlayerText.chapterPosition(progress, strings))
+    binding.chapterDuration.setTextIfChanged(PlayerText.chapterRemaining(progress, strings))
+
+    val currentChapter = viewModel.currentChapter.value
+    binding.chapterTitle.setTextIfChanged(
+      if (currentChapter?.title.isNullOrEmpty()) {
+        viewModel.currentTrack.value.title
+      } else {
+        currentChapter?.title.orEmpty()
+      },
+    )
+  }
+
+  /**
+   * Binds the expanded player's cover art, only when the displayed book actually changed.
+   *
+   * `audiobook` is Room-backed and `ProgressUpdater` rewrites `Audiobook.progress` every second,
+   * so this emitted at tick rate with identical title and artwork while `bindImageRounded` did a
+   * Dagger lookup, a `Uri` parse and a Coil load each time. `MainActivity` already guards its
+   * mini-player copy this way (cu-117); this is the expanded sheet's.
+   *
+   * Not gated on `isShown`: the artwork must be bound before the sheet is expanded, or it opens
+   * blank. The change check is what makes it cheap.
+   */
+  private fun renderPlayerArtwork(binding: FragmentCurrentlyPlayingBinding) {
+    val book = viewModel.audiobook.value
+    val title = book?.title.orEmpty()
+    val thumb = book?.thumb
+    if (title == boundTitle && thumb == boundThumb) {
+      return
+    }
+    boundTitle = title
+    boundThumb = thumb
+
+    binding.bookTitle.setTextIfChanged(title)
+    binding.detailsArtwork.contentDescription = title
+    bindImageRounded(binding.detailsArtwork, thumb, plexConfig.isConnected.value, plexConfig::toServerString)
+  }
+
+  // The slider falls back to track values when there is no chapter. valueTo
+  // must be set before value: Material's Slider throws if value falls outside
+  // the current range, which DataBinding handled internally.
+  private fun refreshSlider(binding: FragmentCurrentlyPlayingBinding) {
+    // The guard belongs *here*, at the write, not on the sources. Four observers call this and
+    // only two of them carried the `isSliding` filter — `currentTrack` and `chapterDuration` are
+    // unfiltered and fire on every playback tick, so the stale position reached the thumb anyway.
+    // Filtering the flows was not enough; this is the single line that moves the slider (cu-93).
+    if (viewModel.isSliding) {
+      return
+    }
+
+    // Nothing to refresh while the sheet is not on screen (DRAFT-117). All four observers fire
+    // on every 1 Hz progress tick whether or not the player is visible, and each write to
+    // `valueTo`/`value` invalidates the Slider — so a *collapsed* sheet was driving four full
+    // measure/layout passes a second over the whole activity. Measured: 89 observer firings and
+    // 33 refreshes in 18 s, against 1312 `View.measure` calls, at 87% janky frames.
+    //
+    // `isShown` accounts for every ancestor's visibility *flags*, so a backgrounded fragment
+    // and a hidden container read false — but a **collapsed bottom sheet does not**. It
+    // collapses to zero height with every child still `VISIBLE`, so `isShown` stays true and
+    // this guard passed while nothing was on screen (an earlier version of this comment
+    // claimed otherwise; it was measured wrong — cu-141). The height check is what actually
+    // establishes "the sheet is open".
+    //
+    // The sheet re-reads current values from the ViewModel when it is expanded, so nothing is
+    // stale — this only skips work whose result cannot be seen.
+    if (!binding.chapterProgressSeekbar.isShown || binding.root.height == 0) {
+      return
+    }
+
+    val chapterDuration = viewModel.chapterDuration.value
+    val trackDuration = viewModel.currentTrack.value.duration
+    val max = (if (chapterDuration == 0L) trackDuration else chapterDuration).toFloat()
+    // Chapter progress when there is a chapter to be inside, track progress otherwise. As
+    // `LiveData` the "no chapter" case was a null coalesced to -1; as a non-null `StateFlow` it
+    // is expressed directly, by asking whether the chapter has a duration at all. Coalescing to
+    // 0 instead would have made this fall back never — a chapter-less book would read 0 forever.
+    val current =
+      if (chapterDuration == 0L) {
+        viewModel.trackProgressForSlider.value
+      } else {
+        viewModel.chapterProgressForSlider.value
+      }
+
+    val newMax = if (max > 0f) max else 1f
+    val newValue = current.toFloat().coerceIn(0f, newMax)
+
+    // Only write when the value actually changed. Material's Slider invalidates on every
+    // assignment, even an identical one, and four observers assigning the same number per tick
+    // is four redundant invalidations.
+    if (binding.chapterProgressSeekbar.valueTo != newMax) {
+      binding.chapterProgressSeekbar.valueTo = newMax
+    }
+    if (binding.chapterProgressSeekbar.value != newValue) {
+      binding.chapterProgressSeekbar.value = newValue
+    }
+  }
+
   override fun onCreateView(
     inflater: LayoutInflater,
     container: ViewGroup?,
@@ -220,156 +363,10 @@ class CurrentlyPlayingFragment :
       binding.sleepTimerCountdown.setTextIfChanged(it)
     }
 
-    // The three text formatters live in `PlayerText` (cu-173). They need no `binding` — a
-    // progress snapshot in, a string out — and inside this function they were unreachable by any
-    // unit test. `strings` is the one capability they do need.
-    val strings: StringResolver = { resId, args -> getString(resId, *args) }
-
-    /**
-     * Writes the expanded player's text, but only while it is on screen.
-     *
-     * Same reasoning as [refreshSlider]'s `isShown` guard (cu-110), applied to the five text
-     * observers that were left unguarded (cu-117). Each `TextView.text` write invalidates and
-     * re-measures; five of them on every 1 Hz tick, for a sheet the user cannot see, is the
-     * measured cause of the remaining playback jank.
-     *
-     * Uses the seekbar as the probe rather than each view in turn: they live in the same sheet, so
-     * one ancestor chain decides all of them. It must be a view that is present in **both**
-     * orientations — probing `binding.progress` blanked the whole block in landscape, where that
-     * view used to be GONE (cu-19). cu-141 has since stopped `progress` keying its visibility off
-     * the artwork, but the seekbar remains the right probe: it is the one view here that no
-     * orientation hides.
-     */
-    fun renderPlayerText() {
-      // Two things must hold before writing text, and `isShown` alone establishes neither.
-      //
-      // It reports only the visibility *flags* up the ancestor chain. The player lives in a
-      // bottom sheet whose container collapses to **zero height** rather than going GONE, and
-      // every child keeps `VISIBLE` with real bounds inside it — measured while collapsed:
-      // `seekShown=true seekW=1824` with the fragment root at `height=0`. So the guard passed,
-      // text was written into a hierarchy with no room, and `wrap_content` views below the
-      // collapsed region measured to zero width. That is why the book-progress line was blank
-      // in landscape *intermittently*: whether it recovered depended on which tick happened to
-      // land after an expand, not on any constraint (cu-141).
-      //
-      // Hence the height check. `binding.root.height` is the sheet's own resolved height, so it
-      // is zero exactly while collapsed and non-zero once expanded — in both orientations, and
-      // without naming any view that one of them hides.
-      if (!binding.chapterProgressSeekbar.isShown || binding.root.height == 0) {
-        return
-      }
-
-      // `setText` with an equal CharSequence still invalidates, so compare first — the strings
-      // genuinely repeat, since a second of a 47-hour book leaves the readout unchanged.
-      //
-      // Two-level, human-formatted progress, never raw h:mm:ss/h:mm:ss (§3.1 rule 3, cu-19):
-      // "Ch 3 of 6" · "2:30 left in chapter" on one line, "6h 12m left in book" on the other.
-      val progress = viewModel.playerProgress.value
-      binding.progress.setTextIfChanged(PlayerText.bookProgress(progress, strings))
-      binding.progressPercentage.setTextIfChanged(
-        viewModel.progressPercentageString.value,
-      )
-      binding.chapterProgress.setTextIfChanged(PlayerText.chapterPosition(progress, strings))
-      binding.chapterDuration.setTextIfChanged(PlayerText.chapterRemaining(progress, strings))
-
-      val currentChapter = viewModel.currentChapter.value
-      binding.chapterTitle.setTextIfChanged(
-        if (currentChapter?.title.isNullOrEmpty()) {
-          viewModel.currentTrack.value.title
-        } else {
-          currentChapter?.title.orEmpty()
-        },
-      )
-    }
-
-    /**
-     * Binds the expanded player's cover art, only when the displayed book actually changed.
-     *
-     * `audiobook` is Room-backed and `ProgressUpdater` rewrites `Audiobook.progress` every second,
-     * so this emitted at tick rate with identical title and artwork while `bindImageRounded` did a
-     * Dagger lookup, a `Uri` parse and a Coil load each time. `MainActivity` already guards its
-     * mini-player copy this way (cu-117); this is the expanded sheet's.
-     *
-     * Not gated on `isShown`: the artwork must be bound before the sheet is expanded, or it opens
-     * blank. The change check is what makes it cheap.
-     */
-    fun renderPlayerArtwork() {
-      val book = viewModel.audiobook.value
-      val title = book?.title.orEmpty()
-      val thumb = book?.thumb
-      if (title == boundTitle && thumb == boundThumb) {
-        return
-      }
-      boundTitle = title
-      boundThumb = thumb
-
-      binding.bookTitle.setTextIfChanged(title)
-      binding.detailsArtwork.contentDescription = title
-      bindImageRounded(binding.detailsArtwork, thumb, plexConfig.isConnected.value, plexConfig::toServerString)
-    }
-
-    // The slider falls back to track values when there is no chapter. valueTo
-    // must be set before value: Material's Slider throws if value falls outside
-    // the current range, which DataBinding handled internally.
-    fun refreshSlider() {
-      // The guard belongs *here*, at the write, not on the sources. Four observers call this and
-      // only two of them carried the `isSliding` filter — `currentTrack` and `chapterDuration` are
-      // unfiltered and fire on every playback tick, so the stale position reached the thumb anyway.
-      // Filtering the flows was not enough; this is the single line that moves the slider (cu-93).
-      if (viewModel.isSliding) {
-        return
-      }
-
-      // Nothing to refresh while the sheet is not on screen (DRAFT-117). All four observers fire
-      // on every 1 Hz progress tick whether or not the player is visible, and each write to
-      // `valueTo`/`value` invalidates the Slider — so a *collapsed* sheet was driving four full
-      // measure/layout passes a second over the whole activity. Measured: 89 observer firings and
-      // 33 refreshes in 18 s, against 1312 `View.measure` calls, at 87% janky frames.
-      //
-      // `isShown` accounts for every ancestor's visibility *flags*, so a backgrounded fragment
-      // and a hidden container read false — but a **collapsed bottom sheet does not**. It
-      // collapses to zero height with every child still `VISIBLE`, so `isShown` stays true and
-      // this guard passed while nothing was on screen (an earlier version of this comment
-      // claimed otherwise; it was measured wrong — cu-141). The height check is what actually
-      // establishes "the sheet is open".
-      //
-      // The sheet re-reads current values from the ViewModel when it is expanded, so nothing is
-      // stale — this only skips work whose result cannot be seen.
-      if (!binding.chapterProgressSeekbar.isShown || binding.root.height == 0) {
-        return
-      }
-
-      val chapterDuration = viewModel.chapterDuration.value
-      val trackDuration = viewModel.currentTrack.value.duration
-      val max = (if (chapterDuration == 0L) trackDuration else chapterDuration).toFloat()
-      // Chapter progress when there is a chapter to be inside, track progress otherwise. As
-      // `LiveData` the "no chapter" case was a null coalesced to -1; as a non-null `StateFlow` it
-      // is expressed directly, by asking whether the chapter has a duration at all. Coalescing to
-      // 0 instead would have made this fall back never — a chapter-less book would read 0 forever.
-      val current =
-        if (chapterDuration == 0L) {
-          viewModel.trackProgressForSlider.value
-        } else {
-          viewModel.chapterProgressForSlider.value
-        }
-
-      val newMax = if (max > 0f) max else 1f
-      val newValue = current.toFloat().coerceIn(0f, newMax)
-
-      // Only write when the value actually changed. Material's Slider invalidates on every
-      // assignment, even an identical one, and four observers assigning the same number per tick
-      // is four redundant invalidations.
-      if (binding.chapterProgressSeekbar.valueTo != newMax) {
-        binding.chapterProgressSeekbar.valueTo = newMax
-      }
-      if (binding.chapterProgressSeekbar.value != newValue) {
-        binding.chapterProgressSeekbar.value = newValue
-      }
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.chapterDuration) { refreshSlider() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.currentTrack) { refreshSlider() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.chapterProgressForSlider) { refreshSlider() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.trackProgressForSlider) { refreshSlider() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.chapterDuration) { refreshSlider(binding) }
+    viewLifecycleOwner.collectWhileStarted(viewModel.currentTrack) { refreshSlider(binding) }
+    viewLifecycleOwner.collectWhileStarted(viewModel.chapterProgressForSlider) { refreshSlider(binding) }
+    viewLifecycleOwner.collectWhileStarted(viewModel.trackProgressForSlider) { refreshSlider(binding) }
 
     // Every collector below fires on the 1 Hz tick and writes to a view in the expanded player.
     // While the sheet is collapsed those writes still invalidate views nobody can see and drive
@@ -389,8 +386,8 @@ class CurrentlyPlayingFragment :
     binding.root.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
       val expanded = view.height > 0 && view.isShown
       if (expanded && !wasExpanded) {
-        renderPlayerText()
-        refreshSlider()
+        renderPlayerText(binding)
+        refreshSlider(binding)
       }
       wasExpanded = expanded
     }
@@ -398,12 +395,12 @@ class CurrentlyPlayingFragment :
     // One source for the progress line now, instead of four strings that each re-rendered the
     // whole block (cu-19). `playerProgress` is already distinctUntilChanged, so this fires only
     // when a displayed number actually moved.
-    viewLifecycleOwner.collectWhileStarted(viewModel.playerProgress) { renderPlayerText() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.playerProgress) { renderPlayerText(binding) }
     viewLifecycleOwner.collectWhileStarted(viewModel.progressPercentageString) {
-      renderPlayerText()
+      renderPlayerText(binding)
     }
-    viewLifecycleOwner.collectWhileStarted(viewModel.currentChapter) { renderPlayerText() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.audiobook) { renderPlayerArtwork() }
+    viewLifecycleOwner.collectWhileStarted(viewModel.currentChapter) { renderPlayerText(binding) }
+    viewLifecycleOwner.collectWhileStarted(viewModel.audiobook) { renderPlayerArtwork(binding) }
     viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
       bindImageRounded(
         binding.detailsArtwork,
