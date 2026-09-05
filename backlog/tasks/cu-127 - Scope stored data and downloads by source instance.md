@@ -1,7 +1,7 @@
 ---
 id: cu-127
 title: Scope stored data and downloads by source instance
-status: In Progress
+status: In Review
 assignee: ['@claude']
 created_date: '2026-09-03'
 labels: [R2, architecture, data, multi-backend]
@@ -120,65 +120,90 @@ migrated for files already on disk, and must not repeat cu-85's failure mode whe
 directory silently un-cached whole libraries. A partial migration that leaves files at the old path
 must degrade to "not cached", never to "deleted".
 
-## Implementation Plan
+## Implementation Notes
 
-Scope confirmed by reading the tree (2026-09-05), and it is **much narrower than the ADR feared**
-in one dimension and wider in another.
+Six commits, each with the verify gate green. The full 6-stage `./verify.sh` passes; coverage rose
+**40.34% → 40.97%** aggregate, with `data/local`, `data/model`, `data/sources`, `data/sources/local`
+and `application` all ratcheted up.
 
-**The good news: DAOs do not leak.** All 78 DAO call sites live in exactly four repositories
-(`BookRepository`, `TrackRepository`, `ChapterRepository`, `CollectionsRepository`). Nothing in
-`features/`, `application/` or the player touches a DAO — the only other references are Dagger
-provision methods and two doc comments. So **the repository is a real seam**, and the scoping can
-be enforced there rather than threaded through every caller. A test can pin that.
+### What the tree turned out to look like
 
-**The correction: `MediaSource.id` is `Long` everywhere**, and a Plex `clientIdentifier` is a
-~40-char string. Storing it needs the `String` retype decision-21 prefers; a hash to `Long` would
-be a second identity to keep in sync, which is the thing cu-71 removed.
+Two findings reshaped the plan, one narrowing and one widening.
 
-### Design
+**Narrowing: the DAOs do not leak.** All 78 DAO call sites live in exactly four repositories.
+Nothing in `features/`, `application/` or the player touches one — the only other references are
+Dagger provision methods and two doc comments. So the scoping is enforced at the repository, which
+already passes `prefsRepo.offlineMode` into every read; `currentSourceId` follows the same path.
+The feared "thread a parameter through the whole app" never materialised.
 
-**A `SourceId` value class wrapping `String`.** Same shape as cu-136's `BookOffset` — `@JvmInline`,
-Room-converted to TEXT — so a raw `String` cannot be passed where a source id belongs. The
-per-instance value for Plex is `"plex:<clientIdentifier>"`, prefixed so a future backend cannot
-collide with a Plex server whose identifier happens to match.
+**Widening: tracks needed the field after all.** A track is nearly always reached through its
+book's `parentKey`, which is scoped — but **four** `TrackDao` queries filter on no book at all
+(every track, every cached track, the title search), and `getTrack(id)` is ambiguous across two
+servers. Those are exactly the reads that would return a union.
 
-**Reads are scoped in the repository, not by adding a parameter to 40 DAO methods.** Two rules:
+### Decisions taken
 
-- A query keyed on a **primary key** (`WHERE id = :bookId`) needs no scope — the id already is
-  one, and adding a filter would only mask a bug rather than prevent one.
-- A query returning a **list or a "pick one" ordering** is scoped. Those are the ones that can
-  show a union.
+- **`String`, not `Long`** — as decision-21 preferred. A Plex `clientIdentifier` is ~40 characters,
+  so a numeric id would be a hash or a locally-assigned number mapped from it: the second identity
+  cu-71 removed.
+- **Primary-key reads are deliberately unscoped.** `WHERE id = :bookId` is already unique; a filter
+  there masks bugs rather than preventing them.
+- **`SourceId.UNKNOWN` is inert.** `planIngestion` writes nothing for an unresolved scope, rather
+  than stamping rows with a key no later refresh matches.
+- **Point 4 of decision-21 — the per-source download path — is deferred, with a tripwire.** The
+  ADR is amended in place with the reasoning: the filename collision is unreachable while
+  `MediaItemTrack.id` is the sole primary key, and the change would touch four file paths whose
+  failure mode is deleted audio. A test fails the moment that stops being true.
 
-**Downloads move to `<cachedMediaDir>/<sourceId>/<trackId>.<ext>`**, with the migration degrading
-to "not cached" and never deleting — cu-85 and cu-153's rules.
+### Bugs and traps found on the way
 
-### Tasks, in order
+1. **Room silently overwrote three released schemas** (`BookDatabase/12.json`,
+   `CollectionsDatabase/2.json`, `TrackDatabase/6.json`) — the cu-24 trap, hit three times in one
+   task because three databases were versioned. Caught by `git status` each time and reverted.
+   Worth checking after *every* entity change that bumps a version.
+2. **`MediaItemTrack.merge` named `source` in neither arm**, so a refresh would have blanked the
+   scope of every track — cu-20's rule in a new field. Each arm is separately sabotage-verified.
+3. **Three test suites stubbed `PlexPrefsRepo` without a `server`** and silently stopped ingesting
+   once the unresolved-scope guard landed. That they broke is what proves they were exercising the
+   path.
+4. **`uncacheAll` and `uncacheAllInLibrary` disagreed on scope** after `getCachedTracks` became
+   scoped: deletion narrowed to one server while the flag clear stayed global, which would have
+   reported another server's downloads as absent while they sat on disk.
+5. **I referenced `BookRepository.adoptLegacyRows` in two KDocs before writing it.** Without it an
+   upgrading user opens the app to an empty library. Caught by re-reading the diff, which is what
+   the self-review pass is for.
 
-1. `SourceId` value class + Room converter + tests. No behaviour change.
-2. `MediaSource.id` retyped `Long` → `SourceId`; `MEDIA_SOURCE_ID_PLEX` becomes per-instance,
-   derived from the connected server. `planIngestion` follows the type.
-3. `Audiobook.source` and `Collection.source` retyped, with migrations (Book v12→13,
-   Collections v2→3) that map the legacy `0` to the connected server's id, and `RoomSchemaTest`
-   cases opening real files.
-4. `MediaItemTrack` gains `source`, TrackDatabase v6→7, same migration shape.
-5. Repository-level read scoping + a guard test that no DAO escapes `data/local/`.
-6. Download path + one-time move, degrading to "not cached".
+### Sabotage verification
 
-### Sequencing note
+Every guard was verified by deliberate sabotage and restored with `--rerun-tasks`:
+the unresolved-scope guard; the naive `CAST` in the book migration; a dropped column in the
+collections rebuild; the track migration's default; each arm of `MediaItemTrack.merge`
+independently; a removed read filter; a newly-added unscoped query (caught by `ScopedQueryTest`);
+and adoption widened past the legacy marker.
 
-Steps 3 and 4 are where a mistake is unrecoverable, so each migration is sabotage-verified before
-moving on — CLAUDE.md's rule that a check which cannot fail proves nothing.
+### Follow-ups
+
+- The per-source download path, if `Audiobook.id`/`MediaItemTrack.id` ever stop being the sole
+  primary keys. The tripwire test names the condition.
+- **Live verification is not done** — see the unchecked criteria below.
 
 ## Acceptance Criteria
 
 - [x] Decision recorded — [[decision-21]]: scope by **source instance**, not library
-- [ ] `source` is populated with a real per-instance id, not a per-type constant
-- [ ] Track-level entities carry the same scoping as book-level ones
-- [ ] Every DAO read is scoped, so two sources cannot merge into one list
-- [ ] Downloads are stored under a per-source path, with a migration for existing files that
-      cannot delete or silently orphan them
-- [ ] Room migrations + `RoomSchemaTest` cases for all affected DBs (four of them)
-- [ ] Switching library or server never shows a union of two catalogues, even before a refresh
+- [x] `source` is populated with a real per-instance id, not a per-type constant
+- [x] Track-level entities carry the same scoping as book-level ones
+- [x] Every DAO read is scoped, so two sources cannot merge into one list — `SourceIsolationTest`
+      against real databases, plus `ScopedQueryTest` as a build gate for the next query
+- [~] ~~Downloads are stored under a per-source path~~ — **retired with reasoning**, not unmet.
+      The collision is unreachable while the track id is the sole primary key, so the change would
+      buy nothing while touching four paths whose failure mode is deleted audio. decision-21 is
+      amended in place and a test fails the moment the premise changes.
+- [x] Room migrations + `RoomSchemaTest` cases for all affected DBs — three needed one
+      (Book v12→13, Collections v2→3, Track v6→7); chapters and bookmarks are keyed by `bookId`
+      and carry no scope. All sabotage-verified.
+- [ ] **Switching library or server never shows a union of two catalogues, even before a refresh**
+      — needs the owner on a device. The unit suite proves the reads are scoped; it cannot prove
+      what the screen shows during the adoption window on the first launch after upgrading.
 
 ## Related
 
@@ -188,3 +213,20 @@ moving on — CLAUDE.md's rule that a check which cannot fail proves nothing.
 - [[cu-15]] / [[cu-33]] — the MediaSource seam these fields were added for
 - [[cu-71]] — String ids; argues against re-encoding meaning into the id itself
 - [[cu-85]] — the "a cache scan that cannot read its directory must change nothing" rule
+
+## What needs the owner's eye
+
+Two things, both on-device and neither provable by a machine:
+
+1. **The first launch after upgrading.** `adoptLegacyRows` is launched rather than awaited, so
+   there is a window where the library reads empty and then fills — the same trade cu-158's chapter
+   backfill makes. How long that window is on a real 196-book library, and whether it reads as a
+   loading state or as a bug, is a judgement call. If it is ugly, the fix is to await it behind the
+   existing splash rather than to change the scoping.
+2. **A real library switch.** The unit suite proves two sources cannot merge in a *query*. Whether
+   the screens behave — home shelves, downloads, collections, search — during and after a switch on
+   the household server is the check that was not performed.
+
+Worth knowing while testing: this is the first change to write a **new schema version to three
+databases at once**, so a downgrade is not possible without clearing data. `plex-session.sh backup`
+before testing.

@@ -40,6 +40,26 @@ not the library, and not the backend *type*.**
 3. Every DAO read is scoped by it, so two sources cannot merge into one list.
 4. Downloads move to `<cachedMediaDir>/<sourceId>/<trackId>.<ext>`.
 
+> **Amended 2026-09-05 during [[cu-127]]'s implementation — point 4 is deferred, with a tripwire.**
+>
+> The premise was that two servers can mint the same track id and therefore the same filename.
+> The ids can collide; **the filenames cannot reach the point of collision**, because
+> `MediaItemTrack.id` is the sole primary key: two tracks sharing an id cannot both exist as rows,
+> and a file is only ever written for a row that exists. One row, one filename.
+>
+> Doing it anyway would touch four file paths that each carry documented data-loss history —
+> [[cu-85]] (a scan that cannot read its directory must change nothing), [[cu-81]] (the prune only
+> scans the *active* directory), [[cu-153]] (a partial and a finished download are
+> indistinguishable by name, so a move must carry both), and cu-76 (a partial must not be promoted
+> to "downloaded") — plus a one-time move of real audio. Its failure mode is **deleted audio**,
+> where the rest of this task's failure mode is a wrong list.
+>
+> So it is deferred rather than dropped, and the reasoning is pinned by a test:
+> `SourceIsolationTest.a track id collision is prevented by the primary key, not by the download
+> path`. That test fails the moment the primary key stops being what prevents the collision —
+> which is precisely when the per-source path becomes necessary. The same change would be needed
+> by a composite `(id, source)` key, so the two travel together.
+
 **Why not scope by library.** A book can genuinely move between libraries on the same server while
 keeping its rating key, so a library-scoped row would churn on a move that changed nothing.
 Scoping to the *source* matches the boundary at which ids are actually unique, which is the only

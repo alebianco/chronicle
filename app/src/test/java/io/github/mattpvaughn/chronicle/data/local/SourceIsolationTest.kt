@@ -304,4 +304,44 @@ class SourceIsolationTest {
       )
       assertEquals(false, bookDb.bookDao.getAudiobooks(TEST_SOURCE).single().isCached)
     }
+
+  /**
+   * Why cu-127 does **not** move downloads to a per-source directory.
+   *
+   * decision-21 specified `<cachedMediaDir>/<sourceId>/<trackId>.<ext>`, on the grounds that two
+   * servers can mint the same track id and so the same filename. That is true of the *ids*, but
+   * the collision is unreachable: `MediaItemTrack.id` is the sole primary key, so two tracks
+   * sharing an id cannot both exist as rows — the second insert replaces the first — and a file is
+   * only ever written for a row that exists. One row means one filename.
+   *
+   * So the path change would buy nothing today while touching four file paths that each carry
+   * documented data-loss history: cu-85 (an unreadable directory must change nothing), cu-81 (the
+   * prune only scans the active directory), cu-153 (a partial and a finished download are
+   * indistinguishable by name, so a move must carry both), and cu-76 (a partial must not be
+   * promoted to "downloaded"). Its failure mode is deleted audio, not a wrong list.
+   *
+   * This test is the record of that reasoning, and the tripwire: it fails the moment the primary
+   * key stops being the thing that prevents the collision — which is exactly when the per-source
+   * path becomes necessary.
+   */
+  @Test
+  fun `a track id collision is prevented by the primary key, not by the download path`() =
+    runTest {
+      trackDb.trackDao.insertAll(
+        listOf(
+          MediaItemTrack(id = "2001", parentKey = "1", source = TEST_SOURCE, media = "/a/x.mp3"),
+          MediaItemTrack(id = "2001", parentKey = "9", source = OTHER_TEST_SOURCE, media = "/b/y.mp3"),
+        ),
+      )
+
+      val both =
+        trackDb.trackDao.getAllTracksAsync(TEST_SOURCE) +
+          trackDb.trackDao.getAllTracksAsync(OTHER_TEST_SOURCE)
+      assertEquals(
+        "if two same-id tracks ever coexist, they can also collide on disk and the per-source " +
+          "download path decision-21 describes becomes necessary",
+        1,
+        both.size,
+      )
+    }
 }

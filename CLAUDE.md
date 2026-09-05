@@ -106,7 +106,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1301 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1425 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **3 instrumented tests** on two managed emulators (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -169,7 +169,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 
 ## Gotchas (things that waste agent runs)
 
-- **Five separate Room databases** (`BookDatabase` v12, `TrackDatabase` v6, `ChapterDatabase` v3, `CollectionsDatabase` v2, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
+- **Five separate Room databases** (`BookDatabase` v13, `TrackDatabase` v7, `ChapterDatabase` v3, `CollectionsDatabase` v3, `BookmarkDatabase` v1), each with its own version and migration list — a schema change means finding the right one. None use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe listening progress. Add a case to `RoomMigrationTest` for any new migration — and note the *load-bearing* check is `RoomSchemaTest`, which opens a real file at the old schema and lets Room migrate it; an in-memory test cannot catch a migration that disagrees with its entity.
 - **Listening position is owned by the *tracks*, never the book** (decision-16, cu-90). Plex stores
   no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a cache of a derivation.
   `merge` carries the local value and **never** adopts `network.progress`; only `syncAudiobook`,
@@ -250,9 +250,46 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   fetch never reaches ingestion at all. All three are sabotage-verified. `refreshData` and
   `refreshDataPaginated` share that one path — the tail was written out twice before, and cu-156 had
   already had to add tag seeding to both copies.
-  **Every real book carries `source = 0`** (`MEDIA_SOURCE_ID_PLEX`) — 196 of 196 rows on the
-  household server. Three test fixtures used `1L`, which nothing checked until source-scoped removal
-  made them fail: the cu-24 fixture trap in a new field.
+  **`source` is a real per-instance id since cu-127, not the constant `0` it was** — see the
+  scoping entry below. Until then every one of the household server's 196 rows carried
+  `MEDIA_SOURCE_ID_PLEX` (`0L`), which is why cu-80's source-scoped removal compared a constant
+  against itself; three test fixtures used `1L` and nothing noticed until that removal made them
+  fail, the cu-24 fixture trap in a new field.
+- **Stored rows are scoped by *source instance* — one Plex server — and the reads enforce it**
+  (cu-127, decision-21). `SourceId` (`data/model/SourceId.kt`) is a `String` value class holding
+  `"plex:<clientIdentifier>"`; `Audiobook`, `Collection` and `MediaItemTrack` all carry one. Four
+  things to know before touching this:
+  - **The repository is the seam, and that is what makes it enforceable.** All 78 DAO call sites
+    live in four repositories; nothing in `features/`, `application/` or the player reaches a DAO.
+    Each repository resolves `currentSourceId` from the connected server and passes it the same way
+    it already passes `prefsRepo.offlineMode`.
+  - **A read that returns rows without naming one must filter by source, and `ScopedQueryTest`
+    fails the build otherwise.** A query keyed on a primary key (`WHERE id = :bookId`) or on one
+    book (`parentKey = :`) is exempt — the id is already unique, and a filter there masks bugs
+    rather than preventing them. Chapters and bookmarks carry no `source` at all for that reason:
+    every query of theirs is keyed by `bookId`. The guard exists because an unscoped read fails
+    *silently* — the symptom is a union that only appears with two servers configured, so nothing
+    else here can catch a newly-added one.
+  - **`SourceId.UNKNOWN` is inert, never a wildcard.** `planIngestion` writes nothing when the
+    scope is unresolved (mid-login, or after `PlexConfig.clear()`): stamping rows with it would put
+    them beyond both the removal rule and every scoped read — a catalogue that grows and can never
+    be pruned. Three test suites were stubbing `PlexPrefsRepo` without a `server` and so silently
+    stopped exercising ingestion once that guard landed; stub `server`, not just `library`.
+  - **Migrating rows land on `SourceId.LEGACY_PLEX`, and `adoptLegacyRows` claims them on the next
+    launch.** A `SupportSQLiteDatabase` cannot know which server the app is configured for, so the
+    v12→v13 and v6→v7 migrations mark every existing row and `ChronicleApplication` adopts them —
+    launched, not awaited, so there is a brief window on the first launch after upgrading where the
+    library reads empty and fills. Adoption matches the marker **only**, never a resolved source,
+    or a second server could take over the first's library. A plain `CAST(source AS TEXT)` in that
+    migration would have produced the string `"0"` — schema-valid, right row count, and every book
+    permanently invisible; that is what the migration tests assert, by sabotage.
+  What this does **not** fix: `Audiobook.id` is still the sole primary key, so two servers sharing
+  a Plex rating key still collide on insert. decision-21 rejected a composite key deliberately
+  (cu-71's lesson). Scoping removes the *union*, which is what a user sees. Downloads therefore
+  stay at `<cachedMediaDir>/<trackId>.<ext>`: the per-source path decision-21 specified would buy
+  nothing while one id means one row means one filename, and it would touch four file paths whose
+  failure mode is deleted audio (cu-85, cu-81, cu-153, cu-76). A test pins that reasoning and
+  fails the moment the primary key stops being what prevents the collision.
 - **Bookmarks are a separate database on purpose** (cu-22). `BookmarkDatabase` is keyed by
   `bookId` and lives outside `BookDatabase` **so the sync path cannot reach it**: `refreshData`
   merges `Audiobook` rows and calls `bookDao.removeAll` for books the server no longer lists, so a
