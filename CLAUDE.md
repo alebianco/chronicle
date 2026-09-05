@@ -500,7 +500,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   particular whether a live Plex returns `key` as `/library/sections/1/style/301`, which is what
   the id is parsed out of. The *multi-id* route, `/library/metadata/{id1},{id2},...` ("Get one or
   more metadata items" in the API spec), would be cheaper still but is spec-verified only. Don't
-  re-derive this. `merge` needs a **third** rule for fields like these — the
+  re-derive this — and note a 2026-09-05 review claimed python-plexapi "uses it in four places",
+  which is **false**: those call sites are `/library/sections/{id}/common` and a PUT to
+  `/library/sections/{id}/all`, both of which pass comma-joined ids as an `id=` *query parameter*
+  to different endpoints. There is no comma-joined `/library/metadata/{id1},{id2}` read anywhere in
+  python-plexapi. The route remains unverified against a real server. `merge` needs a **third** rule for fields like these — the
   network value when it has one, the local value when it does not: preferring the network blanks a
   narrator on every refresh, preferring the local one makes a re-tagged book uncorrectable.
   `Audiobook.seriesIndex` is parsed from `titleSort`, **not** Plex's `index`, which is the album
