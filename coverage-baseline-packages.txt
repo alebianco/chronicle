@@ -14,7 +14,7 @@ io/github/mattpvaughn/chronicle/features/download 14.72
 io/github/mattpvaughn/chronicle/features/home 18.44
 io/github/mattpvaughn/chronicle/features/library 15.34
 io/github/mattpvaughn/chronicle/features/login 29.63
-io/github/mattpvaughn/chronicle/features/player 37.75
+io/github/mattpvaughn/chronicle/features/player 39.28
 io/github/mattpvaughn/chronicle/features/search 83.50
 io/github/mattpvaughn/chronicle/features/settings 59.82
 io/github/mattpvaughn/chronicle/injection/modules 43.26
