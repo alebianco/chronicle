@@ -401,26 +401,15 @@ class CurrentlyPlayingFragment :
     viewLifecycleOwner.collectWhileStarted(viewModel.chapterProgressForSlider) { refreshSlider() }
     viewLifecycleOwner.collectWhileStarted(viewModel.trackProgressForSlider) { refreshSlider() }
 
-    // Every observer below fires on the 1 Hz progress tick, and each one writes to a view in the
-    // expanded player. While the sheet is *collapsed* those views cannot be seen, but the writes
-    // still invalidate them and drive measure/layout over the whole activity — the same defect
-    // `refreshSlider` already guards, in the five places it was not applied (cu-117).
+    // Every collector below fires on the 1 Hz tick and writes to a view in the expanded player.
+    // While the sheet is collapsed those writes still invalidate views nobody can see and drive
+    // measure/layout over the whole activity: measured on a 28-track book, foreground playback drew
+    // ~60-75 frames per 20 s at ~30% jank against 4 frames at 0% backgrounded (cu-117).
     //
-    // Measured on a 28-track book: playing in the foreground drew ~60-75 frames per 20 s at ~30%
-    // jank, while the identical playback with the app *backgrounded* drew 4 frames at 0% and the
-    // main thread fell from 76 to 3 jiffies/10 s. So the cost is rendering views nobody is
-    // looking at.
-    //
-    // `refreshTextIfVisible` carries the `isShown` check for the same reason as the slider: it
-    // accounts for every ancestor, so a collapsed sheet reads false. [renderPlayerText] then
-    // re-runs all of it when the sheet becomes visible, so expanding shows current values even if
-    // playback is paused and no further tick is coming — the slider can rely on the next tick,
-    // text cannot.
-    // Catch the sheet becoming visible. The text observers below skip their writes while the
-    // sheet is collapsed, so without this an expand during *paused* playback would show whatever
-    // was last written — there is no further tick to correct it. A layout-change listener is the
-    // right hook because `isShown` is exactly what it reports on, and it needs no knowledge of
-    // the bottom sheet's state living over in MainActivity.
+    // `refreshTextIfVisible` guards on `isShown`, which accounts for every ancestor. The listener
+    // below then re-runs [renderPlayerText] when the sheet becomes visible — necessary because an
+    // expand during *paused* playback has no further tick to correct the stale text, where the
+    // slider can wait for one.
     var wasShown = false
     binding.chapterProgressSeekbar.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
       val shown = view.isShown

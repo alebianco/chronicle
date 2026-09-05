@@ -15,18 +15,15 @@ data class ScrubberWindow(
 /**
  * Narrows a book-framed position to the current chapter, for the session's scrubber (cu-165).
  *
- * Android Auto and the notification draw their seek bar from `PlaybackState.position` against
- * `METADATA_KEY_DURATION`. Both used to describe the whole track, while the *title* beside them
- * named the chapter — so on a single-file 47-hour audiobook a small drag skipped hours and the
- * readout did not match the title. It is the most-reported Auto complaint against both major
- * competitors (advplyr/audiobookshelf-app#1406, PaulWoitaschek/Voice#3432).
+ * Auto and the notification draw their seek bar from `PlaybackState.position` against
+ * `METADATA_KEY_DURATION`. Both described the whole track while the title beside them named the
+ * chapter, so on a single-file 47-hour book a small drag skipped hours
+ * (advplyr/audiobookshelf-app#1406, PaulWoitaschek/Voice#3432).
  *
- * Returns null when there is no usable chapter, and callers then publish the track window
- * unchanged: a book with no chapter data must keep a working bar, not get a dead one.
- *
- * **The two values must move together.** Publishing a chapter-length duration against a
- * track-framed position is worse than doing nothing — the bar would be the right size and point at
- * the wrong place — so this returns them as one value or not at all.
+ * Position and duration are returned **together or not at all**: a chapter-length duration against
+ * a track-framed position draws a bar of the right size pointing at the wrong place. Null means the
+ * caller keeps the track window, so a book without chapters gets a working bar rather than a dead
+ * one.
  */
 fun chapterScrubberWindow(
   bookPosition: BookOffset,

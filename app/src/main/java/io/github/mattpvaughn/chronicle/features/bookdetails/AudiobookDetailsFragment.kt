@@ -264,23 +264,9 @@ class AudiobookDetailsFragment : Fragment() {
       adapter.submitChapters(chapters)
     }
 
-    // TODO casting
-//        val menu = binding.detailsToolbar.menu
-//        val mediaRouteButton = menu.findItem(R.id.media_route_menu_item).actionView
-//
-//        if (castContext.castState != CastState.NO_DEVICES_AVAILABLE) {
-//            mediaRouteButton.visibility = View.VISIBLE
-//        }
-//
-//        castContext.addCastStateListener { state ->
-//            if (state == CastState.NO_DEVICES_AVAILABLE) {
-//                mediaRouteButton.visibility = View.GONE
-//            } else {
-//                if (mediaRouteButton.visibility == View.GONE) {
-//                    mediaRouteButton.visibility = View.VISIBLE
-//                }
-//            }
-//        }
+    // No Cast button. Upstream left 16 lines of commented-out MediaRouteButton wiring here, dead in
+    // every build. Nothing in the app uses Cast at all — `media3-cast` is declared but never
+    // imported — so this was never one UI hook away from working. See mattttvaughn/chronicle#8.
 
     detailsToolbar = binding.detailsToolbar
     (activity as AppCompatActivity).setSupportActionBar(binding.detailsToolbar)
