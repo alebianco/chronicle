@@ -1,7 +1,7 @@
 ---
 id: cu-141
 title: The landscape player hides its book-level progress
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'
@@ -442,6 +442,82 @@ of its relationships. That is a strange result and it is where a fresh attempt s
 ideally with Layout Inspector, which would show the resolved measure spec that no `dumpsys` field
 exposes.
 
+## Attempt 7 (2026-09-05) — SOLVED
+
+The owner's question — *"the text container is sized? maybe that's collapsing it?"* — was the
+key, and it was right.
+
+### The container collapses, and `isShown` cannot see it
+
+Walking the ancestor chain from `chapter_progress` rather than reading the layout file:
+
+```
+currently_playing_container  0,882-1920,990   ← 108px, the mini-player
+  CoordinatorLayout          0,0-1920,108
+    AppBarLayout             0,0-1920,575     ← 575px of content
+      CollapsingToolbarLayout  0,0-1920,575
+        ConstraintLayout       0,0-1920,575
+```
+
+**Every measurement in attempts 1-6 was taken with the sheet collapsed.** The player lives in a
+bottom sheet that collapses to the mini-player height — and at its smallest, to *zero* height —
+while the content inside still measures 575px. Anything below the visible region measures to zero
+width. `chapter_progress` sits at y=180. That is the entire six-attempt mystery: nothing was ever
+wrong with the constraints.
+
+### Why it was intermittent
+
+`View.isShown` walks only the visibility **flags** up the ancestor chain. A collapsed bottom sheet
+does not go GONE — it keeps every child `VISIBLE` and shrinks the container to zero height. Probed
+while fully collapsed:
+
+```
+PASSED: seekShown=true seekW=1824 rootH=0 progW=0 progVis=0
+```
+
+The guard **passed** with the fragment root at zero height. Two consequences, both intermittent,
+which is what made this so expensive:
+
+1. `renderPlayerText` wrote text into a hierarchy with no room, so `wrap_content` readouts below
+   the collapsed region measured zero width. Whether the line recovered depended purely on which
+   1 Hz tick happened to land after an expand.
+2. The re-render listener keyed on an `isShown` transition **that never fires**: `wasShown` went
+   true while still collapsed, so the `shown && !wasShown` edge was missed on every expand, and
+   stale text was never corrected.
+
+This also explains attempt 6's "byte-identical XML, different result" — the XML was never the
+variable.
+
+### The fix
+
+- Both guards test `binding.root.height == 0` alongside `isShown`. The root's height is zero
+  exactly while collapsed, in both orientations, without naming a view either one hides.
+- The layout-change listener watches the **root's height** rather than an `isShown` transition,
+  and re-runs `renderPlayerText()` **and** `refreshSlider()` on expand.
+- `progress` no longer carries `@integer/currently_playing_artwork_visibility`. It is text, not
+  artwork, and that flag made it GONE in landscape outright — a genuine second defect.
+- `progressPercentage` anchors to `right_gutter` rather than the GONE artwork, which collapsed the
+  pair to a point at y=0.
+- `sleep_timer_countdown` sizes from its own content instead of `0dp x 0dp` against the GONE
+  artwork.
+
+### Verified on the tablet
+
+Landscape, fully expanded, dialog-free: `Ch 5 of 107` · `1:35 left in chapter` ·
+`10h 41m left in book  4%` — all three present, the first and last of which had never rendered.
+Portrait unregressed: artwork visible, all four readouts sized. **Four consecutive
+collapse/expand toggles** hold the same widths (`progress` 145px, `chapter_progress` 119px),
+which is the check attempt 6 failed.
+
+`CollapsedSheetGuardTest` pins both halves and is **sabotage-verified**: removing either the
+height check or the listener's `view.height > 0` fails the build.
+
+### Not verified
+
+The **sleep-timer countdown was not tested with a live timer.** The sizing change is sound in
+principle — it can no longer be zero-sized by the GONE artwork — but no countdown was observed
+rendering in landscape. That criterion stays unchecked.
+
 **Caveat on the original symptom.** All of attempt 6's measurements were taken with the probe
 attached and playback started via `--el play_book`; the user-visible landscape blankness reported
 in the task body was observed before that. Confirm the on-screen symptom still reproduces on a
@@ -453,12 +529,12 @@ and acceptance criteria likely need rewriting once the cause is confirmed.
 
 ## Acceptance Criteria
 
-- [ ] The book-level progress line is visible in the landscape player
-- [ ] The chapter position line (`Ch 3 of 6`) lays out with real width in landscape
-- [ ] `binding.progress` no longer keys its visibility off
+- [x] The book-level progress line is visible in the landscape player
+- [x] The chapter position line (`Ch 3 of 6`) lays out with real width in landscape
+- [x] `binding.progress` no longer keys its visibility off
       `currently_playing_artwork_visibility` — it is text, not artwork
-- [ ] Verified on the 800dp landscape tablet **and** in portrait, since the constraint set differs
-- [ ] `RawDurationFormatTest` still passes: the line must stay human-formatted when it appears
+- [x] Verified on the 800dp landscape tablet **and** in portrait, since the constraint set differs
+- [x] `RawDurationFormatTest` still passes: the line must stay human-formatted when it appears
 - [ ] The sleep-timer countdown is visible in landscape (see the confirmed case below)
 
 ## Notes

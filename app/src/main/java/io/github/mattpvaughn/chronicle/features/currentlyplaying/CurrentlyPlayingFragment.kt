@@ -280,17 +280,26 @@ class CurrentlyPlayingFragment :
      * Uses the seekbar as the probe rather than each view in turn: they live in the same sheet, so
      * one ancestor chain decides all of them. It must be a view that is present in **both**
      * orientations — probing `binding.progress` blanked the whole block in landscape, where that
-     * view is GONE (cu-19).
+     * view used to be GONE (cu-19). cu-141 has since stopped `progress` keying its visibility off
+     * the artwork, but the seekbar remains the right probe: it is the one view here that no
+     * orientation hides.
      */
     fun renderPlayerText() {
-      // Anchored on the seekbar, not on `binding.progress`. That view carries
-      // `android:visibility="@integer/currently_playing_artwork_visibility"`, which is GONE in
-      // landscape — so `isShown` was permanently false there and this returned early *every*
-      // time, leaving the chapter position, the chapter duration, the percentage and the chapter
-      // title all blank on a landscape tablet. The guard's intent (skip the work while the sheet
-      // is collapsed, cu-110/cu-117) is right; keying it on a view that one orientation hides
-      // outright was not. The seekbar is present in both, and `refreshSlider` already uses it.
-      if (!binding.chapterProgressSeekbar.isShown) {
+      // Two things must hold before writing text, and `isShown` alone establishes neither.
+      //
+      // It reports only the visibility *flags* up the ancestor chain. The player lives in a
+      // bottom sheet whose container collapses to **zero height** rather than going GONE, and
+      // every child keeps `VISIBLE` with real bounds inside it — measured while collapsed:
+      // `seekShown=true seekW=1824` with the fragment root at `height=0`. So the guard passed,
+      // text was written into a hierarchy with no room, and `wrap_content` views below the
+      // collapsed region measured to zero width. That is why the book-progress line was blank
+      // in landscape *intermittently*: whether it recovered depended on which tick happened to
+      // land after an expand, not on any constraint (cu-141).
+      //
+      // Hence the height check. `binding.root.height` is the sheet's own resolved height, so it
+      // is zero exactly while collapsed and non-zero once expanded — in both orientations, and
+      // without naming any view that one of them hides.
+      if (!binding.chapterProgressSeekbar.isShown || binding.root.height == 0) {
         return
       }
 
@@ -361,11 +370,16 @@ class CurrentlyPlayingFragment :
       // measure/layout passes a second over the whole activity. Measured: 89 observer firings and
       // 33 refreshes in 18 s, against 1312 `View.measure` calls, at 87% janky frames.
       //
-      // `isShown` rather than a visibility check: it accounts for every ancestor, so a collapsed
-      // bottom sheet, a backgrounded fragment and a hidden container all read false. The sheet
-      // re-reads current values from the ViewModel when it is expanded, so nothing is stale —
-      // this only skips work whose result cannot be seen.
-      if (!binding.chapterProgressSeekbar.isShown) {
+      // `isShown` accounts for every ancestor's visibility *flags*, so a backgrounded fragment
+      // and a hidden container read false — but a **collapsed bottom sheet does not**. It
+      // collapses to zero height with every child still `VISIBLE`, so `isShown` stays true and
+      // this guard passed while nothing was on screen (an earlier version of this comment
+      // claimed otherwise; it was measured wrong — cu-141). The height check is what actually
+      // establishes "the sheet is open".
+      //
+      // The sheet re-reads current values from the ViewModel when it is expanded, so nothing is
+      // stale — this only skips work whose result cannot be seen.
+      if (!binding.chapterProgressSeekbar.isShown || binding.root.height == 0) {
         return
       }
 
@@ -406,17 +420,23 @@ class CurrentlyPlayingFragment :
     // measure/layout over the whole activity: measured on a 28-track book, foreground playback drew
     // ~60-75 frames per 20 s at ~30% jank against 4 frames at 0% backgrounded (cu-117).
     //
-    // `refreshTextIfVisible` guards on `isShown`, which accounts for every ancestor. The listener
-    // below then re-runs [renderPlayerText] when the sheet becomes visible — necessary because an
-    // expand during *paused* playback has no further tick to correct the stale text, where the
-    // slider can wait for one.
-    var wasShown = false
-    binding.chapterProgressSeekbar.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-      val shown = view.isShown
-      if (shown && !wasShown) {
+    // The listener below re-runs [renderPlayerText] and [refreshSlider] when the sheet gains
+    // height — necessary because an expand during *paused* playback has no further tick to
+    // correct the stale text, where the slider can wait for one.
+    //
+    // It watches the **root's height**, not `isShown`. The sheet collapses to zero height
+    // rather than going GONE, so every child stays `VISIBLE` throughout and an `isShown`
+    // transition never fires on expand: `wasShown` went true while still collapsed, and the
+    // `shown && !wasShown` edge was therefore missed every time. Anything written before that
+    // point measured against a zero-height container (cu-141).
+    var wasExpanded = false
+    binding.root.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+      val expanded = view.height > 0 && view.isShown
+      if (expanded && !wasExpanded) {
         renderPlayerText()
+        refreshSlider()
       }
-      wasShown = shown
+      wasExpanded = expanded
     }
 
     // One source for the progress line now, instead of four strings that each re-rendered the
