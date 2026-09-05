@@ -23,6 +23,14 @@ the same change.
 cu-82 made `ChapterDatabase` the source of truth: every read resolves table → legacy column →
 `asChapterList()`. The middle level is now the only thing keeping the column alive.
 
+> **Renumbered 2026-09-05 by [[cu-127]].** This task was written against `BookDatabase` v12 and
+> claimed v12→v13. cu-127 took v13 for the `source` retype, so the numbers here move up one:
+> the migration is **v13→v14** and the released file that must not be rewritten is **`13.json`**.
+> The gate is unchanged — a released build must have run cu-158's backfill first.
+>
+> One thing cu-127 makes easier: `rebuildTable` now takes `columnExpressions`, and dropping a
+> column is a rebuild. Copy the column list from the exported `13.json`, which is the authority.
+
 ## Why cu-82 stopped short of dropping it
 
 `ChronicleApplication.backfillChapterTable()` **launches without awaiting**, and
@@ -38,7 +46,7 @@ understanding.
 ## What to do
 
 1. Confirm the release containing cu-158's backfill has shipped and been run.
-2. Remove `Audiobook.chapters`, bump `BookDatabase` to v13, write the migration.
+2. Remove `Audiobook.chapters`, bump `BookDatabase` to **v14**, write the migration.
 3. Collapse `resolveChapters` and `resolveChaptersFromCache` from three levels to two — the
    `asChapterList()` fallback (cu-13) **stays permanently**; only the column level goes.
 4. Remove `ChapterListConverter` and its tests with the column, or write down why they stay.
@@ -47,10 +55,10 @@ understanding.
 
 ## Acceptance Criteria
 
-- [ ] `Audiobook.chapters` removed, with a `BookDatabase` v12→v13 migration
-- [ ] `RoomSchemaTest` gains a v12 file-backed case, **verified by deliberate sabotage** — an
+- [ ] `Audiobook.chapters` removed, with a `BookDatabase` **v13→v14** migration
+- [ ] `RoomSchemaTest` gains a v13 file-backed case, **verified by deliberate sabotage** — an
       in-memory test cannot catch a migration that disagrees with its entity
-- [ ] The exported `12.json` is unchanged by the bump (cu-24: Room rewrites the *older* file when a
+- [ ] The exported `13.json` is unchanged by the bump (cu-24: Room rewrites the *older* file when a
       version bump and an entity change land together)
 - [ ] The `asChapterList()` fallback still works for a book with no chapter data anywhere
 - [ ] `ChapterListConverter` removed, or a written reason to keep it
