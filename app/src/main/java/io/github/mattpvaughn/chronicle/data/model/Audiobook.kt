@@ -287,25 +287,36 @@ data class Audiobook(
 
     const val SORT_KEY_TITLE = "title"
     const val SORT_KEY_AUTHOR = "author"
-    const val SORT_KEY_GENRE = "title"
-    const val SORT_KEY_RELEASE_DATE = "release_date"
     const val SORT_KEY_YEAR = "year"
     const val SORT_KEY_DURATION = "duration"
-    const val SORT_KEY_RATING = "rating"
-    const val SORT_KEY_CRITIC_RATING = "critic_rating"
     const val SORT_KEY_DATE_ADDED = "date_added"
     const val SORT_KEY_DATE_PLAYED = "date_played"
     const val SORT_KEY_PLAYS = "plays"
 
+    /**
+     * The sort keys the library can actually order by.
+     *
+     * This is **not a documentation list**. It is the allowlist in two places: the
+     * `bookSortKey` setter throws for a value outside it, and `BACKUP_SETTING_VALUES` validates
+     * `KEY_BOOK_SORT_BY` against it on settings *import* (cu-77). So anything listed here is a
+     * value the app will accept and persist — and `LibraryViewModel`'s comparator ends in
+     * `throw NoWhenBranchMatchedException`, which makes a listed-but-unhandled key a **crash on
+     * the library screen**, reachable by importing a settings file and unrecoverable through the
+     * UI because the library is the screen that crashes.
+     *
+     * Four keys were listed without a comparator branch — `genre`, `release_date`, `rating` and
+     * `critic_rating` — and their sort options are commented out in `fragment_library.xml`, so
+     * they were never offered. `SORT_KEY_GENRE` was additionally defined as the string `"title"`,
+     * silently aliasing the title sort. They are gone rather than given branches, because adding
+     * branches would implement four sort orders the product does not offer.
+     *
+     * `LibrarySortKeyTest` fails the build if this list and the comparator drift apart again.
+     */
     val SORT_KEYS =
       listOf(
         SORT_KEY_TITLE,
         SORT_KEY_AUTHOR,
-        SORT_KEY_GENRE,
-        SORT_KEY_RELEASE_DATE,
         SORT_KEY_YEAR,
-        SORT_KEY_RATING,
-        SORT_KEY_CRITIC_RATING,
         SORT_KEY_DATE_ADDED,
         SORT_KEY_DATE_PLAYED,
         SORT_KEY_PLAYS,
