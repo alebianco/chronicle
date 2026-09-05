@@ -451,6 +451,60 @@ class RoomSchemaTest {
   }
 
   /**
+   * The v6 -> v7 migration adds the track scoping key (cu-127, decision-21).
+   *
+   * The assertion that matters is the **default**, not the column's existence — Room's own
+   * validation on open already covers that. An existing track must land on
+   * [SourceId.LEGACY_PLEX], matching what BOOK_MIGRATION_12_13 writes onto the book it belongs to.
+   *
+   * A default of `''` would be [SourceId.UNKNOWN], which ingestion treats as "no scope resolved":
+   * every pre-existing track would be invisible to the scoped reads while its book was not, so a
+   * library would show its books and none of their tracks. That is a schema-valid, silent
+   * corruption, and only reading the value back catches it.
+   */
+  @Test
+  fun `the track database defaults existing rows to the legacy scope when migrating from v6`() {
+    val db =
+      migrated(
+        klass = TrackDatabase::class.java,
+        oldVersion = 6,
+        createSql =
+          "CREATE TABLE IF NOT EXISTS `MediaItemTrack` (`id` TEXT NOT NULL, " +
+            "`parentKey` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+            "`playQueueItemID` INTEGER NOT NULL, `thumb` TEXT, `index` INTEGER NOT NULL, " +
+            "`discNumber` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `media` TEXT NOT NULL, " +
+            "`album` TEXT NOT NULL, `artist` TEXT NOT NULL, `genre` TEXT NOT NULL, " +
+            "`cached` INTEGER NOT NULL, `artwork` TEXT, `viewCount` INTEGER NOT NULL, " +
+            "`progress` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, " +
+            "`updatedAt` INTEGER NOT NULL, `size` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        createIndexSql =
+          "CREATE INDEX IF NOT EXISTS `index_MediaItemTrack_parentKey_discNumber_index` " +
+            "ON `MediaItemTrack` (`parentKey`, `discNumber`, `index`)",
+        seedSql =
+          "INSERT INTO MediaItemTrack (id, parentKey, title, playQueueItemID, thumb, `index`, " +
+            "discNumber, duration, media, album, artist, genre, cached, artwork, viewCount, " +
+            "progress, lastViewedAt, updatedAt, size) VALUES ('2001', '1001', 'Track One', 0, " +
+            "'', 1, 1, 5000, '/media/2001.mp3', '', '', '', 1, '', 0, 4242, 0, 0, 0)",
+        migrations = TRACK_MIGRATIONS,
+      )
+
+    db.query("SELECT id, source, parentKey, progress, cached FROM MediaItemTrack", emptyArray())
+      .use { cursor ->
+        assertTrue("the pre-existing track must survive the upgrade", cursor.moveToFirst())
+        assertEquals("2001", cursor.getString(0))
+        assertEquals(
+          "an existing track must join the same scope as its book, not the unresolved one",
+          SourceId.LEGACY_PLEX.value,
+          cursor.getString(1),
+        )
+        assertEquals("1001", cursor.getString(2))
+        assertEquals("adding a column must not disturb the user's place", 4_242L, cursor.getLong(3))
+        assertEquals("a downloaded track must stay downloaded", 1, cursor.getInt(4))
+      }
+    db.close()
+  }
+
+  /**
    * Creates a database file at an old schema, opens it through Room at the current version, and
    * hands back the opened database so a test can assert the rows survived.
    *
@@ -464,6 +518,7 @@ class RoomSchemaTest {
     createSql: String,
     seedSql: String,
     migrations: Array<Migration>,
+    createIndexSql: String? = null,
   ): T {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     val file = java.io.File(context.cacheDir, "migrate-check-${System.nanoTime()}.db")
@@ -471,6 +526,10 @@ class RoomSchemaTest {
 
     android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(file, null).apply {
       execSQL(createSql)
+      // A real file at that version carries its indices too, and Room validates them on open —
+      // so a case seeding a version that had an index must recreate it or the migration is being
+      // tested against a shape that never existed.
+      createIndexSql?.let { execSQL(it) }
       execSQL(seedSql)
       version = oldVersion
       close()

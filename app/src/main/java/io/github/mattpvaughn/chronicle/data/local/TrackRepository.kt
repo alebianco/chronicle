@@ -5,6 +5,7 @@ import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
@@ -174,6 +175,15 @@ class TrackRepository
     private val plexPrefs: PlexPrefsRepo,
     private val dispatchers: DispatcherProvider,
   ) : ITrackRepository {
+    /**
+     * The Plex server these tracks belong to, as a scoping key (cu-127, decision-21).
+     *
+     * The same accessor `BookRepository` has, and for the same reason: read fresh, because the
+     * user can switch servers between a refresh and the next.
+     */
+    private val currentSourceId: SourceId
+      get() = SourceId.forPlexServer(plexPrefs.server?.serverId.orEmpty())
+
     @Throws(Throwable::class)
     override suspend fun refreshData() {
       if (prefsRepo.offlineMode) {
@@ -447,6 +457,15 @@ class TrackRepository
       localTracks: List<MediaItemTrack>,
       forcePreferNetwork: Boolean = false,
     ): List<MediaItemTrack> {
+      // Stamp the scope onto every network track before merging, the way `planIngestion` does for
+      // books. A parsed response does not know which server it came from, so without this every
+      // track would keep SourceId.UNKNOWN and be invisible to the scoped reads while its book was
+      // not — a library showing books with no tracks.
+      //
+      // An unresolved scope leaves the tracks alone rather than stamping UNKNOWN over a good
+      // value: the merge below still preserves each local track's own source.
+      val scope = currentSourceId
+      val networkTracks = if (scope.isKnown) networkTracks.map { it.copy(source = scope) } else networkTracks
       val localTracksMap = localTracks.associateBy { it.id }
       val localTrackIdentifiers = mutableSetOf<TrackIdentifier>()
       localTracks.mapTo(localTrackIdentifiers) { TrackIdentifier.from(it) }

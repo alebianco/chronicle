@@ -5,6 +5,7 @@ import android.support.v4.media.MediaMetadataCompat
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.TypeConverters
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack.Companion.EMPTY_TRACK
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -18,6 +19,7 @@ import kotlin.math.roundToInt
 /**
  * A model for an audio track (i.e. a song)
  */
+@TypeConverters(SourceIdConverters::class)
 @Entity(
   // Every per-book track query filters on `parentKey` and orders by `discNumber, index`
   // (see `TrackDao`). Unindexed that is a full table scan *plus* a sort, and `writeProgress`
@@ -29,6 +31,19 @@ import kotlin.math.roundToInt
 data class MediaItemTrack(
   @PrimaryKey
   val id: String = TRACK_NOT_FOUND,
+  /**
+   * Which backend installation this track came from — see [SourceId] and decision-21.
+   *
+   * A book carries the same field, and a track is nearly always reached through its book's
+   * `parentKey`, so this looks redundant. It is not: four `TrackDao` queries filter on no book at
+   * all — every track, every cached track, and the title search — and `getTrack(id)` is ambiguous
+   * across two servers, because a Plex rating key is unique per server rather than globally. Those
+   * are precisely the reads that would return a union.
+   *
+   * Written by [io.github.mattpvaughn.chronicle.data.local.TrackRepository] at ingestion, for the
+   * reason [Audiobook.source] is: a parsed response does not know which server it arrived from.
+   */
+  val source: SourceId = SourceId.UNKNOWN,
   val parentKey: String = "-1",
   val title: String = "",
   val playQueueItemID: Long = -1,
@@ -105,12 +120,17 @@ data class MediaItemTrack(
       forceUseNetwork: Boolean = false,
     ) = if (forceUseNetwork || network.lastViewedAt > local.lastViewedAt) {
       Timber.i("Integrating network track: $network")
-      network.copy(cached = local.cached)
+      // `source` is named in **both** arms deliberately (cu-20's rule, cu-127's field). A parsed
+      // network track carries SourceId.UNKNOWN, so an arm that omits it would blank the scope of
+      // every track on each refresh — and only one arm runs for a given pair, so a fix applied to
+      // one and missed in the other looks correct in a test that happens to take the fixed path.
+      network.copy(cached = local.cached, source = local.source)
     } else {
       network.copy(
         cached = local.cached,
         lastViewedAt = local.lastViewedAt,
         progress = local.progress,
+        source = local.source,
       )
     }
 

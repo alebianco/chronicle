@@ -5,6 +5,7 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.SourceId
 import kotlinx.coroutines.flow.Flow
 
 private const val TRACK_DATABASE_NAME = "track_db"
@@ -50,7 +51,28 @@ val MIGRATION_4_5 =
     }
   }
 
-@Database(entities = [MediaItemTrack::class], version = 6, exportSchema = true)
+/**
+ * Adds the per-instance scoping key to tracks (cu-127, decision-21).
+ *
+ * An `ADD COLUMN` rather than a rebuild, because the column is new — nothing is being retyped, so
+ * there is no old value that would mean the wrong thing.
+ *
+ * The default is [SourceId.LEGACY_PLEX], matching what BOOK_MIGRATION_12_13 writes onto the books
+ * these tracks belong to. A default of `''` ([SourceId.UNKNOWN]) would be worse than wrong: it is
+ * the value ingestion treats as "no scope resolved", so every existing track would be invisible to
+ * the scoped reads while its book was not.
+ */
+val TRACK_MIGRATION_6_7 =
+  object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL(
+        "ALTER TABLE MediaItemTrack ADD COLUMN source TEXT NOT NULL " +
+          "DEFAULT '${SourceId.LEGACY_PLEX.value}'",
+      )
+    }
+  }
+
+@Database(entities = [MediaItemTrack::class], version = 7, exportSchema = true)
 abstract class TrackDatabase : RoomDatabase() {
   abstract val trackDao: TrackDao
 }
@@ -201,4 +223,4 @@ val MIGRATION_5_6 =
 
 /** Every migration, in order. Named so `RoomSchemaTest` runs exactly what production runs. */
 val TRACK_MIGRATIONS =
-  arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+  arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, TRACK_MIGRATION_6_7)
