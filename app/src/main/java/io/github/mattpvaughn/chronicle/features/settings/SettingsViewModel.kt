@@ -227,676 +227,14 @@ class SettingsViewModel(
 
   private fun makePreferences(): List<PreferenceModel> {
     val list =
-      mutableListOf(
-        PreferenceModel(
-          PreferenceType.TITLE,
-          FormattableString.from(R.string.settings_category_appearance),
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title =
-            FormattableString.ResourceString(
-              stringRes = R.string.settings_book_cover_type_value,
-              // The chooser's own localized label, not the persisted English literal. The
-              // literal is what made a stored "Rectangle" read back as "Rectangle" under an
-              // option offered as "Rectangular" (cu-101).
-              placeHolderStrings =
-                listOf(
-                  formatBookCoverStyle(prefsRepo.bookCoverStyle),
-                ),
-            ),
-          explanation =
-            FormattableString.from(
-              R.string.settings_book_cover_type_explanation,
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                showOptionsMenu(
-                  options =
-                    BookCoverStyle.choices.map {
-                      FormattableString.from(it.choiceRes)
-                    },
-                  title =
-                    FormattableString.from(
-                      R.string.settings_book_cover_type_label,
-                    ),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        check(
-                          formattableString is FormattableString.ResourceString,
-                        )
-
-                        // Throws rather than silently ignoring, matching the refresh-rate
-                        // chooser below: the options come from BookCoverStyle.choices, so an
-                        // unrecognized resource here means a wiring mistake, not user input.
-                        val style =
-                          BookCoverStyle.ofChoice(formattableString.stringRes)
-                            ?: throw NoWhenBranchMatchedException(
-                              "Unknown item: ${formattableString.stringRes}",
-                            )
-                        prefsRepo.bookCoverStyle = style.stored
-                        setBottomSheetVisibility(false)
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        // Beside the cover style: both are about how the library is presented, and a user looking
-        // for "why is this book numbered oddly" looks where the other display settings are.
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_series_rules_title),
-          explanation = FormattableString.from(R.string.settings_series_rules_explanation),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                _showSeriesIndexTester.setEvent(Unit)
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.TITLE,
-          FormattableString.from(R.string.settings_category_sync),
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title =
-            FormattableString.ResourceString(
-              stringRes = R.string.settings_refresh_rate_value,
-              placeHolderStrings = listOf(formatRefreshRate(prefsRepo.refreshRateMinutes)),
-            ),
-          explanation =
-            FormattableString.from(
-              R.string.settings_refresh_rate_explanation,
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                showOptionsMenu(
-                  options = RefreshRate.choices.map { FormattableString.from(it.choiceRes) },
-                  title =
-                    FormattableString.from(
-                      R.string.settings_refresh_rate_title,
-                    ),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        check(
-                          formattableString is FormattableString.ResourceString,
-                        )
-                        val rate =
-                          RefreshRate.ofChoice(formattableString.stringRes)
-                            ?: throw NoWhenBranchMatchedException(
-                              "Unknown item: ${formattableString.stringRes}",
-                            )
-                        prefsRepo.refreshRateMinutes = rate.minutes
-                        setBottomSheetVisibility(false)
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title =
-            FormattableString.ResourceString(
-              stringRes = R.string.settings_sync_location_value,
-              placeHolderStrings =
-                listOf(
-                  Formatter.formatFileSize(
-                    appContext,
-                    prefsRepo.cachedMediaDir.bytesAvailable(),
-                  ),
-                ),
-            ),
-          explanation =
-            FormattableString.from(
-              R.string.settings_sync_location_explanation,
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                // `provideExternalDeviceDirs` filters nulls out of `getExternalFilesDirs`, so a
-                // device whose volumes are all unavailable yields an empty list — and an empty
-                // chooser is a dialog with nothing in it and no way out but back. Say so instead
-                // (found by SettingsClickHandlerTest, which taps every row).
-                if (externalDeviceDirs.isEmpty()) {
-                  showUserMessage(
-                    FormattableString.from(R.string.settings_sync_location_none_available),
-                  )
-                  return
-                }
-                showOptionsMenu(
-                  options =
-                    externalDeviceDirs.map {
-                      FormattableString.ResourceString(
-                        stringRes = R.string.settings_sync_space_available,
-                        placeHolderStrings =
-                          listOf(
-                            it.path,
-                            Formatter.formatFileSize(
-                              appContext,
-                              it.bytesAvailable(),
-                            ),
-                          ),
-                      )
-                    },
-                  title =
-                    FormattableString.from(
-                      R.string.settings_sync_location_title,
-                    ),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        check(
-                          formattableString is FormattableString.ResourceString,
-                        )
-
-                        val chosen = formattableString.placeHolderStrings[0]
-                        val syncLoc =
-                          externalDeviceDirs.firstOrNull {
-                            chosen.contains(it.path)
-                          }
-                        if (syncLoc != null) {
-                          setSyncLocation(syncLoc)
-                        }
-                        setBottomSheetVisibility(false)
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_delete_synced_title),
-          explanation =
-            FormattableString.from(
-              R.string.settings_delete_synced_explanation,
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                showOptionsMenu(
-                  options = listOf(FormattableString.yes, FormattableString.no),
-                  title =
-                    FormattableString.from(
-                      R.string.settings_delete_synced_confirm,
-                    ),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        when (formattableString) {
-                          FormattableString.yes -> {
-                            viewModelScope.launch {
-                              val deletedFileCount =
-                                cachedFileManager.uncacheAllInLibrary()
-                              showUserMessage(
-                                FormattableString.ResourceString(
-                                  R.string.settings_delete_synced_response,
-                                  placeHolderStrings =
-                                    listOf(
-                                      deletedFileCount.toString(),
-                                    ),
-                                ),
-                              )
-                            }
-                          }
-                          else -> {
-                          } // do nothing
-                        }
-                        setBottomSheetVisibility(false)
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.TITLE,
-          FormattableString.from(R.string.settings_category_backup),
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_backup_export_title),
-          explanation = FormattableString.from(R.string.settings_backup_export_explanation),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                // Export needs no confirmation: it writes a new file the user names, and
-                // overwriting is the picker's own prompt to make.
-                _exportFileRequest.setEvent(defaultBackupFileName())
-              }
-            },
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_backup_import_title),
-          explanation = FormattableString.from(R.string.settings_backup_import_explanation),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                // Import replaces settings, so it warns first — the same yes/no shape as
-                // deleting synced files above.
-                showOptionsMenu(
-                  options = listOf(FormattableString.yes, FormattableString.no),
-                  title = FormattableString.from(R.string.settings_backup_import_confirm),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        if (formattableString == FormattableString.yes) {
-                          _importFileRequest.setEvent(Unit)
-                        }
-                        setBottomSheetVisibility(false)
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.BOOLEAN,
-          FormattableString.from(R.string.settings_offline_mode_title),
-          PrefsRepo.KEY_OFFLINE_MODE,
-          defaultValue = prefsRepo.offlineMode,
-        ),
-        PreferenceModel(
-          PreferenceType.TITLE,
-          FormattableString.from(R.string.settings_category_playback),
-        ),
-        PreferenceModel(
-          PreferenceType.BOOLEAN,
-          FormattableString.from(R.string.settings_skip_silent_audio),
-          PrefsRepo.KEY_SKIP_SILENCE,
-          defaultValue = prefsRepo.skipSilence,
-        ),
-        PreferenceModel(
-          PreferenceType.BOOLEAN,
-          FormattableString.from(R.string.settings_auto_rewind),
-          PrefsRepo.KEY_AUTO_REWIND_ENABLED,
-          FormattableString.from(R.string.settings_auto_rewind_explanation),
-          defaultValue = prefsRepo.autoRewind,
-        ),
-        PreferenceModel(
-          type = PreferenceType.BOOLEAN,
-          title = FormattableString.from(R.string.settings_shake_to_snooze_title),
-          explanation =
-            FormattableString.from(
-              R.string.settings_shake_to_snooze_explanation,
-            ),
-          key = PrefsRepo.KEY_SHAKE_TO_SNOOZE_ENABLED,
-          defaultValue = prefsRepo.shakeToSnooze,
-        ),
-        PreferenceModel(
-          type = PreferenceType.BOOLEAN,
-          title = FormattableString.from(R.string.settings_auto_restart_sleep_timer_title),
-          explanation =
-            FormattableString.from(
-              R.string.settings_auto_restart_sleep_timer_explanation,
-            ),
-          key = PrefsRepo.KEY_AUTO_RESTART_SLEEP_TIMER,
-          defaultValue = prefsRepo.autoRestartSleepTimer,
-        ),
-        PreferenceModel(
-          type = PreferenceType.BOOLEAN,
-          title = FormattableString.from(R.string.settings_pause_on_focus_lost_title),
-          explanation =
-            FormattableString.from(
-              R.string.settings_pause_on_focus_lost_explanation,
-            ),
-          key = PrefsRepo.KEY_PAUSE_ON_FOCUS_LOST,
-          defaultValue = prefsRepo.pauseOnFocusLost,
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title =
-            FormattableString.ResourceString(
-              stringRes = R.string.settings_jump_forward_value,
-              // feels gross
-              placeHolderStrings =
-                listOf(
-                  "${prefsRepo.jumpForwardSeconds} " +
-                    appContext.resources.getString(R.string.seconds),
-                ),
-            ),
-          explanation =
-            FormattableString.from(
-              R.string.settings_jump_forward_explanation,
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                showOptionsMenu(
-                  options =
-                    JumpInterval.choices.map {
-                      FormattableString.from(it.choiceRes)
-                    },
-                  title =
-                    FormattableString.from(
-                      R.string.settings_jump_forward_title,
-                    ),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        check(
-                          formattableString is FormattableString.ResourceString,
-                        )
-                        prefsRepo.jumpForwardSeconds =
-                          JumpInterval.secondsOfChoice(
-                            formattableString.stringRes,
-                            orElse = JumpInterval.DEFAULT_FORWARD_SECONDS,
-                          )
-                        setBottomSheetVisibility(false)
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title =
-            FormattableString.ResourceString(
-              stringRes = R.string.settings_jump_backward_value,
-              // feels gross
-              placeHolderStrings =
-                listOf(
-                  "${prefsRepo.jumpBackwardSeconds} " +
-                    appContext.resources.getString(R.string.seconds),
-                ),
-            ),
-          explanation =
-            FormattableString.from(
-              R.string.settings_jump_backward_explanation,
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                showOptionsMenu(
-                  options =
-                    JumpInterval.choices.map {
-                      FormattableString.from(it.choiceRes)
-                    },
-                  title =
-                    FormattableString.from(
-                      R.string.settings_jump_backward_title,
-                    ),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        check(
-                          formattableString is FormattableString.ResourceString,
-                        )
-                        prefsRepo.jumpBackwardSeconds =
-                          JumpInterval.secondsOfChoice(
-                            formattableString.stringRes,
-                            orElse = JumpInterval.DEFAULT_BACKWARD_SECONDS,
-                          )
-                        setBottomSheetVisibility(false)
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.TITLE,
-          FormattableString.from(R.string.settings_category_account),
-        ),
-        PreferenceModel(
-          PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_change_library),
-          explanation =
-            FormattableString.ResourceString(
-              R.string.settings_current_library,
-              listOf(plexPrefs.library?.name ?: ""),
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                viewModelScope.launch {
-                  if (!cachedFileManager.hasUserCachedTracks()) {
-                    clearConfig(RETURN_TO_LIBRARY_CHOOSER)
-                    return@launch
-                  }
-                  showOptionsMenu(
-                    title =
-                      FormattableString.from(
-                        R.string.prompt_clear_downloads_allow_retain,
-                      ),
-                    options =
-                      listOf(
-                        FormattableString.yes,
-                        FormattableString.no,
-                      ),
-                    listener =
-                      object : BottomChooserItemListener() {
-                        override fun onItemClicked(formattableString: FormattableString) {
-                          check(
-                            formattableString is FormattableString.ResourceString,
-                          )
-                          if (formattableString.stringRes == R.string.yes) {
-                            // Keep downloaded
-                            clearConfig(
-                              RETURN_TO_LIBRARY_CHOOSER,
-                              clearDownloads = false,
-                            )
-                          } else {
-                            // Delete downloaded
-                            clearConfig(
-                              RETURN_TO_LIBRARY_CHOOSER,
-                              clearDownloads = true,
-                            )
-                          }
-                          setBottomSheetVisibility(false)
-                        }
-                      },
-                  )
-                }
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_change_server),
-          explanation =
-            FormattableString.ResourceString(
-              R.string.settings_current_server,
-              listOf(plexPrefs.server?.name ?: ""),
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                viewModelScope.launch {
-                  if (!cachedFileManager.hasUserCachedTracks()) {
-                    clearConfig(RETURN_TO_SERVER_CHOOSER)
-                    return@launch
-                  }
-                  showOptionsMenu(
-                    title =
-                      FormattableString.from(
-                        R.string.settings_clear_downloads_warning,
-                      ),
-                    options =
-                      listOf(
-                        FormattableString.yes,
-                        FormattableString.no,
-                      ),
-                    listener =
-                      object : BottomChooserItemListener() {
-                        override fun onItemClicked(formattableString: FormattableString) {
-                          if (formattableString == FormattableString.yes) {
-                            clearConfig(RETURN_TO_SERVER_CHOOSER)
-                          }
-                          setBottomSheetVisibility(false)
-                        }
-                      },
-                  )
-                }
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_change_user),
-          explanation =
-            FormattableString.ResourceString(
-              R.string.settings_current_user,
-              listOf(plexPrefs.user?.username ?: ""),
-            ),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                viewModelScope.launch {
-                  if (!cachedFileManager.hasUserCachedTracks()) {
-                    clearConfig(RETURN_TO_USER_CHOOSER)
-                    return@launch
-                  }
-                  showOptionsMenu(
-                    title =
-                      FormattableString.from(
-                        R.string.settings_clear_downloads_warning,
-                      ),
-                    options =
-                      listOf(
-                        FormattableString.yes,
-                        FormattableString.no,
-                      ),
-                    listener =
-                      object : BottomChooserItemListener() {
-                        override fun onItemClicked(formattableString: FormattableString) {
-                          if (formattableString == FormattableString.yes) {
-                            clearConfig(RETURN_TO_USER_CHOOSER)
-                          }
-                          setBottomSheetVisibility(false)
-                        }
-                      },
-                  )
-                }
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_reauthenticate),
-          explanation = FormattableString.from(R.string.settings_reauthenticate_summary),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                // Not a logout: keeps the chosen user, server, library *and* downloads, so the
-                // recovery for an expired token is one OAuth PIN rather than the whole setup
-                // again (cu-84). Plex has no refresh token, so a human at a browser is
-                // unavoidable — re-picking a library they already picked was not.
-                // beginReauthentication posts NOT_LOGGED_IN, which is what drives navigation to
-                // the login screen — the same mechanism clearConfig uses via determineLoginState.
-                plexLoginRepo.beginReauthentication()
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_log_out),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                viewModelScope.launch {
-                  val logout = {
-                    viewModelScope.launch {
-                      cachedFileManager.uncacheAllInLibrary()
-                    }
-                    plexConfig.clear()
-                    mediaServiceConnection.transportControls?.stop()
-                    clearConfig(RETURN_TO_LOGIN)
-                  }
-                  if (!cachedFileManager.hasUserCachedTracks()) {
-                    logout()
-                    return@launch
-                  }
-                  showOptionsMenu(
-                    title =
-                      FormattableString.from(
-                        R.string.settings_clear_downloads_warning,
-                      ),
-                    options =
-                      listOf(
-                        FormattableString.yes,
-                        FormattableString.no,
-                      ),
-                    listener =
-                      object : BottomChooserItemListener() {
-                        override fun onItemClicked(formattableString: FormattableString) {
-                          if (formattableString == FormattableString.yes) {
-                            logout()
-                          }
-                          setBottomSheetVisibility(false)
-                        }
-                      },
-                  )
-                }
-                Timber.i("Logging out")
-              }
-            },
-        ),
-        PreferenceModel(
-          PreferenceType.TITLE,
-          FormattableString.from(R.string.settings_category_etc),
-        ),
-        // The r/ChronicleApp subreddit belongs to the upstream project, not this
-        // fork; pointing users there for support would send them somewhere that
-        // cannot help them. Replaced with a credits entry (D12 rule 4).
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_github_title),
-          explanation = FormattableString.from(R.string.settings_github_explanation),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                _webLink.setEvent("https://github.com/alebianco/chronicle")
-              }
-            },
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_credits_title),
-          explanation = FormattableString.from(R.string.settings_credits_explanation),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                showOptionsMenu(
-                  options = listOf(FormattableString.from(R.string.settings_credits_body)),
-                  title = FormattableString.from(R.string.settings_credits_title),
-                  listener =
-                    object : BottomChooserItemListener() {
-                      override fun onItemClicked(formattableString: FormattableString) {
-                        // Informational only — dismissing is the only action.
-                        _bottomChooserState.value = EMPTY_BOTTOM_CHOOSER
-                      }
-                    },
-                )
-              }
-            },
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_version_title),
-          explanation = FormattableString.from(BuildConfig.VERSION_NAME),
-        ),
-        PreferenceModel(
-          type = PreferenceType.CLICKABLE,
-          title = FormattableString.from(R.string.settings_licenses_title),
-          explanation = FormattableString.from(R.string.settings_licenses_explanation),
-          click =
-            object : PreferenceClick {
-              override fun onClick() {
-                _showLicenseActivity.value = true
-              }
-            },
-        ),
-      )
+      mutableListOf<PreferenceModel>().apply {
+        addAll(appearancePreferences())
+        addAll(syncPreferences())
+        addAll(backupPreferences())
+        addAll(playbackPreferences())
+        addAll(accountPreferences())
+        addAll(etcPreferences())
+      }
 
     if (BuildConfig.DEBUG) {
       list.addAll(
@@ -973,6 +311,704 @@ class SettingsViewModel(
 
     return list
   }
+
+  /** The **appearance** section of the settings list. */
+  private fun appearancePreferences(): List<PreferenceModel> =
+    listOf(
+      PreferenceModel(
+        PreferenceType.TITLE,
+        FormattableString.from(R.string.settings_category_appearance),
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title =
+          FormattableString.ResourceString(
+            stringRes = R.string.settings_book_cover_type_value,
+            // The chooser's own localized label, not the persisted English literal. The
+            // literal is what made a stored "Rectangle" read back as "Rectangle" under an
+            // option offered as "Rectangular" (cu-101).
+            placeHolderStrings =
+              listOf(
+                formatBookCoverStyle(prefsRepo.bookCoverStyle),
+              ),
+          ),
+        explanation =
+          FormattableString.from(
+            R.string.settings_book_cover_type_explanation,
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              showOptionsMenu(
+                options =
+                  BookCoverStyle.choices.map {
+                    FormattableString.from(it.choiceRes)
+                  },
+                title =
+                  FormattableString.from(
+                    R.string.settings_book_cover_type_label,
+                  ),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      check(
+                        formattableString is FormattableString.ResourceString,
+                      )
+
+                      // Throws rather than silently ignoring, matching the refresh-rate
+                      // chooser below: the options come from BookCoverStyle.choices, so an
+                      // unrecognized resource here means a wiring mistake, not user input.
+                      val style =
+                        BookCoverStyle.ofChoice(formattableString.stringRes)
+                          ?: throw NoWhenBranchMatchedException(
+                            "Unknown item: ${formattableString.stringRes}",
+                          )
+                      prefsRepo.bookCoverStyle = style.stored
+                      setBottomSheetVisibility(false)
+                    }
+                  },
+              )
+            }
+          },
+      ),
+      // Beside the cover style: both are about how the library is presented, and a user looking
+      // for "why is this book numbered oddly" looks where the other display settings are.
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_series_rules_title),
+        explanation = FormattableString.from(R.string.settings_series_rules_explanation),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              _showSeriesIndexTester.setEvent(Unit)
+            }
+          },
+      ),
+    )
+
+  /** The **sync** section of the settings list. */
+  private fun syncPreferences(): List<PreferenceModel> =
+    listOf(
+      PreferenceModel(
+        PreferenceType.TITLE,
+        FormattableString.from(R.string.settings_category_sync),
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title =
+          FormattableString.ResourceString(
+            stringRes = R.string.settings_refresh_rate_value,
+            placeHolderStrings = listOf(formatRefreshRate(prefsRepo.refreshRateMinutes)),
+          ),
+        explanation =
+          FormattableString.from(
+            R.string.settings_refresh_rate_explanation,
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              showOptionsMenu(
+                options = RefreshRate.choices.map { FormattableString.from(it.choiceRes) },
+                title =
+                  FormattableString.from(
+                    R.string.settings_refresh_rate_title,
+                  ),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      check(
+                        formattableString is FormattableString.ResourceString,
+                      )
+                      val rate =
+                        RefreshRate.ofChoice(formattableString.stringRes)
+                          ?: throw NoWhenBranchMatchedException(
+                            "Unknown item: ${formattableString.stringRes}",
+                          )
+                      prefsRepo.refreshRateMinutes = rate.minutes
+                      setBottomSheetVisibility(false)
+                    }
+                  },
+              )
+            }
+          },
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title =
+          FormattableString.ResourceString(
+            stringRes = R.string.settings_sync_location_value,
+            placeHolderStrings =
+              listOf(
+                Formatter.formatFileSize(
+                  appContext,
+                  prefsRepo.cachedMediaDir.bytesAvailable(),
+                ),
+              ),
+          ),
+        explanation =
+          FormattableString.from(
+            R.string.settings_sync_location_explanation,
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              // `provideExternalDeviceDirs` filters nulls out of `getExternalFilesDirs`, so a
+              // device whose volumes are all unavailable yields an empty list — and an empty
+              // chooser is a dialog with nothing in it and no way out but back. Say so instead
+              // (found by SettingsClickHandlerTest, which taps every row).
+              if (externalDeviceDirs.isEmpty()) {
+                showUserMessage(
+                  FormattableString.from(R.string.settings_sync_location_none_available),
+                )
+                return
+              }
+              showOptionsMenu(
+                options =
+                  externalDeviceDirs.map {
+                    FormattableString.ResourceString(
+                      stringRes = R.string.settings_sync_space_available,
+                      placeHolderStrings =
+                        listOf(
+                          it.path,
+                          Formatter.formatFileSize(
+                            appContext,
+                            it.bytesAvailable(),
+                          ),
+                        ),
+                    )
+                  },
+                title =
+                  FormattableString.from(
+                    R.string.settings_sync_location_title,
+                  ),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      check(
+                        formattableString is FormattableString.ResourceString,
+                      )
+
+                      val chosen = formattableString.placeHolderStrings[0]
+                      val syncLoc =
+                        externalDeviceDirs.firstOrNull {
+                          chosen.contains(it.path)
+                        }
+                      if (syncLoc != null) {
+                        setSyncLocation(syncLoc)
+                      }
+                      setBottomSheetVisibility(false)
+                    }
+                  },
+              )
+            }
+          },
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_delete_synced_title),
+        explanation =
+          FormattableString.from(
+            R.string.settings_delete_synced_explanation,
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              showOptionsMenu(
+                options = listOf(FormattableString.yes, FormattableString.no),
+                title =
+                  FormattableString.from(
+                    R.string.settings_delete_synced_confirm,
+                  ),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      when (formattableString) {
+                        FormattableString.yes -> {
+                          viewModelScope.launch {
+                            val deletedFileCount =
+                              cachedFileManager.uncacheAllInLibrary()
+                            showUserMessage(
+                              FormattableString.ResourceString(
+                                R.string.settings_delete_synced_response,
+                                placeHolderStrings =
+                                  listOf(
+                                    deletedFileCount.toString(),
+                                  ),
+                              ),
+                            )
+                          }
+                        }
+                        else -> {
+                        } // do nothing
+                      }
+                      setBottomSheetVisibility(false)
+                    }
+                  },
+              )
+            }
+          },
+      ),
+    )
+
+  /** The **backup** section of the settings list. */
+  private fun backupPreferences(): List<PreferenceModel> =
+    listOf(
+      PreferenceModel(
+        PreferenceType.TITLE,
+        FormattableString.from(R.string.settings_category_backup),
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_backup_export_title),
+        explanation = FormattableString.from(R.string.settings_backup_export_explanation),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              // Export needs no confirmation: it writes a new file the user names, and
+              // overwriting is the picker's own prompt to make.
+              _exportFileRequest.setEvent(defaultBackupFileName())
+            }
+          },
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_backup_import_title),
+        explanation = FormattableString.from(R.string.settings_backup_import_explanation),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              // Import replaces settings, so it warns first — the same yes/no shape as
+              // deleting synced files above.
+              showOptionsMenu(
+                options = listOf(FormattableString.yes, FormattableString.no),
+                title = FormattableString.from(R.string.settings_backup_import_confirm),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      if (formattableString == FormattableString.yes) {
+                        _importFileRequest.setEvent(Unit)
+                      }
+                      setBottomSheetVisibility(false)
+                    }
+                  },
+              )
+            }
+          },
+      ),
+      PreferenceModel(
+        PreferenceType.BOOLEAN,
+        FormattableString.from(R.string.settings_offline_mode_title),
+        PrefsRepo.KEY_OFFLINE_MODE,
+        defaultValue = prefsRepo.offlineMode,
+      ),
+    )
+
+  /** The **playback** section of the settings list. */
+  private fun playbackPreferences(): List<PreferenceModel> =
+    listOf(
+      PreferenceModel(
+        PreferenceType.TITLE,
+        FormattableString.from(R.string.settings_category_playback),
+      ),
+      PreferenceModel(
+        PreferenceType.BOOLEAN,
+        FormattableString.from(R.string.settings_skip_silent_audio),
+        PrefsRepo.KEY_SKIP_SILENCE,
+        defaultValue = prefsRepo.skipSilence,
+      ),
+      PreferenceModel(
+        PreferenceType.BOOLEAN,
+        FormattableString.from(R.string.settings_auto_rewind),
+        PrefsRepo.KEY_AUTO_REWIND_ENABLED,
+        FormattableString.from(R.string.settings_auto_rewind_explanation),
+        defaultValue = prefsRepo.autoRewind,
+      ),
+      PreferenceModel(
+        type = PreferenceType.BOOLEAN,
+        title = FormattableString.from(R.string.settings_shake_to_snooze_title),
+        explanation =
+          FormattableString.from(
+            R.string.settings_shake_to_snooze_explanation,
+          ),
+        key = PrefsRepo.KEY_SHAKE_TO_SNOOZE_ENABLED,
+        defaultValue = prefsRepo.shakeToSnooze,
+      ),
+      PreferenceModel(
+        type = PreferenceType.BOOLEAN,
+        title = FormattableString.from(R.string.settings_auto_restart_sleep_timer_title),
+        explanation =
+          FormattableString.from(
+            R.string.settings_auto_restart_sleep_timer_explanation,
+          ),
+        key = PrefsRepo.KEY_AUTO_RESTART_SLEEP_TIMER,
+        defaultValue = prefsRepo.autoRestartSleepTimer,
+      ),
+      PreferenceModel(
+        type = PreferenceType.BOOLEAN,
+        title = FormattableString.from(R.string.settings_pause_on_focus_lost_title),
+        explanation =
+          FormattableString.from(
+            R.string.settings_pause_on_focus_lost_explanation,
+          ),
+        key = PrefsRepo.KEY_PAUSE_ON_FOCUS_LOST,
+        defaultValue = prefsRepo.pauseOnFocusLost,
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title =
+          FormattableString.ResourceString(
+            stringRes = R.string.settings_jump_forward_value,
+            // feels gross
+            placeHolderStrings =
+              listOf(
+                "${prefsRepo.jumpForwardSeconds} " +
+                  appContext.resources.getString(R.string.seconds),
+              ),
+          ),
+        explanation =
+          FormattableString.from(
+            R.string.settings_jump_forward_explanation,
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              showOptionsMenu(
+                options =
+                  JumpInterval.choices.map {
+                    FormattableString.from(it.choiceRes)
+                  },
+                title =
+                  FormattableString.from(
+                    R.string.settings_jump_forward_title,
+                  ),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      check(
+                        formattableString is FormattableString.ResourceString,
+                      )
+                      prefsRepo.jumpForwardSeconds =
+                        JumpInterval.secondsOfChoice(
+                          formattableString.stringRes,
+                          orElse = JumpInterval.DEFAULT_FORWARD_SECONDS,
+                        )
+                      setBottomSheetVisibility(false)
+                    }
+                  },
+              )
+            }
+          },
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title =
+          FormattableString.ResourceString(
+            stringRes = R.string.settings_jump_backward_value,
+            // feels gross
+            placeHolderStrings =
+              listOf(
+                "${prefsRepo.jumpBackwardSeconds} " +
+                  appContext.resources.getString(R.string.seconds),
+              ),
+          ),
+        explanation =
+          FormattableString.from(
+            R.string.settings_jump_backward_explanation,
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              showOptionsMenu(
+                options =
+                  JumpInterval.choices.map {
+                    FormattableString.from(it.choiceRes)
+                  },
+                title =
+                  FormattableString.from(
+                    R.string.settings_jump_backward_title,
+                  ),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      check(
+                        formattableString is FormattableString.ResourceString,
+                      )
+                      prefsRepo.jumpBackwardSeconds =
+                        JumpInterval.secondsOfChoice(
+                          formattableString.stringRes,
+                          orElse = JumpInterval.DEFAULT_BACKWARD_SECONDS,
+                        )
+                      setBottomSheetVisibility(false)
+                    }
+                  },
+              )
+            }
+          },
+      ),
+    )
+
+  /** The **account** section of the settings list. */
+  private fun accountPreferences(): List<PreferenceModel> =
+    listOf(
+      PreferenceModel(
+        PreferenceType.TITLE,
+        FormattableString.from(R.string.settings_category_account),
+      ),
+      PreferenceModel(
+        PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_change_library),
+        explanation =
+          FormattableString.ResourceString(
+            R.string.settings_current_library,
+            listOf(plexPrefs.library?.name ?: ""),
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              viewModelScope.launch {
+                if (!cachedFileManager.hasUserCachedTracks()) {
+                  clearConfig(RETURN_TO_LIBRARY_CHOOSER)
+                  return@launch
+                }
+                showOptionsMenu(
+                  title =
+                    FormattableString.from(
+                      R.string.prompt_clear_downloads_allow_retain,
+                    ),
+                  options =
+                    listOf(
+                      FormattableString.yes,
+                      FormattableString.no,
+                    ),
+                  listener =
+                    object : BottomChooserItemListener() {
+                      override fun onItemClicked(formattableString: FormattableString) {
+                        check(
+                          formattableString is FormattableString.ResourceString,
+                        )
+                        if (formattableString.stringRes == R.string.yes) {
+                          // Keep downloaded
+                          clearConfig(
+                            RETURN_TO_LIBRARY_CHOOSER,
+                            clearDownloads = false,
+                          )
+                        } else {
+                          // Delete downloaded
+                          clearConfig(
+                            RETURN_TO_LIBRARY_CHOOSER,
+                            clearDownloads = true,
+                          )
+                        }
+                        setBottomSheetVisibility(false)
+                      }
+                    },
+                )
+              }
+            }
+          },
+      ),
+      PreferenceModel(
+        PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_change_server),
+        explanation =
+          FormattableString.ResourceString(
+            R.string.settings_current_server,
+            listOf(plexPrefs.server?.name ?: ""),
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              viewModelScope.launch {
+                if (!cachedFileManager.hasUserCachedTracks()) {
+                  clearConfig(RETURN_TO_SERVER_CHOOSER)
+                  return@launch
+                }
+                showOptionsMenu(
+                  title =
+                    FormattableString.from(
+                      R.string.settings_clear_downloads_warning,
+                    ),
+                  options =
+                    listOf(
+                      FormattableString.yes,
+                      FormattableString.no,
+                    ),
+                  listener =
+                    object : BottomChooserItemListener() {
+                      override fun onItemClicked(formattableString: FormattableString) {
+                        if (formattableString == FormattableString.yes) {
+                          clearConfig(RETURN_TO_SERVER_CHOOSER)
+                        }
+                        setBottomSheetVisibility(false)
+                      }
+                    },
+                )
+              }
+            }
+          },
+      ),
+      PreferenceModel(
+        PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_change_user),
+        explanation =
+          FormattableString.ResourceString(
+            R.string.settings_current_user,
+            listOf(plexPrefs.user?.username ?: ""),
+          ),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              viewModelScope.launch {
+                if (!cachedFileManager.hasUserCachedTracks()) {
+                  clearConfig(RETURN_TO_USER_CHOOSER)
+                  return@launch
+                }
+                showOptionsMenu(
+                  title =
+                    FormattableString.from(
+                      R.string.settings_clear_downloads_warning,
+                    ),
+                  options =
+                    listOf(
+                      FormattableString.yes,
+                      FormattableString.no,
+                    ),
+                  listener =
+                    object : BottomChooserItemListener() {
+                      override fun onItemClicked(formattableString: FormattableString) {
+                        if (formattableString == FormattableString.yes) {
+                          clearConfig(RETURN_TO_USER_CHOOSER)
+                        }
+                        setBottomSheetVisibility(false)
+                      }
+                    },
+                )
+              }
+            }
+          },
+      ),
+      PreferenceModel(
+        PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_reauthenticate),
+        explanation = FormattableString.from(R.string.settings_reauthenticate_summary),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              // Not a logout: keeps the chosen user, server, library *and* downloads, so the
+              // recovery for an expired token is one OAuth PIN rather than the whole setup
+              // again (cu-84). Plex has no refresh token, so a human at a browser is
+              // unavoidable — re-picking a library they already picked was not.
+              // beginReauthentication posts NOT_LOGGED_IN, which is what drives navigation to
+              // the login screen — the same mechanism clearConfig uses via determineLoginState.
+              plexLoginRepo.beginReauthentication()
+            }
+          },
+      ),
+      PreferenceModel(
+        PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_log_out),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              viewModelScope.launch {
+                val logout = {
+                  viewModelScope.launch {
+                    cachedFileManager.uncacheAllInLibrary()
+                  }
+                  plexConfig.clear()
+                  mediaServiceConnection.transportControls?.stop()
+                  clearConfig(RETURN_TO_LOGIN)
+                }
+                if (!cachedFileManager.hasUserCachedTracks()) {
+                  logout()
+                  return@launch
+                }
+                showOptionsMenu(
+                  title =
+                    FormattableString.from(
+                      R.string.settings_clear_downloads_warning,
+                    ),
+                  options =
+                    listOf(
+                      FormattableString.yes,
+                      FormattableString.no,
+                    ),
+                  listener =
+                    object : BottomChooserItemListener() {
+                      override fun onItemClicked(formattableString: FormattableString) {
+                        if (formattableString == FormattableString.yes) {
+                          logout()
+                        }
+                        setBottomSheetVisibility(false)
+                      }
+                    },
+                )
+              }
+              Timber.i("Logging out")
+            }
+          },
+      ),
+    )
+
+  /** The **etc** section of the settings list. */
+  private fun etcPreferences(): List<PreferenceModel> =
+    listOf(
+      PreferenceModel(
+        PreferenceType.TITLE,
+        FormattableString.from(R.string.settings_category_etc),
+      ),
+      // The r/ChronicleApp subreddit belongs to the upstream project, not this
+      // fork; pointing users there for support would send them somewhere that
+      // cannot help them. Replaced with a credits entry (D12 rule 4).
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_github_title),
+        explanation = FormattableString.from(R.string.settings_github_explanation),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              _webLink.setEvent("https://github.com/alebianco/chronicle")
+            }
+          },
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_credits_title),
+        explanation = FormattableString.from(R.string.settings_credits_explanation),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              showOptionsMenu(
+                options = listOf(FormattableString.from(R.string.settings_credits_body)),
+                title = FormattableString.from(R.string.settings_credits_title),
+                listener =
+                  object : BottomChooserItemListener() {
+                    override fun onItemClicked(formattableString: FormattableString) {
+                      // Informational only — dismissing is the only action.
+                      _bottomChooserState.value = EMPTY_BOTTOM_CHOOSER
+                    }
+                  },
+              )
+            }
+          },
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_version_title),
+        explanation = FormattableString.from(BuildConfig.VERSION_NAME),
+      ),
+      PreferenceModel(
+        type = PreferenceType.CLICKABLE,
+        title = FormattableString.from(R.string.settings_licenses_title),
+        explanation = FormattableString.from(R.string.settings_licenses_explanation),
+        click =
+          object : PreferenceClick {
+            override fun onClick() {
+              _showLicenseActivity.value = true
+            }
+          },
+      ),
+    )
 
   /**
    * Sets future synced files to be downloaded to [syncDir] and moves existing synced files

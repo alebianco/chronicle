@@ -1,7 +1,7 @@
 ---
 id: cu-175
 title: Split makePreferences into a pure SettingsPreferencesBuilder
-status: To Do
+status: In Review
 assignee: []
 created_date: ''
 labels:
@@ -61,9 +61,9 @@ See `backlog/docs/analysis/maintainability-review-2026-09.md`.
 
 - [ ] `SettingsPreferencesBuilder` is pure and unit-tested, including the cu-101 label cases
 - [ ] `SettingsViewModel` constructor drops to 10 dependencies or fewer
-- [ ] The settings screen is unchanged on device — same entries, same order, same labels
-- [ ] A preference change still rebuilds the list (the `OnSharedPreferenceChangeListener` path)
-- [ ] `features/settings` coverage rises in `coverage-baseline-packages.txt`
+- [ ] The settings screen is unchanged on device — same entries, same order, same labels **(not device-verified)**
+- [x] A preference change still rebuilds the list (the `OnSharedPreferenceChangeListener` path)
+- [x] `features/settings` coverage rises in `coverage-baseline-packages.txt` — 19.00% → 59.29%
 
 ## Attempt notes (2026-09-05) — coverage delivered, extraction deferred
 
@@ -101,3 +101,44 @@ session. It now has tests to refactor against, which is the right order, and its
 readability alone.
 
 Returned to `To Do` rather than closed.
+
+## Implementation Notes (2026-09-05) — split by section, not by concern
+
+Done, but **not** the split this task originally proposed, and the difference is the finding.
+
+A pure `SettingsPreferencesBuilder` would have moved the *labels* out and left all 20 click
+handlers behind in the ViewModel. Since the handlers are where the uncovered lines were, that split
+would have solved neither problem. `SettingsViewModel` still needs its fifteen dependencies because
+the handlers genuinely use ten of them.
+
+What actually helps readability is splitting by the **sections the screen already has** — the six
+`TITLE` rows were the natural seam:
+
+| function | lines | CC |
+|---|---:|---:|
+| `makePreferences` | **86** | **7** |
+| `accountPreferences` | 201 | 17 |
+| `syncPreferences` | 162 | 5 |
+| `playbackPreferences` | 142 | 1 |
+| `appearancePreferences` | 72 | 3 |
+| `etcPreferences` | 58 | 2 |
+| `backupPreferences` | 51 | 2 |
+
+From one 748-line function at CC 30. `makePreferences` now reads as six `addAll` calls plus the
+debug-build and Android Auto post-processing it always had.
+
+The existing tests carried the refactor — they passed unchanged throughout, which is the whole
+reason the tests came first.
+
+`accountPreferences` at CC 17 is the one still worth attention; it holds the login/logout and
+library-switching handlers. Not split further here because that is a judgement about *product*
+grouping rather than mechanics.
+
+**Left `In Review`:** the settings screen was not verified on a device. The row list is unchanged
+by test, but only an owner's eye confirms nothing shifted visually.
+
+### Not done, deliberately
+
+The constructor still takes 15 dependencies. Reducing that means moving handlers, which means
+moving behaviour — a different task, and one that should follow a product decision about what
+belongs on this screen.
