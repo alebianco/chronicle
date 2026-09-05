@@ -20,7 +20,6 @@ import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.FLAG_OPEN_ACTIVITY_TO_AUDIOBOOK_WITH_ID
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.REQUEST_CODE_PREFIX_OPEN_ACTIVITY_TO_AUDIOBOOK_WITH_ID
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import kotlinx.coroutines.*
 import timber.log.Timber
 import kotlin.coroutines.resume
@@ -126,35 +125,10 @@ class DownloadNotificationWorker(
   private fun showDownloadsCompleteNotification(downloads: List<Download>) {
     val bookDownloads = downloads.groupByBookId()
     Timber.i("Downloads: ${bookDownloads.mapValues { (_, forBook) -> forBook.size }}")
-    val bookStatuses =
-      bookDownloads.map { bookDownload ->
-        // Don't show a notification for a cancelled download, users don't need to be
-        // informed that they cancelled a download
-        val statuses =
-          bookDownload.value.filter {
-            it.status != Status.CANCELLED
-          }.map { it.status }
-        val bookName = bookDownload.value.firstOrNull()?.tag ?: ""
-        val bookId = bookDownload.key
-        DownloadResult(
-          bookName = bookName,
-          bookId = bookId,
-          status =
-            when {
-              Status.FAILED in statuses -> Status.FAILED
-              Status.COMPLETED in statuses -> Status.COMPLETED
-              else -> Status.NONE
-            },
-          errors =
-            bookDownload.value.filter { it.error != Error.NONE }.map {
-              it.error.name
-            }.distinct(),
-        )
-      }.filter {
-        it.bookName.isNotEmpty() &&
-          it.bookId != NO_AUDIOBOOK_FOUND_ID &&
-          (it.status in listOf(Status.FAILED, Status.COMPLETED))
-      }
+    // The decision — which books to report and as what — is pure and lives in
+    // `DownloadOutcomes.kt` (cu-179), so it can be tested without a worker or a
+    // NotificationManager. This function keeps only the rendering.
+    val bookStatuses = downloads.toOutcomes()
 
     if (bookStatuses.isNotEmpty()) {
       val showInGroup = bookStatuses.size > 1
@@ -179,13 +153,6 @@ class DownloadNotificationWorker(
     }
   }
 
-  internal data class DownloadResult(
-    val bookName: String,
-    val bookId: String,
-    val status: Status,
-    val errors: List<String>,
-  )
-
   /** Creates a notification channel if required by the given version of Android SDK */
   private fun createNotificationChannelAsNeeded() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -203,7 +170,7 @@ class DownloadNotificationWorker(
   }
 
   /** Make a group summary for all completed downloads */
-  private fun makeFinishedSummary(bookStatuses: List<DownloadResult>): Notification? {
+  private fun makeFinishedSummary(bookStatuses: List<DownloadOutcome>): Notification? {
     val failCount = bookStatuses.count { it.status == Status.FAILED }
     val successCount = bookStatuses.count { it.status == Status.COMPLETED }
     if (failCount + successCount == 0) {
@@ -288,7 +255,7 @@ class DownloadNotificationWorker(
    * downloading
    */
   private fun makeFinishedNotification(
-    downloadResult: DownloadResult,
+    downloadResult: DownloadOutcome,
     showInGroup: Boolean,
   ): Notification? {
     val status = downloadResult.status
