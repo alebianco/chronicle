@@ -312,6 +312,54 @@ excluded set's own coverage first.
 
 ---
 
+## Coverage work done (2026-09-05)
+
+Acted on rather than filed. Chosen by reading JaCoCo's per-line data, never by chasing the
+percentage — two candidates were **rejected** on inspection for that reason.
+
+### data/model: 88.43% → 94.43%
+
+| suite | what it pins |
+|---|---|
+| `AsServerModelTest` | `accessToken = this.accessToken ?: ""` — the cu-33 empty-token root |
+| `MergeSeriesFieldsTest` | narrator/series/seriesIndex through **both** merge arms |
+| `TrackListEdgeCaseTest` | the empty-and-absent branches on the track-list helpers |
+| `AudiobookMediaItemTest` | `toMediaItem`/`toAlbumMediaMetadata` under Robolectric (Auto) |
+| `CollectionSortAndConverterTest` | the unofficial sort-code fallback, the converter's empty branch |
+
+### Elsewhere
+
+| package | before | after |
+|---|---:|---:|
+| `features/library` | 2.42% | **15.34%** |
+| `features/login` | 19.49% | **29.63%** |
+| `features/collections` | 0.00% | **8.69%** |
+| **overall** | 40.47% | **41.59%** |
+
+### Two targets deliberately rejected
+
+Worth recording, because both look attractive in a coverage report and neither is real work:
+
+- **`MediaMetadataCompatExtKt`** — 738 missed instructions at 6.9%, the largest single non-Fragment
+  gap. Every member is an `inline val`, so its body is compiled into the *caller* and JaCoCo cannot
+  attribute execution back to the declaring file. Covering it would not move the number, and the
+  file is upstream boilerplate.
+- **`ChapterAssembly.kt`** — reported at 36.2% with `assembleChapters` showing 0%, while
+  `AssembleChaptersTest` exercises it thoroughly. Same `inline` artifact.
+
+**79 of the 353 instructions still missing from `data/model` are this artifact plus data-class
+`equals`/`hashCode`.** Another 112 are Android media builders. Chasing either would be gaming the
+metric.
+
+### What the remaining gap looks like
+
+Of the top reachable targets left, the largest are `SettingsViewModel` (1,300 missed, 0% — blocked
+by its 15 dependencies, hence DRAFT-175), `CurrentlyPlayingViewModel` (1,241 missed, 40%) and
+`CachedFileManager` (993 missed, 27%). `MediaPlayerService` (1,956 missed) is a bound Service and
+genuinely needs instrumentation.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
