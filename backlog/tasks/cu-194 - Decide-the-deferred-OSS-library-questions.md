@@ -78,6 +78,15 @@ So the honest question is whether DataStore buys enough to justify touching the 
 security-sensitive storage in the app. **Answer it explicitly — including "no, and here is why" —
 so it stops being unasked.**
 
+**Paging 3** — a genuine loose end. The archived `M7-large-library-performance-plan.md` proposed it
+as a whole phase (*"Phase 3: Implement Pagination"*, with `androidx.paging:paging-runtime-ktx`) and
+left an approval checkbox **unticked**: *"[ ] **Paging 3**: Approved to use Paging library"*. cu-51
+then closed *without* adopting it, having found hand-rolled pagination already in production
+(`BookRepository.refreshDataPaginated`). So it was surveyed, never approved, never declined, and the
+plan was archived — the decline just needs recording. The measurement that justifies it is already
+in hand: cu-51 measured 10,000 books searching in 29 ms and grouping in 1 ms, **~2x cost for a 2x
+library on every path, nothing quadratic**, against a household library of 196 books.
+
 Also worth a look while in this area: **SQLDelight** vs Room (almost certainly no — Room is deeply
 embedded across five databases with migration tests), and **kotlinx-serialization** vs Moshi (Moshi
 codegen landed in cu-62 and works; note kotlinx-serialization is the KMP-friendlier of the two, so
