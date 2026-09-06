@@ -1,7 +1,10 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.content.Context
+import androidx.hilt.work.HiltWorker
 import androidx.work.*
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
@@ -22,102 +25,105 @@ import timber.log.Timber
  * and returned success without awaiting it, so every report was fire-and-forget on a
  * scope whose worker WorkManager already considered finished.
  */
-class PlexSyncScrobbleWorker(
-  context: Context,
-  workerParameters: WorkerParameters,
-  private val trackRepository: ITrackRepository,
-  private val bookRepository: IBookRepository,
-  private val plexPrefs: PlexPrefsRepo,
-  private val plexMediaService: PlexMediaService,
-) : CoroutineWorker(context, workerParameters) {
-  override suspend fun doWork(): Result {
-    // Nothing can be reported without a token, and waiting will not produce one.
-    // Re-auth is cu-10's job.
-    val authToken = plexPrefs.user?.authToken ?: plexPrefs.accountAuthToken
-    if (authToken.isEmpty()) {
-      Timber.w("Progress report skipped: not logged in")
-      return Result.failure()
+@HiltWorker
+class PlexSyncScrobbleWorker
+  @AssistedInject
+  constructor(
+    @Assisted context: Context,
+    @Assisted workerParameters: WorkerParameters,
+    private val trackRepository: ITrackRepository,
+    private val bookRepository: IBookRepository,
+    private val plexPrefs: PlexPrefsRepo,
+    private val plexMediaService: PlexMediaService,
+  ) : CoroutineWorker(context, workerParameters) {
+    override suspend fun doWork(): Result {
+      // Nothing can be reported without a token, and waiting will not produce one.
+      // Re-auth is cu-10's job.
+      val authToken = plexPrefs.user?.authToken ?: plexPrefs.accountAuthToken
+      if (authToken.isEmpty()) {
+        Timber.w("Progress report skipped: not logged in")
+        return Result.failure()
+      }
+
+      val reporter =
+        ProgressReporter(
+          // Through DebugHooks so a debug build can inject a terminal failure with
+          // `--ez fail_sync true` and make the "position not synced" badge reachable against a
+          // real server (cu-73). Release returns this unchanged.
+          api = DebugHooks.wrapProgressApi(PlexProgressApi(plexMediaService)),
+          lookupTrack = { trackRepository.getTrackAsync(it) },
+          lookupBookDuration = { bookId ->
+            trackRepository.getTracksForAudiobookAsync(bookId).getDuration()
+          },
+          // Reads the local copy rather than the server's: it is what `syncAudiobook` last wrote,
+          // and one extra network round-trip per progress tick to answer "is this already finished"
+          // would cost more than the duplicate scrobble it prevents.
+          lookupBookViewCount = { bookId ->
+            bookRepository.getAudiobookAsync(bookId)?.viewCount ?: 0L
+          },
+        )
+
+      val request =
+        ProgressReporter.Request(
+          trackId = inputData.requireId(TRACK_ID_ARG),
+          playbackState = inputData.requireString(TRACK_STATE_ARG),
+          trackProgress = inputData.requireLong(TRACK_POSITION_ARG),
+          bookProgress = inputData.requireLong(BOOK_PROGRESS),
+        )
+
+      return when (reporter.report(request)) {
+        ProgressReporter.Outcome.SUCCESS -> Result.success()
+        // Retry is what makes the backoff configured at the enqueue site mean anything.
+        ProgressReporter.Outcome.RETRY -> Result.retry()
+        ProgressReporter.Outcome.PERMANENT_FAILURE -> Result.failure()
+      }
     }
 
-    val reporter =
-      ProgressReporter(
-        // Through DebugHooks so a debug build can inject a terminal failure with
-        // `--ez fail_sync true` and make the "position not synced" badge reachable against a
-        // real server (cu-73). Release returns this unchanged.
-        api = DebugHooks.wrapProgressApi(PlexProgressApi(plexMediaService)),
-        lookupTrack = { trackRepository.getTrackAsync(it) },
-        lookupBookDuration = { bookId ->
-          trackRepository.getTracksForAudiobookAsync(bookId).getDuration()
-        },
-        // Reads the local copy rather than the server's: it is what `syncAudiobook` last wrote,
-        // and one extra network round-trip per progress tick to answer "is this already finished"
-        // would cost more than the duplicate scrobble it prevents.
-        lookupBookViewCount = { bookId ->
-          bookRepository.getAudiobookAsync(bookId)?.viewCount ?: 0L
-        },
-      )
+    companion object {
+      const val TRACK_ID_ARG = "Track ID"
+      const val TRACK_STATE_ARG = "State"
+      const val TRACK_POSITION_ARG = "Track position"
+      const val BOOK_PROGRESS = "Book progress"
 
-    val request =
-      ProgressReporter.Request(
-        trackId = inputData.requireId(TRACK_ID_ARG),
-        playbackState = inputData.requireString(TRACK_STATE_ARG),
-        trackProgress = inputData.requireLong(TRACK_POSITION_ARG),
-        bookProgress = inputData.requireLong(BOOK_PROGRESS),
-      )
-
-    return when (reporter.report(request)) {
-      ProgressReporter.Outcome.SUCCESS -> Result.success()
-      // Retry is what makes the backoff configured at the enqueue site mean anything.
-      ProgressReporter.Outcome.RETRY -> Result.retry()
-      ProgressReporter.Outcome.PERMANENT_FAILURE -> Result.failure()
+      fun makeWorkerData(
+        trackId: String,
+        playbackState: String,
+        trackProgress: Long,
+        bookProgress: Long,
+      ): Data {
+        require(trackId != TRACK_NOT_FOUND)
+        return workDataOf(
+          TRACK_ID_ARG to trackId,
+          TRACK_POSITION_ARG to trackProgress,
+          TRACK_STATE_ARG to playbackState,
+          BOOK_PROGRESS to bookProgress,
+        )
+      }
     }
-  }
 
-  companion object {
-    const val TRACK_ID_ARG = "Track ID"
-    const val TRACK_STATE_ARG = "State"
-    const val TRACK_POSITION_ARG = "Track position"
-    const val BOOK_PROGRESS = "Book progress"
-
-    fun makeWorkerData(
-      trackId: String,
-      playbackState: String,
-      trackProgress: Long,
-      bookProgress: Long,
-    ): Data {
-      require(trackId != TRACK_NOT_FOUND)
-      return workDataOf(
-        TRACK_ID_ARG to trackId,
-        TRACK_POSITION_ARG to trackProgress,
-        TRACK_STATE_ARG to playbackState,
-        BOOK_PROGRESS to bookProgress,
-      )
+    private fun Data.requireLong(key: String): Long {
+      require(hasKeyWithValueOfType<Long>(key))
+      return getLong(key, -1L)
     }
-  }
 
-  private fun Data.requireLong(key: String): Long {
-    require(hasKeyWithValueOfType<Long>(key))
-    return getLong(key, -1L)
-  }
-
-  private fun Data.requireString(key: String): String {
-    require(hasKeyWithValueOfType<String>(key))
-    return getString(key) ?: ""
-  }
-
-  /**
-   * Reads an id that [makeWorkerData] now writes as a `String`.
-   *
-   * A work request enqueued by a version before cu-71 stored it as an `Int`, and WorkManager
-   * persists pending requests across an app upgrade. [requireString] would throw on those, and an
-   * exception out of `doWork` is an uncaught crash — so the `Int` form is still accepted. Losing
-   * one report would be harmless (the next playback tick re-sends the position, and the work is
-   * unique per track), but crashing on upgrade is not.
-   */
-  private fun Data.requireId(key: String): String =
-    when {
-      hasKeyWithValueOfType<String>(key) -> getString(key) ?: ""
-      hasKeyWithValueOfType<Int>(key) -> getInt(key, -1).toString()
-      else -> throw IllegalArgumentException("no id under $key")
+    private fun Data.requireString(key: String): String {
+      require(hasKeyWithValueOfType<String>(key))
+      return getString(key) ?: ""
     }
-}
+
+    /**
+     * Reads an id that [makeWorkerData] now writes as a `String`.
+     *
+     * A work request enqueued by a version before cu-71 stored it as an `Int`, and WorkManager
+     * persists pending requests across an app upgrade. [requireString] would throw on those, and an
+     * exception out of `doWork` is an uncaught crash — so the `Int` form is still accepted. Losing
+     * one report would be harmless (the next playback tick re-sends the position, and the work is
+     * unique per track), but crashing on upgrade is not.
+     */
+    private fun Data.requireId(key: String): String =
+      when {
+        hasKeyWithValueOfType<String>(key) -> getString(key) ?: ""
+        hasKeyWithValueOfType<Int>(key) -> getInt(key, -1).toString()
+        else -> throw IllegalArgumentException("no id under $key")
+      }
+  }

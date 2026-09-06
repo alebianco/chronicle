@@ -29,9 +29,9 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
@@ -46,8 +46,6 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayin
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_ACTION
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
-import io.github.mattpvaughn.chronicle.injection.components.DaggerServiceComponent
-import io.github.mattpvaughn.chronicle.injection.modules.ServiceModule
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.PackageValidator
 import io.github.mattpvaughn.chronicle.util.ServiceUtils
@@ -63,6 +61,7 @@ import kotlin.time.ExperimentalTime
 /** The service responsible for media playback, notification */
 @ExperimentalCoroutinesApi
 @OptIn(ExperimentalTime::class)
+@AndroidEntryPoint
 class MediaPlayerService :
   MediaBrowserServiceCompat(),
   ForegroundServiceController,
@@ -249,12 +248,6 @@ class MediaPlayerService :
 
   override fun onCreate() {
     super.onCreate()
-
-    DaggerServiceComponent.builder()
-      .appComponent((application as ChronicleApplication).appComponent)
-      .serviceModule(ServiceModule(this))
-      .build()
-      .inject(this)
 
     ServiceUtils.notifyServiceStarted(this)
 

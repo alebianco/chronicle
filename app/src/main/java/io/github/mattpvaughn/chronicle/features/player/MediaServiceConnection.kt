@@ -8,12 +8,12 @@ import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.Builder
 import android.support.v4.media.session.PlaybackStateCompat.STATE_NONE
-import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
+import dagger.hilt.android.scopes.ActivityScoped
 import kotlinx.coroutines.flow.MutableStateFlow
 import timber.log.Timber
 import javax.inject.Inject
 
-@ActivityScope
+@ActivityScoped
 class MediaServiceConnection
   @Inject
   constructor(

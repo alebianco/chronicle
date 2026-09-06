@@ -1,17 +1,16 @@
 package io.github.mattpvaughn.chronicle.features.browse
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.databinding.FragmentBrowseBinding
 import io.github.mattpvaughn.chronicle.features.browse.compose.BrowseScreen
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import javax.inject.Inject
@@ -24,19 +23,12 @@ import javax.inject.Inject
  * The coverage line says so: a facet list showing 12 narrators out of 196 books without qualifying
  * itself reads as "these are all the narrators I have", which is worse than showing nothing.
  */
+@AndroidEntryPoint
 class BrowseFragment : Fragment() {
-  @Inject
-  lateinit var viewModelFactory: BrowseViewModel.Factory
-
   @Inject
   lateinit var navigator: Navigator
 
-  private lateinit var viewModel: BrowseViewModel
-
-  override fun onAttach(context: Context) {
-    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
-    super.onAttach(context)
-  }
+  private val viewModel: BrowseViewModel by viewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -44,7 +36,6 @@ class BrowseFragment : Fragment() {
     savedInstanceState: Bundle?,
   ): View {
     val binding = FragmentBrowseBinding.inflate(inflater, container, false)
-    viewModel = ViewModelProvider(this, viewModelFactory)[BrowseViewModel::class.java]
 
     binding.browseToolbar.setNavigationOnClickListener {
       parentFragmentManager.popBackStack()

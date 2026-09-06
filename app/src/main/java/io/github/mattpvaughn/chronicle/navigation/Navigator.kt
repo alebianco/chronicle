@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.navigation
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.FragmentManager
+import dagger.hilt.android.scopes.ActivityScoped
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
@@ -24,7 +25,6 @@ import io.github.mattpvaughn.chronicle.features.login.ChooseUserFragment
 import io.github.mattpvaughn.chronicle.features.login.LoginFragment
 import io.github.mattpvaughn.chronicle.features.settings.SeriesIndexTesterFragment
 import io.github.mattpvaughn.chronicle.features.settings.SettingsFragment
-import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import timber.log.Timber
 import javax.inject.Inject
@@ -37,7 +37,7 @@ import javax.inject.Inject
  *
  * TODO: handle multiple back stacks for the different bottom nav items?
  */
-@ActivityScope
+@ActivityScoped
 class Navigator
   @Inject
   constructor(

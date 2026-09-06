@@ -22,22 +22,6 @@ class ChooseServerViewModel
     private val plexLoginRepo: PlexLoginRepo,
     private val exceptionHandler: CoroutineExceptionHandler,
   ) : ViewModel() {
-    class Factory
-      @Inject
-      constructor(
-        private val plexLoginService: PlexLoginService,
-        private val plexLoginRepo: PlexLoginRepo,
-        private val exceptionHandler: CoroutineExceptionHandler,
-      ) : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-          if (modelClass.isAssignableFrom(ChooseServerViewModel::class.java)) {
-            return ChooseServerViewModel(plexLoginService, plexLoginRepo, exceptionHandler) as T
-          }
-          throw IllegalArgumentException("Unknown ViewHolder class")
-        }
-      }
-
     private val _userMessage = MutableStateFlow<Event<String>?>(null)
     val userMessage: StateFlow<Event<String>?>
       get() = _userMessage

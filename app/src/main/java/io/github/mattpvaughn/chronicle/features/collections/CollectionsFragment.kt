@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -14,8 +13,9 @@ import androidx.appcompat.widget.SearchView
 import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Collection
@@ -24,27 +24,21 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionsBinding
 import io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsScreen
 import io.github.mattpvaughn.chronicle.features.search.compose.SearchOverlay
 import io.github.mattpvaughn.chronicle.features.search.searchOverlayState
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
-import timber.log.Timber
 import javax.inject.Inject
 
 /** TODO: refactor search to reuse code from Library + Home fragments */
+@AndroidEntryPoint
 class CollectionsFragment : Fragment() {
   companion object {
     fun newInstance() = CollectionsFragment()
   }
 
-  @Inject
-  lateinit var viewModelFactory: CollectionsViewModel.Factory
-
-  private val viewModel: CollectionsViewModel by lazy {
-    ViewModelProvider(this, viewModelFactory).get(CollectionsViewModel::class.java)
-  }
+  private val viewModel: CollectionsViewModel by viewModels()
 
   @Inject
   lateinit var navigator: Navigator
@@ -195,15 +189,5 @@ class CollectionsFragment : Fragment() {
 
   private fun openAudiobookDetails(audiobook: Audiobook) {
     navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
-  }
-
-  override fun onAttach(context: Context) {
-    // Asks the host for a graph rather than casting to `MainActivity` (cu-178). The cast named a
-    // concrete Activity, so this Fragment could not be hosted by anything else — including
-    // `FragmentScenario`'s empty activity, which failed in `onAttach` before a line of the screen
-    // ran. `check` rather than a silent skip: in production a missing graph is a wiring bug.
-    check(injectFromHost { it.inject(this) }) { "CollectionsFragment needs an ActivityComponentHost" }
-    super.onAttach(context)
-    Timber.i("Reattached!")
   }
 }

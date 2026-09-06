@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.settings
 
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -12,9 +11,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -25,7 +25,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.FragmentSettingsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.settings.compose.SettingsScreen
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
@@ -36,10 +35,8 @@ import io.github.mattpvaughn.chronicle.views.getString
 import timber.log.Timber
 import javax.inject.Inject
 
+@AndroidEntryPoint
 class SettingsFragment : Fragment() {
-  @Inject
-  lateinit var viewModelFactory: SettingsViewModel.Factory
-
   @Inject
   lateinit var mediaServiceConnection: MediaServiceConnection
 
@@ -91,9 +88,7 @@ class SettingsFragment : Fragment() {
    * `by lazy` rather than assignment in `onCreateView`: a callback can fire before the view is
    * recreated after a process death, and a `lateinit` would not be initialised yet.
    */
-  private val viewModel: SettingsViewModel by lazy {
-    ViewModelProvider(this, viewModelFactory).get(SettingsViewModel::class.java)
-  }
+  private val viewModel: SettingsViewModel by viewModels()
 
   companion object {
     @JvmStatic
@@ -115,11 +110,6 @@ class SettingsFragment : Fragment() {
      * unreadable file rather than applying anything.
      */
     private val BACKUP_OPEN_MIME_TYPES = arrayOf("*/*")
-  }
-
-  override fun onAttach(context: Context) {
-    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
-    super.onAttach(context)
   }
 
   override fun onCreateView(

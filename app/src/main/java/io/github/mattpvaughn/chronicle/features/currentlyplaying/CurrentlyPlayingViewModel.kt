@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.lifecycle.*
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
 import io.github.mattpvaughn.chronicle.application.SECONDS_PER_MINUTE
@@ -112,1271 +113,1236 @@ internal fun playerProgressOf(
   )
 }
 
-class CurrentlyPlayingViewModel(
-  private val bookRepository: IBookRepository,
-  private val trackRepository: ITrackRepository,
-  private val localBroadcastManager: LocalBroadcastManager,
-  private val mediaServiceConnection: MediaServiceConnection,
-  private val prefsRepo: PrefsRepo,
-  private val plexConfig: PlexConfig,
-  private val currentlyPlaying: CurrentlyPlaying,
-  private val workManager: WorkManager,
-  private val bookmarkRepository: IBookmarkRepository,
-  sharedPrefs: SharedPreferences,
-  private val exceptionHandler: CoroutineExceptionHandler,
-  private val appContext: Context,
-) : ViewModel() {
-  @Suppress("UNCHECKED_CAST")
-  class Factory
-    @Inject
-    constructor(
-      private val bookRepository: IBookRepository,
-      private val trackRepository: ITrackRepository,
-      private val localBroadcastManager: LocalBroadcastManager,
-      private val mediaServiceConnection: MediaServiceConnection,
-      private val prefsRepo: PrefsRepo,
-      private val plexConfig: PlexConfig,
-      private val currentlyPlaying: CurrentlyPlaying,
-      private val workManager: WorkManager,
-      private val bookmarkRepository: IBookmarkRepository,
-      private val sharedPrefs: SharedPreferences,
-      private val exceptionHandler: CoroutineExceptionHandler,
-      private val appContext: Context,
-    ) : ViewModelProvider.Factory {
-      override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(CurrentlyPlayingViewModel::class.java)) {
-          return CurrentlyPlayingViewModel(
-            bookRepository,
-            trackRepository,
-            localBroadcastManager,
-            mediaServiceConnection,
-            prefsRepo,
-            plexConfig,
-            currentlyPlaying,
-            workManager,
-            bookmarkRepository,
-            sharedPrefs,
-            exceptionHandler,
-            appContext,
-          ) as T
-        } else {
-          throw IllegalArgumentException("Incorrect class type provided")
-        }
-      }
-    }
+@HiltViewModel
+class CurrentlyPlayingViewModel
+  @Inject
+  constructor(
+    private val bookRepository: IBookRepository,
+    private val trackRepository: ITrackRepository,
+    private val localBroadcastManager: LocalBroadcastManager,
+    private val mediaServiceConnection: MediaServiceConnection,
+    private val prefsRepo: PrefsRepo,
+    private val plexConfig: PlexConfig,
+    private val currentlyPlaying: CurrentlyPlaying,
+    private val workManager: WorkManager,
+    private val bookmarkRepository: IBookmarkRepository,
+    sharedPrefs: SharedPreferences,
+    private val exceptionHandler: CoroutineExceptionHandler,
+    private val appContext: Context,
+  ) : ViewModel() {
+    @Suppress("UNCHECKED_CAST")
+    private val _showUserMessage = MutableStateFlow<Event<String>?>(null)
+    val showUserMessage: StateFlow<Event<String>?>
+      get() = _showUserMessage
 
-  private val _showUserMessage = MutableStateFlow<Event<String>?>(null)
-  val showUserMessage: StateFlow<Event<String>?>
-    get() = _showUserMessage
+    /**
+     * True when a progress report has permanently failed, so the position on the server is
+     * behind the device's.
+     *
+     * Failure-only by design — see [hasFailedSync] for why a synced/pending indicator
+     * cannot be built honestly from WorkManager's states here.
+     */
+    val hasFailedProgressSync: StateFlow<Boolean> =
+      workManager
+        .getWorkInfosByTagFlow(ProgressUpdater.PROGRESS_SYNC_WORK_TAG)
+        .map { hasFailedSync(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-  /**
-   * True when a progress report has permanently failed, so the position on the server is
-   * behind the device's.
-   *
-   * Failure-only by design — see [hasFailedSync] for why a synced/pending indicator
-   * cannot be built honestly from WorkManager's states here.
-   */
-  val hasFailedProgressSync: StateFlow<Boolean> =
-    workManager
-      .getWorkInfosByTagFlow(ProgressUpdater.PROGRESS_SYNC_WORK_TAG)
-      .map { hasFailedSync(it) }
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+    private val audiobookId = MutableStateFlow(EMPTY_AUDIOBOOK.id)
 
-  private val audiobookId = MutableStateFlow(EMPTY_AUDIOBOOK.id)
+    val audiobook: StateFlow<Audiobook?> =
+      audiobookId
+        .flatMapLatest { id ->
+          if (id == EMPTY_AUDIOBOOK.id) flowOf(EMPTY_AUDIOBOOK) else bookRepository.getAudiobook(id)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_AUDIOBOOK)
 
-  val audiobook: StateFlow<Audiobook?> =
-    audiobookId
-      .flatMapLatest { id ->
-        if (id == EMPTY_AUDIOBOOK.id) flowOf(EMPTY_AUDIOBOOK) else bookRepository.getAudiobook(id)
-      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_AUDIOBOOK)
+    // TODO: expose combined track/chapter bits in ViewModel as "windowSomething" instead of in xml
+    val tracks: StateFlow<List<MediaItemTrack>> =
+      audiobookId
+        .flatMapLatest { id ->
+          if (id == EMPTY_AUDIOBOOK.id) {
+            flowOf(emptyList())
+          } else {
+            trackRepository.getTracksForAudiobook(id)
+          }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  // TODO: expose combined track/chapter bits in ViewModel as "windowSomething" instead of in xml
-  val tracks: StateFlow<List<MediaItemTrack>> =
-    audiobookId
-      .flatMapLatest { id ->
+    // Used to cache tracks.asChapterList when tracks changes
+    private val tracksAsChaptersCache: Flow<List<Chapter>> = tracks.mapLatest { it.asChapterList() }
+
+    /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
+    private val chaptersFromTable: Flow<List<Chapter>> =
+      audiobookId.flatMapLatest { id ->
         if (id == EMPTY_AUDIOBOOK.id) {
           flowOf(emptyList())
         } else {
-          trackRepository.getTracksForAudiobook(id)
+          bookRepository.getChaptersForBookLive(id)
         }
+      }
+
+    val chapters: StateFlow<List<Chapter>> =
+      combineDistinct(
+        chaptersFromTable,
+        tracksAsChaptersCache,
+      ) { fromTable, tracksAsChapters ->
+        resolveChaptersFromCache(fromTable, tracksAsChapters)
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  // Used to cache tracks.asChapterList when tracks changes
-  private val tracksAsChaptersCache: Flow<List<Chapter>> = tracks.mapLatest { it.asChapterList() }
+    val speed: StateFlow<Float> =
+      sharedPrefs
+        .floatFlow(PrefsRepo.KEY_PLAYBACK_SPEED, PLAYBACK_SPEED_DEFAULT)
+        .map {
+          Timber.i("Speed: %.2f", it)
+          it.coerceIn(PLAYBACK_SPEED_MIN, PLAYBACK_SPEED_MAX)
+        }.stateIn(
+          viewModelScope,
+          SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+          PLAYBACK_SPEED_DEFAULT,
+        )
 
-  /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
-  private val chaptersFromTable: Flow<List<Chapter>> =
-    audiobookId.flatMapLatest { id ->
-      if (id == EMPTY_AUDIOBOOK.id) {
-        flowOf(emptyList())
-      } else {
-        bookRepository.getChaptersForBookLive(id)
+    val playbackSpeedString: StateFlow<String> =
+      speed
+        .map { String.format("%.2f", it) + "x" }
+        .stateIn(
+          viewModelScope,
+          SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+          String.format("%.2f", PLAYBACK_SPEED_DEFAULT) + "x",
+        )
+
+    private val _showModalBottomSheetSpeedChooser = MutableStateFlow<Event<Unit>?>(null)
+    val showModalBottomSheetSpeedChooser: StateFlow<Event<Unit>?>
+      get() = _showModalBottomSheetSpeedChooser
+
+    val activeTrackId: StateFlow<String> =
+      mediaServiceConnection.nowPlaying
+        .map { metadata -> metadata.takeIf { !it.id.isNullOrEmpty() }?.id ?: TRACK_NOT_FOUND }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TRACK_NOT_FOUND)
+
+    /** Already a `StateFlow` on the singleton, so this is an alias rather than another `stateIn`. */
+    val currentTrack: StateFlow<MediaItemTrack>
+      get() = currentlyPlaying.track
+
+    // cachedChapter and activeChapter are declared here, above their first use in chapterDuration
+    // below, and not further down the file. Kotlin initialises properties in declaration order, so a
+    // `get()` alias that resolves to a property declared later reads null during construction — which
+    // crashed MainActivity on launch with "Parameter specified as non-null is null" from
+    // Transformations.map. Nothing in the unit suite constructs this ViewModel, so only the app
+    // caught it (cu-87).
+    private val cachedChapter: Flow<Chapter> =
+      combineDistinct(
+        chapters,
+        tracks,
+      ) { _chapters, _tracks ->
+        // Deliberately not logged. These lines serialised the entire chapter list — 40+ objects —
+        // several times a second on a real book, which is a measurable cost in a debug build and
+        // drowned the log when diagnosing the seek churn (cu-93).
+
+        // `chapterAtBookProgress`, not a hand-rolled walk. The loop this replaces subtracted each
+        // chapter's *duration* from a running offset while comparing against the **absolute**
+        // `bookEndTimeOffset` — mixing relative and absolute coordinates, the same defect as cu-13 and
+        // cu-49. At 28,359,976ms in a real book it picked Chapter 12 (ending 15,803,900) instead of
+        // Chapter 20, so a cold start showed the wrong chapter until playback corrected it (cu-73).
+        //
+        // The helper also sorts, which matters: the list arrives from the DB and the network in no
+        // guaranteed order, and the old walk trusted the given order.
+        _chapters.chapterAtBookProgress(_tracks.getProgress())
       }
+
+    val activeChapter: StateFlow<Chapter> =
+      combineDistinct(
+        currentlyPlaying.chapter,
+        cachedChapter,
+      ) { activeChapter, cachedChapter ->
+        if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
+          activeChapter
+        } else {
+          cachedChapter
+        }
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_CHAPTER)
+
+    /**
+     * The chapter the book is at, for the timeline readout.
+     *
+     * Deliberately the *same* value as [activeChapter], which the chapter list highlights. These used
+     * to differ: this was the raw `currentlyPlaying.chapter`, which starts at `EMPTY_CHAPTER` and is
+     * only recomputed by `CurrentlyPlayingSingleton.update()` — called from playback callbacks only.
+     * So on returning to the screen without playing, the timeline read from a stale or empty chapter
+     * while the list highlighted the one derived from saved progress, and the two disagreed until
+     * playback started (cu-87).
+     */
+    val currentChapter: StateFlow<Chapter> get() = activeChapter
+
+    // Both operands in the **book** frame. This was `track.progress - chapter.bookStartTimeOffset`,
+    // which subtracts a book-absolute offset from an in-track one: on any track after the first the
+    // result is a large negative, so the chapter elapsed time and the slider were nonsense. It
+    // happened to work on a single-track book, where the two frames are the same number (cu-115).
+    val chapterProgress: StateFlow<Long> =
+      combineDistinct(
+        currentlyPlaying.chapter,
+        currentlyPlaying.bookPosition,
+      ) { chapter, bookPosition ->
+        millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
+
+    private val _isSliding = MutableStateFlow(false)
+
+    /**
+     * Suppresses slider writes while the user owns the position.
+     *
+     * True from touch-down until the seek has actually landed — **not** until touch-up. Releasing it
+     * on touch-up left a window of up to one progress tick in which the old position was written
+     * back, so the thumb snapped to where it was before jumping forward when the seek completed. The
+     * owner described exactly that: *"seeking moves the timeline where I clicked, then back at the
+     * previous place, then starts playing and goes back to where I requested"* (cu-93).
+     * [awaitSeek] closes it again once the reported position is near the requested one.
+     *
+     * **Observable rather than a plain `var` (cu-198).**
+     *
+     * It was `var isSliding = false`, read inside `.filter { !isSliding }` on the two slider flows.
+     * A predicate reading a mutable field **outside** the stream is not part of that stream's state,
+     * so flipping the field re-emits nothing — the values suppressed during a drag are simply lost,
+     * and the slider only recovers when the upstream next ticks. Paused, it never does.
+     *
+     * As a `StateFlow` it is a real input: `combine` re-runs when the guard opens, so the current
+     * position is republished immediately. It is also the only form Compose can consume, which is
+     * why this had to land before the screen could migrate.
+     */
+    val isSliding: StateFlow<Boolean> = _isSliding.asStateFlow()
+
+    val chapterProgressForSlider: StateFlow<Long> =
+      currentlyPlaying.chapter
+        .combine(currentlyPlaying.bookPosition) { chapter, bookPosition ->
+          millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
+        }
+        // distinctUntilChanged *before* the guard, not after: it exists because `currentlyPlaying`
+        // publishes book, track *and* chapter on every progress tick and each fans out through this
+        // combine — the device logged 228 recomputations a minute for a value that changes once a
+        // second (cu-93). Applied after the guard it would also swallow the catch-up emission below,
+        // since that republishes a value the flow already saw.
+        .distinctUntilChanged()
+        // Suppress while the user is dragging, then republish on release. A `filter` reading a plain
+        // `var` could only do the first half — the suppressed position was lost for good and the
+        // thumb stayed frozen until the next tick, which never comes while paused (cu-198).
+        .combine(_isSliding) { progress, sliding -> progress to sliding }
+        .filter { (_, sliding) -> !sliding }
+        .map { (progress, _) -> progress }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
+
+    val trackProgressForSlider: StateFlow<Long> =
+      currentlyPlaying.track
+        .combine(_isSliding) { track, sliding -> track.progress to sliding }
+        .filter { (_, sliding) -> !sliding }
+        .map { (progress, _) -> progress }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
+
+    val chapterDuration: StateFlow<Long> =
+      currentChapter
+        .map { it.bookEndTimeOffset - it.bookStartTimeOffset }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
+
+    /**
+     * The two-level progress the player shows, as data rather than a formatted string.
+     *
+     * §3.1 convergent-grammar rule 3: chapter position **and** time-left-in-book, never raw
+     * `h:mm:ss/h:mm:ss`. Exposed as numbers and an index so the *wording* stays in the view layer
+     * where `strings.xml` and a `Context` live (rule 2) — which also means this is unit-testable
+     * without Robolectric.
+     *
+     * [chapterNumber] is 1-based for display and `0` when the book reports no chapters; the view
+     * then omits the chapter part rather than printing "Ch 0 of 0".
+     */
+    data class PlayerProgress(
+      val chapterNumber: Int,
+      val chapterCount: Int,
+      val millisLeftInChapter: Long,
+      val millisLeftInBook: Long,
+    ) {
+      val hasChapters: Boolean get() = chapterCount > 0 && chapterNumber > 0
     }
 
-  val chapters: StateFlow<List<Chapter>> =
-    combineDistinct(
-      chaptersFromTable,
-      tracksAsChaptersCache,
-    ) { fromTable, tracksAsChapters ->
-      resolveChaptersFromCache(fromTable, tracksAsChapters)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
-
-  val speed: StateFlow<Float> =
-    sharedPrefs
-      .floatFlow(PrefsRepo.KEY_PLAYBACK_SPEED, PLAYBACK_SPEED_DEFAULT)
-      .map {
-        Timber.i("Speed: %.2f", it)
-        it.coerceIn(PLAYBACK_SPEED_MIN, PLAYBACK_SPEED_MAX)
+    /**
+     * Recomputed from the chapter, the book position and the chapter list.
+     *
+     * `distinctUntilChanged` because all three sources re-emit on every 1 Hz progress tick while the
+     * displayed values change once a second at most — the churn cu-93 measured at 228 recomputations
+     * a minute came from exactly this shape.
+     *
+     * The derivation itself is [playerProgressOf], a pure function: this wiring only supplies it
+     * with the four inputs. Keeping them apart is what makes the arithmetic testable — reaching it
+     * through the LiveData graph needs `audiobookId` to have been populated by the ViewModel's own
+     * init observers, which is plumbing rather than behaviour.
+     */
+    val playerProgress: StateFlow<PlayerProgress> =
+      combineDistinct(
+        currentChapter,
+        currentlyPlaying.bookPosition,
+        chapters,
+      ) { chapter, bookPosition, chapterList ->
+        playerProgressOf(
+          chapter = chapter,
+          bookPosition = bookPosition,
+          chapterList = chapterList,
+          bookDurationMillis = tracks.value.getDuration(),
+        )
       }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        PLAYBACK_SPEED_DEFAULT,
+        playerProgressOf(EMPTY_CHAPTER, BookOffset.ZERO, emptyList(), 0L),
       )
 
-  val playbackSpeedString: StateFlow<String> =
-    speed
-      .map { String.format("%.2f", it) + "x" }
-      .stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        String.format("%.2f", PLAYBACK_SPEED_DEFAULT) + "x",
-      )
+    /**
+     * The settle job for the seek currently in flight, so a second seek can cancel the first.
+     *
+     * Without this, rapid taps released the guard too early: tap one starts waiting for target A,
+     * tap two starts waiting for B, and whichever *arrives* first clears `isSliding` for both. The
+     * A-waiter then also fires and clears the guard while B is still travelling, which is the
+     * snap-back this guard exists to prevent — just narrower, so it survived the cu-93 fix.
+     */
+    private var seekSettleJob: Job? = null
 
-  private val _showModalBottomSheetSpeedChooser = MutableStateFlow<Event<Unit>?>(null)
-  val showModalBottomSheetSpeedChooser: StateFlow<Event<Unit>?>
-    get() = _showModalBottomSheetSpeedChooser
-
-  val activeTrackId: StateFlow<String> =
-    mediaServiceConnection.nowPlaying
-      .map { metadata -> metadata.takeIf { !it.id.isNullOrEmpty() }?.id ?: TRACK_NOT_FOUND }
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TRACK_NOT_FOUND)
-
-  /** Already a `StateFlow` on the singleton, so this is an alias rather than another `stateIn`. */
-  val currentTrack: StateFlow<MediaItemTrack>
-    get() = currentlyPlaying.track
-
-  // cachedChapter and activeChapter are declared here, above their first use in chapterDuration
-  // below, and not further down the file. Kotlin initialises properties in declaration order, so a
-  // `get()` alias that resolves to a property declared later reads null during construction — which
-  // crashed MainActivity on launch with "Parameter specified as non-null is null" from
-  // Transformations.map. Nothing in the unit suite constructs this ViewModel, so only the app
-  // caught it (cu-87).
-  private val cachedChapter: Flow<Chapter> =
-    combineDistinct(
-      chapters,
-      tracks,
-    ) { _chapters, _tracks ->
-      // Deliberately not logged. These lines serialised the entire chapter list — 40+ objects —
-      // several times a second on a real book, which is a measurable cost in a debug build and
-      // drowned the log when diagnosing the seek churn (cu-93).
-
-      // `chapterAtBookProgress`, not a hand-rolled walk. The loop this replaces subtracted each
-      // chapter's *duration* from a running offset while comparing against the **absolute**
-      // `bookEndTimeOffset` — mixing relative and absolute coordinates, the same defect as cu-13 and
-      // cu-49. At 28,359,976ms in a real book it picked Chapter 12 (ending 15,803,900) instead of
-      // Chapter 20, so a cold start showed the wrong chapter until playback corrected it (cu-73).
-      //
-      // The helper also sorts, which matters: the list arrives from the DB and the network in no
-      // guaranteed order, and the old walk trusted the given order.
-      _chapters.chapterAtBookProgress(_tracks.getProgress())
+    fun onSlideStart() {
+      _isSliding.value = true
     }
 
-  val activeChapter: StateFlow<Chapter> =
-    combineDistinct(
-      currentlyPlaying.chapter,
-      cachedChapter,
-    ) { activeChapter, cachedChapter ->
-      if (activeChapter != EMPTY_CHAPTER && activeChapter.trackId == cachedChapter.trackId) {
-        activeChapter
-      } else {
-        cachedChapter
-      }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), EMPTY_CHAPTER)
-
-  /**
-   * The chapter the book is at, for the timeline readout.
-   *
-   * Deliberately the *same* value as [activeChapter], which the chapter list highlights. These used
-   * to differ: this was the raw `currentlyPlaying.chapter`, which starts at `EMPTY_CHAPTER` and is
-   * only recomputed by `CurrentlyPlayingSingleton.update()` — called from playback callbacks only.
-   * So on returning to the screen without playing, the timeline read from a stale or empty chapter
-   * while the list highlighted the one derived from saved progress, and the two disagreed until
-   * playback started (cu-87).
-   */
-  val currentChapter: StateFlow<Chapter> get() = activeChapter
-
-  // Both operands in the **book** frame. This was `track.progress - chapter.bookStartTimeOffset`,
-  // which subtracts a book-absolute offset from an in-track one: on any track after the first the
-  // result is a large negative, so the chapter elapsed time and the slider were nonsense. It
-  // happened to work on a single-track book, where the two frames are the same number (cu-115).
-  val chapterProgress: StateFlow<Long> =
-    combineDistinct(
-      currentlyPlaying.chapter,
-      currentlyPlaying.bookPosition,
-    ) { chapter, bookPosition ->
-      millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
-
-  private val _isSliding = MutableStateFlow(false)
-
-  /**
-   * Suppresses slider writes while the user owns the position.
-   *
-   * True from touch-down until the seek has actually landed — **not** until touch-up. Releasing it
-   * on touch-up left a window of up to one progress tick in which the old position was written
-   * back, so the thumb snapped to where it was before jumping forward when the seek completed. The
-   * owner described exactly that: *"seeking moves the timeline where I clicked, then back at the
-   * previous place, then starts playing and goes back to where I requested"* (cu-93).
-   * [awaitSeek] closes it again once the reported position is near the requested one.
-   *
-   * **Observable rather than a plain `var` (cu-198).**
-   *
-   * It was `var isSliding = false`, read inside `.filter { !isSliding }` on the two slider flows.
-   * A predicate reading a mutable field **outside** the stream is not part of that stream's state,
-   * so flipping the field re-emits nothing — the values suppressed during a drag are simply lost,
-   * and the slider only recovers when the upstream next ticks. Paused, it never does.
-   *
-   * As a `StateFlow` it is a real input: `combine` re-runs when the guard opens, so the current
-   * position is republished immediately. It is also the only form Compose can consume, which is
-   * why this had to land before the screen could migrate.
-   */
-  val isSliding: StateFlow<Boolean> = _isSliding.asStateFlow()
-
-  val chapterProgressForSlider: StateFlow<Long> =
-    currentlyPlaying.chapter
-      .combine(currentlyPlaying.bookPosition) { chapter, bookPosition ->
-        millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
-      }
-      // distinctUntilChanged *before* the guard, not after: it exists because `currentlyPlaying`
-      // publishes book, track *and* chapter on every progress tick and each fans out through this
-      // combine — the device logged 228 recomputations a minute for a value that changes once a
-      // second (cu-93). Applied after the guard it would also swallow the catch-up emission below,
-      // since that republishes a value the flow already saw.
-      .distinctUntilChanged()
-      // Suppress while the user is dragging, then republish on release. A `filter` reading a plain
-      // `var` could only do the first half — the suppressed position was lost for good and the
-      // thumb stayed frozen until the next tick, which never comes while paused (cu-198).
-      .combine(_isSliding) { progress, sliding -> progress to sliding }
-      .filter { (_, sliding) -> !sliding }
-      .map { (progress, _) -> progress }
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
-
-  val trackProgressForSlider: StateFlow<Long> =
-    currentlyPlaying.track
-      .combine(_isSliding) { track, sliding -> track.progress to sliding }
-      .filter { (_, sliding) -> !sliding }
-      .map { (progress, _) -> progress }
-      .distinctUntilChanged()
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
-
-  val chapterDuration: StateFlow<Long> =
-    currentChapter
-      .map { it.bookEndTimeOffset - it.bookStartTimeOffset }
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
-
-  /**
-   * The two-level progress the player shows, as data rather than a formatted string.
-   *
-   * §3.1 convergent-grammar rule 3: chapter position **and** time-left-in-book, never raw
-   * `h:mm:ss/h:mm:ss`. Exposed as numbers and an index so the *wording* stays in the view layer
-   * where `strings.xml` and a `Context` live (rule 2) — which also means this is unit-testable
-   * without Robolectric.
-   *
-   * [chapterNumber] is 1-based for display and `0` when the book reports no chapters; the view
-   * then omits the chapter part rather than printing "Ch 0 of 0".
-   */
-  data class PlayerProgress(
-    val chapterNumber: Int,
-    val chapterCount: Int,
-    val millisLeftInChapter: Long,
-    val millisLeftInBook: Long,
-  ) {
-    val hasChapters: Boolean get() = chapterCount > 0 && chapterNumber > 0
-  }
-
-  /**
-   * Recomputed from the chapter, the book position and the chapter list.
-   *
-   * `distinctUntilChanged` because all three sources re-emit on every 1 Hz progress tick while the
-   * displayed values change once a second at most — the churn cu-93 measured at 228 recomputations
-   * a minute came from exactly this shape.
-   *
-   * The derivation itself is [playerProgressOf], a pure function: this wiring only supplies it
-   * with the four inputs. Keeping them apart is what makes the arithmetic testable — reaching it
-   * through the LiveData graph needs `audiobookId` to have been populated by the ViewModel's own
-   * init observers, which is plumbing rather than behaviour.
-   */
-  val playerProgress: StateFlow<PlayerProgress> =
-    combineDistinct(
-      currentChapter,
-      currentlyPlaying.bookPosition,
-      chapters,
-    ) { chapter, bookPosition, chapterList ->
-      playerProgressOf(
-        chapter = chapter,
-        bookPosition = bookPosition,
-        chapterList = chapterList,
-        bookDurationMillis = tracks.value.getDuration(),
-      )
-    }.stateIn(
-      viewModelScope,
-      SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-      playerProgressOf(EMPTY_CHAPTER, BookOffset.ZERO, emptyList(), 0L),
-    )
-
-  /**
-   * The settle job for the seek currently in flight, so a second seek can cancel the first.
-   *
-   * Without this, rapid taps released the guard too early: tap one starts waiting for target A,
-   * tap two starts waiting for B, and whichever *arrives* first clears `isSliding` for both. The
-   * A-waiter then also fires and clears the guard while B is still travelling, which is the
-   * snap-back this guard exists to prevent — just narrower, so it survived the cu-93 fix.
-   */
-  private var seekSettleJob: Job? = null
-
-  fun onSlideStart() {
-    _isSliding.value = true
-  }
-
-  /**
-   * Opens the guard when a drag ends without a seek being issued.
-   *
-   * The View screen had no such call: `Slider.OnSliderTouchListener.onStopTrackingTouch` always
-   * seeked, so the guard was only ever released by [awaitSeek]. Compose's
-   * `Slider(onValueChangeFinished = …)` fires on *every* drag end, including one the user cancels,
-   * and without this the guard would latch closed and freeze the thumb for good.
-   *
-   * A no-op while a seek is settling: [awaitSeek] owns the guard then, and releasing early is the
-   * cu-93 snap-back.
-   */
-  fun onSlideFinished() {
-    if (seekSettleJob?.isActive != true) {
-      _isSliding.value = false
-    }
-  }
-
-  /**
-   * Holds the guard until playback reports a position near [target], or until [SEEK_SETTLE_TIMEOUT]
-   * passes.
-   *
-   * The timeout matters: a seek that never lands — a dead network on a streamed book — must not
-   * freeze the slider forever. Releasing late looks like a brief lag; never releasing looks broken.
-   */
-  private fun awaitSeek(target: TrackOffset) {
-    // Only the newest seek may release the guard; see [seekSettleJob].
-    seekSettleJob?.cancel()
-    seekSettleJob =
-      viewModelScope.launch {
-        withTimeoutOrNull(SEEK_SETTLE_TIMEOUT) {
-          currentlyPlaying.track.first { track ->
-            abs(TrackOffset(track.progress) - target) < SEEK_SETTLE_TOLERANCE
-          }
-        }
+    /**
+     * Opens the guard when a drag ends without a seek being issued.
+     *
+     * The View screen had no such call: `Slider.OnSliderTouchListener.onStopTrackingTouch` always
+     * seeked, so the guard was only ever released by [awaitSeek]. Compose's
+     * `Slider(onValueChangeFinished = …)` fires on *every* drag end, including one the user cancels,
+     * and without this the guard would latch closed and freeze the thumb for good.
+     *
+     * A no-op while a seek is settling: [awaitSeek] owns the guard then, and releasing early is the
+     * cu-93 snap-back.
+     */
+    fun onSlideFinished() {
+      if (seekSettleJob?.isActive != true) {
         _isSliding.value = false
       }
-  }
-
-  private val _isSleepTimerActive = MutableStateFlow(false)
-  val isSleepTimerActive: StateFlow<Boolean>
-    get() = _isSleepTimerActive
-
-  private val sleepTimerTimeRemaining = MutableStateFlow(0L)
-
-  val sleepTimerTimeRemainingString: StateFlow<String> =
-    sleepTimerTimeRemaining
-      .map { DateUtils.formatElapsedTime(StringBuilder(), it / 1000) }
-      .stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        DateUtils.formatElapsedTime(StringBuilder(), 0L),
-      )
-
-  /**
-   * True while the player is buffering or connecting, i.e. play was asked for but no audio is
-   * flowing yet.
-   *
-   * Mirrors `AudiobookDetailsViewModel.isAudioLoading` rather than inventing a second rule — the
-   * two screens showing different things for the same state is what cu-94 was about. The player had
-   * no such state at all: pressing play on a streamed book looked identical to pressing play on a
-   * stalled one, with only the play/pause icon to go on (cu-95).
-   *
-   * Note this covers the *initial* buffer. Media3 reports a mid-book stall as STATE_PLAYING once
-   * playback has started, so a starved stream partway through still shows as normal playback; that
-   * is recorded in cu-95 as a separate question.
-   */
-  val isAudioLoading: StateFlow<Boolean> =
-    mediaServiceConnection.playbackState
-      .map { state ->
-        state.state == PlaybackStateCompat.STATE_BUFFERING ||
-          state.state == PlaybackStateCompat.STATE_CONNECTING
-      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
-
-  val isPlaying: StateFlow<Boolean> =
-    mediaServiceConnection.playbackState
-      .map { it.isPlaying }
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
-
-  /**
-   * The book's completion percentage, derived from the **same** source as the timeline.
-   *
-   * It used to read `tracks` straight from Room, which the progress loop writes every second,
-   * while the timeline reads `currentlyPlaying.track`, refreshed only by playback callbacks. The
-   * database write lands first, so the percentage visibly moved before the timeline did — two
-   * readouts of one fact, disagreeing (cu-94). Same split cu-87 fixed for the chapter list.
-   *
-   * The track list still supplies the *total* duration, which does not change during playback; only
-   * the position now comes from `currentlyPlaying`.
-   */
-  val progressPercentageString: StateFlow<String> =
-    combineDistinct(
-      tracks,
-      currentlyPlaying.track,
-    ) { _tracks, playing ->
-      val total = _tracks.getDuration()
-      if (_tracks.isEmpty() || total == 0L) {
-        return@combineDistinct "0%"
-      }
-      // Position of the playing track's start, plus how far into it playback has reached.
-      val before = _tracks.sorted().takeWhile { it.id != playing.id }.sumOf { it.duration }
-      val percent = (((before + playing.progress) / total.toDouble()) * 100).roundToInt()
-      "${percent.coerceIn(0, 100)}%"
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0%")
-
-  private val _isLoadingTracks = MutableStateFlow(false)
-  val isLoadingTracks: StateFlow<Boolean>
-    get() = _isLoadingTracks
-
-  private val _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
-  val bottomChooserState: StateFlow<BottomChooserState>
-    get() = _bottomChooserState
-
-  private val _sleepTimerChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
-  val sleepTimerChooserState: StateFlow<BottomChooserState>
-    get() = _sleepTimerChooserState
-
-  private val _jumpForwardsIcon = MutableStateFlow(makeJumpForwardsIcon())
-  val jumpForwardsIcon: StateFlow<Int>
-    get() = _jumpForwardsIcon
-
-  private val _jumpBackwardsIcon = MutableStateFlow(makeJumpBackwardsIcon())
-  val jumpBackwardsIcon: StateFlow<Int>
-    get() = _jumpBackwardsIcon
-
-  private val prefsChangeListener =
-    SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-      when (key) {
-        PrefsRepo.KEY_JUMP_FORWARD_SECONDS -> _jumpForwardsIcon.value = makeJumpForwardsIcon()
-        PrefsRepo.KEY_JUMP_BACKWARD_SECONDS -> _jumpBackwardsIcon.value = makeJumpBackwardsIcon()
-      }
     }
 
-  private suspend fun setAudiobook(trackId: String) {
-    val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
-    // only update [audiobookId] when we see a new audiobook
-    val potentiallyNewAudiobookId = trackRepository.getBookIdForTrack(trackId)
-    if (potentiallyNewAudiobookId != previousAudiobookId) {
-      audiobookId.value = potentiallyNewAudiobookId
-    }
-  }
-
-  init {
-    // Collected on viewModelScope rather than observed forever; the scope's cancellation is what
-    // the explicit removeObserver pair in onCleared was doing by hand.
-    viewModelScope.launch(exceptionHandler) {
-      mediaServiceConnection.nowPlaying.collect { metadata ->
-        if (metadata.id?.isEmpty() == false) {
-          setAudiobook(metadata.id!!)
-        }
-      }
-    }
-    viewModelScope.launch(exceptionHandler) {
-      plexConfig.isConnected.collect { isConnected ->
-        if (isConnected) {
-          refreshTracks(audiobookId.value)
-        }
-      }
-    }
-
-    // Listen for changes in SharedPreferences that could effect playback
-    prefsRepo.registerPrefsListener(prefsChangeListener)
-  }
-
-  private fun refreshTracks(bookId: String) {
-    if (bookId == NO_AUDIOBOOK_FOUND_ID) {
-      return
-    }
-    viewModelScope.launch(exceptionHandler) {
-      try {
-        // Only replace track view w/ loading view if we have no tracks.
-        //
-        // `isEmpty()`, not `?.size == null`: `tracks` is a non-null `StateFlow` since cu-52, so the
-        // safe call could never short-circuit and the spinner never showed. It read as a null check
-        // because it was one, against `LiveData<List<…>>?`.
-        if (tracks.value.isEmpty()) {
-          _isLoadingTracks.value = true
-        }
-        val tracks = trackRepository.loadTracksForAudiobook(bookId)
-        if (tracks.isOk) {
-          bookRepository.updateTrackData(
-            bookId,
-            tracks.value.getProgress().millis,
-            tracks.value.getDuration(),
-            tracks.value.size,
-          )
-          audiobook.value?.let {
-            bookRepository.syncAudiobook(it, tracks.value)
-          }
-        }
-        _isLoadingTracks.value = false
-      } catch (e: Throwable) {
-        Timber.e(e, "Failed to load tracks for audiobook $bookId")
-        _isLoadingTracks.value = false
-      }
-    }
-  }
-
-  fun play() {
-    if (mediaServiceConnection.isConnected.value) {
-      if (audiobook.value == null) {
-        Timber.e("Tried to play null audiobook!")
-        _showUserMessage.setEvent(
-          "Audiobook is null. Try restarting the app and trying again",
-        )
-        return
-      }
-      pausePlay(
-        bookId = audiobook.value!!.id,
-        // Neither a track id nor an offset is supplied: resume where the book left off.
-        // This used to pass ACTIVE_TRACK — a *track id* sentinel — as bookStartTimeOffset,
-        // which is not a time at all.
-        forcePlay = false,
-      )
-    }
-  }
-
-  private fun pausePlay(
-    bookId: String,
-    bookStartTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
-    forcePlay: Boolean = false,
-    trackId: String? = null,
-  ) {
-    val transportControls = mediaServiceConnection.transportControls
-
-    val extras =
-      Bundle().apply {
-        putLong(KEY_START_TIME_TRACK_OFFSET, bookStartTimeOffset)
-        // Only written when a specific track was asked for; absence means "resume active".
-        trackId?.let { putString(KEY_SEEK_TO_TRACK_WITH_ID, it) }
-      }
-    if (transportControls != null) {
-      mediaServiceConnection.playbackState.value?.let { playbackState ->
-        when {
-          forcePlay -> transportControls.playFromMediaId(bookId, extras)
-          playbackState.state == STATE_PAUSED -> transportControls.play()
-          playbackState.isPlaying -> transportControls.pause()
-          else -> {
-          } // do nothing?
-        }
-      }
-    }
-  }
-
-  fun skipToNext() {
-    skipToChapter(SKIP_TO_NEXT, forward = true)
-  }
-
-  fun skipToPrevious() {
-    skipToChapter(SKIP_TO_PREVIOUS, forward = false)
-  }
-
-  private fun skipToChapter(
-    action: PlaybackStateCompat.CustomAction,
-    forward: Boolean,
-  ) {
-    val transportControls = mediaServiceConnection.transportControls
-    mediaServiceConnection.let { connection ->
-      if (connection.nowPlaying.value != NOTHING_PLAYING) {
-        // Service will be alive, so we can let it handle the action
-        Timber.i("Seeking!")
-        // Predict where the service will land and hold the slider there. The chapter buttons
-        // showed the same snap-back as the slider: the readout moved to the new chapter, reverted
-        // for a tick, then moved again once the seek completed (cu-93).
-        val chapters = currentlyPlaying.chapters
-        val here = chapters.indexOf(currentlyPlaying.chapter.value)
-        val target =
-          if (forward) {
-            chapters.getOrNull(here + 1)?.bookStartTimeOffset
-          } else {
-            // Matches the service's rule: past the threshold, restart the current chapter.
-            val current = currentlyPlaying.chapter.value
-            // Book frame on both sides (cu-115). `track.value.progress` is an in-track offset,
-            // so on a later track this went negative and the threshold test always took the
-            // restart-current-chapter branch — the same mix-up cu-96 fixed in the service, left
-            // unfixed in this mirror copy.
-            val intoChapter = millisIntoChapter(current, currentlyPlaying.bookPosition.value)
-            if (intoChapter < SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS) {
-              chapters.getOrNull(here - 1)?.bookStartTimeOffset
-            } else {
-              current.bookStartTimeOffset
+    /**
+     * Holds the guard until playback reports a position near [target], or until [SEEK_SETTLE_TIMEOUT]
+     * passes.
+     *
+     * The timeout matters: a seek that never lands — a dead network on a streamed book — must not
+     * freeze the slider forever. Releasing late looks like a brief lag; never releasing looks broken.
+     */
+    private fun awaitSeek(target: TrackOffset) {
+      // Only the newest seek may release the guard; see [seekSettleJob].
+      seekSettleJob?.cancel()
+      seekSettleJob =
+        viewModelScope.launch {
+          withTimeoutOrNull(SEEK_SETTLE_TIMEOUT) {
+            currentlyPlaying.track.first { track ->
+              abs(TrackOffset(track.progress) - target) < SEEK_SETTLE_TOLERANCE
             }
           }
-        transportControls?.sendCustomAction(action, null)
-        // `awaitSeek` waits on the *track* progress the player reports, so the predicted book
-        // offset has to be converted first — it is the chapter's own track we are landing in.
-        target?.let { bookTarget ->
-          awaitSeek(inTrackOffsetFor(bookTarget, currentlyPlaying.chapter.value.trackId))
+          _isSliding.value = false
         }
-      } else {
-        val currentChapterIndex =
-          currentlyPlaying.chapters.indexOf(
-            currentlyPlaying.chapter.value,
+    }
+
+    private val _isSleepTimerActive = MutableStateFlow(false)
+    val isSleepTimerActive: StateFlow<Boolean>
+      get() = _isSleepTimerActive
+
+    private val sleepTimerTimeRemaining = MutableStateFlow(0L)
+
+    val sleepTimerTimeRemainingString: StateFlow<String> =
+      sleepTimerTimeRemaining
+        .map { DateUtils.formatElapsedTime(StringBuilder(), it / 1000) }
+        .stateIn(
+          viewModelScope,
+          SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+          DateUtils.formatElapsedTime(StringBuilder(), 0L),
+        )
+
+    /**
+     * True while the player is buffering or connecting, i.e. play was asked for but no audio is
+     * flowing yet.
+     *
+     * Mirrors `AudiobookDetailsViewModel.isAudioLoading` rather than inventing a second rule — the
+     * two screens showing different things for the same state is what cu-94 was about. The player had
+     * no such state at all: pressing play on a streamed book looked identical to pressing play on a
+     * stalled one, with only the play/pause icon to go on (cu-95).
+     *
+     * Note this covers the *initial* buffer. Media3 reports a mid-book stall as STATE_PLAYING once
+     * playback has started, so a starved stream partway through still shows as normal playback; that
+     * is recorded in cu-95 as a separate question.
+     */
+    val isAudioLoading: StateFlow<Boolean> =
+      mediaServiceConnection.playbackState
+        .map { state ->
+          state.state == PlaybackStateCompat.STATE_BUFFERING ||
+            state.state == PlaybackStateCompat.STATE_CONNECTING
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+
+    val isPlaying: StateFlow<Boolean> =
+      mediaServiceConnection.playbackState
+        .map { it.isPlaying }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
+
+    /**
+     * The book's completion percentage, derived from the **same** source as the timeline.
+     *
+     * It used to read `tracks` straight from Room, which the progress loop writes every second,
+     * while the timeline reads `currentlyPlaying.track`, refreshed only by playback callbacks. The
+     * database write lands first, so the percentage visibly moved before the timeline did — two
+     * readouts of one fact, disagreeing (cu-94). Same split cu-87 fixed for the chapter list.
+     *
+     * The track list still supplies the *total* duration, which does not change during playback; only
+     * the position now comes from `currentlyPlaying`.
+     */
+    val progressPercentageString: StateFlow<String> =
+      combineDistinct(
+        tracks,
+        currentlyPlaying.track,
+      ) { _tracks, playing ->
+        val total = _tracks.getDuration()
+        if (_tracks.isEmpty() || total == 0L) {
+          return@combineDistinct "0%"
+        }
+        // Position of the playing track's start, plus how far into it playback has reached.
+        val before = _tracks.sorted().takeWhile { it.id != playing.id }.sumOf { it.duration }
+        val percent = (((before + playing.progress) / total.toDouble()) * 100).roundToInt()
+        "${percent.coerceIn(0, 100)}%"
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0%")
+
+    private val _isLoadingTracks = MutableStateFlow(false)
+    val isLoadingTracks: StateFlow<Boolean>
+      get() = _isLoadingTracks
+
+    private val _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+    val bottomChooserState: StateFlow<BottomChooserState>
+      get() = _bottomChooserState
+
+    private val _sleepTimerChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
+    val sleepTimerChooserState: StateFlow<BottomChooserState>
+      get() = _sleepTimerChooserState
+
+    private val _jumpForwardsIcon = MutableStateFlow(makeJumpForwardsIcon())
+    val jumpForwardsIcon: StateFlow<Int>
+      get() = _jumpForwardsIcon
+
+    private val _jumpBackwardsIcon = MutableStateFlow(makeJumpBackwardsIcon())
+    val jumpBackwardsIcon: StateFlow<Int>
+      get() = _jumpBackwardsIcon
+
+    private val prefsChangeListener =
+      SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+          PrefsRepo.KEY_JUMP_FORWARD_SECONDS -> _jumpForwardsIcon.value = makeJumpForwardsIcon()
+          PrefsRepo.KEY_JUMP_BACKWARD_SECONDS -> _jumpBackwardsIcon.value = makeJumpBackwardsIcon()
+        }
+      }
+
+    private suspend fun setAudiobook(trackId: String) {
+      val previousAudiobookId = audiobook.value?.id ?: NO_AUDIOBOOK_FOUND_ID
+      // only update [audiobookId] when we see a new audiobook
+      val potentiallyNewAudiobookId = trackRepository.getBookIdForTrack(trackId)
+      if (potentiallyNewAudiobookId != previousAudiobookId) {
+        audiobookId.value = potentiallyNewAudiobookId
+      }
+    }
+
+    init {
+      // Collected on viewModelScope rather than observed forever; the scope's cancellation is what
+      // the explicit removeObserver pair in onCleared was doing by hand.
+      viewModelScope.launch(exceptionHandler) {
+        mediaServiceConnection.nowPlaying.collect { metadata ->
+          if (metadata.id?.isEmpty() == false) {
+            setAudiobook(metadata.id!!)
+          }
+        }
+      }
+      viewModelScope.launch(exceptionHandler) {
+        plexConfig.isConnected.collect { isConnected ->
+          if (isConnected) {
+            refreshTracks(audiobookId.value)
+          }
+        }
+      }
+
+      // Listen for changes in SharedPreferences that could effect playback
+      prefsRepo.registerPrefsListener(prefsChangeListener)
+    }
+
+    private fun refreshTracks(bookId: String) {
+      if (bookId == NO_AUDIOBOOK_FOUND_ID) {
+        return
+      }
+      viewModelScope.launch(exceptionHandler) {
+        try {
+          // Only replace track view w/ loading view if we have no tracks.
+          //
+          // `isEmpty()`, not `?.size == null`: `tracks` is a non-null `StateFlow` since cu-52, so the
+          // safe call could never short-circuit and the spinner never showed. It read as a null check
+          // because it was one, against `LiveData<List<…>>?`.
+          if (tracks.value.isEmpty()) {
+            _isLoadingTracks.value = true
+          }
+          val tracks = trackRepository.loadTracksForAudiobook(bookId)
+          if (tracks.isOk) {
+            bookRepository.updateTrackData(
+              bookId,
+              tracks.value.getProgress().millis,
+              tracks.value.getDuration(),
+              tracks.value.size,
+            )
+            audiobook.value?.let {
+              bookRepository.syncAudiobook(it, tracks.value)
+            }
+          }
+          _isLoadingTracks.value = false
+        } catch (e: Throwable) {
+          Timber.e(e, "Failed to load tracks for audiobook $bookId")
+          _isLoadingTracks.value = false
+        }
+      }
+    }
+
+    fun play() {
+      if (mediaServiceConnection.isConnected.value) {
+        if (audiobook.value == null) {
+          Timber.e("Tried to play null audiobook!")
+          _showUserMessage.setEvent(
+            "Audiobook is null. Try restarting the app and trying again",
           )
-        var skipToChapterIndex: Int
-        if (forward) {
-          skipToChapterIndex = currentChapterIndex + 1
-          if (skipToChapterIndex < currentlyPlaying.chapters.size) {
+          return
+        }
+        pausePlay(
+          bookId = audiobook.value!!.id,
+          // Neither a track id nor an offset is supplied: resume where the book left off.
+          // This used to pass ACTIVE_TRACK — a *track id* sentinel — as bookStartTimeOffset,
+          // which is not a time at all.
+          forcePlay = false,
+        )
+      }
+    }
+
+    private fun pausePlay(
+      bookId: String,
+      bookStartTimeOffset: Long = USE_SAVED_TRACK_PROGRESS,
+      forcePlay: Boolean = false,
+      trackId: String? = null,
+    ) {
+      val transportControls = mediaServiceConnection.transportControls
+
+      val extras =
+        Bundle().apply {
+          putLong(KEY_START_TIME_TRACK_OFFSET, bookStartTimeOffset)
+          // Only written when a specific track was asked for; absence means "resume active".
+          trackId?.let { putString(KEY_SEEK_TO_TRACK_WITH_ID, it) }
+        }
+      if (transportControls != null) {
+        mediaServiceConnection.playbackState.value?.let { playbackState ->
+          when {
+            forcePlay -> transportControls.playFromMediaId(bookId, extras)
+            playbackState.state == STATE_PAUSED -> transportControls.play()
+            playbackState.isPlaying -> transportControls.pause()
+            else -> {
+            } // do nothing?
+          }
+        }
+      }
+    }
+
+    fun skipToNext() {
+      skipToChapter(SKIP_TO_NEXT, forward = true)
+    }
+
+    fun skipToPrevious() {
+      skipToChapter(SKIP_TO_PREVIOUS, forward = false)
+    }
+
+    private fun skipToChapter(
+      action: PlaybackStateCompat.CustomAction,
+      forward: Boolean,
+    ) {
+      val transportControls = mediaServiceConnection.transportControls
+      mediaServiceConnection.let { connection ->
+        if (connection.nowPlaying.value != NOTHING_PLAYING) {
+          // Service will be alive, so we can let it handle the action
+          Timber.i("Seeking!")
+          // Predict where the service will land and hold the slider there. The chapter buttons
+          // showed the same snap-back as the slider: the readout moved to the new chapter, reverted
+          // for a tick, then moved again once the seek completed (cu-93).
+          val chapters = currentlyPlaying.chapters
+          val here = chapters.indexOf(currentlyPlaying.chapter.value)
+          val target =
+            if (forward) {
+              chapters.getOrNull(here + 1)?.bookStartTimeOffset
+            } else {
+              // Matches the service's rule: past the threshold, restart the current chapter.
+              val current = currentlyPlaying.chapter.value
+              // Book frame on both sides (cu-115). `track.value.progress` is an in-track offset,
+              // so on a later track this went negative and the threshold test always took the
+              // restart-current-chapter branch — the same mix-up cu-96 fixed in the service, left
+              // unfixed in this mirror copy.
+              val intoChapter = millisIntoChapter(current, currentlyPlaying.bookPosition.value)
+              if (intoChapter < SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS) {
+                chapters.getOrNull(here - 1)?.bookStartTimeOffset
+              } else {
+                current.bookStartTimeOffset
+              }
+            }
+          transportControls?.sendCustomAction(action, null)
+          // `awaitSeek` waits on the *track* progress the player reports, so the predicted book
+          // offset has to be converted first — it is the chapter's own track we are landing in.
+          target?.let { bookTarget ->
+            awaitSeek(inTrackOffsetFor(bookTarget, currentlyPlaying.chapter.value.trackId))
+          }
+        } else {
+          val currentChapterIndex =
+            currentlyPlaying.chapters.indexOf(
+              currentlyPlaying.chapter.value,
+            )
+          var skipToChapterIndex: Int
+          if (forward) {
+            skipToChapterIndex = currentChapterIndex + 1
+            if (skipToChapterIndex < currentlyPlaying.chapters.size) {
+              val skipToChapter = currentlyPlaying.chapters[skipToChapterIndex]
+              jumpToChapter(
+                skipToChapter.bookStartTimeOffset,
+                currentlyPlaying.track.value.id,
+                hasUserConfirmation = true,
+              )
+            } else {
+              val toast =
+                Toast.makeText(
+                  appContext,
+                  R.string.skip_forwards_reached_last_chapter,
+                  Toast.LENGTH_LONG,
+                )
+              toast.setGravity(Gravity.BOTTOM, 0, 200)
+              toast.show()
+            }
+          } else {
+            skipToChapterIndex = currentChapterIndex - 1
+            if (skipToChapterIndex < 0) skipToChapterIndex = 0
             val skipToChapter = currentlyPlaying.chapters[skipToChapterIndex]
             jumpToChapter(
               skipToChapter.bookStartTimeOffset,
               currentlyPlaying.track.value.id,
               hasUserConfirmation = true,
             )
-          } else {
-            val toast =
-              Toast.makeText(
-                appContext,
-                R.string.skip_forwards_reached_last_chapter,
-                Toast.LENGTH_LONG,
-              )
-            toast.setGravity(Gravity.BOTTOM, 0, 200)
-            toast.show()
           }
-        } else {
-          skipToChapterIndex = currentChapterIndex - 1
-          if (skipToChapterIndex < 0) skipToChapterIndex = 0
-          val skipToChapter = currentlyPlaying.chapters[skipToChapterIndex]
-          jumpToChapter(
-            skipToChapter.bookStartTimeOffset,
-            currentlyPlaying.track.value.id,
-            hasUserConfirmation = true,
-          )
         }
       }
     }
-  }
 
-  fun makeJumpForwardsIcon(): Int {
-    return when (prefsRepo.jumpForwardSeconds) {
-      10L -> R.drawable.ic_forward_10_white
-      15L -> R.drawable.ic_forward_15_white
-      20L -> R.drawable.ic_forward_20_white
-      30L -> R.drawable.ic_forward_30_white
-      60L -> R.drawable.ic_forward_60_white
-      90L -> R.drawable.ic_forward_90_white
-      else -> R.drawable.ic_forward_30_white
+    fun makeJumpForwardsIcon(): Int {
+      return when (prefsRepo.jumpForwardSeconds) {
+        10L -> R.drawable.ic_forward_10_white
+        15L -> R.drawable.ic_forward_15_white
+        20L -> R.drawable.ic_forward_20_white
+        30L -> R.drawable.ic_forward_30_white
+        60L -> R.drawable.ic_forward_60_white
+        90L -> R.drawable.ic_forward_90_white
+        else -> R.drawable.ic_forward_30_white
+      }
     }
-  }
 
-  fun makeJumpBackwardsIcon(): Int {
-    return when (prefsRepo.jumpBackwardSeconds) {
-      10L -> R.drawable.ic_replay_10_white
-      15L -> R.drawable.ic_replay_15_white
-      20L -> R.drawable.ic_replay_20_white
-      30L -> R.drawable.ic_replay_30_white
-      60L -> R.drawable.ic_replay_60_white
-      90L -> R.drawable.ic_replay_90_white
-      else -> R.drawable.ic_replay_10_white
+    fun makeJumpBackwardsIcon(): Int {
+      return when (prefsRepo.jumpBackwardSeconds) {
+        10L -> R.drawable.ic_replay_10_white
+        15L -> R.drawable.ic_replay_15_white
+        20L -> R.drawable.ic_replay_20_white
+        30L -> R.drawable.ic_replay_30_white
+        60L -> R.drawable.ic_replay_60_white
+        90L -> R.drawable.ic_replay_90_white
+        else -> R.drawable.ic_replay_10_white
+      }
     }
-  }
 
-  fun skipForwards() {
-    seekRelative(makeSkipForward(prefsRepo), prefsRepo.jumpForwardSeconds * MILLIS_PER_SECOND)
-  }
+    fun skipForwards() {
+      seekRelative(makeSkipForward(prefsRepo), prefsRepo.jumpForwardSeconds * MILLIS_PER_SECOND)
+    }
 
-  fun skipBackwards() {
-    seekRelative(
-      makeSkipBackward(prefsRepo),
-      prefsRepo.jumpBackwardSeconds * MILLIS_PER_SECOND * -1,
-    )
-  }
+    fun skipBackwards() {
+      seekRelative(
+        makeSkipBackward(prefsRepo),
+        prefsRepo.jumpBackwardSeconds * MILLIS_PER_SECOND * -1,
+      )
+    }
 
-  private fun seekRelative(
-    action: PlaybackStateCompat.CustomAction,
-    offset: Long,
-  ) {
-    val transportControls = mediaServiceConnection.transportControls
-    mediaServiceConnection.let { connection ->
-      if (connection.nowPlaying.value != NOTHING_PLAYING) {
-        // Service will be alive, so we can let it handle the action
-        Timber.i("Seeking!")
-        transportControls?.sendCustomAction(action, null)
-      } else {
-        Timber.i("Updating DB progress!")
-        // Service is not alive, so update track repo directly.
-        //
-        // Read straight from the repository rather than from the `tracks` StateFlow. That one is
-        // `WhileSubscribed`, so with no collector its cached value is the `emptyList()` seed and a
-        // `first()` on it would return immediately with nothing — the `observeOnce` this replaces
-        // did not have that failure mode, since a cold `LiveData` waits for a real emission.
-        viewModelScope.launch(exceptionHandler) {
-          val trackList = trackRepository.getTracksForAudiobook(audiobookId.value).first()
-          // don't bother seeking if there aren't any files
-          if (trackList.isEmpty()) {
-            return@launch
-          }
-          val manager = TrackListStateManager()
-          manager.trackList = trackList
-          manager.seekToActiveTrack()
-          manager.seekByRelative(offset)
-          // `updateTrackProgress` writes `MediaItemTrack.progress`, which is the offset within
-          // *that track* — so it takes `currentTrackProgress`, not `currentBookPosition`. It
-          // used to take the book position, inflating the row by the sum of every preceding
-          // track's duration, and `getActiveTrack` (furthest-started) then read a corrupt
-          // position. Single-track books were unaffected, which is why it survived (cu-136).
+    private fun seekRelative(
+      action: PlaybackStateCompat.CustomAction,
+      offset: Long,
+    ) {
+      val transportControls = mediaServiceConnection.transportControls
+      mediaServiceConnection.let { connection ->
+        if (connection.nowPlaying.value != NOTHING_PLAYING) {
+          // Service will be alive, so we can let it handle the action
+          Timber.i("Seeking!")
+          transportControls?.sendCustomAction(action, null)
+        } else {
+          Timber.i("Updating DB progress!")
+          // Service is not alive, so update track repo directly.
           //
-          // The index is into the sorted list, matching `manager.currentTrackIndex`.
-          val updatedTrack = trackList.sorted()[manager.currentTrackIndex.value]
-          trackRepository.updateTrackProgress(
-            manager.currentTrackProgress.millis,
-            updatedTrack.id,
-            System.currentTimeMillis(),
+          // Read straight from the repository rather than from the `tracks` StateFlow. That one is
+          // `WhileSubscribed`, so with no collector its cached value is the `emptyList()` seed and a
+          // `first()` on it would return immediately with nothing — the `observeOnce` this replaces
+          // did not have that failure mode, since a cold `LiveData` waits for a real emission.
+          viewModelScope.launch(exceptionHandler) {
+            val trackList = trackRepository.getTracksForAudiobook(audiobookId.value).first()
+            // don't bother seeking if there aren't any files
+            if (trackList.isEmpty()) {
+              return@launch
+            }
+            val manager = TrackListStateManager()
+            manager.trackList = trackList
+            manager.seekToActiveTrack()
+            manager.seekByRelative(offset)
+            // `updateTrackProgress` writes `MediaItemTrack.progress`, which is the offset within
+            // *that track* — so it takes `currentTrackProgress`, not `currentBookPosition`. It
+            // used to take the book position, inflating the row by the sum of every preceding
+            // track's duration, and `getActiveTrack` (furthest-started) then read a corrupt
+            // position. Single-track books were unaffected, which is why it survived (cu-136).
+            //
+            // The index is into the sorted list, matching `manager.currentTrackIndex`.
+            val updatedTrack = trackList.sorted()[manager.currentTrackIndex.value]
+            trackRepository.updateTrackProgress(
+              manager.currentTrackProgress.millis,
+              updatedTrack.id,
+              System.currentTimeMillis(),
+            )
+          }
+        }
+      }
+    }
+
+    /** Jumps to a given track with [MediaItemTrack.id] == [trackId] */
+    fun jumpToChapter(
+      bookStartTimeOffset: BookOffset = BookOffset.ZERO,
+      trackId: String = TRACK_NOT_FOUND,
+      hasUserConfirmation: Boolean = false,
+    ) {
+      if (!hasUserConfirmation) {
+        showOptionsMenu(
+          title =
+            FormattableString.from(
+              R.string.warning_jump_to_chapter_will_clear_progress,
+            ),
+          options = listOf(FormattableString.yes, FormattableString.no),
+          listener =
+            object : BottomChooserItemListener() {
+              override fun onItemClicked(formattableString: FormattableString) {
+                when (formattableString) {
+                  FormattableString.yes ->
+                    jumpToChapter(
+                      bookStartTimeOffset,
+                      trackId,
+                      true,
+                    )
+                  FormattableString.no -> Unit
+                  else -> throw NoWhenBranchMatchedException()
+                }
+                hideOptionsMenu()
+              }
+            },
+        )
+        return
+      }
+
+      val jumpToChapterAction = {
+        audiobook.value?.let { book ->
+          // `pausePlay` forwards this as KEY_START_TIME_TRACK_OFFSET, which the service applies as
+          // an offset *within* the starting track — but a chapter's offset is book-absolute (cu-96).
+          //
+          // The conversion goes through `chapterSeekTarget`, the one home for it. This site used to
+          // inline the arithmetic with `takeWhile { it.id != trackId }`, which silently sums *every*
+          // track when the id is absent — where `chapterSeekTarget` returns null and the caller can
+          // decline to seek (cu-136).
+          val inTrackOffset = inTrackOffsetFor(bookStartTimeOffset, trackId)
+          pausePlay(
+            book.id,
+            bookStartTimeOffset = inTrackOffset.millis,
+            trackId = trackId,
+            forcePlay = true,
           )
         }
       }
-    }
-  }
-
-  /** Jumps to a given track with [MediaItemTrack.id] == [trackId] */
-  fun jumpToChapter(
-    bookStartTimeOffset: BookOffset = BookOffset.ZERO,
-    trackId: String = TRACK_NOT_FOUND,
-    hasUserConfirmation: Boolean = false,
-  ) {
-    if (!hasUserConfirmation) {
-      showOptionsMenu(
-        title =
-          FormattableString.from(
-            R.string.warning_jump_to_chapter_will_clear_progress,
-          ),
-        options = listOf(FormattableString.yes, FormattableString.no),
-        listener =
-          object : BottomChooserItemListener() {
-            override fun onItemClicked(formattableString: FormattableString) {
-              when (formattableString) {
-                FormattableString.yes ->
-                  jumpToChapter(
-                    bookStartTimeOffset,
-                    trackId,
-                    true,
-                  )
-                FormattableString.no -> Unit
-                else -> throw NoWhenBranchMatchedException()
-              }
-              hideOptionsMenu()
-            }
-          },
-      )
-      return
-    }
-
-    val jumpToChapterAction = {
-      audiobook.value?.let { book ->
-        // `pausePlay` forwards this as KEY_START_TIME_TRACK_OFFSET, which the service applies as
-        // an offset *within* the starting track — but a chapter's offset is book-absolute (cu-96).
-        //
-        // The conversion goes through `chapterSeekTarget`, the one home for it. This site used to
-        // inline the arithmetic with `takeWhile { it.id != trackId }`, which silently sums *every*
-        // track when the id is absent — where `chapterSeekTarget` returns null and the caller can
-        // decline to seek (cu-136).
-        val inTrackOffset = inTrackOffsetFor(bookStartTimeOffset, trackId)
-        pausePlay(
-          book.id,
-          bookStartTimeOffset = inTrackOffset.millis,
-          trackId = trackId,
-          forcePlay = true,
-        )
-      }
-    }
-    if (!mediaServiceConnection.isConnected.value) {
-      mediaServiceConnection.connect(onConnected = jumpToChapterAction)
-    } else {
-      jumpToChapterAction()
-    }
-  }
-
-  fun showSleepTimerOptions() {
-    val title =
-      sleepTimerTitle(
-        isActive = isSleepTimerActive.value,
-        remainingMillis = sleepTimerTimeRemaining.value,
-      )
-    val options =
-      if (isSleepTimerActive.value) {
-        listOf(
-          FormattableString.from(R.string.sleep_timer_append),
-          FormattableString.from(R.string.sleep_timer_duration_end_of_chapter),
-          FormattableString.from(R.string.cancel),
-        )
+      if (!mediaServiceConnection.isConnected.value) {
+        mediaServiceConnection.connect(onConnected = jumpToChapterAction)
       } else {
-        listOf(
-          FormattableString.from(R.string.sleep_timer_duration_5_minutes),
-          FormattableString.from(R.string.sleep_timer_duration_15_minutes),
-          FormattableString.from(R.string.sleep_timer_duration_30_minutes),
-          FormattableString.from(R.string.sleep_timer_duration_40_minutes),
-          FormattableString.from(R.string.sleep_timer_duration_60_minutes),
-          FormattableString.from(R.string.sleep_timer_duration_90_minutes),
-          FormattableString.from(R.string.sleep_timer_duration_120_minutes),
-          FormattableString.from(R.string.sleep_timer_duration_end_of_chapter),
+        jumpToChapterAction()
+      }
+    }
+
+    fun showSleepTimerOptions() {
+      val title =
+        sleepTimerTitle(
+          isActive = isSleepTimerActive.value,
+          remainingMillis = sleepTimerTimeRemaining.value,
         )
-      }
-    val listener =
-      object : BottomChooserListener {
-        override fun onItemClicked(formattableString: FormattableString) {
-          check(formattableString is FormattableString.ResourceString)
-
-          val actionPair: Pair<SleepTimerAction, Long> =
-            when (formattableString.stringRes) {
-              R.string.sleep_timer_duration_5_minutes -> {
-                val duration = 5 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                BEGIN to duration
-              }
-              R.string.sleep_timer_duration_15_minutes -> {
-                val duration = 15 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                BEGIN to duration
-              }
-              R.string.sleep_timer_duration_30_minutes -> {
-                val duration = 30 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                BEGIN to duration
-              }
-              R.string.sleep_timer_duration_40_minutes -> {
-                val duration = 40 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                BEGIN to duration
-              }
-              R.string.sleep_timer_duration_60_minutes -> {
-                val duration = 60 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                BEGIN to duration
-              }
-              R.string.sleep_timer_duration_90_minutes -> {
-                val duration = 90 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                BEGIN to duration
-              }
-              R.string.sleep_timer_duration_120_minutes -> {
-                val duration = 120 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                BEGIN to duration
-              }
-              R.string.sleep_timer_duration_end_of_chapter -> {
-                // No duration. This used to compute
-                // `(chapterDuration - chapterProgress) / playbackSpeed` and start an ordinary
-                // countdown, which is wrong twice: a seek does not change the deadline, so it
-                // fired mid-chapter or long after; and the speed was baked in at pick time, so any
-                // later change desynced it — now likelier, since cu-20 made speed per book. The
-                // timer watches the chapter itself instead (cu-21).
-                BEGIN_END_OF_CHAPTER to 0L
-              }
-              R.string.sleep_timer_append -> {
-                val additionalTime = 5 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
-                EXTEND to additionalTime
-              }
-              R.string.cancel -> {
-                setSleepTimerTitle(FormattableString.from(R.string.sleep_timer))
-                CANCEL to 0L
-              }
-              else -> throw NoWhenBranchMatchedException(
-                "Unknown duration picked for sleep timer",
-              )
-            }
-          hideSleepTimerChooser()
-          val sleepTimerIntent =
-            Intent(SleepTimer.ACTION_SLEEP_TIMER_CHANGE).apply {
-              putExtra(ARG_SLEEP_TIMER_ACTION, actionPair.first)
-              putExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, actionPair.second)
-            }
-          localBroadcastManager.sendBroadcast(sleepTimerIntent)
-        }
-
-        override fun onChooserClosed(wasBackgroundClicked: Boolean) {
-          if (wasBackgroundClicked) {
-            hideSleepTimerChooser()
-          }
-        }
-      }
-
-    _sleepTimerChooserState.value =
-      BottomChooserState(
-        title = title,
-        options = options,
-        listener = listener,
-        shouldShow = true,
-      )
-  }
-
-  /**
-   * A bookmark that was just created, so the view can offer to add a note (cu-22).
-   *
-   * Carries the record rather than a formatted string: the wording lives in `strings.xml` where a
-   * `Context` is (convention 5), and the position needs formatting through `DurationFormat` — which
-   * `showUserMessage`, being a bare `String`, cannot express without building the sentence here.
-   */
-  private val _bookmarkAdded = MutableStateFlow<Event<Bookmark>?>(null)
-  val bookmarkAdded: StateFlow<Event<Bookmark>?>
-    get() = _bookmarkAdded
-
-  /**
-   * The bookmarks of the book being played.
-   *
-   * `switchMap` on the book's **id**, not the book: `currentlyPlaying.book` republishes on every
-   * progress tick, and re-subscribing a Room query once a second is exactly the per-second waste
-   * cu-110 was about.
-   */
-  val bookmarks: StateFlow<List<Bookmark>> =
-    currentlyPlaying.book
-      .map { it.id }
-      .distinctUntilChanged()
-      .flatMapLatest { bookId ->
-        if (bookId.isEmpty() || bookId == NO_AUDIOBOOK_FOUND_ID) {
-          flowOf(emptyList())
+      val options =
+        if (isSleepTimerActive.value) {
+          listOf(
+            FormattableString.from(R.string.sleep_timer_append),
+            FormattableString.from(R.string.sleep_timer_duration_end_of_chapter),
+            FormattableString.from(R.string.cancel),
+          )
         } else {
-          bookmarkRepository.getBookmarksForBook(bookId)
+          listOf(
+            FormattableString.from(R.string.sleep_timer_duration_5_minutes),
+            FormattableString.from(R.string.sleep_timer_duration_15_minutes),
+            FormattableString.from(R.string.sleep_timer_duration_30_minutes),
+            FormattableString.from(R.string.sleep_timer_duration_40_minutes),
+            FormattableString.from(R.string.sleep_timer_duration_60_minutes),
+            FormattableString.from(R.string.sleep_timer_duration_90_minutes),
+            FormattableString.from(R.string.sleep_timer_duration_120_minutes),
+            FormattableString.from(R.string.sleep_timer_duration_end_of_chapter),
+          )
         }
-      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+      val listener =
+        object : BottomChooserListener {
+          override fun onItemClicked(formattableString: FormattableString) {
+            check(formattableString is FormattableString.ResourceString)
 
-  /**
-   * Marks the current moment.
-   *
-   * The position is the **book** offset `currentlyPlaying` already publishes — deliberately not
-   * derived here from a track progress, which is the mix-up cu-136 made a type error. A bookmark
-   * points into the book, so it is stored in the book frame and converted only when jumping.
-   */
-  fun addBookmark() {
-    val book = currentlyPlaying.book.value
-    if (book.id.isEmpty() || book.id == NO_AUDIOBOOK_FOUND_ID) {
-      Timber.w("Cannot bookmark: no book is playing")
-      return
-    }
-    val position = currentlyPlaying.bookPosition.value
-    // No `unhandledExceptionHandler`: each of these catches its own failure and reports
-    // it, so routing to the global handler would only hide a case already handled — and
-    // it makes these reachable from a unit test, which has no Injector.
-    viewModelScope.launch {
-      try {
-        val bookmark = bookmarkRepository.add(bookId = book.id, position = position)
-        _bookmarkAdded.setEvent(bookmark)
-      } catch (e: Throwable) {
-        // Reported rather than swallowed: the user pressed a button and is entitled to know it
-        // did nothing.
-        Timber.e(e, "Failed to add a bookmark for ${book.id}")
-        _showUserMessage.setEvent("Could not add bookmark")
-      }
-    }
-  }
-
-  /** Saves a note onto a bookmark the user just made, or edited from the list. */
-  fun setBookmarkNote(
-    bookmarkId: String,
-    note: String,
-  ) {
-    viewModelScope.launch {
-      try {
-        bookmarkRepository.updateNote(bookmarkId, note.trim())
-      } catch (e: Throwable) {
-        Timber.e(e, "Failed to save a note on bookmark $bookmarkId")
-      }
-    }
-  }
-
-  /** Removes a bookmark. */
-  fun deleteBookmark(bookmarkId: String) {
-    viewModelScope.launch {
-      try {
-        bookmarkRepository.delete(bookmarkId)
-      } catch (e: Throwable) {
-        Timber.e(e, "Failed to delete bookmark $bookmarkId")
-      }
-    }
-  }
-
-  /**
-   * Jumps to a bookmark.
-   *
-   * Goes through [jumpToChapter], which is the existing single home for "seek to a book offset" —
-   * it converts to the track frame via `inTrackOffsetFor` and drives `pausePlay`. A second seek
-   * path here is exactly how cu-136 found four frame bugs.
-   *
-   * `hasUserConfirmation = true` because picking a specific bookmark *is* the confirmation, and
-   * the prompt that function otherwise shows is worded about losing chapter progress.
-   */
-  fun jumpToBookmark(bookmark: Bookmark) {
-    jumpToChapter(
-      bookStartTimeOffset = bookmark.position,
-      trackId = currentlyPlaying.track.value.id,
-      hasUserConfirmation = true,
-    )
-  }
-
-  fun showPlaybackSpeedChooser() {
-    _showModalBottomSheetSpeedChooser.value = Event(Unit)
-  }
-
-  private fun hideSleepTimerChooser() {
-    _sleepTimerChooserState.value = _sleepTimerChooserState.value.copy(shouldShow = false)
-  }
-
-  private fun hideOptionsMenu() {
-    _bottomChooserState.value = _bottomChooserState.value.copy(shouldShow = false)
-  }
-
-  private fun showOptionsMenu(
-    title: FormattableString,
-    options: List<FormattableString>,
-    listener: BottomChooserListener,
-  ) {
-    _bottomChooserState.value =
-      BottomChooserState(
-        title = title,
-        options = options,
-        listener = listener,
-        shouldShow = true,
-      )
-  }
-
-  val onUpdateSleepTimer =
-    object : BroadcastReceiver() {
-      override fun onReceive(
-        context: Context?,
-        intent: Intent?,
-      ) {
-        if (intent == null || !intent.hasExtra(ARG_SLEEP_TIMER_DURATION_MILLIS)) {
-          return
-        }
-        val timeLeftMillis = intent.getLongExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, 0L)
-        // Read, not inferred from the duration: an end-of-chapter timer is active with 0 remaining
-        // (cu-21). The fallback keeps an older sender working.
-        val isActive =
-          intent.getBooleanExtra(ARG_SLEEP_TIMER_IS_ACTIVE, timeLeftMillis > 0L)
-        // A BroadcastReceiver callback, so this may not be the main thread — which is why it was a
-        // `postValue`. A `MutableStateFlow` assignment is thread-safe and lands immediately.
-        _isSleepTimerActive.value = isActive
-        sleepTimerTimeRemaining.value = timeLeftMillis
-
-        // Three cases, not two. An end-of-chapter timer is active with nothing to count down, so
-        // naming a remaining time is impossible and falling back to the generic title would say
-        // "Sleep timer" while the menu below it offers a cancel (cu-21).
-        setSleepTimerTitle(sleepTimerTitle(isActive, timeLeftMillis))
-      }
-    }
-
-  /**
-   * The chooser's title for a given timer state.
-   *
-   * Three cases, not two. An end-of-chapter timer is active with nothing to count down, so naming
-   * a remaining time is impossible and falling back to the generic title would read "Sleep timer"
-   * while the menu below offered a cancel (cu-21). Shared by the broadcast receiver and
-   * [showSleepTimerOptions] so the two cannot disagree.
-   */
-  private fun sleepTimerTitle(
-    isActive: Boolean,
-    remainingMillis: Long,
-  ): FormattableString =
-    when {
-      isActive && remainingMillis > 0L ->
-        FormattableString.ResourceString(
-          stringRes = R.string.sleep_timer_active_title,
-          placeHolderStrings = listOf(sleepTimerTimeRemainingString.value),
-        )
-      isActive -> FormattableString.from(R.string.sleep_timer_active_end_of_chapter)
-      else -> FormattableString.from(R.string.sleep_timer)
-    }
-
-  private fun setSleepTimerTitle(formattableString: FormattableString) {
-    _sleepTimerChooserState.value = _sleepTimerChooserState.value.copy(title = formattableString)
-  }
-
-  override fun onCleared() {
-    prefsRepo.unregisterPrefsListener(prefsChangeListener)
-    super.onCleared()
-  }
-
-  /**
-   * [bookOffset] expressed as an offset within the track named by [trackId].
-   *
-   * Delegates to [chapterSeekTarget], which is the single home for this conversion — it needs the
-   * *sorted* track list and the track's own start, and the two sites that inlined the arithmetic
-   * instead are exactly where cu-115 found bugs.
-   *
-   * Falls back to treating the book offset as an in-track one when the tracks are not loaded or
-   * the id is unknown. That is only correct on a single-track book, and it is what both inlined
-   * copies already did — kept deliberately rather than refusing to seek, because the alternative
-   * is a dead button, and preserved here so the fallback exists in one place where it can be seen.
-   */
-  private fun inTrackOffsetFor(
-    bookOffset: BookOffset,
-    trackId: String,
-  ): TrackOffset {
-    // Emptiness, not nullity: `tracks` is a non-null StateFlow whose seed is an empty list, so
-    // "not loaded yet" and "no tracks" are the same observable state and both mean the book-frame
-    // offset is the best answer available.
-    val loaded = tracks.value
-    if (loaded.isEmpty()) {
-      return TrackOffset(bookOffset.millis)
-    }
-    return inTrackOffsetOf(bookOffset, trackId, loaded) ?: TrackOffset(bookOffset.millis)
-  }
-
-  fun seekTo(percentProgress: Double) {
-    val id: String = audiobookId.value
-    if (currentChapter.value == EMPTY_CHAPTER) {
-      // Seeking by track length
-      currentTrack.value.let { curr ->
-        val extras =
-          Bundle().apply {
-            putString(KEY_SEEK_TO_TRACK_WITH_ID, curr.id)
+            val actionPair: Pair<SleepTimerAction, Long> =
+              when (formattableString.stringRes) {
+                R.string.sleep_timer_duration_5_minutes -> {
+                  val duration = 5 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  BEGIN to duration
+                }
+                R.string.sleep_timer_duration_15_minutes -> {
+                  val duration = 15 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  BEGIN to duration
+                }
+                R.string.sleep_timer_duration_30_minutes -> {
+                  val duration = 30 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  BEGIN to duration
+                }
+                R.string.sleep_timer_duration_40_minutes -> {
+                  val duration = 40 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  BEGIN to duration
+                }
+                R.string.sleep_timer_duration_60_minutes -> {
+                  val duration = 60 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  BEGIN to duration
+                }
+                R.string.sleep_timer_duration_90_minutes -> {
+                  val duration = 90 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  BEGIN to duration
+                }
+                R.string.sleep_timer_duration_120_minutes -> {
+                  val duration = 120 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  BEGIN to duration
+                }
+                R.string.sleep_timer_duration_end_of_chapter -> {
+                  // No duration. This used to compute
+                  // `(chapterDuration - chapterProgress) / playbackSpeed` and start an ordinary
+                  // countdown, which is wrong twice: a seek does not change the deadline, so it
+                  // fired mid-chapter or long after; and the speed was baked in at pick time, so any
+                  // later change desynced it — now likelier, since cu-20 made speed per book. The
+                  // timer watches the chapter itself instead (cu-21).
+                  BEGIN_END_OF_CHAPTER to 0L
+                }
+                R.string.sleep_timer_append -> {
+                  val additionalTime = 5 * SECONDS_PER_MINUTE * MILLIS_PER_SECOND
+                  EXTEND to additionalTime
+                }
+                R.string.cancel -> {
+                  setSleepTimerTitle(FormattableString.from(R.string.sleep_timer))
+                  CANCEL to 0L
+                }
+                else -> throw NoWhenBranchMatchedException(
+                  "Unknown duration picked for sleep timer",
+                )
+              }
+            hideSleepTimerChooser()
+            val sleepTimerIntent =
+              Intent(SleepTimer.ACTION_SLEEP_TIMER_CHANGE).apply {
+                putExtra(ARG_SLEEP_TIMER_ACTION, actionPair.first)
+                putExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, actionPair.second)
+              }
+            localBroadcastManager.sendBroadcast(sleepTimerIntent)
           }
-        mediaServiceConnection.transportControls?.playFromMediaId(id, extras)
-        // Same hold as the chapter branch; without it the guard is released while the restart is
-        // still in flight.
-        awaitSeek(TrackOffset(curr.progress))
-      }
-    } else {
-      // Seeking within the current chapter.
-      currentChapter.value.let { chapter ->
-        val chapterDuration = chapter.bookEndTimeOffset - chapter.bookStartTimeOffset
-        // Book-absolute: where in the *book* the user asked to be.
-        val bookOffset =
-          chapter.bookStartTimeOffset + (percentProgress * chapterDuration).toLong()
 
-        // `MediaControllerCompat.TransportControls.seekTo` is a position **within the current
-        // media item**, not within the book — so handing it a book offset overshoots on any
-        // multi-track book, and Media3 clamps rather than throwing, which presents as the thumb
-        // jumping to the end of the current track (cu-115). One conversion, one home (cu-136).
-        val inTrackOffset = inTrackOffsetFor(bookOffset, chapter.trackId)
+          override fun onChooserClosed(wasBackgroundClicked: Boolean) {
+            if (wasBackgroundClicked) {
+              hideSleepTimerChooser()
+            }
+          }
+        }
 
-        mediaServiceConnection.transportControls?.seekTo(inTrackOffset.millis)
-        // Keep the slider on the requested position until playback reports it. Without this the
-        // next progress tick overwrites the thumb with the pre-seek position (cu-93).
-        //
-        // `awaitSeek` compares against the *track* progress the player reports, so it takes the
-        // in-track value, not the book one.
-        awaitSeek(inTrackOffset)
-      }
+      _sleepTimerChooserState.value =
+        BottomChooserState(
+          title = title,
+          options = options,
+          listener = listener,
+          shouldShow = true,
+        )
     }
-  }
-
-  private val artworkState: StateFlow<ArtworkState> =
-    combineDistinct(audiobook, plexConfig.isConnected) { book, connected ->
-      ArtworkState(
-        title = book?.title.orEmpty(),
-        thumb = book?.thumb,
-        serverConnected = connected,
-      )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ArtworkState())
-
-  private val textState: StateFlow<TextState> =
-    combineDistinct(playerProgress, progressPercentageString, activeChapter, currentTrack) {
-        progress, percentage, chapter, track ->
-      TextState(
-        progress = progress,
-        progressPercentage = percentage,
-        // The chapter's own title, falling back to the track's when a chapter is untitled — a
-        // book with no chapter data still needs a line here.
-        chapterTitle = chapter.title.ifEmpty { track.title },
-      )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TextState())
-
-  private val sliderState: StateFlow<SliderState> =
-    combineDistinct(
-      chapterDuration,
-      currentTrack,
-      combineDistinct(chapterProgressForSlider, trackProgressForSlider) { c, t -> c to t },
-      isSliding,
-    ) { chapterMillis, track, progressPair, sliding ->
-      // Chapter progress when there is a chapter to be inside, track progress otherwise. Asking
-      // whether the chapter has a *duration* rather than coalescing to 0 — a chapter-less book
-      // would otherwise read 0 forever and never fall back.
-      val max = (if (chapterMillis == 0L) track.duration else chapterMillis).toFloat()
-      val current = if (chapterMillis == 0L) progressPair.second else progressPair.first
-      val valueTo = if (max > 0f) max else 1f
-      SliderState(
-        value = current.toFloat().coerceIn(0f, valueTo),
-        valueTo = valueTo,
-        isSliding = sliding,
-      )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SliderState())
-
-  /**
-   * The transport row, the utility tray and the two spinners, folded together only because four
-   * sources is the combinator's ceiling. They are separate fields on [PlayerUiState], which is
-   * what the recomposition boundaries actually follow.
-   */
-  private val transportUtilityState:
-    StateFlow<Triple<TransportState, UtilityState, Pair<Boolean, Boolean>>> =
-    combineDistinct(
-      combineDistinct(isPlaying, isAudioLoading, jumpForwardsIcon, jumpBackwardsIcon) {
-          playing, loading, fwd, back ->
-        TransportState(playing, loading, fwd, back)
-      },
-      combineDistinct(playbackSpeedString, isSleepTimerActive, sleepTimerTimeRemainingString) {
-          speed, timerActive, remaining ->
-        UtilityState(speed, timerActive, remaining)
-      },
-      isLoadingTracks,
-      hasFailedProgressSync,
-    ) { transport, utility, loadingTracks, failedSync ->
-      Triple(transport, utility, loadingTracks to failedSync)
-    }.stateIn(
-      viewModelScope,
-      SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-      Triple(TransportState(), UtilityState(), false to false),
-    )
-
-  /**
-   * The whole player body, as one value (cu-198).
-   *
-   * Assembled in groups rather than one wide combinator — the four-source `combineDistinct` is the
-   * widest available, and more importantly the groups are the recomposition boundaries. Each
-   * sub-state is `distinctUntilChanged` in its own right, so the text block re-renders once a
-   * second while the transport row and the artwork sit still, which is what the Fragment's
-   * `setTextIfChanged` / `boundTitle` guards were emulating by hand.
-   *
-   * `WhileSubscribed` is right: nothing reads `.value` off this without collecting, and dropping
-   * the upstream subscriptions when the sheet closes is the point (cu-110/cu-117).
-   */
-  val uiState: StateFlow<PlayerUiState> =
-    combineDistinct(
-      artworkState,
-      textState,
-      sliderState,
-      transportUtilityState,
-    ) { artwork, text, slider, transportUtility ->
-      PlayerUiState(
-        artwork = artwork,
-        text = text,
-        slider = slider,
-        transport = transportUtility.first,
-        utility = transportUtility.second,
-        isLoadingTracks = transportUtility.third.first,
-        hasFailedProgressSync = transportUtility.third.second,
-      )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), PlayerUiState())
-
-  companion object {
-    /** Minimal and maximal allowed playback speed. */
-    const val PLAYBACK_SPEED_MIN = 0.5f
-    const val PLAYBACK_SPEED_DEFAULT = 1.0f
-    const val PLAYBACK_SPEED_MAX = 3.0f
-
-    /** How close a reported position must be to the requested one to count as "landed". */
-    private const val SEEK_SETTLE_TOLERANCE = 2_000L
-
-    /** Never hold the slider hostage to a seek that will not complete. */
-    private const val SEEK_SETTLE_TIMEOUT = 5_000L
 
     /**
-     * Mirrors `SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS` in the service: within this far into a
-     * chapter, "previous" means the chapter before; past it, restart the current one. Duplicated
-     * deliberately rather than shared, because the two are allowed to diverge — but they should be
-     * changed together, so both carry this note.
+     * A bookmark that was just created, so the view can offer to add a note (cu-22).
+     *
+     * Carries the record rather than a formatted string: the wording lives in `strings.xml` where a
+     * `Context` is (convention 5), and the position needs formatting through `DurationFormat` — which
+     * `showUserMessage`, being a bare `String`, cannot express without building the sentence here.
      */
-    private const val SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS = 30_000L
+    private val _bookmarkAdded = MutableStateFlow<Event<Bookmark>?>(null)
+    val bookmarkAdded: StateFlow<Event<Bookmark>?>
+      get() = _bookmarkAdded
+
+    /**
+     * The bookmarks of the book being played.
+     *
+     * `switchMap` on the book's **id**, not the book: `currentlyPlaying.book` republishes on every
+     * progress tick, and re-subscribing a Room query once a second is exactly the per-second waste
+     * cu-110 was about.
+     */
+    val bookmarks: StateFlow<List<Bookmark>> =
+      currentlyPlaying.book
+        .map { it.id }
+        .distinctUntilChanged()
+        .flatMapLatest { bookId ->
+          if (bookId.isEmpty() || bookId == NO_AUDIOBOOK_FOUND_ID) {
+            flowOf(emptyList())
+          } else {
+            bookmarkRepository.getBookmarksForBook(bookId)
+          }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    /**
+     * Marks the current moment.
+     *
+     * The position is the **book** offset `currentlyPlaying` already publishes — deliberately not
+     * derived here from a track progress, which is the mix-up cu-136 made a type error. A bookmark
+     * points into the book, so it is stored in the book frame and converted only when jumping.
+     */
+    fun addBookmark() {
+      val book = currentlyPlaying.book.value
+      if (book.id.isEmpty() || book.id == NO_AUDIOBOOK_FOUND_ID) {
+        Timber.w("Cannot bookmark: no book is playing")
+        return
+      }
+      val position = currentlyPlaying.bookPosition.value
+      // No `unhandledExceptionHandler`: each of these catches its own failure and reports
+      // it, so routing to the global handler would only hide a case already handled — and
+      // it makes these reachable from a unit test, which has no Injector.
+      viewModelScope.launch {
+        try {
+          val bookmark = bookmarkRepository.add(bookId = book.id, position = position)
+          _bookmarkAdded.setEvent(bookmark)
+        } catch (e: Throwable) {
+          // Reported rather than swallowed: the user pressed a button and is entitled to know it
+          // did nothing.
+          Timber.e(e, "Failed to add a bookmark for ${book.id}")
+          _showUserMessage.setEvent("Could not add bookmark")
+        }
+      }
+    }
+
+    /** Saves a note onto a bookmark the user just made, or edited from the list. */
+    fun setBookmarkNote(
+      bookmarkId: String,
+      note: String,
+    ) {
+      viewModelScope.launch {
+        try {
+          bookmarkRepository.updateNote(bookmarkId, note.trim())
+        } catch (e: Throwable) {
+          Timber.e(e, "Failed to save a note on bookmark $bookmarkId")
+        }
+      }
+    }
+
+    /** Removes a bookmark. */
+    fun deleteBookmark(bookmarkId: String) {
+      viewModelScope.launch {
+        try {
+          bookmarkRepository.delete(bookmarkId)
+        } catch (e: Throwable) {
+          Timber.e(e, "Failed to delete bookmark $bookmarkId")
+        }
+      }
+    }
+
+    /**
+     * Jumps to a bookmark.
+     *
+     * Goes through [jumpToChapter], which is the existing single home for "seek to a book offset" —
+     * it converts to the track frame via `inTrackOffsetFor` and drives `pausePlay`. A second seek
+     * path here is exactly how cu-136 found four frame bugs.
+     *
+     * `hasUserConfirmation = true` because picking a specific bookmark *is* the confirmation, and
+     * the prompt that function otherwise shows is worded about losing chapter progress.
+     */
+    fun jumpToBookmark(bookmark: Bookmark) {
+      jumpToChapter(
+        bookStartTimeOffset = bookmark.position,
+        trackId = currentlyPlaying.track.value.id,
+        hasUserConfirmation = true,
+      )
+    }
+
+    fun showPlaybackSpeedChooser() {
+      _showModalBottomSheetSpeedChooser.value = Event(Unit)
+    }
+
+    private fun hideSleepTimerChooser() {
+      _sleepTimerChooserState.value = _sleepTimerChooserState.value.copy(shouldShow = false)
+    }
+
+    private fun hideOptionsMenu() {
+      _bottomChooserState.value = _bottomChooserState.value.copy(shouldShow = false)
+    }
+
+    private fun showOptionsMenu(
+      title: FormattableString,
+      options: List<FormattableString>,
+      listener: BottomChooserListener,
+    ) {
+      _bottomChooserState.value =
+        BottomChooserState(
+          title = title,
+          options = options,
+          listener = listener,
+          shouldShow = true,
+        )
+    }
+
+    val onUpdateSleepTimer =
+      object : BroadcastReceiver() {
+        override fun onReceive(
+          context: Context?,
+          intent: Intent?,
+        ) {
+          if (intent == null || !intent.hasExtra(ARG_SLEEP_TIMER_DURATION_MILLIS)) {
+            return
+          }
+          val timeLeftMillis = intent.getLongExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, 0L)
+          // Read, not inferred from the duration: an end-of-chapter timer is active with 0 remaining
+          // (cu-21). The fallback keeps an older sender working.
+          val isActive =
+            intent.getBooleanExtra(ARG_SLEEP_TIMER_IS_ACTIVE, timeLeftMillis > 0L)
+          // A BroadcastReceiver callback, so this may not be the main thread — which is why it was a
+          // `postValue`. A `MutableStateFlow` assignment is thread-safe and lands immediately.
+          _isSleepTimerActive.value = isActive
+          sleepTimerTimeRemaining.value = timeLeftMillis
+
+          // Three cases, not two. An end-of-chapter timer is active with nothing to count down, so
+          // naming a remaining time is impossible and falling back to the generic title would say
+          // "Sleep timer" while the menu below it offers a cancel (cu-21).
+          setSleepTimerTitle(sleepTimerTitle(isActive, timeLeftMillis))
+        }
+      }
+
+    /**
+     * The chooser's title for a given timer state.
+     *
+     * Three cases, not two. An end-of-chapter timer is active with nothing to count down, so naming
+     * a remaining time is impossible and falling back to the generic title would read "Sleep timer"
+     * while the menu below offered a cancel (cu-21). Shared by the broadcast receiver and
+     * [showSleepTimerOptions] so the two cannot disagree.
+     */
+    private fun sleepTimerTitle(
+      isActive: Boolean,
+      remainingMillis: Long,
+    ): FormattableString =
+      when {
+        isActive && remainingMillis > 0L ->
+          FormattableString.ResourceString(
+            stringRes = R.string.sleep_timer_active_title,
+            placeHolderStrings = listOf(sleepTimerTimeRemainingString.value),
+          )
+        isActive -> FormattableString.from(R.string.sleep_timer_active_end_of_chapter)
+        else -> FormattableString.from(R.string.sleep_timer)
+      }
+
+    private fun setSleepTimerTitle(formattableString: FormattableString) {
+      _sleepTimerChooserState.value = _sleepTimerChooserState.value.copy(title = formattableString)
+    }
+
+    override fun onCleared() {
+      prefsRepo.unregisterPrefsListener(prefsChangeListener)
+      super.onCleared()
+    }
+
+    /**
+     * [bookOffset] expressed as an offset within the track named by [trackId].
+     *
+     * Delegates to [chapterSeekTarget], which is the single home for this conversion — it needs the
+     * *sorted* track list and the track's own start, and the two sites that inlined the arithmetic
+     * instead are exactly where cu-115 found bugs.
+     *
+     * Falls back to treating the book offset as an in-track one when the tracks are not loaded or
+     * the id is unknown. That is only correct on a single-track book, and it is what both inlined
+     * copies already did — kept deliberately rather than refusing to seek, because the alternative
+     * is a dead button, and preserved here so the fallback exists in one place where it can be seen.
+     */
+    private fun inTrackOffsetFor(
+      bookOffset: BookOffset,
+      trackId: String,
+    ): TrackOffset {
+      // Emptiness, not nullity: `tracks` is a non-null StateFlow whose seed is an empty list, so
+      // "not loaded yet" and "no tracks" are the same observable state and both mean the book-frame
+      // offset is the best answer available.
+      val loaded = tracks.value
+      if (loaded.isEmpty()) {
+        return TrackOffset(bookOffset.millis)
+      }
+      return inTrackOffsetOf(bookOffset, trackId, loaded) ?: TrackOffset(bookOffset.millis)
+    }
+
+    fun seekTo(percentProgress: Double) {
+      val id: String = audiobookId.value
+      if (currentChapter.value == EMPTY_CHAPTER) {
+        // Seeking by track length
+        currentTrack.value.let { curr ->
+          val extras =
+            Bundle().apply {
+              putString(KEY_SEEK_TO_TRACK_WITH_ID, curr.id)
+            }
+          mediaServiceConnection.transportControls?.playFromMediaId(id, extras)
+          // Same hold as the chapter branch; without it the guard is released while the restart is
+          // still in flight.
+          awaitSeek(TrackOffset(curr.progress))
+        }
+      } else {
+        // Seeking within the current chapter.
+        currentChapter.value.let { chapter ->
+          val chapterDuration = chapter.bookEndTimeOffset - chapter.bookStartTimeOffset
+          // Book-absolute: where in the *book* the user asked to be.
+          val bookOffset =
+            chapter.bookStartTimeOffset + (percentProgress * chapterDuration).toLong()
+
+          // `MediaControllerCompat.TransportControls.seekTo` is a position **within the current
+          // media item**, not within the book — so handing it a book offset overshoots on any
+          // multi-track book, and Media3 clamps rather than throwing, which presents as the thumb
+          // jumping to the end of the current track (cu-115). One conversion, one home (cu-136).
+          val inTrackOffset = inTrackOffsetFor(bookOffset, chapter.trackId)
+
+          mediaServiceConnection.transportControls?.seekTo(inTrackOffset.millis)
+          // Keep the slider on the requested position until playback reports it. Without this the
+          // next progress tick overwrites the thumb with the pre-seek position (cu-93).
+          //
+          // `awaitSeek` compares against the *track* progress the player reports, so it takes the
+          // in-track value, not the book one.
+          awaitSeek(inTrackOffset)
+        }
+      }
+    }
+
+    private val artworkState: StateFlow<ArtworkState> =
+      combineDistinct(audiobook, plexConfig.isConnected) { book, connected ->
+        ArtworkState(
+          title = book?.title.orEmpty(),
+          thumb = book?.thumb,
+          serverConnected = connected,
+        )
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ArtworkState())
+
+    private val textState: StateFlow<TextState> =
+      combineDistinct(playerProgress, progressPercentageString, activeChapter, currentTrack) {
+          progress, percentage, chapter, track ->
+        TextState(
+          progress = progress,
+          progressPercentage = percentage,
+          // The chapter's own title, falling back to the track's when a chapter is untitled — a
+          // book with no chapter data still needs a line here.
+          chapterTitle = chapter.title.ifEmpty { track.title },
+        )
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TextState())
+
+    private val sliderState: StateFlow<SliderState> =
+      combineDistinct(
+        chapterDuration,
+        currentTrack,
+        combineDistinct(chapterProgressForSlider, trackProgressForSlider) { c, t -> c to t },
+        isSliding,
+      ) { chapterMillis, track, progressPair, sliding ->
+        // Chapter progress when there is a chapter to be inside, track progress otherwise. Asking
+        // whether the chapter has a *duration* rather than coalescing to 0 — a chapter-less book
+        // would otherwise read 0 forever and never fall back.
+        val max = (if (chapterMillis == 0L) track.duration else chapterMillis).toFloat()
+        val current = if (chapterMillis == 0L) progressPair.second else progressPair.first
+        val valueTo = if (max > 0f) max else 1f
+        SliderState(
+          value = current.toFloat().coerceIn(0f, valueTo),
+          valueTo = valueTo,
+          isSliding = sliding,
+        )
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SliderState())
+
+    /**
+     * The transport row, the utility tray and the two spinners, folded together only because four
+     * sources is the combinator's ceiling. They are separate fields on [PlayerUiState], which is
+     * what the recomposition boundaries actually follow.
+     */
+    private val transportUtilityState:
+      StateFlow<Triple<TransportState, UtilityState, Pair<Boolean, Boolean>>> =
+      combineDistinct(
+        combineDistinct(isPlaying, isAudioLoading, jumpForwardsIcon, jumpBackwardsIcon) {
+            playing, loading, fwd, back ->
+          TransportState(playing, loading, fwd, back)
+        },
+        combineDistinct(playbackSpeedString, isSleepTimerActive, sleepTimerTimeRemainingString) {
+            speed, timerActive, remaining ->
+          UtilityState(speed, timerActive, remaining)
+        },
+        isLoadingTracks,
+        hasFailedProgressSync,
+      ) { transport, utility, loadingTracks, failedSync ->
+        Triple(transport, utility, loadingTracks to failedSync)
+      }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        Triple(TransportState(), UtilityState(), false to false),
+      )
+
+    /**
+     * The whole player body, as one value (cu-198).
+     *
+     * Assembled in groups rather than one wide combinator — the four-source `combineDistinct` is the
+     * widest available, and more importantly the groups are the recomposition boundaries. Each
+     * sub-state is `distinctUntilChanged` in its own right, so the text block re-renders once a
+     * second while the transport row and the artwork sit still, which is what the Fragment's
+     * `setTextIfChanged` / `boundTitle` guards were emulating by hand.
+     *
+     * `WhileSubscribed` is right: nothing reads `.value` off this without collecting, and dropping
+     * the upstream subscriptions when the sheet closes is the point (cu-110/cu-117).
+     */
+    val uiState: StateFlow<PlayerUiState> =
+      combineDistinct(
+        artworkState,
+        textState,
+        sliderState,
+        transportUtilityState,
+      ) { artwork, text, slider, transportUtility ->
+        PlayerUiState(
+          artwork = artwork,
+          text = text,
+          slider = slider,
+          transport = transportUtility.first,
+          utility = transportUtility.second,
+          isLoadingTracks = transportUtility.third.first,
+          hasFailedProgressSync = transportUtility.third.second,
+        )
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), PlayerUiState())
+
+    companion object {
+      /** Minimal and maximal allowed playback speed. */
+      const val PLAYBACK_SPEED_MIN = 0.5f
+      const val PLAYBACK_SPEED_DEFAULT = 1.0f
+      const val PLAYBACK_SPEED_MAX = 3.0f
+
+      /** How close a reported position must be to the requested one to count as "landed". */
+      private const val SEEK_SETTLE_TOLERANCE = 2_000L
+
+      /** Never hold the slider hostage to a seek that will not complete. */
+      private const val SEEK_SETTLE_TIMEOUT = 5_000L
+
+      /**
+       * Mirrors `SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS` in the service: within this far into a
+       * chapter, "previous" means the chapter before; past it, restart the current one. Duplicated
+       * deliberately rather than shared, because the two are allowed to diverge — but they should be
+       * changed together, so both carry this note.
+       */
+      private const val SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_MILLIS = 30_000L
+    }
   }
-}

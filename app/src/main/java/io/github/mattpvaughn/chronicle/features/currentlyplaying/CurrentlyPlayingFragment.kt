@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
-import android.content.Context
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.Bundle
@@ -12,7 +11,7 @@ import android.widget.Toast.LENGTH_SHORT
 import androidx.compose.runtime.getValue
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import io.github.mattpvaughn.chronicle.application.MainActivity
@@ -48,14 +47,9 @@ class CurrentlyPlayingFragment :
   lateinit var plexConfig: PlexConfig
 
   @Inject
-  lateinit var viewModelFactory: CurrentlyPlayingViewModel.Factory
-
-  @Inject
   lateinit var localBroadcastManager: LocalBroadcastManager
 
-  private val viewModel: CurrentlyPlayingViewModel by lazy {
-    ViewModelProvider(this, viewModelFactory).get(CurrentlyPlayingViewModel::class.java)
-  }
+  private val viewModel: CurrentlyPlayingViewModel by viewModels()
 
   /**
    * Opens the bookmark list, keeping it fed while it is shown.
@@ -96,12 +90,6 @@ class CurrentlyPlayingFragment :
 
   companion object {
     fun newInstance() = CurrentlyPlayingFragment()
-  }
-
-  override fun onAttach(context: Context) {
-    currentlyPlayingInterface = (context as MainActivity).getCurrentlyPlayingInterface()
-    context.activityComponent!!.inject(this)
-    super.onAttach(context as Context)
   }
 
   override fun onStart() {

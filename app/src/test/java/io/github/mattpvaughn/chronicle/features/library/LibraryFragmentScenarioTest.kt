@@ -11,8 +11,6 @@ import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
-import io.github.mattpvaughn.chronicle.injection.components.ActivityComponent
-import io.github.mattpvaughn.chronicle.injection.components.testActivityComponent
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.every

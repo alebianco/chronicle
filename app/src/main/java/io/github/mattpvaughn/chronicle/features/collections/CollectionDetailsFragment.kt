@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,8 +7,9 @@ import android.view.ViewGroup
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -18,7 +18,6 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionDetailsBinding
 import io.github.mattpvaughn.chronicle.features.library.compose.BookGrid
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
@@ -28,6 +27,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
+@AndroidEntryPoint
 class CollectionDetailsFragment : Fragment() {
   companion object {
     fun newInstance(collectionId: String): CollectionDetailsFragment {
@@ -54,16 +54,7 @@ class CollectionDetailsFragment : Fragment() {
   @Inject
   lateinit var plexConfig: PlexConfig
 
-  lateinit var viewModel: CollectionDetailsViewModel
-
-  @Inject
-  lateinit var viewModelFactory: CollectionDetailsViewModel.Factory
-
-  override fun onAttach(context: Context) {
-    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
-    Timber.i("CollectionDetailsFragment onAttach()")
-    super.onAttach(context)
-  }
+  private val viewModel: CollectionDetailsViewModel by viewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -73,13 +64,6 @@ class CollectionDetailsFragment : Fragment() {
     Timber.i("AudiobookDetailsFragment onCreateView()")
 
     val binding = FragmentCollectionDetailsBinding.inflate(inflater, container, false)
-
-    val inputId = requireArguments().getString(ARG_COLLECTION_ID)
-
-    viewModelFactory.collectionId = inputId
-    viewModel =
-      ViewModelProvider(this, viewModelFactory)
-        .get(CollectionDetailsViewModel::class.java)
 
     // The grid is `BookGrid` now (cu-201) — the same composable the browse-facet screen uses,
     // since both are a grid, an empty message and a tap.

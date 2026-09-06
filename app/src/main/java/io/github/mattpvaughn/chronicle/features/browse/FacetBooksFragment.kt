@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.browse
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,8 +7,9 @@ import android.view.ViewGroup
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
@@ -17,7 +17,6 @@ import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentFacetBooksBinding
 import io.github.mattpvaughn.chronicle.features.library.compose.BookGrid
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
@@ -30,6 +29,7 @@ import javax.inject.Inject
  * however the user arrived at it — the alternative is a third book list that drifts from the other
  * two.
  */
+@AndroidEntryPoint
 class FacetBooksFragment : Fragment() {
   @Inject
   lateinit var prefsRepo: PrefsRepo
@@ -40,15 +40,7 @@ class FacetBooksFragment : Fragment() {
   @Inject
   lateinit var plexConfig: PlexConfig
 
-  @Inject
-  lateinit var viewModelFactory: FacetBooksViewModel.Factory
-
-  private lateinit var viewModel: FacetBooksViewModel
-
-  override fun onAttach(context: Context) {
-    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
-    super.onAttach(context)
-  }
+  private val viewModel: FacetBooksViewModel by viewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -61,11 +53,6 @@ class FacetBooksFragment : Fragment() {
     val value = requireArguments().getString(ARG_VALUE).orEmpty()
     // By name, not ordinal: an ordinal in a Bundle survives a process death and would silently
     // mean a different facet if the enum ever gained a member.
-    viewModelFactory.kind =
-      FacetKind.entries.firstOrNull { it.name == kindName } ?: FacetKind.Author
-    viewModelFactory.value = value
-    viewModel =
-      ViewModelProvider(this, viewModelFactory)[FacetBooksViewModel::class.java]
 
     // The grid is `BookGrid` now (cu-201) — shared with the collection-detail screen, which is
     // the same shape: a grid, an empty message, and a tap.

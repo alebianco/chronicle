@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.login
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,18 +9,18 @@ import android.widget.Toast.LENGTH_SHORT
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseServerBinding
 import io.github.mattpvaughn.chronicle.features.login.compose.PickerItem
 import io.github.mattpvaughn.chronicle.features.login.compose.PickerScreen
-import io.github.mattpvaughn.chronicle.injection.components.injectFromAppGraph
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
-import javax.inject.Inject
 
+@AndroidEntryPoint
 class ChooseServerFragment : Fragment() {
   companion object {
     @JvmStatic
@@ -30,14 +29,7 @@ class ChooseServerFragment : Fragment() {
     const val TAG = "Choose server fragment"
   }
 
-  @Inject
-  lateinit var viewModelFactory: ChooseServerViewModel.Factory
-  private lateinit var viewModel: ChooseServerViewModel
-
-  override fun onAttach(context: Context) {
-    check(injectFromAppGraph { it.inject(this) }) { "${javaClass.simpleName} needs an AppComponentHost" }
-    super.onAttach(context)
-  }
+  private val viewModel: ChooseServerViewModel by viewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -47,12 +39,6 @@ class ChooseServerFragment : Fragment() {
     super.onCreate(savedInstanceState)
 
     val binding = OnboardingPlexChooseServerBinding.inflate(inflater, container, false)
-
-    viewModel =
-      ViewModelProvider(
-        viewModelStore,
-        viewModelFactory,
-      ).get(ChooseServerViewModel::class.java)
 
     binding.refresh.setOnClickListener { viewModel.refresh() }
 

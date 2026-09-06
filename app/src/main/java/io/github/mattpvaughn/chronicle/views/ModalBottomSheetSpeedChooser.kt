@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.views
 
-import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -17,7 +16,6 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.databinding.ModalBottomSheetSpeedChooserBinding
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -67,11 +65,6 @@ class ModalBottomSheetSpeedChooser : BottomSheetDialogFragment() {
    * listener, in a loop.
    */
   private var isRendering = false
-
-  override fun onAttach(context: Context) {
-    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
-    super.onAttach(context)
-  }
 
   override fun onCreateView(
     inflater: LayoutInflater,

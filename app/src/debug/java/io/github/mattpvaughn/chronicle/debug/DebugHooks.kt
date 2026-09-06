@@ -9,7 +9,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication
-import io.github.mattpvaughn.chronicle.application.Injector
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
@@ -18,6 +17,7 @@ import io.github.mattpvaughn.chronicle.features.download.MoveSyncLocationWorker
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.injection.chronicleGraph
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import kotlinx.coroutines.CoroutineScope
@@ -230,7 +230,7 @@ object DebugHooks : DebugHooksContract {
     if (intent == null || !intent.getBooleanExtra(EXTRA_INVALIDATE_SERVER_TOKEN, false)) {
       return
     }
-    val plexPrefs = Injector.get().plexPrefs()
+    val plexPrefs = ChronicleApplication.get().chronicleGraph().plexPrefs()
     val server = plexPrefs.server
     if (server == null) {
       Timber.w("invalidate_server_token: no server is configured; nothing to invalidate")
@@ -445,7 +445,7 @@ object DebugHooks : DebugHooksContract {
     activity: FragmentActivity,
   ) {
     val target = intent?.getStringExtra(EXTRA_MOVE_SYNC_LOCATION) ?: return
-    val candidates = Injector.get().externalDeviceDirs()
+    val candidates = activity.chronicleGraph().externalDeviceDirs()
     val dir = resolveSyncTarget(target, candidates)
     if (dir == null) {
       Timber.w(
@@ -456,7 +456,7 @@ object DebugHooks : DebugHooksContract {
       return
     }
 
-    val prefsRepo = Injector.get().prefsRepo()
+    val prefsRepo = activity.chronicleGraph().prefsRepo()
     Timber.i("move_sync_location: %s -> %s", prefsRepo.cachedMediaDir.absolutePath, dir.absolutePath)
     prefsRepo.cachedMediaDir = dir
 

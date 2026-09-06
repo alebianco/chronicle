@@ -44,36 +44,6 @@ class ChooseLibraryViewModel
     private val collectionsRepository: CollectionsRepository,
     private val cachedFileManager: ICachedFileManager,
   ) : ViewModel() {
-    class Factory
-      @Inject
-      constructor(
-        private val plexMediaService: PlexMediaService,
-        private val plexConfig: PlexConfig,
-        private val plexPrefsRepo: PlexPrefsRepo,
-        private val plexLoginRepo: IPlexLoginRepo,
-        private val bookRepository: IBookRepository,
-        private val trackRepository: ITrackRepository,
-        private val collectionsRepository: CollectionsRepository,
-        private val cachedFileManager: ICachedFileManager,
-      ) : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-          if (modelClass.isAssignableFrom(ChooseLibraryViewModel::class.java)) {
-            return ChooseLibraryViewModel(
-              plexMediaService,
-              plexConfig,
-              plexPrefsRepo,
-              plexLoginRepo,
-              bookRepository,
-              trackRepository,
-              collectionsRepository,
-              cachedFileManager,
-            ) as T
-          }
-          throw IllegalArgumentException("Unknown ViewHolder class")
-        }
-      }
-
     private val _userMessage = MutableStateFlow<Event<String>?>(null)
     val userMessage: StateFlow<Event<String>?>
       get() = _userMessage

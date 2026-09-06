@@ -1,11 +1,12 @@
 package io.github.mattpvaughn.chronicle.debug
 
 import android.content.Context
-import io.github.mattpvaughn.chronicle.application.Injector
+import io.github.mattpvaughn.chronicle.application.ChronicleApplication
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
+import io.github.mattpvaughn.chronicle.injection.chronicleGraph
 import timber.log.Timber
 
 /**
@@ -57,7 +58,7 @@ object MockPlexMode {
     val mock = MockPlexServer(context.applicationContext).apply { start() }
     server = mock
 
-    val plexPrefs = Injector.get().plexPrefs()
+    val plexPrefs = context.chronicleGraph().plexPrefs()
     plexPrefs.accountAuthToken = "mock-account-token"
     plexPrefs.server =
       ServerModel(
@@ -75,12 +76,12 @@ object MockPlexMode {
       )
 
     // Point the interceptor's rewrite target at the fixture server.
-    Injector.get().plexConfig().url = mock.baseUrl
+    context.chronicleGraph().plexConfig().url = mock.baseUrl
 
     // PlexLoginRepo evaluates login state in its own init, which has already run
     // by the time this hook fires, so the seeded prefs need a re-evaluation to
     // take effect.
-    Injector.get().plexLoginRepo().determineLoginState()
+    context.chronicleGraph().plexLoginRepo().determineLoginState()
 
     // No explicit connectToServer() here: this now runs before the app's own
     // setupNetwork(), so the normal connection flow picks up the seeded server
@@ -92,7 +93,7 @@ object MockPlexMode {
   fun disable() {
     server?.shutdown()
     server = null
-    Injector.get().plexPrefs().clear()
+    ChronicleApplication.get().chronicleGraph().plexPrefs().clear()
     Timber.i("MockPlexMode disabled")
   }
 }

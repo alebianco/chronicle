@@ -8,18 +8,17 @@ import androidx.appcompat.widget.SearchView
 import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentHomeBinding
 import io.github.mattpvaughn.chronicle.features.home.compose.HomeScreen
-import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
 import io.github.mattpvaughn.chronicle.features.search.compose.SearchOverlay
 import io.github.mattpvaughn.chronicle.features.search.searchOverlayState
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
@@ -28,11 +27,9 @@ import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import javax.inject.Inject
 
+@AndroidEntryPoint
 class HomeFragment : Fragment() {
-  @Inject
-  lateinit var viewModelFactory: HomeViewModel.Factory
-
-  private lateinit var viewModel: HomeViewModel
+  private val viewModel: HomeViewModel by viewModels()
 
   @Inject
   lateinit var prefsRepo: PrefsRepo
@@ -42,14 +39,6 @@ class HomeFragment : Fragment() {
 
   @Inject
   lateinit var plexConfig: PlexConfig
-
-  override fun onCreate(savedInstanceState: Bundle?) {
-    // Asks the host for a graph rather than casting to `MainActivity` (cu-178), which is what
-    // lets this screen be launched into a generic host by `FragmentScenario`.
-    check(injectFromHost { it.inject(this) }) { "HomeFragment needs an ActivityComponentHost" }
-    super.onCreate(savedInstanceState)
-    viewModel = ViewModelProvider(this, viewModelFactory).get(HomeViewModel::class.java)
-  }
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -184,31 +173,6 @@ class HomeFragment : Fragment() {
       },
     )
   }
-
-  /** Opens the details screen — the right default for a book that has not been started. */
-  private val openDetails =
-    object : AudiobookClick {
-      override fun onClick(audiobook: Audiobook) = openAudiobookDetails(audiobook)
-    }
-
-  /**
-   * Resumes on tap, with the details screen on a long press.
-   *
-   * A shelf whose premise is "carry on where you left off" should not need a second screen and a
-   * second tap to do it (cu-18).
-   */
-  private val resumeOnClick =
-    object : AudiobookClick {
-      // `viewModel` is a lateinit set in onCreate, and these properties initialize during
-      // construction — so the read has to stay inside the lambda body, where it happens at click
-      // time. Hoisting it to the initializer would throw on the first Home render.
-      override fun onClick(audiobook: Audiobook) = viewModel.resume(audiobook)
-
-      override fun onLongClick(audiobook: Audiobook): Boolean {
-        openAudiobookDetails(audiobook)
-        return true
-      }
-    }
 
   fun openAudiobookDetails(audiobook: Audiobook) {
     navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)

@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.login
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
@@ -12,17 +11,18 @@ import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.FEATURE_FLAG_IS_AUTO_ENABLED
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.OnboardingLoginBinding
-import io.github.mattpvaughn.chronicle.injection.components.injectFromAppGraph
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import timber.log.Timber
 import javax.inject.Inject
 
+@AndroidEntryPoint
 class LoginFragment : Fragment() {
   companion object {
     @JvmStatic
@@ -34,27 +34,13 @@ class LoginFragment : Fragment() {
   @Inject
   lateinit var prefsRepo: PrefsRepo
 
-  @Inject
-  lateinit var viewModelFactory: LoginViewModel.Factory
-
-  private lateinit var loginViewModel: LoginViewModel
-
-  override fun onAttach(context: Context) {
-    check(injectFromAppGraph { it.inject(this) }) { "${javaClass.simpleName} needs an AppComponentHost" }
-    super.onAttach(context)
-  }
+  private val loginViewModel: LoginViewModel by viewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater,
     container: ViewGroup?,
     savedInstanceState: Bundle?,
   ): View? {
-    loginViewModel =
-      ViewModelProvider(
-        this,
-        viewModelFactory,
-      ).get(LoginViewModel::class.java)
-
     val binding = OnboardingLoginBinding.inflate(inflater, container, false)
 
     binding.enableAuto.visibility =

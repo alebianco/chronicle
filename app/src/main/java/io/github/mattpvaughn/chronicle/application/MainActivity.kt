@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -19,11 +20,12 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.material.snackbar.Snackbar
+import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.scopes.ActivityScoped
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.EXPANDED
@@ -44,11 +46,6 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.setBottomSheetS
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
-import io.github.mattpvaughn.chronicle.injection.components.ActivityComponent
-import io.github.mattpvaughn.chronicle.injection.components.ActivityComponentHost
-import io.github.mattpvaughn.chronicle.injection.components.DaggerActivityComponent
-import io.github.mattpvaughn.chronicle.injection.modules.ActivityModule
-import io.github.mattpvaughn.chronicle.injection.scopes.ActivityScope
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
@@ -62,17 +59,13 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
-@ActivityScope
-class MainActivity : AppCompatActivity(), ActivityComponentHost {
+@ActivityScoped
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
   @Inject
   lateinit var localBroadcastManager: LocalBroadcastManager
 
-  @Inject
-  lateinit var mainActivityViewModelFactory: MainActivityViewModel.Factory
-
-  private val viewModel: MainActivityViewModel by lazy {
-    ViewModelProvider(this, mainActivityViewModelFactory).get(MainActivityViewModel::class.java)
-  }
+  private val viewModel: MainActivityViewModel by viewModels()
 
   @Inject
   lateinit var plexLoginRepo: IPlexLoginRepo
@@ -111,22 +104,8 @@ class MainActivity : AppCompatActivity(), ActivityComponentHost {
   @Inject
   lateinit var accountAuthState: AccountAuthState
 
-  override var activityComponent: ActivityComponent? = null
-
-  override fun onDestroy() {
-    activityComponent = null
-    super.onDestroy()
-  }
-
   override fun onCreate(savedInstanceState: Bundle?) {
     Timber.i("MainActivity onCreate()")
-    activityComponent =
-      DaggerActivityComponent.builder()
-        .appComponent((application as ChronicleApplication).appComponent)
-        .activityModule(ActivityModule(this))
-        .build()
-    activityComponent!!.inject(this)
-
     // No-op in release: the release source set provides an empty DebugHooks, so
     // the mock-Plex machinery is not compiled into a release build at all.
     DebugHooks.onMainActivityIntent(intent)

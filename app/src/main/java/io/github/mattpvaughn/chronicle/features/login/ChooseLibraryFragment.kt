@@ -8,8 +8,9 @@ import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
@@ -18,12 +19,12 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseLibraryBinding
 import io.github.mattpvaughn.chronicle.features.login.compose.PickerItem
 import io.github.mattpvaughn.chronicle.features.login.compose.PickerScreen
-import io.github.mattpvaughn.chronicle.injection.components.injectFromAppGraph
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 import javax.inject.Inject
 
+@AndroidEntryPoint
 class ChooseLibraryFragment : Fragment() {
   companion object {
     @JvmStatic
@@ -32,10 +33,7 @@ class ChooseLibraryFragment : Fragment() {
     const val TAG = "choose library fragment"
   }
 
-  @Inject
-  lateinit var viewModelFactory: ChooseLibraryViewModel.Factory
-
-  private lateinit var viewModel: ChooseLibraryViewModel
+  private val viewModel: ChooseLibraryViewModel by viewModels()
 
   @Inject
   lateinit var plexConfig: PlexConfig
@@ -51,18 +49,7 @@ class ChooseLibraryFragment : Fragment() {
     container: ViewGroup?,
     savedInstanceState: Bundle?,
   ): View? {
-    check(injectFromAppGraph { it.inject(this) }) { "${javaClass.simpleName} needs an AppComponentHost" }
-    super.onCreate(savedInstanceState)
-
     val binding = OnboardingPlexChooseLibraryBinding.inflate(inflater, container, false)
-
-    viewModel =
-      ViewModelProvider(
-        viewModelStore,
-        viewModelFactory,
-      ).get(ChooseLibraryViewModel::class.java)
-
-    binding.refresh.setOnClickListener { viewModel.refresh() }
 
     // The list, the spinner and the error message are `PickerScreen` now (cu-201), shared with the
     // server and user pickers.

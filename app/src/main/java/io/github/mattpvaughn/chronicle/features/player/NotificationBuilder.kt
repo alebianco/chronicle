@@ -20,6 +20,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import androidx.media.session.MediaButtonReceiver
+import dagger.hilt.android.scopes.ServiceScoped
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.FLAG_OPEN_ACTIVITY_TO_CURRENTLY_PLAYING
@@ -28,7 +29,6 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
-import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
@@ -39,7 +39,7 @@ const val NOW_PLAYING_NOTIFICATION: Int = 0xb32229
 
 /** Helper class to encapsulate code for building notifications. */
 @ExperimentalCoroutinesApi
-@ServiceScope
+@ServiceScoped
 class NotificationBuilder
   @Inject
   constructor(

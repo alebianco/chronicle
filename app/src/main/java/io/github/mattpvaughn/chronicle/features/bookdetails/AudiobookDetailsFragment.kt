@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
-import android.content.Context
 import android.graphics.drawable.AnimatedVectorDrawable
 import android.os.Bundle
 import android.view.*
@@ -11,18 +10,16 @@ import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
-import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
-import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.model.chapterRows
-import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState
 import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBinding
@@ -31,7 +28,6 @@ import io.github.mattpvaughn.chronicle.features.bookdetails.compose.DetailsScree
 import io.github.mattpvaughn.chronicle.features.player.CastMenu
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.PlayServicesCastAvailability
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
@@ -44,6 +40,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
+@AndroidEntryPoint
 class AudiobookDetailsFragment : Fragment() {
   companion object {
     fun newInstance() = AudiobookDetailsFragment()
@@ -72,16 +69,7 @@ class AudiobookDetailsFragment : Fragment() {
   @Inject
   lateinit var mediaServiceConnection: MediaServiceConnection
 
-  @Inject
-  lateinit var viewModelFactory: AudiobookDetailsViewModel.Factory
-
-  lateinit var viewModel: AudiobookDetailsViewModel
-
-  override fun onAttach(context: Context) {
-    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
-    Timber.i("AudiobookDetailsFragment onAttach()")
-    super.onAttach(context)
-  }
+  private val viewModel: AudiobookDetailsViewModel by viewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -91,20 +79,6 @@ class AudiobookDetailsFragment : Fragment() {
     Timber.i("AudiobookDetailsFragment onCreateView()")
 
     val binding = FragmentAudiobookDetailsBinding.inflate(inflater, container, false)
-
-    val inputId = requireArguments().getString(ARG_AUDIOBOOK_ID) ?: NO_AUDIOBOOK_FOUND_ID
-    val bookTitle = requireArguments().getString(ARG_AUDIOBOOK_TITLE) ?: ""
-    val inputCached = requireArguments().getBoolean(ARG_IS_AUDIOBOOK_CACHED)
-
-    viewModelFactory.inputAudiobook =
-      Audiobook(
-        id = inputId,
-        title = bookTitle,
-        source = MediaSource.NO_SOURCE_FOUND,
-        isCached = inputCached,
-      )
-    viewModel =
-      ViewModelProvider(this, viewModelFactory)[AudiobookDetailsViewModel::class.java]
 
     // The header is `DetailsScreen` now (cu-200). This replaces ~24 imperative writes and twelve
     // independent `isVisible` decisions — artwork, title, author, narrator/series, the progress

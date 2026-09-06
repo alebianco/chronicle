@@ -13,8 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
@@ -23,13 +24,13 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseUserBinding
 import io.github.mattpvaughn.chronicle.features.login.compose.PickerItem
 import io.github.mattpvaughn.chronicle.features.login.compose.PickerScreen
-import io.github.mattpvaughn.chronicle.injection.components.injectFromAppGraph
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 /** Handles the picking of user profiles. */
+@AndroidEntryPoint
 class ChooseUserFragment : Fragment() {
   companion object {
     @JvmStatic
@@ -38,9 +39,7 @@ class ChooseUserFragment : Fragment() {
     const val TAG = "Choose user fragment"
   }
 
-  @Inject
-  lateinit var viewModelFactory: ChooseUserViewModel.Factory
-  private lateinit var viewModel: ChooseUserViewModel
+  private val viewModel: ChooseUserViewModel by viewModels()
 
   @Inject
   lateinit var plexLoginRepo: IPlexLoginRepo
@@ -67,7 +66,7 @@ class ChooseUserFragment : Fragment() {
         before: Int,
         count: Int,
       ) {
-        if (s != null && this@ChooseUserFragment::viewModel.isInitialized) {
+        if (s != null) {
           viewModel.setPinData(s)
           // Automatically submit on 4 digits entered
           if (s.length >= 4) {
@@ -82,16 +81,7 @@ class ChooseUserFragment : Fragment() {
     container: ViewGroup?,
     savedInstanceState: Bundle?,
   ): View? {
-    check(injectFromAppGraph { it.inject(this) }) { "${javaClass.simpleName} needs an AppComponentHost" }
-    super.onCreate(savedInstanceState)
-
     val tempBinding = OnboardingPlexChooseUserBinding.inflate(inflater, container, false)
-
-    viewModel =
-      ViewModelProvider(
-        viewModelStore,
-        viewModelFactory,
-      ).get(ChooseUserViewModel::class.java)
 
     // The user list, its spinner and its error message are `PickerScreen` now (cu-201), shared
     // with the server and library pickers.

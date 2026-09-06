@@ -5,8 +5,6 @@ import androidx.lifecycle.Lifecycle
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService
-import io.github.mattpvaughn.chronicle.injection.components.AppComponent
-import io.github.mattpvaughn.chronicle.injection.components.testAppComponent
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot

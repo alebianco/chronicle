@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.library
 
-import android.content.Context
 import android.os.Bundle
 import android.view.*
 import android.widget.Toast
@@ -10,13 +9,14 @@ import androidx.compose.runtime.getValue
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
 import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -25,7 +25,6 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
 import io.github.mattpvaughn.chronicle.features.library.compose.LibraryScreen
 import io.github.mattpvaughn.chronicle.features.search.compose.SearchOverlay
 import io.github.mattpvaughn.chronicle.features.search.searchOverlayState
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
@@ -36,17 +35,13 @@ import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import timber.log.Timber
 import javax.inject.Inject
 
+@AndroidEntryPoint
 class LibraryFragment : Fragment() {
   companion object {
     fun newInstance() = LibraryFragment()
   }
 
-  @Inject
-  lateinit var viewModelFactory: LibraryViewModel.Factory
-
-  private val viewModel: LibraryViewModel by lazy {
-    ViewModelProvider(this, viewModelFactory).get(LibraryViewModel::class.java)
-  }
+  private val viewModel: LibraryViewModel by viewModels()
 
   @Inject
   lateinit var prefsRepo: PrefsRepo
@@ -294,33 +289,5 @@ class LibraryFragment : Fragment() {
 
   private fun openAudiobookDetails(audiobook: Audiobook) {
     navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
-  }
-
-  override fun onAttach(context: Context) {
-    // Host capability, not host type (cu-178) — what makes this screen launchable by
-    // `FragmentScenario`.
-    check(injectFromHost { it.inject(this) }) { "LibraryFragment needs an ActivityComponentHost" }
-    super.onAttach(context)
-    Timber.i("Reattached!")
-  }
-
-  override fun onDestroyView() {
-    super.onDestroyView()
-  }
-
-  interface AudiobookClick {
-    fun onClick(audiobook: Audiobook)
-
-    /**
-     * A long press on the same cover.
-     *
-     * Defaulted to "not handled" so every existing shelf keeps its behaviour: only the Continue
-     * Listening shelf overrides it, where a tap resumes and the long press is how the details
-     * screen stays reachable (cu-18).
-     *
-     * @return whether the press was consumed, which is what `setOnLongClickListener` wants — a
-     *   `false` lets the platform fall through to the click.
-     */
-    fun onLongClick(audiobook: Audiobook): Boolean = false
   }
 }

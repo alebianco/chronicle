@@ -21,6 +21,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import dagger.Module
 import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.components.ServiceComponent
+import dagger.hilt.android.scopes.ServiceScoped
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
@@ -32,36 +35,49 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_MAX_BUFFER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_MIN_BUFFER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.artworkFreeExtractorsFactory
-import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import io.github.mattpvaughn.chronicle.util.PackageValidator
 import kotlinx.coroutines.CompletableJob
 import kotlin.time.ExperimentalTime
 
+/**
+ * Player-service bindings (cu-185).
+ *
+ * An `object` taking `Service` rather than a class holding the concrete service: Hilt builds the
+ * module, so there is no constructor to pass one to. Six of these bindings genuinely need the
+ * **subclass** — `serviceJob`, `serviceScope`, `sessionToken`, and the three interfaces
+ * `MediaPlayerService` itself implements — so those cast, which is safe because Hilt only builds
+ * this component for that service.
+ */
 @ExperimentalTime
 @Module
-class ServiceModule(private val service: MediaPlayerService) {
-  @Provides
-  @ServiceScope
-  fun service(): Service = service
+@InstallIn(ServiceComponent::class)
+object ServiceModule {
+  private fun Service.player(): MediaPlayerService = this as MediaPlayerService
 
   @Provides
-  @ServiceScope
-  fun serviceController(): ServiceController = service
+  @ServiceScoped
+  fun service(service: Service): Service = service
 
   @Provides
-  @ServiceScope
-  fun serviceJob(): CompletableJob = service.serviceJob
+  @ServiceScoped
+  fun serviceController(service: Service): ServiceController = service.player()
 
   @Provides
-  @ServiceScope
-  fun serviceScope() = service.serviceScope
+  @ServiceScoped
+  fun serviceJob(service: Service): CompletableJob = service.player().serviceJob
 
   @Provides
-  @ServiceScope
+  @ServiceScoped
+  fun serviceScope(service: Service) = service.player().serviceScope
+
+  @Provides
+  @ServiceScoped
   // DefaultMediaSourceFactory and the extractor flags it carries are Media3 @UnstableApi, the same
   // opt-in AudiobookRenderersFactory already takes.
   @UnstableApi
-  fun exoPlayer(): ExoPlayer =
+  fun exoPlayer(
+    service: Service,
+  ): ExoPlayer =
     // AudiobookRenderersFactory retunes silence skipping for narration: ExoPlayer's defaults
     // collapse pauses shorter than the gaps between ordinary words (cu-88).
     ExoPlayer.Builder(service)
@@ -80,8 +96,8 @@ class ServiceModule(private val service: MediaPlayerService) {
       ).build()
 
   @Provides
-  @ServiceScope
-  fun pendingIntent(): PendingIntent =
+  @ServiceScoped
+  fun pendingIntent(service: Service): PendingIntent =
     service.packageManager.getLaunchIntentForPackage(service.packageName).let { sessionIntent ->
       sessionIntent?.putExtra(MainActivity.FLAG_OPEN_ACTIVITY_TO_CURRENTLY_PLAYING, true)
       PendingIntent.getActivity(
@@ -93,8 +109,11 @@ class ServiceModule(private val service: MediaPlayerService) {
     }
 
   @Provides
-  @ServiceScope
-  fun mediaSession(launchActivityPendingIntent: PendingIntent): MediaSessionCompat =
+  @ServiceScoped
+  fun mediaSession(
+    launchActivityPendingIntent: PendingIntent,
+    service: Service,
+  ): MediaSessionCompat =
     MediaSessionCompat(service, APP_NAME).apply {
       // All three deliberately, not just queue commands. The media-button and transport-control
       // flags are auto-enabled from API 28, but minSdk here is 27 — so on the oldest supported
@@ -107,26 +126,26 @@ class ServiceModule(private val service: MediaPlayerService) {
           FLAG_HANDLES_TRANSPORT_CONTROLS or
           FLAG_HANDLES_QUEUE_COMMANDS,
       )
-      service.sessionToken = sessionToken
+      service.player().sessionToken = sessionToken
       setSessionActivity(launchActivityPendingIntent)
       setRatingType(RATING_NONE)
       isActive = true
     }
 
   @Provides
-  @ServiceScope
-  fun localBroadcastManager() = LocalBroadcastManager.getInstance(service)
+  @ServiceScoped
+  fun localBroadcastManager(service: Service) = LocalBroadcastManager.getInstance(service)
 
   @Provides
-  @ServiceScope
-  fun sleepTimerBroadcaster(): SleepTimer.SleepTimerBroadcaster = service
+  @ServiceScoped
+  fun sleepTimerBroadcaster(service: Service): SleepTimer.SleepTimerBroadcaster = service.player()
 
   @Provides
-  @ServiceScope
+  @ServiceScoped
   fun sleepTimer(simpleSleepTimer: SimpleSleepTimer): SleepTimer = simpleSleepTimer
 
   @Provides
-  @ServiceScope
+  @ServiceScoped
   fun provideProgressUpdater(
     updater: SimpleProgressUpdater,
     mediaControllerCompat: MediaControllerCompat,
@@ -136,22 +155,29 @@ class ServiceModule(private val service: MediaPlayerService) {
     }
 
   @Provides
-  @ServiceScope
-  fun notificationManager(): NotificationManagerCompat = NotificationManagerCompat.from(service)
+  @ServiceScoped
+  fun notificationManager(service: Service): NotificationManagerCompat = NotificationManagerCompat.from(service)
 
   @Provides
-  @ServiceScope
-  fun mediaController(session: MediaSessionCompat) = MediaControllerCompat(service, session.sessionToken)
+  @ServiceScoped
+  fun mediaController(
+    session: MediaSessionCompat,
+    service: Service,
+  ) = MediaControllerCompat(service, session.sessionToken)
 
   @Provides
-  @ServiceScope
-  fun becomingNoisyReceiver(session: MediaSessionCompat) = BecomingNoisyReceiver(service, session.sessionToken)
+  @ServiceScoped
+  fun becomingNoisyReceiver(
+    session: MediaSessionCompat,
+    service: Service,
+  ) = BecomingNoisyReceiver(service, session.sessionToken)
 
   @Provides
-  @ServiceScope
+  @ServiceScoped
   fun plexDataSourceFactory(
     plexPrefs: PlexPrefsRepo,
     playbackSession: PlaybackSession,
+    service: Service,
   ): DefaultHttpDataSource.Factory {
     val dataSourceFactory = DefaultHttpDataSource.Factory()
     dataSourceFactory.setUserAgent(Util.getUserAgent(service, APP_NAME))
@@ -175,29 +201,29 @@ class ServiceModule(private val service: MediaPlayerService) {
   }
 
   @Provides
-  @ServiceScope
-  fun packageValidator() = PackageValidator(service, R.xml.auto_allowed_callers)
+  @ServiceScoped
+  fun packageValidator(service: Service) = PackageValidator(service, R.xml.auto_allowed_callers)
 
   @Provides
-  @ServiceScope
-  fun foregroundServiceController(): ForegroundServiceController = service
+  @ServiceScoped
+  fun foregroundServiceController(service: Service): ForegroundServiceController = service.player()
 
   @Provides
-  @ServiceScope
+  @ServiceScoped
   fun mediaSessionCallback(callback: AudiobookMediaSessionCallback): Callback = callback
 
   @Provides
-  @ServiceScope
-  fun trackListManager(): TrackListStateManager = TrackListStateManager()
+  @ServiceScoped
+  fun trackListManager(service: Service): TrackListStateManager = TrackListStateManager()
 
   @Provides
-  @ServiceScope
-  fun sensorManager(): SensorManager =
+  @ServiceScoped
+  fun sensorManager(service: Service): SensorManager =
     service.getSystemService(
       Context.SENSOR_SERVICE,
     ) as SensorManager
 
   @Provides
-  @ServiceScope
-  fun toneManager() = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+  @ServiceScoped
+  fun toneManager(service: Service) = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
 }

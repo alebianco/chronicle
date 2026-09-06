@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.injection.modules
 
-import android.app.Application
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
@@ -13,6 +12,9 @@ import com.tonyodev.fetch2.FetchConfiguration
 import com.tonyodev.fetch2okhttp.OkHttpDownloader
 import dagger.Module
 import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import io.github.mattpvaughn.chronicle.application.LOG_NETWORK_REQUESTS
 import io.github.mattpvaughn.chronicle.data.local.*
 import io.github.mattpvaughn.chronicle.data.model.asServer
@@ -36,53 +38,63 @@ import javax.inject.Named
 import javax.inject.Provider
 import javax.inject.Singleton
 
+/**
+ * Application-wide bindings (cu-185).
+ *
+ * An `object` with `@ApplicationContext` parameters rather than a class holding an `Application`:
+ * Hilt builds the module itself, so a constructor argument has nowhere to come from. Each provider
+ * that needed the app now takes the context it actually wanted.
+ */
 @Module
-class AppModule(private val app: Application) {
-  companion object {
-    const val OKHTTP_CLIENT_MEDIA = "Media"
-    const val OKHTTP_CLIENT_LOGIN = "Login"
+@InstallIn(SingletonComponent::class)
+object AppModule {
+  const val OKHTTP_CLIENT_MEDIA = "Media"
+  const val OKHTTP_CLIENT_LOGIN = "Login"
 
-    /**
-     * Qualifier for the client Fetch2 downloads through; see [downloaderOkHttpClient].
-     *
-     * Deliberately *not* the media client, even though it is derived from it: a media body is a
-     * whole audiobook, and body-level logging buffers it in memory (cu-109).
-     */
-    const val OKHTTP_CLIENT_DOWNLOADER = "Downloader"
+  /**
+   * Qualifier for the client Fetch2 downloads through; see [downloaderOkHttpClient].
+   *
+   * Deliberately *not* the media client, even though it is derived from it: a media body is a
+   * whole audiobook, and body-level logging buffers it in memory (cu-109).
+   */
+  const val OKHTTP_CLIENT_DOWNLOADER = "Downloader"
 
-    /** Qualifier for the credentials preferences file; see [provideAuthPrefs]. */
-    const val AUTH_PREFS = "AuthPrefs"
+  /** Qualifier for the credentials preferences file; see [provideAuthPrefs]. */
+  const val AUTH_PREFS = "AuthPrefs"
 
-    /**
-     * Handshake budget. A reachability probe that takes 15s has already failed as far as
-     * the listener is concerned, and the old value let a dead LAN address consume the whole
-     * connection attempt before relay was tried (cu-11).
-     */
-    const val CONNECT_TIMEOUT_SECONDS = 5L
+  /**
+   * Handshake budget. A reachability probe that takes 15s has already failed as far as
+   * the listener is concerned, and the old value let a dead LAN address consume the whole
+   * connection attempt before relay was tried (cu-11).
+   */
+  const val CONNECT_TIMEOUT_SECONDS = 5L
 
-    /**
-     * Transfer budget, deliberately still long. A slow *stream* of audio is useful; a slow
-     * *handshake* just means the route is wrong. Do not shorten this to match the connect
-     * timeout.
-     */
-    const val READ_TIMEOUT_SECONDS = 15L
+  /**
+   * Transfer budget, deliberately still long. A slow *stream* of audio is useful; a slow
+   * *handshake* just means the route is wrong. Do not shorten this to match the connect
+   * timeout.
+   */
+  const val READ_TIMEOUT_SECONDS = 15L
 
-    /**
-     * How many times Fetch2 retries a failed download before giving up.
-     *
-     * Retries resume via HTTP Range rather than restarting, so this is cheap; the previous
-     * value of 1 meant a single network blip ended a download permanently (cu-76).
-     */
-    const val DOWNLOAD_RETRY_ATTEMPTS = 5
-  }
-
-  @Provides
-  @Singleton
-  fun provideContext(): Context = app.applicationContext
+  /**
+   * How many times Fetch2 retries a failed download before giving up.
+   *
+   * Retries resume via HTTP Range rather than restarting, so this is cheap; the previous
+   * value of 1 meant a single network blip ended a download permanently (cu-76).
+   */
+  const val DOWNLOAD_RETRY_ATTEMPTS = 5
 
   @Provides
   @Singleton
-  fun provideSharedPrefs(): SharedPreferences = app.getSharedPreferences(APP_NAME, MODE_PRIVATE)
+  fun provideContext(
+    @ApplicationContext context: Context,
+  ): Context = context
+
+  @Provides
+  @Singleton
+  fun provideSharedPrefs(
+    @ApplicationContext context: Context,
+  ): SharedPreferences = context.getSharedPreferences(APP_NAME, MODE_PRIVATE)
 
   /**
    * The credentials file, separate from settings (cu-108).
@@ -95,11 +107,15 @@ class AppModule(private val app: Application) {
   @Provides
   @Singleton
   @Named(AUTH_PREFS)
-  fun provideAuthPrefs(): SharedPreferences = app.getSharedPreferences(AUTH_PREFS_NAME, MODE_PRIVATE)
+  fun provideAuthPrefs(
+    @ApplicationContext context: Context,
+  ): SharedPreferences = context.getSharedPreferences(AUTH_PREFS_NAME, MODE_PRIVATE)
 
   @Provides
   @Singleton
-  fun provideContentResolver(): ContentResolver = app.contentResolver
+  fun provideContentResolver(
+    @ApplicationContext context: Context,
+  ): ContentResolver = context.contentResolver
 
   @Provides
   @Singleton
@@ -127,7 +143,9 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
-  fun provideTrackDao(): TrackDao = getTrackDatabase(app.applicationContext).trackDao
+  fun provideTrackDao(
+    @ApplicationContext context: Context,
+  ): TrackDao = getTrackDatabase(context).trackDao
 
   @Provides
   @Singleton
@@ -135,7 +153,9 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
-  fun provideBookDao(): BookDao = getBookDatabase(app.applicationContext).bookDao
+  fun provideBookDao(
+    @ApplicationContext context: Context,
+  ): BookDao = getBookDatabase(context).bookDao
 
   @Provides
   @Singleton
@@ -143,11 +163,15 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
-  fun provideChapterDao(): ChapterDao = getChapterDatabase(app.applicationContext).chapterDao
+  fun provideChapterDao(
+    @ApplicationContext context: Context,
+  ): ChapterDao = getChapterDatabase(context).chapterDao
 
   @Provides
   @Singleton
-  fun provideBookmarkDao(): BookmarkDao = getBookmarkDatabase(app.applicationContext).bookmarkDao
+  fun provideBookmarkDao(
+    @ApplicationContext context: Context,
+  ): BookmarkDao = getBookmarkDatabase(context).bookmarkDao
 
   @Provides
   @Singleton
@@ -155,14 +179,15 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
-  fun provideCollectionsDao(): CollectionsDao =
-    getCollectionsDatabase(
-      app.applicationContext,
-    ).collectionsDao
+  fun provideCollectionsDao(
+    @ApplicationContext context: Context,
+  ): CollectionsDao = getCollectionsDatabase(context).collectionsDao
 
   @Provides
   @Singleton
-  fun provideInternalDeviceDirs(): File = app.applicationContext.filesDir
+  fun provideInternalDeviceDirs(
+    @ApplicationContext context: Context,
+  ): File = context.filesDir
 
   /**
    * The app's external storage directories, nulls removed.
@@ -178,9 +203,11 @@ class AppModule(private val app: Application) {
    */
   @Provides
   @Singleton
-  fun provideExternalDeviceDirs(): List<File> =
+  fun provideExternalDeviceDirs(
+    @ApplicationContext context: Context,
+  ): List<File> =
     ContextCompat.getExternalFilesDirs(
-      app.applicationContext,
+      context,
       null,
     ).filterNotNull()
 
@@ -190,7 +217,9 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
-  fun workManager(): WorkManager = WorkManager.getInstance(app)
+  fun workManager(
+    @ApplicationContext context: Context,
+  ): WorkManager = WorkManager.getInstance(context)
 
   @Provides
   @Singleton

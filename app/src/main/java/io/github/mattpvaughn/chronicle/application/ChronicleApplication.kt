@@ -10,11 +10,13 @@ import android.net.Network
 import android.os.Build
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
+import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import dagger.hilt.android.HiltAndroidApp
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -26,63 +28,39 @@ import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.model.mergeServerRefresh
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
-import io.github.mattpvaughn.chronicle.features.download.ChronicleWorkerFactory
-import io.github.mattpvaughn.chronicle.injection.components.AppComponent
-import io.github.mattpvaughn.chronicle.injection.components.AppComponentHost
-import io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent
-import io.github.mattpvaughn.chronicle.injection.modules.AppModule
+import io.github.mattpvaughn.chronicle.injection.chronicleGraph
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import retrofit2.HttpException
 import timber.log.Timber
 import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
 import javax.inject.Inject
-import javax.inject.Singleton
 
 // Exposing a ref to the application statically doesn't leak anything because Application is already
 // a singleton
 @Suppress("LeakingThis")
-@Singleton
+@HiltAndroidApp
 open class ChronicleApplication :
   Application(),
   Configuration.Provider,
-  AppComponentHost,
   SingletonImageLoader.Factory {
   /**
-   * Builds workers with their dependencies passed in rather than fetched (cu-179).
+   * Builds workers with their dependencies injected (cu-179, moved to Hilt in cu-185).
    *
    * `Configuration.Provider` replaces WorkManager's default initialisation, which is what lets a
-   * `WorkerFactory` be installed at all. Lazy because it reads the Dagger graph, which does not
-   * exist until `onCreate` has run.
+   * `WorkerFactory` be installed at all. `HiltWorkerFactory` replaces the hand-written
+   * `ChronicleWorkerFactory` and its seven graph-reading lambdas — each worker is `@HiltWorker`
+   * with an ordinary `@Inject` constructor now, so cu-179's goal (workers constructable in a unit
+   * test) is met by the framework rather than by a factory we maintain.
    */
+  @Inject
+  lateinit var workerFactory: HiltWorkerFactory
+
   override val workManagerConfiguration: Configuration
     get() =
       Configuration.Builder()
-        .setWorkerFactory(
-          ChronicleWorkerFactory(
-            fetch = { appComponent.fetch() },
-            prefsRepo = appComponent.prefsRepo(),
-            externalDeviceDirs = { appComponent.externalDeviceDirs() },
-            trackRepository = { appComponent.trackRepo() },
-            bookRepository = { appComponent.bookRepo() },
-            plexPrefs = { appComponent.plexPrefs() },
-            plexMediaService = { appComponent.plexMediaService() },
-          ),
-        ).build()
-
-  // Instance of the AppComponent that will be used by all the Activities in the project
-  val appComponent by lazy {
-    initializeComponent()
-  }
-
-  /**
-   * The graph, reached as a capability rather than by casting to this class (cu-178).
-   *
-   * The login screens used to do `(activity.application as ChronicleApplication).appComponent`,
-   * which named this concrete type and so could not be hosted by anything else.
-   */
-  override val appComponentForInjection: AppComponent
-    get() = appComponent
+        .setWorkerFactory(workerFactory)
+        .build()
 
   init {
     INSTANCE = this
@@ -152,7 +130,7 @@ open class ChronicleApplication :
       .components {
         add(
           OkHttpNetworkFetcherFactory(
-            callFactory = { Injector.get().mediaOkHttpClient() },
+            callFactory = { context.chronicleGraph().mediaOkHttpClient() },
           ),
         )
       }
@@ -184,7 +162,6 @@ open class ChronicleApplication :
       Timber.plant(Timber.DebugTree())
     }
 
-    appComponent.inject(this)
     // No-op in release. In debug this may seed a fixture-backed Plex session, so
     // it must run before setupNetwork, which would otherwise try to refresh
     // connections against the real plex.tv and clear them.
@@ -249,11 +226,6 @@ open class ChronicleApplication :
       // Collections additionally adopt `SourceId.UNKNOWN` rows — see `adoptUnscopedRows` (cu-197).
       collectionsRepository.adoptUnscopedRows()
     }
-  }
-
-  open fun initializeComponent(): AppComponent {
-    // We pass the applicationContext that will be used as Context in the graph
-    return DaggerAppComponent.builder().appModule(AppModule(this)).build()
   }
 
   companion object {

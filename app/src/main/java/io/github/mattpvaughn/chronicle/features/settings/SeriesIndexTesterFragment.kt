@@ -1,20 +1,18 @@
 package io.github.mattpvaughn.chronicle.features.settings
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.databinding.FragmentSeriesIndexTesterBinding
 import io.github.mattpvaughn.chronicle.features.settings.compose.SeriesIndexTesterScreen
-import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
-import javax.inject.Inject
 
 /**
  * Shows how the series-numbering rules read a title (cu-151).
@@ -27,16 +25,9 @@ import javax.inject.Inject
  * criterion: the summary and the sample list answer "does my library even need a rule?" from the
  * user's own data.
  */
+@AndroidEntryPoint
 class SeriesIndexTesterFragment : Fragment() {
-  @Inject
-  lateinit var viewModelFactory: SeriesIndexTesterViewModel.Factory
-
-  private lateinit var viewModel: SeriesIndexTesterViewModel
-
-  override fun onAttach(context: Context) {
-    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
-    super.onAttach(context)
-  }
+  private val viewModel: SeriesIndexTesterViewModel by viewModels()
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -44,7 +35,6 @@ class SeriesIndexTesterFragment : Fragment() {
     savedInstanceState: Bundle?,
   ): View {
     val binding = FragmentSeriesIndexTesterBinding.inflate(inflater, container, false)
-    viewModel = ViewModelProvider(this, viewModelFactory)[SeriesIndexTesterViewModel::class.java]
 
     binding.toolbar.setNavigationOnClickListener { parentFragmentManager.popBackStack() }
 

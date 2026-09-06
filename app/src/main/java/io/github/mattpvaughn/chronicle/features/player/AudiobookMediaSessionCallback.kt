@@ -15,6 +15,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import com.github.michaelbull.result.getError
+import dagger.hilt.android.scopes.ServiceScoped
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MILLIS_PER_SECOND
@@ -33,7 +34,6 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
-import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -42,7 +42,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
-@ServiceScope
+@ServiceScoped
 class AudiobookMediaSessionCallback
   @Inject
   constructor(

@@ -3,6 +3,7 @@ plugins {
   alias(libs.plugins.kotlin.android)
   id("kotlin-parcelize")
   alias(libs.plugins.ksp)
+  alias(libs.plugins.hilt)
   alias(libs.plugins.compose.compiler)
   id("com.google.android.gms.oss-licenses-plugin")
   alias(libs.plugins.pitest)
@@ -218,6 +219,11 @@ dependencies {
 
   implementation(libs.dagger)
   ksp(libs.dagger.compiler)
+  implementation(libs.hilt.android)
+  ksp(libs.hilt.compiler)
+  implementation(libs.hilt.work)
+  ksp(libs.hilt.work.compiler)
+  implementation(libs.hilt.navigation.compose)
 
   // Declared explicitly: 23 files import android.support.v4.media / androidx.media
   // (MediaSessionCompat, PlaybackStateCompat, MediaBrowserServiceCompat...), which
