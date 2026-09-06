@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only additions (cu-181).
+
+  `ComposePreviewActivity` renders a Compose screen on a real device with no server and no login,
+  so the POC can be *seen* rather than only asserted. `exported="true"` is what lets `adb shell am
+  start` launch it; that is safe here because this manifest is merged only into the debug variant,
+  whose application id carries the `.debug` suffix and which is never published.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <activity
+      android:name="io.github.mattpvaughn.chronicle.debug.compose.ComposePreviewActivity"
+      android:exported="true"
+      android:label="Compose preview"
+      android:theme="@style/AppTheme" />
+  </application>
+</manifest>

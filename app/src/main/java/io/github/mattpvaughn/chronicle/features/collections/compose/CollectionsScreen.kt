@@ -2,7 +2,6 @@ package io.github.mattpvaughn.chronicle.features.collections.compose
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -15,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -83,7 +83,15 @@ fun CollectionsScreen(
   onDisableOfflineMode: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  Box(modifier.fillMaxSize()) {
+  // `Surface`, not a bare `Box`: `MaterialTheme` *defines* `colorScheme.background` but nothing
+  // paints it -- that is `Surface`'s (or `Scaffold`'s) job. Without this the window's own theme
+  // colour shows through, and on this app's dark window that renders as #121212 with the
+  // onBackground text nearly invisible on it. Caught on a device; every unit test still passed,
+  // because the semantics tree is correct and only the *pixels* were wrong.
+  Surface(
+    modifier = modifier.fillMaxSize(),
+    color = MaterialTheme.colorScheme.background,
+  ) {
     when (val content = state.content) {
       is CollectionsContent.Loaded ->
         CollectionsGrid(
@@ -115,9 +123,13 @@ private fun CollectionsGrid(
   onCollectionClick: (Collection) -> Unit,
 ) {
   LazyVerticalGrid(
-    // The XML screen swaps GridLayoutManager(3) for a LinearLayoutManager; here the column count
-    // is just a number, so there is no layout manager to rebuild on a preference change.
-    columns = GridCells.Fixed(if (isGrid) 3 else 1),
+    // `Adaptive`, not `Fixed(3)`: a fixed count divides the *available* width, so on this 1920px
+    // tablet each cell was 640px wide and one square cover filled the screen -- a bug only a
+    // device shows, since a Compose test measures whatever width it is told to. Adaptive asks for
+    // a minimum cell size and picks the count itself, which is also what makes the same screen
+    // right on a phone, a tablet and in both orientations (Android's guidance for adaptive
+    // layouts). The list style stays a single column.
+    columns = if (isGrid) GridCells.Adaptive(minSize = 180.dp) else GridCells.Fixed(1),
     contentPadding = PaddingValues(8.dp),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     verticalArrangement = Arrangement.spacedBy(8.dp),
