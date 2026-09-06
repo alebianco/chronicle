@@ -105,6 +105,18 @@ itself the tell.
 
 ## Status
 
-**Proposed, not Accepted.** Two things are still owed: the screen has **not been run on a device**,
-and APK/build-time deltas are unmeasured. The owner should see it on the tablet before this is
-Accepted — which is why cu-181 closes to `In Review`, not `Done`.
+**Proposed, not Accepted.**
+
+Done since this was first written: the screen **has** now been rendered on the tablet — that is
+where the two bugs above came from — and the debug APK delta is measured.
+
+Still owed before Accepted:
+
+- **Release APK size.** Only the debug APK was measured, and debug is not R8-shrunk.
+- **Build-time delta.** Not measured at all.
+- **The owner has not seen it.** Launch with:
+  `adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.debug.compose.ComposePreviewActivity`
+  plus `--es state empty|offline|loaded`.
+
+The composable is **not wired into `CollectionsFragment`**, so accepting or rejecting this changes
+nothing a user can see today. cu-181 closes to `In Review` for that reason.
