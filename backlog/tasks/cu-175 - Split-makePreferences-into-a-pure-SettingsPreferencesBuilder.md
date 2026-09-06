@@ -1,7 +1,7 @@
 ---
 id: cu-175
 title: Split makePreferences into a pure SettingsPreferencesBuilder
-status: In Review
+status: Done
 assignee: []
 created_date: ''
 labels:
@@ -62,7 +62,14 @@ See `backlog/docs/analysis/maintainability-review-2026-09.md`.
 
 - ~~[ ] `SettingsPreferencesBuilder` is pure and unit-tested~~ — **retired**: the split was made by *section*, not by label-vs-handler. A pure builder would have moved the labels out and left all 20 handlers in the ViewModel, covering nothing. See the notes below.
 - ~~[ ] `SettingsViewModel` constructor drops to 10 dependencies or fewer~~ — **retired**: the handlers genuinely use ten collaborators, so the count cannot fall without moving *behaviour*, which is a product decision about what belongs on this screen rather than a refactor.
-- [ ] The settings screen is unchanged on device — same entries, same order, same labels **(not device-verified)**
+- [x] The settings screen is unchanged on device — same entries, same order, same labels.
+      **Verified 2026-09-06** on the 1200x1920 device, deliberately *before* cu-199 migrated the
+      screen to Compose: after that, any visual difference would be ambiguous between this refactor
+      and the rewrite. Sections in order — Appearance (book cover style, series numbering rules),
+      Sync (refresh frequency, sync location, delete synced files), Backup (export, import, offline
+      mode), Playback (skip silent audio, auto-rewind, Android Auto, shake to snooze, restart sleep
+      timer, pause during interruptions, jump forward/backward) — with every label, explanation and
+      switch state correct.
 - [x] A preference change still rebuilds the list (the `OnSharedPreferenceChangeListener` path)
 - [x] `features/settings` coverage rises in `coverage-baseline-packages.txt` — 19.00% → 59.29%
 
@@ -135,7 +142,10 @@ reason the tests came first.
 library-switching handlers. Not split further here because that is a judgement about *product*
 grouping rather than mechanics.
 
-**Left `In Review`:** the settings screen was not verified on a device. The row list is unchanged
+**Closed 2026-09-06.** The device pass was done as the first step of the Settings Compose
+migration (cu-199), on the pre-Compose screen, for the reason recorded in the criterion above.
+
+**Was left `In Review`:** the settings screen was not verified on a device. The row list is unchanged
 by test, but only an owner's eye confirms nothing shifted visually.
 
 ### Not done, deliberately
