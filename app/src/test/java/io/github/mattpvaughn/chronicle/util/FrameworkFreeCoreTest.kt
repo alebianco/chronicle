@@ -80,7 +80,6 @@ class FrameworkFreeCoreTest {
     val FRAMEWORK_FREE =
       listOf(
         "application/Constants.kt",
-        "application/Injector.kt",
         "data/local/BookRepository.kt",
         "data/local/BookmarkRepository.kt",
         "data/local/CollectionsRepository.kt",
@@ -160,8 +159,6 @@ class FrameworkFreeCoreTest {
         // the list rather than left to fail as "missing", which is what this guard reports for a
         // deleted entry.
         "features/settings/PreferenceModel.kt",
-        "injection/scopes/ActivityScope.kt",
-        "injection/scopes/ServiceScope.kt",
         "util/DispatcherProvider.kt",
         "util/DurationFormat.kt",
         "util/FlowCombinators.kt",

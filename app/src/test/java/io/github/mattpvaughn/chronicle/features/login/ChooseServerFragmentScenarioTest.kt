@@ -1,17 +1,16 @@
 package io.github.mattpvaughn.chronicle.features.login
 
-import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
+import dagger.hilt.android.testing.BindValue
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginRepo
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService
-import io.mockk.every
+import io.github.mattpvaughn.chronicle.testing.launchFragmentInHiltContainer
 import io.mockk.mockk
-import io.mockk.slot
-import kotlinx.coroutines.CoroutineExceptionHandler
-import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -29,36 +28,26 @@ import org.robolectric.RobolectricTestRunner
  * over fakes, a mocked component whose `inject` populates the `lateinit`s, `launchFragmentInContainer`
  * with the app theme.
  */
+@HiltAndroidTest
 @RunWith(RobolectricTestRunner::class)
 class ChooseServerFragmentScenarioTest {
-  private fun realFactory() =
-    ChooseServerViewModel.Factory(
-      plexLoginService = mockk<PlexLoginService>(relaxed = true),
-      plexLoginRepo = mockk<PlexLoginRepo>(relaxed = true),
-      exceptionHandler = CoroutineExceptionHandler { _, _ -> },
-    )
+  @get:Rule
+  val hiltRule = HiltAndroidRule(this)
+
+  /** What the ViewModel builds from, bound into the real test graph (cu-185). */
+
+  @BindValue
+  @JvmField
+  val plexLoginRepo: PlexLoginRepo = mockk(relaxed = true)
 
   @Before
-  fun installGraph() {
-    val factory = realFactory()
-    val fragmentSlot = slot<ChooseServerFragment>()
-    testAppComponent =
-      mockk<AppComponent>(relaxed = true) {
-        every { inject(capture(fragmentSlot)) } answers {
-          fragmentSlot.captured.viewModelFactory = factory
-          Unit
-        }
-      }
-  }
-
-  @After
-  fun clearGraph() {
-    testAppComponent = null
+  fun setUp() {
+    hiltRule.inject()
   }
 
   @Test
   fun `the server chooser reaches a resumed state in a generic host`() {
-    launchFragmentInContainer<ChooseServerFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<ChooseServerFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
       scenario.onFragment { assertNotNull("the view must be created", it.view) }
     }
@@ -70,7 +59,7 @@ class ChooseServerFragmentScenarioTest {
    */
   @Test
   fun `the server chooser renders while still loading`() {
-    launchFragmentInContainer<ChooseServerFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<ChooseServerFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
       scenario.onFragment { assertNotNull(it.view) }
     }
@@ -78,7 +67,7 @@ class ChooseServerFragmentScenarioTest {
 
   @Test
   fun `the server chooser survives a recreation`() {
-    launchFragmentInContainer<ChooseServerFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<ChooseServerFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.recreate()
       scenario.onFragment { assertNotNull(it.view) }
     }

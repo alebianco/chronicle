@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
+import android.content.Context
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.Bundle
@@ -14,6 +15,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
@@ -37,6 +39,7 @@ import javax.inject.Inject
 
 /** Responsible for playback controls and displaying the currently playing media */
 @ExperimentalCoroutinesApi
+@AndroidEntryPoint
 class CurrentlyPlayingFragment :
   Fragment(),
   ModalBottomSheetBookmarkNote.Listener,
@@ -90,6 +93,19 @@ class CurrentlyPlayingFragment :
 
   companion object {
     fun newInstance() = CurrentlyPlayingFragment()
+  }
+
+  /**
+   * The host's currently-playing interface, which is **not** dependency injection.
+   *
+   * This survived cu-185's removal of the DI `onAttach` bodies because it is a different thing:
+   * the host *is* the interface, so it comes from the attaching context rather than the graph.
+   * Deleting it with the injection line left `currentlyPlayingInterface` uninitialised and the
+   * player crashed on its first composition.
+   */
+  override fun onAttach(context: Context) {
+    currentlyPlayingInterface = (context as MainActivity).getCurrentlyPlayingInterface()
+    super.onAttach(context)
   }
 
   override fun onStart() {

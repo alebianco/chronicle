@@ -1,8 +1,5 @@
 package io.github.mattpvaughn.chronicle.injection
 
-import dagger.Provides
-import io.github.mattpvaughn.chronicle.injection.modules.ServiceModule
-import io.github.mattpvaughn.chronicle.injection.scopes.ServiceScope
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -20,16 +17,28 @@ import org.junit.Test
  * Written as a sweep rather than a single assertion so the next unscoped provider is
  * caught when it is added, not after it causes a bug.
  */
-@OptIn(kotlin.time.ExperimentalTime::class)
 class ServiceModuleScopeTest {
+  private val source =
+    java.io.File("src/main/java/io/github/mattpvaughn/chronicle/injection/modules/ServiceModule.kt")
+      .readText()
+
+  /**
+   * A **source** scan, not reflection (cu-185).
+   *
+   * The old custom `@ServiceScope` was `RUNTIME`-retained, so `isAnnotationPresent` could see it.
+   * Hilt's `@ServiceScoped` is `CLASS`-retained and therefore invisible to reflection — a
+   * reflective sweep reports every provider unscoped, which is exactly the false alarm that
+   * replaced this. Reading the file is cruder but it can actually fail for the right reason.
+   */
   @Test
   fun `every provider in ServiceModule is scoped`() {
+    val providers = Regex("""@Provides\n(?<rest>(?:\s*@[^\n]*\n)*)\s*fun (?<name>\w+)""")
     val unscoped =
-      ServiceModule::class.java.declaredMethods
-        .filter { it.isAnnotationPresent(Provides::class.java) }
-        .filterNot { it.isAnnotationPresent(ServiceScope::class.java) }
-        .map { it.name }
+      providers.findAll(source)
+        .filterNot { it.groups["rest"]!!.value.contains("@ServiceScoped") }
+        .map { it.groups["name"]!!.value }
         .sorted()
+        .toList()
 
     assertEquals(
       "an unscoped provider hands out a fresh instance to each injection point",
@@ -38,15 +47,13 @@ class ServiceModuleScopeTest {
     )
   }
 
-  /** Guards the guard: reflection finding no providers at all would pass vacuously. */
+  /** Guards the guard: a regex matching nothing would pass vacuously. */
   @Test
   fun `the sweep actually finds providers`() {
-    val providerCount =
-      ServiceModule::class.java.declaredMethods
-        .count { it.isAnnotationPresent(Provides::class.java) }
+    val providerCount = Regex("""@Provides""").findAll(source).count()
 
     assertEquals(
-      "expected ServiceModule to expose providers; zero means the reflection is wrong",
+      "expected ServiceModule to expose providers; zero means the scan is wrong",
       true,
       providerCount > 10,
     )

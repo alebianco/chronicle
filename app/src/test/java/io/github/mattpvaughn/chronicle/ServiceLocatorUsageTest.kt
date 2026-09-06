@@ -103,39 +103,40 @@ class ServiceLocatorUsageTest {
     const val MAIN_SOURCE_ROOT = "src/main/java"
 
     /**
-     * Workers still reaching the locator.
+     * Workers still reaching the locator — **none, as of cu-185.**
+     *
+     * The list is kept empty rather than deleted: it is the record of a rule that took three
+     * passes to land, and an emptied exemption set is the outcome, not an absence.
      *
      * cu-152 exempted **all** workers, reasoning that WorkManager builds them reflectively through
      * a fixed `(Context, WorkerParameters)` signature so they have no constructor to inject into,
      * and that a `WorkerFactory` "would buy nothing while no worker is unit-tested".
      *
      * cu-179 re-decided that on new facts — `androidx.work:work-testing` was already in the build
-     * and unused, and the workers were among the largest untested bodies left. `ChronicleWorkerFactory`
-     * now passes their dependencies in, `ChronicleApplication` installs it through
-     * `Configuration.Provider`, and `MoveSyncLocationWorker` came off this list entirely.
+     * and unused, and the workers were among the largest untested bodies left — and converted two
+     * of the three through a hand-written `ChronicleWorkerFactory`.
      *
-     * The two that remain are not constructor injection:
-     *
-     * - `DownloadNotificationWorker` keeps one call in its **companion** `enqueue` helper, which
-     *   reaches `workManager()` to schedule itself. That is a static entry point, not a dependency
-     *   of the instance, and injecting it would mean threading a `WorkManager` through every caller.
-     * - `PlexSyncScrobbleWorker` **has** been converted: cu-179 wired two of the three workers
-     *   through [ChronicleWorkerFactory] and left this one behind, and the cu-178 follow-up
-     *   finished it. Its dependencies are constructor parameters now, so it came off this list.
+     * cu-185 finished it. `@HiltWorker` gives each worker an ordinary `@Inject` constructor and
+     * `HiltWorkerFactory` builds them, so the factory we maintained is gone. The last holdout was
+     * `DownloadNotificationWorker`'s **companion** `enqueue` helper, which reached the locator for
+     * a `WorkManager` to schedule itself; it takes a `Context` now, passed by the one caller,
+     * which was already constructor-injected.
      */
-    val EXEMPT_WORKERS =
-      setOf(
-        "DownloadNotificationWorker.kt",
-      )
+    val EXEMPT_WORKERS = emptySet<String>()
 
     /**
-     * [EXEMPT_WORKERS] plus the DI root itself.
+     * **Empty since cu-185** — there is no `Injector` left to exempt anything from.
      *
-     * `ChronicleApplication` *is* where the graph is built, so reaching it there is not a service
-     * locator call in the sense this guard is about — and its one use is deliberately a lazy
-     * lambda (`callFactory = { … }`), because resolving the OkHttp client eagerly while
-     * constructing the image loader would close a construction cycle.
+     * `ChronicleApplication` was the last entry: it *was* where the graph was built, so reaching
+     * the locator there was not the thing this guard is about. `@HiltAndroidApp` builds the graph
+     * now, and the one call the exemption covered (a lazy `callFactory = { … }`, deliberately
+     * lazy so resolving the OkHttp client would not close a construction cycle while the image
+     * loader was being built) goes through a narrow `@EntryPoint` instead.
+     *
+     * The guard itself stays. `Injector` is deleted, but the *pattern* — a class fetching its own
+     * dependencies at runtime instead of taking them as constructor parameters — is what cu-33
+     * banned, and a new one could be written tomorrow.
      */
-    val EXEMPT = EXEMPT_WORKERS + "ChronicleApplication.kt"
+    val EXEMPT = EXEMPT_WORKERS
   }
 }

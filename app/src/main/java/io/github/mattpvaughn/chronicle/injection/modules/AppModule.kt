@@ -96,12 +96,6 @@ object AppModule {
     @ApplicationContext context: Context,
   ): Context = context
 
-  @Provides
-  @Singleton
-  fun provideSharedPrefs(
-    @ApplicationContext context: Context,
-  ): SharedPreferences = context.getSharedPreferences(APP_NAME, MODE_PRIVATE)
-
   /**
    * The credentials file, separate from settings (cu-108).
    *
@@ -129,10 +123,6 @@ object AppModule {
 
   @Provides
   @Singleton
-  fun providePrefsRepo(prefsImpl: SharedPreferencesPrefsRepo): PrefsRepo = prefsImpl
-
-  @Provides
-  @Singleton
   fun provideDispatcherProvider(impl: DefaultDispatcherProvider): DispatcherProvider = impl
 
   /**
@@ -156,17 +146,9 @@ object AppModule {
 
   @Provides
   @Singleton
-  fun provideTrackRepo(trackRepository: TrackRepository): ITrackRepository = trackRepository
-
-  @Provides
-  @Singleton
   fun provideBookDao(
     @ApplicationContext context: Context,
   ): BookDao = getBookDatabase(context).bookDao
-
-  @Provides
-  @Singleton
-  fun provideBookRepo(bookRepository: BookRepository): IBookRepository = bookRepository
 
   @Provides
   @Singleton
@@ -440,10 +422,6 @@ object AppModule {
     CoroutineExceptionHandler { _, e ->
       Timber.e(e, "Caught unhandled exception!")
     }
-
-  @Provides
-  @Singleton
-  fun provideCachedFileManager(cacheManager: CachedFileManager): ICachedFileManager = cacheManager
 
   @Provides
   @Singleton

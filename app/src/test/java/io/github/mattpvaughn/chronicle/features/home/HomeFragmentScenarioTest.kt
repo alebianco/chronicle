@@ -1,23 +1,22 @@
 package io.github.mattpvaughn.chronicle.features.home
 
-import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
+import dagger.hilt.android.testing.BindValue
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
-import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
+import io.github.mattpvaughn.chronicle.testing.launchFragmentInHiltContainer
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -36,66 +35,52 @@ import org.robolectric.RobolectricTestRunner
  * picks among several `create` overloads and stubbing the wrong one fails at run time with "no
  * answer found".
  */
+@HiltAndroidTest
 @RunWith(RobolectricTestRunner::class)
 class HomeFragmentScenarioTest {
   private val booksFlow = MutableStateFlow<List<Audiobook>>(emptyList())
 
-  private fun realFactory(): HomeViewModel.Factory {
-    val bookRepository =
-      mockk<IBookRepository>(relaxed = true) {
-        every { getAllBooks() } returns booksFlow
-        every { getRecentlyListened() } returns booksFlow
-        every { getRecentlyAdded() } returns booksFlow
-        every { getCachedAudiobooks() } returns booksFlow
-      }
-    val syncRepository =
-      mockk<LibrarySyncRepository>(relaxed = true) {
-        every { isRefreshing } returns MutableStateFlow(false)
-        every { errorMessage } returns MutableStateFlow(null)
-      }
-    return HomeViewModel.Factory(
-      plexConfig = mockk<PlexConfig>(relaxed = true) { every { isConnected } returns MutableStateFlow(true) },
-      bookRepository = bookRepository,
-      librarySyncRepository = syncRepository,
-      prefsRepo = mockk<PrefsRepo>(relaxed = true),
-      mediaServiceConnection = mockk<MediaServiceConnection>(relaxed = true),
-      exceptionHandler = CoroutineExceptionHandler { _, _ -> },
-    )
-  }
+  @get:Rule
+  val hiltRule = HiltAndroidRule(this)
+
+  /**
+   * What the screen reads, bound into the real test graph (cu-185).
+   *
+   * The ViewModel builds itself from these rather than from a hand-assembled factory — the
+   * factory is gone, and the graph resolving it is the same one production uses.
+   *
+   * `isConnected` is stubbed rather than relaxed: a relaxed `StateFlow<Boolean>` hands back a
+   * `StateFlow<Object>` and `collectAsStateWithLifecycle` throws `ClassCastException` when Compose
+   * reads it (cu-187's finding).
+   */
+  @BindValue
+  @JvmField
+  val plexConfig: PlexConfig =
+    mockk(relaxed = true) {
+      every { isConnected } returns MutableStateFlow(true)
+      every { toServerString(any()) } returns "http://localhost/cover.jpg"
+    }
+
+  @BindValue
+  @JvmField
+  val navigator: Navigator = mockk(relaxed = true)
+
+  @BindValue
+  @JvmField
+  val librarySyncRepository: LibrarySyncRepository =
+    mockk(relaxed = true) {
+      every { isRefreshing } returns MutableStateFlow(false)
+      every { errorMessage } returns MutableStateFlow(null)
+    }
 
   @Before
-  fun installGraph() {
-    val factory = realFactory()
-    val fragmentSlot = slot<HomeFragment>()
-    testActivityComponent =
-      mockk<ActivityComponent>(relaxed = true) {
-        every { inject(capture(fragmentSlot)) } answers {
-          fragmentSlot.captured.apply {
-            viewModelFactory = factory
-            prefsRepo = mockk(relaxed = true)
-            navigator = mockk(relaxed = true)
-            plexConfig =
-              mockk(relaxed = true) {
-                // `isConnected` must be stubbed, not relaxed: a relaxed `StateFlow<Boolean>` hands
-                // back a `StateFlow<Object>`, and `collectAsStateWithLifecycle` throws
-                // ClassCastException the moment Compose reads it (cu-187's finding).
-                every { isConnected } returns MutableStateFlow(true)
-                every { toServerString(any()) } returns "http://localhost/cover.jpg"
-              }
-          }
-          Unit
-        }
-      }
-  }
-
-  @After
-  fun clearGraph() {
-    testActivityComponent = null
+  fun setUp() {
+    hiltRule.inject()
   }
 
   @Test
   fun `the home screen reaches a resumed state in a generic host`() {
-    launchFragmentInContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
       scenario.onFragment { assertNotNull("the view must be created", it.view) }
     }
@@ -109,7 +94,7 @@ class HomeFragmentScenarioTest {
   fun `the home screen renders with an empty library`() {
     booksFlow.value = emptyList()
 
-    launchFragmentInContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
       scenario.onFragment { assertNotNull(it.view) }
     }
@@ -123,7 +108,7 @@ class HomeFragmentScenarioTest {
         Audiobook(id = "1002", source = TEST_SOURCE, title = "Elantris"),
       )
 
-    launchFragmentInContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
       scenario.onFragment { assertNotNull(it.view) }
     }
@@ -132,7 +117,7 @@ class HomeFragmentScenarioTest {
   /** Rotation is destroy/recreate, and where most Fragment bugs here have come from. */
   @Test
   fun `the home screen survives a recreation`() {
-    launchFragmentInContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<HomeFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.recreate()
       scenario.onFragment { assertNotNull(it.view) }
     }

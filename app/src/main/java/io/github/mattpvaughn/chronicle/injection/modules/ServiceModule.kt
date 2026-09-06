@@ -124,7 +124,10 @@ object ServiceModule {
           FLAG_HANDLES_TRANSPORT_CONTROLS or
           FLAG_HANDLES_QUEUE_COMMANDS,
       )
-      service.player().sessionToken = sessionToken
+      // **Not set here** since cu-185 — see `MediaPlayerService.onCreate`. `@AndroidEntryPoint`
+      // injects the service *before* `MediaBrowserServiceCompat.onCreate()` runs, and
+      // `setSessionToken` needs the impl that call creates: assigning it during provision threw
+      // `NullPointerException: ... MediaBrowserServiceImpl.setSessionToken(...) on a null object`.
       setSessionActivity(launchActivityPendingIntent)
       setRatingType(RATING_NONE)
       isActive = true

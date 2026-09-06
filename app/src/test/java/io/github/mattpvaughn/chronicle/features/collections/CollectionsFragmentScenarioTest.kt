@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
 import androidx.compose.ui.platform.ComposeView
-import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
 import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -11,6 +10,7 @@ import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.testing.launchFragmentInHiltContainer
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -93,7 +93,7 @@ class CollectionsFragmentScenarioTest {
    */
   @Test
   fun `the fragment reaches a resumed state in a generic host`() {
-    launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
       scenario.onFragment { assertNotNull("the view must be created", it.view) }
     }
@@ -110,7 +110,7 @@ class CollectionsFragmentScenarioTest {
    */
   @Test
   fun `the fragment hosts its compose view`() {
-    launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
       scenario.onFragment {
         assertNotNull(
@@ -124,7 +124,7 @@ class CollectionsFragmentScenarioTest {
   /** A rotation is a destroy/recreate, which is where most Fragment bugs here have come from. */
   @Test
   fun `the fragment survives a recreation`() {
-    launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
+    launchFragmentInHiltContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.recreate()
       scenario.onFragment { assertNotNull(it.view) }
     }

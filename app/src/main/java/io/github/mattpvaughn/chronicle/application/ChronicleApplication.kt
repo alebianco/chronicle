@@ -137,6 +137,15 @@ open class ChronicleApplication :
       .build()
 
   override fun onCreate() {
+    // **First, not last** (cu-185). Hilt injects this class's members inside `super.onCreate()`,
+    // so everything below it runs with the `@Inject` fields still uninitialised — the app died on
+    // launch with "lateinit property unhandledExceptionHandler has not been initialized". It used
+    // to be the final statement because the old graph was built by hand *here*, before super ran.
+    //
+    // The one ordering constraint in this method is unaffected: `DebugHooks.onApplicationCreate`
+    // still precedes `setupNetwork`.
+    super.onCreate()
+
     if (USE_STRICT_MODE && BuildConfig.DEBUG) {
       StrictMode.setThreadPolicy(
         StrictMode.ThreadPolicy.Builder()
@@ -171,7 +180,6 @@ open class ChronicleApplication :
     adoptLegacyRows()
     setupNetwork(plexPrefs)
     updateDownloadedFileState()
-    super.onCreate()
   }
 
   /**

@@ -10,6 +10,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.slider.Slider
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -34,6 +35,7 @@ import javax.inject.Inject
  * the single writer of `PlaybackParameters` and reacts to both a pref change and a book change.
  */
 @ExperimentalCoroutinesApi
+@AndroidEntryPoint
 class ModalBottomSheetSpeedChooser : BottomSheetDialogFragment() {
   private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 

@@ -1,7 +1,5 @@
 package io.github.mattpvaughn.chronicle.injection
 
-import android.app.Application
-import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
 import okhttp3.Authenticator
 import okhttp3.Interceptor
@@ -34,7 +32,9 @@ import java.util.concurrent.TimeUnit
  */
 @RunWith(RobolectricTestRunner::class)
 class DownloadLogLevelTest {
-  private val module = AppModule(ApplicationProvider.getApplicationContext<Application>())
+  // `AppModule` is a Hilt `object` since cu-185, so its providers are called directly rather
+  // than on an instance holding an `Application`.
+  private val module = AppModule
 
   /** A stand-in for the media client: what matters is that it carries a BODY logger. */
   private fun mediaClientWithBodyLogging(): OkHttpClient =

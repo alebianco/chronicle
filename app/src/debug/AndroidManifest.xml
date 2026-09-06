@@ -7,12 +7,29 @@
   start` launch it; that is safe here because this manifest is merged only into the debug variant,
   whose application id carries the `.debug` suffix and which is never published.
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
   <application>
     <activity
       android:name="io.github.mattpvaughn.chronicle.debug.compose.ComposePreviewActivity"
       android:exported="true"
       android:label="Compose preview"
       android:theme="@style/AppTheme" />
+
+    <!--
+      The generic `@AndroidEntryPoint` host the four scenario suites launch into (cu-185). Hilt
+      refuses to attach a `@AndroidEntryPoint` Fragment to a host that is not one, and
+      `launchFragmentInContainer`'s stock `EmptyFragmentActivity` is not.
+
+      `tools:ignore="MissingClass"` because the class lives in the **test** source set, which lint
+      cannot see from here — but Robolectric resolves activities through this merged manifest, so
+      the declaration has to be here. Not exported: nothing but a test launches it, and this
+      manifest is merged only into the debug variant.
+    -->
+    <activity
+      android:name="io.github.mattpvaughn.chronicle.testing.HiltFragmentHostActivity"
+      android:exported="false"
+      android:theme="@style/AppTheme"
+      tools:ignore="MissingClass" />
   </application>
 </manifest>

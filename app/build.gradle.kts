@@ -324,6 +324,14 @@ val coverageExclusions =
     "**/*Module_*Factory*.*",
     "**/*_Impl*.*",
     "**/*_Provide*Factory*.*",
+    // Hilt's generated code, on the same reasoning as the Dagger entries above (cu-185). The
+    // `Hilt_*` base classes it inserts under each `@AndroidEntryPoint` are 147 instructions apiece
+    // of lifecycle plumbing nobody writes — 1,789 across 74 classes, all of it in the denominator.
+    "**/Hilt_*.*",
+    "**/*_HiltModules*.*",
+    "**/*_HiltComponents*.*",
+    "**/hilt_aggregated_deps/**",
+    "**/dagger/hilt/**",
     // Moshi codegen (cu-62 moved every model to `@JsonClass(generateAdapter = true)`). These are
     // generated `fromJson`/`toJson` bodies nobody writes or reviews — 7,882 instructions, 9.2% of
     // the measured codebase, sitting in the denominator. The *models* they serialize stay
@@ -342,9 +350,16 @@ tasks.register<JacocoReport>("jacocoTestReport") {
     html.required.set(true)
   }
 
+  // The **ASM-transformed** classes, not `tmp/kotlin-classes/debug` (cu-185).
+  //
+  // Hilt rewrites `@AndroidEntryPoint` classes through an ASM transform, and the tests execute
+  // *those*. Reporting against the untransformed output makes JaCoCo unable to match its execution
+  // data — it logs "Execution data for class ... does not match" and **silently discards that
+  // class's coverage**, which read as a 2.24% aggregate regression across the five rewritten
+  // classes rather than as a broken report.
   classDirectories.setFrom(
     files(
-      fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
+      fileTree(layout.buildDirectory.dir("intermediates/classes/debug/transformDebugClassesWithAsm/dirs")) {
         exclude(coverageExclusions)
       },
       fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) {

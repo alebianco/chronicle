@@ -249,6 +249,11 @@ class MediaPlayerService :
   override fun onCreate() {
     super.onCreate()
 
+    // After `super.onCreate()`, which is what creates the `MediaBrowserServiceImpl` this needs
+    // (cu-185). It used to happen inside the `mediaSession` provider, which Hilt now runs before
+    // super — so the token has to be published here instead.
+    sessionToken = mediaSession.sessionToken
+
     ServiceUtils.notifyServiceStarted(this)
 
     Timber.i("Service created! $this")

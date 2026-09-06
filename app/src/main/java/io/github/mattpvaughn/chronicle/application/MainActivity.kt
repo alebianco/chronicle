@@ -106,6 +106,14 @@ class MainActivity : AppCompatActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     Timber.i("MainActivity onCreate()")
+
+    // **Before the debug hooks and before `viewModel` is touched** (cu-185). Hilt injects this
+    // activity's members inside `super.onCreate()`, and `by viewModels()` needs the activity at
+    // CREATED — reading either earlier crashed on launch with "You can 'consumeRestoredStateForKey'
+    // only after the corresponding component has moved to the 'CREATED' state". The hooks below
+    // read `viewModel`, `navigator` and `mediaServiceConnection`, so they all move after it.
+    super.onCreate(savedInstanceState)
+
     // No-op in release: the release source set provides an empty DebugHooks, so
     // the mock-Plex machinery is not compiled into a release build at all.
     DebugHooks.onMainActivityIntent(intent)
@@ -130,8 +138,6 @@ class MainActivity : AppCompatActivity() {
     // button cannot be reached by `input tap` — the currently-playing sheet takes the coordinates
     // — so a sync had no scriptable entry point at all (cu-132).
     DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
-
-    super.onCreate(savedInstanceState)
 
     localBroadcastManager = LocalBroadcastManager.getInstance(this)
 

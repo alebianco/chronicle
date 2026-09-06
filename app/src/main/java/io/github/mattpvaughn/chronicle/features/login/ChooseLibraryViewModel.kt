@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.login
 
 import androidx.lifecycle.*
+import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -32,6 +33,7 @@ import timber.log.Timber
 import java.util.*
 import javax.inject.Inject
 
+@HiltViewModel
 class ChooseLibraryViewModel
   @Inject
   constructor(
