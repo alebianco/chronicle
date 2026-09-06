@@ -1,7 +1,7 @@
 ---
 id: cu-178
 title: Prove FragmentScenario on one screen
-status: In Progress
+status: In Review
 assignee: []
 created_date: ''
 labels:
@@ -48,14 +48,64 @@ rather than pushing through for the metric.
 
 - [x] `androidx.fragment:fragment-testing` added to the version catalog as `debugImplementation`
       (it needs an empty activity in the debug manifest)
-- [ ] One `CollectionsFragment` scenario test runs **on the JVM** under Robolectric, not on a device
+- [x] One `CollectionsFragment` scenario test runs **on the JVM** under Robolectric, not on a device
 - [x] The test-factory approach is documented in the test's KDoc so the next screen can copy it
-- [ ] `features/collections` coverage rises measurably
-- [ ] `./verify.sh` stays green and the unit-test stage stays under a minute — if Robolectric
-      Fragment tests make it materially slower, record the measurement and reconsider
-- [ ] A note in the analysis doc recording whether the approach generalises or should stop at one
+- [x] `features/collections` coverage rises measurably
+- [x] `./verify.sh` stays green and the unit-test stage stays under a minute
+- [x] A note in the analysis doc recording whether the approach generalises or should stop at one
 
-## Attempt notes (2026-09-06) — half the blocker removed, half remains
+## Implementation Notes
+
+**It generalises.** Four suites now run on the JVM — `CollectionsFragment` (the POC),
+`HomeFragment`, `LibraryFragment` and `ChooseServerFragment` — and coverage went **40.47% → 50.43%**
+over the sequence.
+
+Getting there took **two** inversions plus a third seam this task found last.
+
+### Layer 1 — DI from the Activity graph. Done here.
+
+`ActivityComponentHost` + `injectFromHost` replaced `(activity as MainActivity).activityComponent!!`.
+The Fragment depended on its host's *type* when it needed a capability.
+
+### Layer 2 — AppCompat. Done in cu-180.
+
+Six fragments called `setSupportActionBar`, which genuinely requires an `AppCompatActivity` and
+cannot be hidden behind an interface. The attempt note below concluded this needed a debug-manifest
+host activity. **That was wrong, and the cheaper answer was to stop needing AppCompat at all**:
+`Toolbar` implements `MenuHost` natively, so `setToolbarMenu` gives the fragment's own toolbar its
+menu with no Activity involved. Measured first: `MainActivity` has no toolbar of its own and no
+fragment read the action bar back, so the call was doing nothing but forwarding a menu.
+
+### Layer 3 — the *app* graph. Done here, and it hid a vacuous test.
+
+The four login screens do not use `ActivityComponent` — they run before a library is chosen and
+inject from `AppComponent`, reached by casting through both `Activity` and `ChronicleApplication`.
+`AppComponentHost` + `injectFromAppGraph` is the parallel seam.
+
+**The ordering of the two seams differs, and that difference is load-bearing.** Written the same way
+as the activity seam — host first, test override as fallback — `ChooseServerFragmentScenarioTest`
+passed **with its mock's `inject` doing nothing at all**. Robolectric reads the real manifest and
+instantiates the real `ChronicleApplication`, so the host branch always resolves and the override
+was never consulted; the suite was silently building the real Dagger graph and asserting against it.
+`FragmentScenario`'s `EmptyFragmentActivity` is *not* an `ActivityComponentHost`, so no equivalent
+problem exists on the activity side. Both orderings are now verified by sabotage — the app seam
+fails 3/3 when its mock is neutered, the activity seam 4/4.
+
+### Scope actually covered
+
+All **12** remaining host casts are gone: seven activity-graph fragments, the speed chooser, and
+four login-flow fragments. No `setSupportActionBar` remains in `app/src/main`.
+
+### Follow-ups
+
+- Five screens still have no scenario suite: `AudiobookDetailsFragment` (1,305 instructions),
+  `CurrentlyPlayingFragment` (1,356), `ChooseUserFragment`, `SettingsFragment`,
+  `SeriesIndexTesterFragment`. The recipe is established; these are mechanical.
+- **cu-181** proposes retiring this whole apparatus by moving to Compose, where a screen is testable
+  without a host, a manifest entry or Robolectric at all.
+
+## Attempt notes (2026-09-06) — superseded, kept for the reasoning
+
 
 **The library is not the problem. The app's host-type coupling is**, and there are *two* layers of
 it, not one.
