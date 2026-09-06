@@ -118,6 +118,10 @@ class MainActivityViewModel(
   val currentlyPlayingLayoutState: StateFlow<BottomSheetState>
     get() = _currentlyPlayingLayoutState
 
+  /** Satisfies [MainActivity.CurrentlyPlayingInterface]'s read side (cu-198). */
+  override val bottomSheetState: StateFlow<BottomSheetState>
+    get() = _currentlyPlayingLayoutState
+
   private val audiobookId = MutableStateFlow(NO_AUDIOBOOK_FOUND_ID)
 
   val audiobook: StateFlow<Audiobook> =

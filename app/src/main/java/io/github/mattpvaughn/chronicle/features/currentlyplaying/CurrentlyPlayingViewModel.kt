@@ -25,6 +25,12 @@ import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.ArtworkState
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.PlayerUiState
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.SliderState
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.TextState
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.TransportState
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.UtilityState
 import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
@@ -1252,6 +1258,103 @@ class CurrentlyPlayingViewModel(
       }
     }
   }
+
+  private val artworkState: StateFlow<ArtworkState> =
+    combineDistinct(audiobook, plexConfig.isConnected) { book, connected ->
+      ArtworkState(
+        title = book?.title.orEmpty(),
+        thumb = book?.thumb,
+        serverConnected = connected,
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ArtworkState())
+
+  private val textState: StateFlow<TextState> =
+    combineDistinct(playerProgress, progressPercentageString, activeChapter, currentTrack) {
+        progress, percentage, chapter, track ->
+      TextState(
+        progress = progress,
+        progressPercentage = percentage,
+        // The chapter's own title, falling back to the track's when a chapter is untitled — a
+        // book with no chapter data still needs a line here.
+        chapterTitle = chapter.title.ifEmpty { track.title },
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TextState())
+
+  private val sliderState: StateFlow<SliderState> =
+    combineDistinct(
+      chapterDuration,
+      currentTrack,
+      combineDistinct(chapterProgressForSlider, trackProgressForSlider) { c, t -> c to t },
+      isSliding,
+    ) { chapterMillis, track, progressPair, sliding ->
+      // Chapter progress when there is a chapter to be inside, track progress otherwise. Asking
+      // whether the chapter has a *duration* rather than coalescing to 0 — a chapter-less book
+      // would otherwise read 0 forever and never fall back.
+      val max = (if (chapterMillis == 0L) track.duration else chapterMillis).toFloat()
+      val current = if (chapterMillis == 0L) progressPair.second else progressPair.first
+      val valueTo = if (max > 0f) max else 1f
+      SliderState(
+        value = current.toFloat().coerceIn(0f, valueTo),
+        valueTo = valueTo,
+        isSliding = sliding,
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SliderState())
+
+  /**
+   * The transport row, the utility tray and the two spinners, folded together only because four
+   * sources is the combinator's ceiling. They are separate fields on [PlayerUiState], which is
+   * what the recomposition boundaries actually follow.
+   */
+  private val transportUtilityState:
+    StateFlow<Triple<TransportState, UtilityState, Pair<Boolean, Boolean>>> =
+    combineDistinct(
+      combineDistinct(isPlaying, isAudioLoading, jumpForwardsIcon, jumpBackwardsIcon) {
+          playing, loading, fwd, back ->
+        TransportState(playing, loading, fwd, back)
+      },
+      combineDistinct(playbackSpeedString, isSleepTimerActive, sleepTimerTimeRemainingString) {
+          speed, timerActive, remaining ->
+        UtilityState(speed, timerActive, remaining)
+      },
+      isLoadingTracks,
+      hasFailedProgressSync,
+    ) { transport, utility, loadingTracks, failedSync ->
+      Triple(transport, utility, loadingTracks to failedSync)
+    }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+      Triple(TransportState(), UtilityState(), false to false),
+    )
+
+  /**
+   * The whole player body, as one value (cu-198).
+   *
+   * Assembled in groups rather than one wide combinator — the four-source `combineDistinct` is the
+   * widest available, and more importantly the groups are the recomposition boundaries. Each
+   * sub-state is `distinctUntilChanged` in its own right, so the text block re-renders once a
+   * second while the transport row and the artwork sit still, which is what the Fragment's
+   * `setTextIfChanged` / `boundTitle` guards were emulating by hand.
+   *
+   * `WhileSubscribed` is right: nothing reads `.value` off this without collecting, and dropping
+   * the upstream subscriptions when the sheet closes is the point (cu-110/cu-117).
+   */
+  val uiState: StateFlow<PlayerUiState> =
+    combineDistinct(
+      artworkState,
+      textState,
+      sliderState,
+      transportUtilityState,
+    ) { artwork, text, slider, transportUtility ->
+      PlayerUiState(
+        artwork = artwork,
+        text = text,
+        slider = slider,
+        transport = transportUtility.first,
+        utility = transportUtility.second,
+        isLoadingTracks = transportUtility.third.first,
+        hasFailedProgressSync = transportUtility.third.second,
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), PlayerUiState())
 
   companion object {
     /** Minimal and maximal allowed playback speed. */

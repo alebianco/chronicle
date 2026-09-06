@@ -56,6 +56,7 @@ import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
 import io.github.mattpvaughn.chronicle.util.setTextIfChanged
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -391,6 +392,18 @@ class MainActivity : AppCompatActivity(), ActivityComponentHost {
 
   interface CurrentlyPlayingInterface {
     fun setBottomSheetState(state: MainActivityViewModel.BottomSheetState)
+
+    /**
+     * The sheet's state, so the player can stop inferring it from view geometry (cu-198).
+     *
+     * The interface was write-only, so `CurrentlyPlayingFragment` established "am I on screen?"
+     * with `!seekbar.isShown || root.height == 0`. That inference is the direct cause of cu-141
+     * and cu-19: a collapsed sheet is **zero height with every child still `VISIBLE`**, so
+     * `isShown` alone reads true while nothing is on screen, and the obvious alternative probe was
+     * a view that `values-land` hides. Reading the state the sheet is actually in removes both
+     * failure modes, and it is a `StateFlow` a composable can consume directly.
+     */
+    val bottomSheetState: StateFlow<MainActivityViewModel.BottomSheetState>
   }
 
   fun getCurrentlyPlayingInterface(): CurrentlyPlayingInterface {
