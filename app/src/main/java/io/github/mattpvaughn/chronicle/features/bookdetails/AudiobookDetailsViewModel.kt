@@ -21,6 +21,12 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.Cach
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.BookHeader
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.DetailsUiState
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.DownloadState
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.PlaybackState
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.ProgressLine
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.SummaryState
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
@@ -695,4 +701,92 @@ class AudiobookDetailsViewModel(
       }
     }
   }
+
+  // ---- the aggregated header state (cu-200) ----
+
+  private val bookHeader: StateFlow<BookHeader> =
+    combineDistinct(audiobook, plexConfig.isConnected) { book, connected ->
+      BookHeader(
+        title = book?.title.orEmpty(),
+        author = book?.author.orEmpty(),
+        thumb = book?.thumb,
+        narrator = book?.let { BookMetadataLines.narrator(it) },
+        series = book?.let { BookMetadataLines.series(it) },
+        serverConnected = connected,
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), BookHeader())
+
+  /**
+   * The download control, as one exhaustive state.
+   *
+   * Replaces four flows — `cacheStatus`, `cacheIconDrawable`, `cacheContentDescription` and
+   * `cacheIconTint` — each a `map` over the same source with its own `null ->` branch meaning
+   * "not resolved yet". The four stay for now because `CacheLabelPairingTest` reads two of them
+   * out of this file's source text; the screen renders from this.
+   */
+  private val downloadState: StateFlow<DownloadState> =
+    cacheStatus
+      .map { status ->
+        when (status) {
+          CacheStatus.CACHED -> DownloadState.Cached
+          CacheStatus.CACHING -> DownloadState.Caching
+          CacheStatus.NOT_CACHED -> DownloadState.NotCached
+          null -> DownloadState.Unknown
+        }
+      }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        DownloadState.Unknown,
+      )
+
+  private val playbackState: StateFlow<PlaybackState> =
+    combineDistinct(
+      isBookInViewPlaying,
+      isAudioLoading,
+      isWatchedIcon,
+      forceSyncInProgress,
+    ) { playing, loading, watched, syncing ->
+      PlaybackState(playing, loading, watched, syncing)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), PlaybackState())
+
+  private val summaryState: StateFlow<SummaryState> =
+    combineDistinct(audiobook, showSummary, isExpanded, summaryLinesShown) {
+        book, shown, expanded, lines ->
+      SummaryState(
+        text = book?.summary.orEmpty(),
+        isShown = shown,
+        isExpanded = expanded,
+        linesShown = lines,
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SummaryState())
+
+  private val progressLine: StateFlow<ProgressLine> =
+    combineDistinct(progressString, progressPercentageString) { text, percentage ->
+      ProgressLine(text, percentage)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProgressLine())
+
+  /**
+   * Everything the header renders (cu-200).
+   *
+   * The Fragment collected 17 flows and made twelve independent `isVisible` decisions from them,
+   * each on its own boolean or enum comparison, with nothing stopping two being true at once.
+   * Grouped here by what changes together, so a progress tick does not recompose the artwork.
+   */
+  val uiState: StateFlow<DetailsUiState> =
+    combineDistinct(
+      combineDistinct(bookHeader, progressLine) { header, progress -> header to progress },
+      downloadState,
+      combineDistinct(playbackState, summaryState) { playback, summary -> playback to summary },
+      combineDistinct(serverConnection, isLoadingTracks) { conn, loading -> conn to loading },
+    ) { headerProgress, download, playbackSummary, connLoading ->
+      DetailsUiState(
+        book = headerProgress.first,
+        progress = headerProgress.second,
+        download = download,
+        playback = playbackSummary.first,
+        summary = playbackSummary.second,
+        connection = connLoading.first,
+        isLoadingTracks = connLoading.second,
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), DetailsUiState())
 }

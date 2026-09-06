@@ -95,24 +95,24 @@ class CacheLabelPairingTest {
   }
 
   /**
-   * The layout must not reintroduce a static label.
+   * The static-label check retires with the layout (cu-200).
    *
-   * A `tools:contentDescription` is fine — it is preview-only and never reaches a screen reader.
+   * It substringed `fragment_audiobook_details.xml` from `android:id="@+id/download"` to assert
+   * the control carried no `android:contentDescription` — because a static one said "Download"
+   * for a book that was already downloaded, which is what a screen reader announced (cu-149).
+   *
+   * The download control is `DetailsScreen` now and the XML view is gone, so `indexOf` returned
+   * -1 and the test threw `StringIndexOutOfBoundsException` rather than failing cleanly. Retired
+   * rather than deleted: the invariant it protected is **unrepresentable** in the replacement,
+   * where one sealed `DownloadState` drives the icon and the label together and there is no
+   * static attribute to set. `DetailsScreenTest` asserts each state announces its own action,
+   * which is the part a type cannot check.
+   *
+   * **The remaining tests here are now the only readers of what they check.** `cacheIconDrawable`,
+   * `cacheContentDescription` and `cacheIconTint` are no longer consumed by anything: the screen
+   * renders from the sealed `DownloadState`, and grepping the app finds no other caller. I first
+   * wrote that Android Auto still used them — it does not. They and these tests should go
+   * together in a follow-up; leaving them is deliberate for one commit only, so the migration's
+   * diff stays about rendering rather than also deleting ViewModel surface.
    */
-  @Test
-  fun `the layout declares no static contentDescription on the download control`() {
-    val layout =
-      File("src/main/res/layout/fragment_audiobook_details.xml").readText()
-    val control =
-      layout.substring(
-        layout.indexOf("""android:id="@+id/download""""),
-        layout.indexOf("/>", layout.indexOf("""android:id="@+id/download"""")),
-      )
-
-    assertTrue(
-      "the download control must not carry android:contentDescription — it has three meanings " +
-        "and the fragment sets the right one; found: $control",
-      !control.contains("android:contentDescription"),
-    )
-  }
 }

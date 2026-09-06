@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying.compose
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -238,13 +239,20 @@ private fun TransportRow(
         CircularProgressIndicator(Modifier.size(32.dp))
       } else {
         IconButton(onClick = actions.onPlayPause) {
-          Icon(
+          // `Image`, not `Icon`: these are **two-colour** drawables — an accent circle with a
+          // white glyph — and `Icon` flattens both to a single `tint`, rendering the play button
+          // as a bare filled circle with no triangle. Found on a device during cu-200; every
+          // Compose test passed, since the semantics tree was right and only the pixels wrong.
+          Image(
             painterResource(
-              if (transport.isPlaying) R.drawable.ic_pause_button_large_colored else R.drawable.ic_play_button_large_colored,
+              if (transport.isPlaying) {
+                R.drawable.ic_pause_button_large_colored
+              } else {
+                R.drawable.ic_play_button_large_colored
+              },
             ),
-            stringResource(R.string.pause_play_button),
+            contentDescription = stringResource(R.string.pause_play_button),
             modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.primary,
           )
         }
       }

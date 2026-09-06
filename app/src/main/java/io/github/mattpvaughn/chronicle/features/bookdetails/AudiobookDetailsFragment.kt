@@ -1,17 +1,18 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.graphics.drawable.AnimatedVectorDrawable
 import android.os.Bundle
 import android.view.*
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.Toolbar
+import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -22,19 +23,20 @@ import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
-import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState
 import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBinding
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.DetailsActions
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.DetailsScreen
 import io.github.mattpvaughn.chronicle.features.player.CastMenu
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.PlayServicesCastAvailability
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
-import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,45 +45,6 @@ import javax.inject.Inject
 
 @ExperimentalCoroutinesApi
 class AudiobookDetailsFragment : Fragment() {
-  /**
-   * The narrator and series lines, shown only when there is something to say (cu-145).
-   *
-   * Each row is `gone` in XML and un-hidden here, rather than shown-and-blanked: cu-24 learns
-   * narrator and series only for books the user has opened, and cu-146 leaves the series position
-   * unknown wherever the tagging carried no number — so most books are missing one or both today.
-   * An empty "Narrated by" line states the book has no narrator, which is a wrong claim rather
-   * than a missing one.
-   *
-   * The series line navigates into the browse facet for that series, which cu-24 already built;
-   * the tap target is only attached when there is a series to reach, so a dead row cannot ripple.
-   */
-  private fun bindMetadataLines(
-    binding: FragmentAudiobookDetailsBinding,
-    book: Audiobook?,
-  ) {
-    val narrator = book?.let { BookMetadataLines.narrator(it) }
-    binding.narrator.isVisible = narrator != null
-    if (narrator != null) {
-      binding.narrator.text = getString(R.string.book_narrated_by, narrator)
-    }
-
-    val series = book?.let { BookMetadataLines.series(it) }
-    binding.series.isVisible = series != null
-    if (series != null && book != null) {
-      binding.series.text = series
-      // Spoken as an action, since it is tappable and the text alone reads as a label (cu-149's
-      // lesson: a control's label must say what a tap does).
-      binding.series.contentDescription = getString(R.string.book_series_browse, book.series)
-      binding.series.setOnClickListener {
-        navigator.showFacetBooks(FacetKind.Series, book.series)
-      }
-    } else {
-      // Clear the listener rather than leaving a stale one on a recycled view.
-      binding.series.setOnClickListener(null)
-      binding.series.isClickable = false
-    }
-  }
-
   companion object {
     fun newInstance() = AudiobookDetailsFragment()
 
@@ -143,91 +106,32 @@ class AudiobookDetailsFragment : Fragment() {
     viewModel =
       ViewModelProvider(this, viewModelFactory)[AudiobookDetailsViewModel::class.java]
 
-    // Was 29 binding expressions in fragment_audiobook_details.xml.
-    viewLifecycleOwner.collectWhileStarted(viewModel.audiobook) { book ->
-      binding.bookTitle.text = book?.title.orEmpty()
-      binding.author.text = book?.author.orEmpty()
-      bindMetadataLines(binding, book)
-      binding.infoSummary.text = book?.summary.orEmpty()
-      binding.detailsArtwork.contentDescription = book?.title.orEmpty()
-      bindImageRounded(
-        binding.detailsArtwork,
-        book?.thumb,
-        plexConfig.isConnected.value,
-        plexConfig::toServerString,
-      )
-    }
-    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
-      bindImageRounded(
-        binding.detailsArtwork,
-        viewModel.audiobook.value?.thumb,
-        connected,
-        plexConfig::toServerString,
-      )
+    // The header is `DetailsScreen` now (cu-200). This replaces ~24 imperative writes and twelve
+    // independent `isVisible` decisions — artwork, title, author, narrator/series, the progress
+    // line, the four-flow download control, play/pause and the collapsible summary.
+    binding.detailsCompose.setContent {
+      val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+      ChronicleTheme {
+        DetailsScreen(
+          state = state,
+          actions =
+            DetailsActions(
+              onPlayPause = viewModel::pausePlayButtonClicked,
+              onDownload = viewModel::onCacheButtonClick,
+              onToggleSummary = viewModel::onToggleSummaryView,
+              // The series line navigates into the browse facet cu-24 built. It was wired inside
+              // `bindMetadataLines`, which is gone — losing it would be a silent feature loss of
+              // the kind cu-198 shipped and had to recover.
+              onSeriesClick = {
+                viewModel.audiobook.value?.let { navigator.showFacetBooks(FacetKind.Series, it.series) }
+              },
+            ),
+          coverUrl = plexConfig::toServerString,
+        )
+      }
     }
 
-    viewLifecycleOwner.collectWhileStarted(viewModel.progressString) { binding.progress.text = it }
-    viewLifecycleOwner.collectWhileStarted(viewModel.progressPercentageString) {
-      binding.progressPercentage.text = it
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.cacheStatus) { status ->
-      binding.cachingTracksSpinner.isVisible = status == CacheStatus.CACHING
-      // INVISIBLE, not GONE: the icon keeps its slot while the spinner overlays it.
-      binding.download.visibility =
-        if (status == CacheStatus.CACHING) View.INVISIBLE else View.VISIBLE
-      // Disabled until the status is known, so a press cannot be silently swallowed (cu-92).
-      // `android:enabled="false"` in the layout is the matching default — without it the button
-      // renders enabled for a frame before this first fires.
-      val statusKnown = status != null
-      binding.download.isEnabled = statusKnown
-      binding.cachingTracksSpinner.isEnabled = statusKnown
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.cacheIconDrawable) {
-      binding.download.setImageResource(it)
-    }
-    // Immediately beside the icon it labels, so the two cannot drift apart again (cu-149). The
-    // layout's static `android:contentDescription` is gone: it said "Download" for a book that was
-    // already downloaded, which is what a screen reader announced.
-    viewLifecycleOwner.collectWhileStarted(viewModel.cacheContentDescription) {
-      binding.download.contentDescription = getString(it)
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.cacheIconTint) { tint ->
-      binding.download.imageTintList = ColorStateList.valueOf(tint)
-    }
-    binding.download.setOnClickListener { viewModel.onCacheButtonClick() }
-    binding.cachingTracksSpinner.setOnClickListener { viewModel.onCacheButtonClick() }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.isBookInViewPlaying) { playing ->
-      binding.detailsPausePlay.setImageResource(
-        if (playing) {
-          R.drawable.ic_pause_button_large_colored
-        } else {
-          R.drawable.ic_play_button_large_colored
-        },
-      )
-    }
-    binding.detailsPausePlay.setOnClickListener { viewModel.pausePlayButtonClicked() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.isAudioLoading) { loading ->
-      binding.audioLoadingSpinner.isVisible = loading
-      binding.detailsPausePlay.isVisible = !loading
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.summaryLinesShown) {
-      binding.infoSummary.maxLines = it
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.showSummary) { show ->
-      binding.infoSummary.isVisible = show
-      binding.infoExpandSummary.isVisible = show
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.isExpanded) { expanded ->
-      binding.infoExpandSummary.text = getString(if (expanded) R.string.less else R.string.more)
-    }
-    binding.infoExpandSummary.setOnClickListener { viewModel.onToggleSummaryView() }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.isLoadingTracks) {
-      binding.loadingTracksSpinner.isVisible = it
-    }
     viewLifecycleOwner.collectWhileStarted(viewModel.serverConnection) { state ->
       binding.connectingToServerIndicator.isVisible = state == ConnectionState.CONNECTING
       binding.connectionFailedMessage.isVisible = state == ConnectionState.CONNECTION_FAILED
