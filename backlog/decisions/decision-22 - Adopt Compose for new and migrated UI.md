@@ -92,7 +92,9 @@ itself the tell.
   number should be smaller — but that is an expectation, not a measurement, and cu-181 must take it
   before this moves to Accepted.
 - **Two UI toolkits at once** until the migration finishes. Accepted deliberately: the alternative
-  is a big-bang rewrite of 43 layouts.
+  is a big-bang rewrite of 43 layouts. **Which of these costs actually end** is set out below —
+  not all of them do, and the ones that do not are the reason this is a decision rather than an
+  obvious yes.
 - **Theme values are duplicated** in `ChronicleTheme` as Kotlin literals, because a `@Preview` and a
   Compose test render with no Android theme and `colorResource` would yield stock Material colours.
   `ChronicleThemeTest` pins them against the XML and is sabotage-verified.
@@ -102,6 +104,49 @@ itself the tell.
   Navigation Compose are different APIs; doing the former now means migrating navigation twice.
   Same argument sequences Hilt (cu-185) after Compose, since `hiltViewModel()` and Compose are
   designed together.
+
+## Which costs are temporary, and which are permanent
+
+Asked directly: does the cost evaporate when the migration completes? **Partly. Three of five end;
+two do not.**
+
+### Ends
+
+- **The duplicated theme values.** `ChronicleTheme` mirrors `colors.xml` only because XML screens
+  still need the XML palette. When the last XML screen goes, `colors.xml` goes and the Compose
+  palette is the single source. `ChronicleThemeTest` retires with it.
+- **`FirstFrameFlashTest`, the `isShown` guards, and the whole bug class behind cu-141 / cu-142 /
+  cu-19 / cu-68.** These guard hazards that stop existing. **This is the main prize** — not the
+  coverage number.
+- **`ViewBinding`, the 43 layouts, and the `FragmentScenario` apparatus** (cu-178's
+  `ActivityComponentHost` / `AppComponentHost` seams, cu-180's `setToolbarMenu`). All of it exists
+  to make Fragments hostable and testable; all of it is deletable. Note `list_item_*` and
+  `modal_bottom_sheet_*` layouts migrate too — a row becomes a composable inside `items {}` — so
+  the XML count genuinely reaches zero.
+
+### Does not end
+
+- **The APK size.** Compose is a *runtime library shipped in the APK*; the View system is in the
+  OS. Removing XML removes almost no bytes, so the delta is close to permanent — R8 shrinks it, it
+  does not eliminate it. The measured +0.1 MB debug is the floor of what to expect, and the release
+  number is still unmeasured. **The size cost is the price of admission, not a transition cost.**
+- **AppCompat and `com.google.android.material` do not leave.** `MainActivity` stays an
+  `AppCompatActivity` (theming, day/night, and `ComposeView` needs a host), and 19 Kotlin sites
+  reference Material components today. Some of those go; the dependency does not.
+
+### Neither — these are simply out of Compose's reach
+
+Two UI surfaces in this app **cannot** be Compose at any point, and would keep a View-shaped
+mental model alive regardless:
+
+- **Notifications.** `DownloadNotificationWorker` and the media notification build
+  `NotificationCompat` / `RemoteViews`. A notification is rendered by the *system* process;
+  Compose cannot cross that boundary. (Glance exists for App Widgets — this app has none.)
+- **Android Auto.** The browse tree and player are drawn by the car's host app from
+  `MediaBrowser` items (`onGetRoot` / `onLoadChildren`). We supply data, not UI, and always will.
+
+**So the honest summary:** the *maintenance* costs end and the *bug class* ends — which is the case
+for doing it. The *dependency* costs are permanent, and two surfaces stay outside Compose forever.
 
 ## Status
 
