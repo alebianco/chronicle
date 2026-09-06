@@ -54,6 +54,16 @@ data class CollectionsUiState(
  * at every `when` rather than a screen that silently renders nothing.
  */
 sealed interface CollectionsContent {
+  /**
+   * Nothing has been read yet — the `stateIn` seed.
+   *
+   * A distinct state rather than `Loaded(emptyList())` (cu-187): that seed renders an empty grid
+   * before the first Room emission, and worse, it is indistinguishable from a genuinely empty
+   * library, so a test asserting "empty" passes against a flow that has produced nothing. That is
+   * the vacuous-pass shape CLAUDE.md warns about for `WhileSubscribed` flows.
+   */
+  data object Loading : CollectionsContent
+
   /** The library has collections. */
   data class Loaded(val collections: List<Collection>) : CollectionsContent
 
@@ -93,6 +103,10 @@ fun CollectionsScreen(
     color = MaterialTheme.colorScheme.background,
   ) {
     when (val content = state.content) {
+      // Deliberately blank: the screen is behind a `SwipeRefreshLayout` that shows its own
+      // spinner, and a second one here would double up on every refresh.
+      CollectionsContent.Loading -> Unit
+
       is CollectionsContent.Loaded ->
         CollectionsGrid(
           collections = content.collections,

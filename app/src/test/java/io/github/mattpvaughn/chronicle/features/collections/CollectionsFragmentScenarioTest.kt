@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
 import android.content.SharedPreferences
+import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
 import io.github.mattpvaughn.chronicle.R
@@ -105,9 +106,16 @@ class CollectionsFragmentScenarioTest {
         every { inject(capture(fragmentSlot)) } answers {
           fragmentSlot.captured.apply {
             viewModelFactory = factory
-            prefsRepo = mockk(relaxed = true)
             navigator = mockk(relaxed = true)
-            plexConfig = mockk(relaxed = true)
+            // `isConnected` must be stubbed, not relaxed. A relaxed `StateFlow<Boolean>` hands
+            // back a `StateFlow<Object>`, and `collectAsStateWithLifecycle` then throws
+            // ClassCastException the moment Compose reads it — the cu-187 form of the rule that a
+            // relaxed mock is wrong for anything flow-shaped.
+            plexConfig =
+              mockk(relaxed = true) {
+                every { isConnected } returns MutableStateFlow(true)
+                every { toServerString(any()) } returns "http://localhost/cover.jpg"
+              }
           }
           Unit
         }
@@ -137,12 +145,25 @@ class CollectionsFragmentScenarioTest {
     }
   }
 
-  /** The lifecycle is really driven: the adapter exists once the view is up. */
+  /**
+   * The lifecycle is really driven: the `ComposeView` is inflated and hosted once the view is up.
+   *
+   * This replaces an assertion on `adapter`, which cu-187 deleted along with `CollectionsAdapter`.
+   * What is worth pinning is not that a particular field exists but that the **Compose host is
+   * reachable from a generic Activity** — a `ComposeView` needs a `ViewTreeLifecycleOwner` and a
+   * `SavedStateRegistryOwner`, and a Fragment that failed to provide them would render nothing
+   * while every `createComposeRule` test in `CollectionsScreenTest` still passed.
+   */
   @Test
-  fun `the fragment builds its adapter`() {
+  fun `the fragment hosts its compose view`() {
     launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
       scenario.moveToState(Lifecycle.State.RESUMED)
-      scenario.onFragment { assertNotNull("onCreateView must have run", it.adapter) }
+      scenario.onFragment {
+        assertNotNull(
+          "onCreateView must have inflated the ComposeView",
+          it.view?.findViewById<ComposeView>(R.id.collections_compose),
+        )
+      }
     }
   }
 

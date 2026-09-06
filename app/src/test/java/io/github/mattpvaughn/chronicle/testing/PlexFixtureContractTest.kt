@@ -8,8 +8,11 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asCollections
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asTrackList
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.toChapter
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -23,6 +26,9 @@ import org.junit.Test
  * *values*, so a mismatch fails loudly.
  */
 class PlexFixtureContractTest {
+  @get:Rule
+  val server = FakePlexServer()
+
   private val moshi = Moshi.Builder().build()
 
   private fun container(fixture: String): PlexMediaContainerWrapper =
@@ -379,6 +385,42 @@ class PlexFixtureContractTest {
       "double digits, so a string sort would put this before book 2",
       10 * scale,
       container("album-1003.json").plexMediaContainer.asAudiobooks().single().seriesIndex,
+    )
+  }
+
+  /**
+   * A track fetch must be routed to tracks, not albums (cu-187).
+   *
+   * `type=10` (tracks) and `type=9` (albums) are both `/library/sections/N/all`, so a routing rule
+   * keyed only on `/all` answers `albums.json` to both. An album carries no `Media`, so
+   * `MediaItemTrack.fromPlexModel` throws `IndexOutOfBoundsException` on `networkTrack.media[0]`
+   * and the **whole refresh aborts** — which on the tablet meant collections were never stored and
+   * the Collections tab never appeared.
+   *
+   * This is the cu-18/cu-19 defect class in a new field: the routing exists twice
+   * (`FakePlexServer` here, `MockPlexServer` in `app/src/debug`) and *both* copies had it. The
+   * assertion is about the failure mode — that every routed track has a playable part — rather
+   * than about which filename was chosen, so it fails for anything merely album-shaped too.
+   */
+  @Test
+  fun `a track-type section request routes to tracks, not albums`() {
+    val client = OkHttpClient()
+    val request =
+      Request.Builder()
+        .url("${server.url}/library/sections/1/all?type=10&X-Plex-Container-Start=0&X-Plex-Container-Size=100")
+        .build()
+    val body = client.newCall(request).execute().use { it.body!!.string() }
+
+    val tracks =
+      moshi.adapter(PlexMediaContainerWrapper::class.java)
+        .fromJson(body)!!
+        .plexMediaContainer
+        .asTrackList()
+
+    assertTrue("a track request must return tracks", tracks.isNotEmpty())
+    assertTrue(
+      "every track needs a media part, or fromPlexModel throws on media[0]",
+      tracks.all { it.media.isNotEmpty() },
     )
   }
 }

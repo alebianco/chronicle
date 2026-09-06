@@ -87,7 +87,7 @@ itself the tell.
 ## Consequences
 
 - **APK size: +0.1 MB debug** (26.9 → 27.0 MB), measured by building both branches. That is the
-  *debug* APK, which is not R8-shrunk; the release delta is the one that matters and is **not yet
+  *debug* APK, which is not R8-shrunk; the release delta is the one that matters and was **not yet
   measured**. Compose's own guidance is that R8 strips unused Compose heavily, so the release
   number should be smaller — but that is an expectation, not a measurement, and cu-181 must take it
   before this moves to Accepted.
@@ -159,14 +159,22 @@ Compose's reach for good. The trade is deliberate: what ends is the cu-141 / cu-
 bug class, the `FirstFrameFlashTest` and `isShown` guards that exist only to police it, and the
 whole ViewBinding + `FragmentScenario` apparatus.
 
-**Two measurements were still outstanding at acceptance and remain owed** — they inform how the
-migration is paced, not whether it happens:
+### The two owed measurements, taken (2026-09-06, cu-187)
 
-- **Release APK size.** Only the debug APK was measured (+0.1 MB), and debug is not R8-shrunk.
-- **Build-time delta.** Not measured.
+Both were outstanding at acceptance. Measured by building `7253cc3^` (the last pre-Compose commit)
+against the current tree, in separate worktrees so neither could reuse the other's cache.
 
-Both are cu-187's first job. If the release delta is materially worse than the debug figure
-suggests, that is a reason to revisit the *pace*, and it should be raised rather than absorbed.
+- **Release APK: 6,878,452 → 6,879,292 bytes — `+840 bytes`.** The +0.1 MB debug figure
+  **overstated the cost by two orders of magnitude**, exactly as suspected: debug is not R8-shrunk,
+  and with one Compose screen R8 strips essentially the whole runtime. This is *not* a reason to
+  revisit the pace — it is the opposite, and the "size cost is the price of admission" framing
+  above should be read against this number rather than the debug one.
+  **Expect this to grow as screens migrate** — the runtime becomes unstrippable once enough of it
+  is reachable, so re-measure at cu-188 rather than treating +840 bytes as the standing figure.
+- **Incremental build: ~5.7–6.3 s → ~7.7–9.0 s, about `+35%`** for a one-line edit to
+  `CollectionsViewModel.kt` with a warm daemon (two runs each). Real, and it compounds with the
+  KSP2 overhead already recorded in cu-8 (+13% on an ordinary edit). The agent loop pays this on
+  every iteration, so it is the cost worth watching — not the APK.
 
 ### What acceptance means in practice
 

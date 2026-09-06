@@ -206,6 +206,14 @@ class MockPlexServer(private val context: Context) {
       path.contains("mood=") -> "albums-mood-${path.substringAfter("mood=").substringBefore("&")}.json"
       path.startsWith("/library/sections") && path.contains("/style") -> "filter-style.json"
       path.startsWith("/library/sections") && path.contains("/mood") -> "filter-mood.json"
+      // `type=10` is a **track** fetch, `type=9` an album one, and both are `/library/sections/N/all`
+      // — so a rule keyed only on `/all` answers `albums.json` to both. An album carries no
+      // `Media`, so `MediaItemTrack.fromPlexModel`'s `networkTrack.media[0]` threw
+      // `IndexOutOfBoundsException` and aborted the whole refresh *before collections were
+      // stored*, which is why the Collections tab never appeared in mock mode (found on the
+      // tablet during cu-187). Same family as the cu-18/cu-19 routing defects: nothing in the
+      // path distinguishes the two callers except the type.
+      path.startsWith("/library/sections") && path.contains("type=10") -> "tracks.json"
       path.startsWith("/library/sections") && path.contains("/all") -> "albums.json"
       path.startsWith("/library/sections") -> "libraries.json"
       path.contains("/children") -> "tracks.json"

@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -136,47 +135,4 @@ class CollectionDetailsTest {
 
       assertTrue("the seed must be empty, not a placeholder", vm.booksInCollection.value.isEmpty())
     }
-
-  // ---- diff callback ----
-
-  @Test
-  fun `two collections are the same item when their ids match`() {
-    val diff = CollectionsDiffCallback()
-
-    assertTrue(diff.areItemsTheSame(collection(id = "c1"), collection(id = "c1", title = "renamed")))
-    assertFalse(diff.areItemsTheSame(collection(id = "c1"), collection(id = "c2")))
-  }
-
-  /**
-   * The three fields a collection tile actually draws. Each is pinned separately, because a field
-   * dropped from this comparison makes the tile silently stop repainting — nothing fails, it just
-   * stops updating.
-   */
-  @Test
-  fun `a tile repaints when any drawn field changes`() {
-    val diff = CollectionsDiffCallback()
-    val base = collection()
-
-    assertTrue("identical collections must not repaint", diff.areContentsTheSame(base, base.copy()))
-    assertFalse("a renamed collection must repaint", diff.areContentsTheSame(base, base.copy(title = "Stormlight")))
-    assertFalse("a new cover must repaint", diff.areContentsTheSame(base, base.copy(thumb = "/thumb/new")))
-    assertFalse(
-      "a changed book count must repaint",
-      diff.areContentsTheSame(base, base.copy(childCount = 5L)),
-    )
-  }
-
-  /**
-   * A collection's *sort type* is not drawn on the tile, so changing it must not force a repaint —
-   * the counterpart to the rule above, and what stops a refresh from redrawing every tile.
-   */
-  @Test
-  fun `a field the tile does not draw does not force a repaint`() {
-    val diff = CollectionsDiffCallback()
-    val base = collection()
-
-    assertTrue(
-      diff.areContentsTheSame(base, base.copy(sortType = Collection.SortType.CUSTOM)),
-    )
-  }
 }

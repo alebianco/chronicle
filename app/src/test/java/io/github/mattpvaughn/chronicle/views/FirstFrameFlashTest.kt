@@ -111,7 +111,13 @@ class FirstFrameFlashTest {
         "activity_main.xml" to listOf("bottom_nav", "currently_playing_container"),
         "onboarding_plex_choose_library.xml" to listOf("no_libraries_found", "library_list"),
         "onboarding_plex_choose_server.xml" to listOf("no_servers_found", "server_list"),
-        "fragment_collections.xml" to listOf("offline_mode_container", "no_books_message"),
+        // `fragment_collections.xml`'s two entries — `offline_mode_container` and
+        // `no_books_message` — are **retired, not dropped** (cu-187). Both views are gone: the
+        // screen is `CollectionsScreen`, where the same three states are a sealed
+        // `CollectionsContent` seeded to `Loading`. The flash this guard exists to prevent is not
+        // merely re-fixed there, it is unrepresentable — nothing can render an empty message
+        // before the first emission, because "no emission yet" is its own branch. That is the
+        // argument decision-22 makes for the migration, and this is the first place it pays off.
       )
 
     mustBeGone.forEach { (layoutName, ids) ->

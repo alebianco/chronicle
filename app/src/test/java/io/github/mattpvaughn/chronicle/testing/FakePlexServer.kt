@@ -165,6 +165,13 @@ class FakePlexServer : ExternalResource() {
       path.contains("mood=") -> json("albums-mood-${path.substringAfter("mood=").substringBefore("&")}.json")
       path.startsWith("/library/sections") && path.contains("/style") -> json("filter-style.json")
       path.startsWith("/library/sections") && path.contains("/mood") -> json("filter-mood.json")
+      // `type=10` is a **track** fetch and `type=9` an album one, both under
+      // `/library/sections/N/all` — a rule keyed only on `/all` answers albums to both, and an
+      // album carries no `Media`, so `MediaItemTrack.fromPlexModel` throws on `media[0]`. Found on
+      // the tablet in cu-187, where it aborted the refresh before collections were stored. The
+      // same defect was in `MockPlexServer`; this routing exists twice and both copies had it,
+      // exactly as cu-18 and cu-19 did.
+      path.startsWith("/library/sections") && path.contains("type=10") -> json("tracks.json")
       path.startsWith("/library/sections") && path.contains("/all") -> json("albums.json")
       path.startsWith("/library/sections") -> json("libraries.json")
       // The multi-id metadata route (cu-156). Must precede the single-id rule below: a

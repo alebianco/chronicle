@@ -6,9 +6,12 @@ import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Collection
+import io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsContent
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.github.mattpvaughn.chronicle.util.keepCollected
+import io.github.mattpvaughn.chronicle.util.settledValue
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -63,6 +66,14 @@ class CollectionsViewModelTest {
       value: Boolean,
     ) {
       booleans[key] = value
+      listeners.toList().forEach { it.onSharedPreferenceChanged(this, key) }
+    }
+
+    fun put(
+      key: String,
+      value: String,
+    ) {
+      strings[key] = value
       listeners.toList().forEach { it.onSharedPreferenceChanged(this, key) }
     }
 
@@ -219,5 +230,80 @@ class CollectionsViewModelTest {
 
       assertTrue(vm.isQueryEmpty.value)
       assertTrue(vm.searchRows.value.isEmpty())
+    }
+
+  // ---- uiState: the three-way content state (cu-187) ----
+
+  /**
+   * The bug this state exists to make impossible.
+   *
+   * The Fragment used to gate three views on `collections.isEmpty()` alone — the offline
+   * container, the empty message and the grid — so an empty library rendered the offline banner
+   * *and* the "no books found" message together, while neither consulted offline mode. A sealed
+   * [CollectionsContent] means exactly one can be true, checked by the compiler.
+   */
+  @Test
+  fun `an empty library online is Empty, not OfflineEmpty`() =
+    runTest {
+      collectionsFlow.value = emptyList()
+      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, false)
+
+      val vm = viewModel()
+      keepCollected(vm.uiState)
+
+      assertEquals(CollectionsContent.Empty, settledValue(vm.uiState).content)
+    }
+
+  /**
+   * Offline and empty is a *different* state, not a flavour of empty: telling a user their library
+   * is empty when it is merely unreachable is the trust bug this project treats as R0.
+   */
+  @Test
+  fun `an empty library offline says so, and can offer a way out`() =
+    runTest {
+      collectionsFlow.value = emptyList()
+      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, true)
+
+      val vm = viewModel()
+      keepCollected(vm.uiState)
+
+      assertEquals(CollectionsContent.OfflineEmpty, settledValue(vm.uiState).content)
+    }
+
+  /**
+   * Content wins over offline mode: a user with a synced library who is offline should see their
+   * collections, not an offline banner.
+   */
+  @Test
+  fun `collections are shown even when offline`() =
+    runTest {
+      collectionsFlow.value = listOf(collection("1", "Dune"))
+      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, true)
+
+      val vm = viewModel()
+      keepCollected(vm.uiState)
+
+      assertEquals(
+        CollectionsContent.Loaded(listOf(collection("1", "Dune"))),
+        settledValue(vm.uiState).content,
+      )
+    }
+
+  /** The view style reaches the state as a boolean, so the screen never parses a preference. */
+  @Test
+  fun `the view style decides the grid flag`() =
+    runTest {
+      collectionsFlow.value = listOf(collection("1", "Dune"))
+      prefs.put(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, PrefsRepo.VIEW_STYLE_DETAILS_LIST)
+
+      val listVm = viewModel()
+      keepCollected(listVm.uiState)
+      assertEquals(false, settledValue(listVm.uiState).isGrid)
+
+      prefs.put(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, PrefsRepo.VIEW_STYLE_COVER_GRID)
+
+      val gridVm = viewModel()
+      keepCollected(gridVm.uiState)
+      assertEquals(true, settledValue(gridVm.uiState).isGrid)
     }
 }

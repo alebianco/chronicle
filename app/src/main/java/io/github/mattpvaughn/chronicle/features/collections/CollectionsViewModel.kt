@@ -10,8 +10,12 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_BOOK_S
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_HIDE_PLAYED_AUDIOBOOKS
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_IS_LIBRARY_SORT_DESCENDING
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_LIBRARY_VIEW_STYLE
+import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_OFFLINE_MODE
+import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_TITLE
 import io.github.mattpvaughn.chronicle.data.model.Collection
+import io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsContent
+import io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsUiState
 import io.github.mattpvaughn.chronicle.features.search.SearchController
 import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.util.*
@@ -24,7 +28,9 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserSta
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -97,6 +103,12 @@ class CollectionsViewModel(
       false,
     )
 
+  private val offlineMode =
+    sharedPreferences.booleanFlow(
+      KEY_OFFLINE_MODE,
+      prefsRepo.offlineMode,
+    )
+
   private val sortKey =
     sharedPreferences.stringFlow(
       KEY_BOOK_SORT_BY,
@@ -134,6 +146,47 @@ class CollectionsViewModel(
         }
       }
     }
+
+  /**
+   * Everything [io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsScreen]
+   * renders, as one value (cu-187).
+   *
+   * The Fragment used to read six flows and push each into a view independently, so three
+   * `isVisible` assignments decided between "empty", "offline and empty" and "populated" — and
+   * nothing stopped two being true at once. In fact two always were: an empty library showed the
+   * offline container *and* the empty message together, because both were gated on
+   * `collections.isEmpty()` and neither consulted offline mode. Collapsing them into one sealed
+   * [CollectionsContent] makes that state unrepresentable rather than merely unlikely.
+   *
+   * `WhileSubscribed` is right here: nothing reads `.value` without collecting, and dropping the
+   * Room subscription when the screen goes is the point (cu-110).
+   *
+   * `serverConnected` is deliberately **not** part of this state: it belongs to `PlexConfig`, which
+   * the Fragment already holds, and folding it in would need a five-source combinator for a field
+   * that only decides whether Coil is handed a URL.
+   */
+  val uiState: StateFlow<CollectionsUiState> =
+    combineDistinct(
+      collections,
+      offlineMode,
+      isRefreshing,
+      viewStyle,
+    ) { collections, isOffline, isRefreshing, viewStyle ->
+      CollectionsUiState(
+        content =
+          when {
+            collections.isNotEmpty() -> CollectionsContent.Loaded(collections)
+            isOffline -> CollectionsContent.OfflineEmpty
+            else -> CollectionsContent.Empty
+          },
+        isRefreshing = isRefreshing,
+        isGrid = viewStyleIsGrid(viewStyle),
+      )
+    }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+      CollectionsUiState(content = CollectionsContent.Loading),
+    )
 
   private var _messageForUser = MutableStateFlow<Event<String>?>(null)
   val messageForUser: StateFlow<Event<String>?>

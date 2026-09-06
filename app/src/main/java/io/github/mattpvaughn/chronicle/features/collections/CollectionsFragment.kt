@@ -2,31 +2,33 @@ package io.github.mattpvaughn.chronicle.features.collections
 
 import android.content.Context
 import android.os.Bundle
-import android.view.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.SearchView
+import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView.Adapter.StateRestorationPolicy
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.BOOK_COVER_STYLE_SQUARE
-import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionsBinding
+import io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsScreen
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
-import io.github.mattpvaughn.chronicle.util.isDifferentListById
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import timber.log.Timber
 import javax.inject.Inject
@@ -45,98 +47,51 @@ class CollectionsFragment : Fragment() {
   }
 
   @Inject
-  lateinit var prefsRepo: PrefsRepo
-
-  @Inject
   lateinit var navigator: Navigator
 
   @Inject
   lateinit var plexConfig: PlexConfig
-
-  var adapter: CollectionsAdapter? = null
 
   override fun onCreateView(
     inflater: LayoutInflater,
     container: ViewGroup?,
     savedInstanceState: Bundle?,
   ): View {
-    Timber.i("Lib frag view create")
     val binding = FragmentCollectionsBinding.inflate(inflater, container, false)
 
-    adapter =
-      CollectionsAdapter(
-        prefsRepo.libraryBookViewStyle,
-        true,
-        prefsRepo.bookCoverStyle == BOOK_COVER_STYLE_SQUARE,
-        object : CollectionClick {
-          override fun onClick(collection: Collection) {
-            openCollectionDetails(collection)
-          }
-        },
-        plexConfig::toServerString,
-      ).apply {
-        stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
-      }
+    // The grid, the empty state and the offline state are all `CollectionsScreen` now (cu-187).
+    // What this replaces is worth naming: a `CollectionsAdapter`, a hand-rolled
+    // `isDifferentListById` diff with a `submitList(null) { submitList(real) }` scroll-to-top
+    // dance, a layout-manager swap for grid-vs-list, and three `isVisible` assignments that
+    // decided between empty, offline and populated — badly, since an empty library showed the
+    // offline container *and* the empty message at once.
+    binding.collectionsCompose.setContent {
+      val state by viewModel.uiState.collectAsStateWithLifecycle()
+      val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
 
-    binding.collectionsGrid.adapter = adapter
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.collections) { collections ->
-      // Was three visibility binding expressions in fragment_collections.xml.
-      val isEmpty = collections.isEmpty()
-      binding.offlineModeContainer.isVisible = isEmpty
-      binding.swipeToRefresh.isVisible = !isEmpty
-      binding.noBooksMessage.isVisible = isEmpty
-
-      // Adapter is always non-null between view creation and view destruction
-      if (adapter == null) {
-        return@collectWhileStarted
-      }
-
-      // If there are no previous books, submit normally
-      if (adapter!!.currentList.isEmpty()) {
-        Timber.i("Updating book list: no previous books")
-        adapter!!.submitList(collections)
-        return@collectWhileStarted
-      }
-
-      // Sometimes [books] will be the same as [adapter.currentList] so don't do any
-      // submission/diffing if that's the case
-      //
-      // A ListAdapter hands back only an immutable copy of its list, so telling "actually new" from
-      // "same list, one field changed" means comparing. By **id**, not equals: the playing book's
-      // progress changes once a second (cu-110), and a full comparison would scroll to top on every
-      // tick. O(n), and synchronous — it used to sit in `withContext(Dispatchers.IO)` here and in
-      // its twin, which was neither IO nor safe, since `currentList` is a UI object (cu-169).
-      val isNewList = isDifferentListById(collections, adapter?.currentList?.map { it.id }) { it.id }
-      if (isNewList) {
-        // submit an empty list to force a scroll-to-top, then when it is done, submit
-        // the real list
-        Timber.i("Updating book list: scroll to top")
-        adapter!!.submitList(null) { adapter?.submitList(collections) }
+      // Every composable is wrapped in `ChronicleTheme` — unwrapped it renders in stock Material
+      // purple, which is obvious on a device and easy to miss in a test asserting only text.
+      ChronicleTheme {
+        CollectionsScreen(
+          // `serverConnected` comes from `PlexConfig` rather than the ViewModel's state: it only
+          // decides whether Coil is handed a URL, and folding it in would need a five-source
+          // combinator for one boolean.
+          state = state.copy(serverConnected = isConnected),
+          coverUrl = plexConfig::toServerString,
+          onCollectionClick = ::openCollectionDetails,
+          onDisableOfflineMode = viewModel::disableOfflineMode,
+        )
       }
     }
 
-    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { isConnected ->
-      adapter?.setServerConnected(isConnected)
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
-      Timber.i("View style is: $style")
-      val isGrid =
-        viewStyleIsGrid(style)
-      binding.collectionsGrid.layoutManager =
-        if (isGrid) {
-          GridLayoutManager(requireContext(), 3)
-        } else {
-          LinearLayoutManager(requireContext())
-        }
-      adapter!!.viewStyle = style
-    }
-    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
+    val searchAdapter =
+      GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
     binding.searchResultsList.adapter = searchAdapter
 
-    // Was the `searchBookList`/`serverConnectedSearch` binding adapters on search_results_list.
-    // These must stay below the adapter assignment above, since observe() delivers an
+    // Search is still Views: `GroupedSearchAdapter` is shared with Library and Home, so it
+    // migrates with them (cu-188) rather than being forked here.
+    //
+    // These must stay below the adapter assignment above, since collection delivers an
     // already-set value synchronously.
     viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { rows ->
       searchAdapter.submitList(rows)
@@ -150,8 +105,9 @@ class CollectionsFragment : Fragment() {
     viewLifecycleOwner.collectWhileStarted(viewModel.isSearchActive) { updateSearchVisibility(binding) }
     viewLifecycleOwner.collectWhileStarted(viewModel.isQueryEmpty) { updateSearchVisibility(binding) }
 
-    binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
-
+    // `SwipeRefreshLayout` stays as the Compose view's host rather than moving to a Compose
+    // pull-refresh: it is a working widget the rest of the app also uses, and swapping it would be
+    // an unrelated behaviour change inside a screen migration.
     binding.swipeToRefresh.setOnRefreshListener {
       viewModel.refreshData()
     }
@@ -184,9 +140,9 @@ class CollectionsFragment : Fragment() {
           menu: Menu,
           menuInflater: MenuInflater,
         ) {
-          // The toolbar inflates `R.menu.collections_menu` itself via `app:menu` in the layout (cu-180), so
-          // inflating again here would double every item — which it did, visibly, as two
-          // search icons. This provider only wires the items up.
+          // The toolbar inflates `R.menu.collections_menu` itself via `app:menu` in the layout
+          // (cu-180), so inflating again here would double every item — which it did, visibly, as
+          // two search icons. This provider only wires the items up.
           val searchView = menu.findItem(R.id.search).actionView as SearchView
           val searchItem = menu.findItem(R.id.search)
 
@@ -227,7 +183,6 @@ class CollectionsFragment : Fragment() {
     )
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
-
     binding.toolbarLayout.applyTopSystemBarInset()
 
     return binding.root
@@ -235,8 +190,8 @@ class CollectionsFragment : Fragment() {
 
   /**
    * Was the two `android:visibility` binding expressions on the search views in
-   * fragment_collections.xml. Both depend on more than one LiveData, so every source
-   * re-evaluates the pair rather than each observer owning one view.
+   * fragment_collections.xml. Both depend on more than one flow, so every source re-evaluates the
+   * pair rather than each collector owning one view.
    */
   private fun updateSearchVisibility(binding: FragmentCollectionsBinding) {
     val isSearchActive = viewModel.isSearchActive.value
@@ -259,18 +214,9 @@ class CollectionsFragment : Fragment() {
     // Asks the host for a graph rather than casting to `MainActivity` (cu-178). The cast named a
     // concrete Activity, so this Fragment could not be hosted by anything else — including
     // `FragmentScenario`'s empty activity, which failed in `onAttach` before a line of the screen
-    // ran. `error` rather than a silent skip: in production a missing graph is a wiring bug.
+    // ran. `check` rather than a silent skip: in production a missing graph is a wiring bug.
     check(injectFromHost { it.inject(this) }) { "CollectionsFragment needs an ActivityComponentHost" }
     super.onAttach(context)
     Timber.i("Reattached!")
-  }
-
-  override fun onDestroyView() {
-    adapter = null
-    super.onDestroyView()
-  }
-
-  interface CollectionClick {
-    fun onClick(collection: Collection)
   }
 }
