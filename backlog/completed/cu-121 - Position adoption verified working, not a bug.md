@@ -156,16 +156,29 @@ were not evidence of anything. **Tap the book in the UI** (or otherwise reach
 
 ## Acceptance Criteria
 
-- [ ] **Re-test first, on a device that has not played the book**, with both devices logged in and
+> **Ticked 2026-09-06.** All four device criteria were performed during the 2026-09-03 re-test and
+> are evidenced by the retraction table at the top of this file; the boxes were never updated when
+> the retraction was written. No new work was done to close them — only the record corrected.
+
+- [x] **Re-test first, on a device that has not played the book**, with both devices logged in and
       the phone's stale certificate cleared. The original run does not establish a bug.
-- [ ] Device B adopts device A's position after opening the book, with both on the same server
+      **Done** — the re-test in the retraction table above, run once the phone was logged back in
+      and its stale certificate cleared.
+- [x] Device B adopts device A's position after opening the book, with both on the same server
+      **Done** — the phone moved `14768` → `284551`, matching the server's `viewOffset` exactly and
+      reading `04:44/11:11:47` on screen. `Integrating network track` fired, i.e. the network-wins
+      branch of `merge`.
 - [x] A test that would have caught this: a track whose *network* copy has a greater
       `lastViewedAt` and a different `viewOffset` must end up with the network progress.
       **Added: `PositionAdoptionTest`, 5 tests, using the exact live numbers. They pass against
       unmodified production code**, which is itself the evidence that `merge` is not the fault.
-- [ ] Re-check the converse afterwards — local progress must still not be clobbered by a *stale*
+- [x] Re-check the converse afterwards — local progress must still not be clobbered by a *stale*
       server value ([[cu-73]]'s next item). Fixing adoption naively could break that.
-- [ ] Verified on two real devices, not one device plus a fixture
+      **Done** — with the phone played to `318426` (newer than the tablet's `286557`), re-opening
+      the book left it at `318426`. The stale server value did not win.
+- [x] Verified on two real devices, not one device plus a fixture
+      **Done** — tablet and phone, both against the live server. The earlier fixture-built run is
+      the method lesson this file is kept for, not the evidence.
 
 ## Related
 

@@ -1,5 +1,5 @@
 ---
-id: CU-152
+id: cu-152
 title: Extend dispatcher injection to the workers
 status: Done
 assignee:

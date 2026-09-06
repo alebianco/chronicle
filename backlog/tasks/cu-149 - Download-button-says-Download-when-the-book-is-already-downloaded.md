@@ -1,5 +1,5 @@
 ---
-id: CU-149
+id: cu-149
 title: Download button says Download when the book is already downloaded
 status: Done
 assignee:
