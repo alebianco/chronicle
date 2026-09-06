@@ -149,6 +149,7 @@ dependencies {
   // @Preview rendering and the layout inspector. Debug-only: it pulls in tooling that must not
   // ship, and `ui-tooling-preview` above is the part release code actually needs.
   debugImplementation(libs.compose.ui.tooling)
+  implementation(libs.coil.compose)
 
   testImplementation(platform(libs.compose.bom))
   testImplementation(libs.compose.ui.test.junit4)

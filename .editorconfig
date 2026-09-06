@@ -3,3 +3,9 @@ ktlint_code_style = ktlint_official
 ktlint_standard_no-wildcard-imports = disabled
 ktlint_standard_property-naming = disabled
 ktlint_standard_max-line-length = disabled
+
+# @Composable functions are PascalCase by Google's own convention -- a composable names a piece of
+# UI, not an action, and every Compose sample, the AndroidX source and Studio's templates follow it.
+# ktlint's function-naming rule cannot know that, so it is told rather than disabled: functions
+# *not* annotated @Composable still have to be camelCase (cu-181).
+ktlint_function_naming_ignore_when_annotated_with = Composable
