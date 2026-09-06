@@ -720,6 +720,70 @@ largest single body.
 
 ---
 
+## Would Hilt help? (2026-09-06)
+
+Asked whether Hilt would make setup and testing easier. Measured against this codebase rather than
+answered in general.
+
+### What Hilt would genuinely delete
+
+| | today |
+|---|---:|
+| Hand-written components + modules | **985 lines** across 7 files |
+| `ViewModelProvider.Factory` inner classes | **360 lines** across 15 ViewModels |
+| Field-injection boilerplate (`(activity as X).component.inject(this)`) | 14 sites |
+
+`@HiltViewModel` + `by viewModels()` erases all 360 factory lines outright — every one is
+mechanical, and each is a place a dependency can be forgotten. `@AndroidEntryPoint` erases the
+`onAttach` injection call in ten Fragments. That is a real, uncontested simplification.
+
+Hilt also brings `@TestInstallIn` / `@BindValue`, which is a genuinely better story than the
+`testActivityComponent` seam cu-178 had to invent.
+
+### What it would *not* fix — and this is the deciding fact
+
+The blocker that stopped cu-178 is **not DI**. Six of ten Fragments call:
+
+```kotlin
+(activity as AppCompatActivity).setSupportActionBar(binding.toolbar)
+```
+
+`setSupportActionBar` is AppCompat's own API, so the host must really be an `AppCompatActivity`.
+Hilt changes nothing about that: `launchFragmentInContainer` would still host the Fragment in
+`EmptyFragmentActivity` and still fail in `onCreateView`. **The 9,000 Fragment instructions — the
+largest untested body — stay untestable either way.**
+
+Hilt would have made cu-178's *layer 1* unnecessary (`@AndroidEntryPoint` replaces
+`ActivityComponentHost`). It does nothing for layer 2, which is the half that actually blocked.
+
+### The other costs, stated plainly
+
+- **It is a migration, not an addition.** Three components, three scopes, 149 `@Inject` sites, and
+  a `WorkerFactory` that would become `@HiltWorker` + `HiltWorkerFactory`. Every screen touched at
+  once, on a codebase whose verification is largely manual and device-bound.
+- **KSP support for Hilt has historically lagged** — worth verifying against 2.57.2 before
+  committing, since this project is deliberately KAPT-free (cu-8/cu-58) and reintroducing KAPT
+  would be a real regression.
+- **Dagger is not the thing hurting here.** Constructor injection is used wherever the app controls
+  construction, and the locator is down to **6 real call sites** with a build guard preventing new
+  ones. The DI is not the problem the review found.
+
+### Recommendation
+
+**Not now, and not for testability.**
+
+The honest case for Hilt is the **360 lines of ViewModel factories** — that is mechanical
+boilerplate with no design content, and deleting it is a real gain. But it is a large migration
+justified by tidiness, competing against work that is currently blocked on something Hilt does not
+touch.
+
+If the goal is coverage, the ranked order is unchanged: **remove `setSupportActionBar` from the
+Fragments** (or add the debug-manifest host), which unblocks 9,000 instructions and needs no new
+framework. Revisit Hilt when a migration is wanted for its own sake — ideally after the Fragment
+work, so it lands on code that has tests.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
