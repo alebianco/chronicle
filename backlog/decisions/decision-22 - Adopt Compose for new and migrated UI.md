@@ -1,7 +1,7 @@
 ---
 id: decision-22
 title: "Adopt Compose for new and migrated UI"
-status: Proposed
+status: Accepted
 created_date: '2026-09-06'
 ---
 
@@ -150,18 +150,29 @@ for doing it. The *dependency* costs are permanent, and two surfaces stay outsid
 
 ## Status
 
-**Proposed, not Accepted.**
+**Accepted — owner decision, 2026-09-06.**
 
-Done since this was first written: the screen **has** now been rendered on the tablet — that is
-where the two bugs above came from — and the debug APK delta is measured.
+Accepted knowing two costs are permanent, not transitional: the Compose runtime ships in the APK
+(the View system is in the OS, so deleting XML frees almost nothing), and AppCompat/Material stay
+because `MainActivity` remains an `AppCompatActivity`. Notifications and Android Auto are outside
+Compose's reach for good. The trade is deliberate: what ends is the cu-141 / cu-142 / cu-19 / cu-68
+bug class, the `FirstFrameFlashTest` and `isShown` guards that exist only to police it, and the
+whole ViewBinding + `FragmentScenario` apparatus.
 
-Still owed before Accepted:
+**Two measurements were still outstanding at acceptance and remain owed** — they inform how the
+migration is paced, not whether it happens:
 
-- **Release APK size.** Only the debug APK was measured, and debug is not R8-shrunk.
-- **Build-time delta.** Not measured at all.
-- **The owner has not seen it.** Launch with:
-  `adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.debug.compose.ComposePreviewActivity`
-  plus `--es state empty|offline|loaded`.
+- **Release APK size.** Only the debug APK was measured (+0.1 MB), and debug is not R8-shrunk.
+- **Build-time delta.** Not measured.
 
-The composable is **not wired into `CollectionsFragment`**, so accepting or rejecting this changes
-nothing a user can see today. cu-181 closes to `In Review` for that reason.
+Both are cu-187's first job. If the release delta is materially worse than the debug figure
+suggests, that is a reason to revisit the *pace*, and it should be raised rather than absorbed.
+
+### What acceptance means in practice
+
+- New UI is written in Compose by default.
+- Existing screens migrate one per task, each independently shippable and device-verified.
+- **Navigation Component for Fragments must not be adopted** — Navigation Compose is the target, and
+  doing the Fragment variant first means migrating navigation twice.
+- **cu-185 (Hilt) is unblocked**, and should follow rather than lead: `hiltViewModel()` and Compose
+  are designed together.

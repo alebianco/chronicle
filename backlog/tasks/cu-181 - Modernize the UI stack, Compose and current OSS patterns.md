@@ -70,7 +70,7 @@ navigation twice.
 - [x] **Media3 interop probed** — see below; the risk does not exist
 - [x] APK size delta measured (debug); build-time delta **not** measured
 - [x] An ADR recording go / no-go — `decision-22`, status **Proposed**
-- [ ] Follow-up tasks per remaining screen — **deferred to the owner's go/no-go**
+- [x] Follow-up tasks per remaining screen — decision-22 **Accepted** 2026-09-06; cu-187 (Collections in production) and cu-188 (the rest, player first) filed
 - [x] `./verify.sh` green
 
 ## Implementation Notes
@@ -131,8 +131,11 @@ hidden.
   `adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.debug.compose.ComposePreviewActivity`
   and `--es state empty|offline|loaded`.
 
-### What needs the owner's eye
+### Outcome
 
-Whether to proceed at all — `decision-22` is **Proposed**, not Accepted. If yes, the per-screen
-follow-ups get filed and cu-185 (Hilt) unblocks. The screen is not wired into production, so
-nothing user-visible changed yet.
+**decision-22 was Accepted by the owner on 2026-09-06**, knowing the APK-size and AppCompat costs
+are permanent rather than transitional. cu-187 and cu-188 carry the migration; cu-185 (Hilt) is
+unblocked and sequenced after it.
+
+Two measurements remain owed and are cu-187's first job: the **release** APK delta (only debug was
+measured, and debug is not R8-shrunk) and the build-time delta.

@@ -53,7 +53,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Project snapshot (truthful as of 2026-08-31 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin **2.2.10**, minSdk 27, target/compileSdk **36** (cu-6). Gradle 9.5.1 + AGP 8.13.2 — note AGP 8.x cannot use Gradle >= 9.6.0, and AGP 9.x absorbs the Kotlin plugin (its own migration).
-- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`; the reflective `KotlinJsonAdapterFactory` was removed in cu-62) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · **StateFlow** (LiveData removed in cu-52) + **ViewBinding** (DataBinding removed in cu-58; no Compose) · Fetch2 for downloads.
+- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`; the reflective `KotlinJsonAdapterFactory` was removed in cu-62) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · **StateFlow** (LiveData removed in cu-52) + **ViewBinding** *and* **Compose** (DataBinding removed in cu-58; Compose adopted by decision-22, cu-181 — the two run side by side while screens migrate one at a time) · Fetch2 for downloads.
 - **KSP, not KAPT** (cu-8/cu-58). `kotlin-kapt` is gone; Room and Dagger use `ksp(...)`. Any doc claiming KAPT is wrong.
   Note incremental builds are *slower* than they were under KAPT (+13% on an ordinary edit, +97% when an annotated type
   changes) — this is fixed per-invocation overhead in KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating
@@ -696,6 +696,29 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   "LAN allowance" written that way silently permits nothing and breaks LAN connections at runtime.
   Also note resource shrinking renames the file in release (`res/8G.xml`), so verifying it in an
   APK by its original path returns empty and proves nothing.
+- **Compose is the target for UI; ViewBinding is what has not migrated yet** (decision-22, cu-181).
+  New UI is written in Compose. Existing screens move one per task (cu-187, then cu-188 in bug-density
+  order, player first), each independently shippable and **device-verified in both orientations** —
+  cu-141, cu-142 and cu-19 were all landscape-only, and a Compose test measures whatever width it is
+  told. Four things to know before writing any:
+  - **`MaterialTheme` defines `colorScheme.background` but paints nothing.** That is `Surface`'s or
+    `Scaffold`'s job. A bare `Box` lets the window colour through — the screen renders `#121212` with
+    near-invisible text while every unit test passes, because the semantics tree is right and only
+    the *pixels* are wrong. Wrap every screen in `Surface`.
+  - **`GridCells.Fixed(n)` divides the available width**, so `Fixed(3)` gives 640px cells on the
+    1200x1920 tablet and one cover fills the screen. Use `GridCells.Adaptive(minSize)`.
+  - **Wrap every composable in `ChronicleTheme`** — including previews and tests. Unwrapped renders
+    in stock Material purple, obvious on a device and easy to miss in a test asserting only text.
+    `ChronicleThemeTest` pins the palette against `colors.xml`; the duplication is deliberate
+    (a preview has no Android theme) and retires with the last XML screen.
+  - **The Compose BOM is held at the 2026.06.x line and `lifecycle` at 2.10.0**, both because newer
+    versions demand compileSdk 37 (we are on 36) and AGP 9.1. Raise them only with compileSdk.
+  **Navigation Component for Fragments must not be adopted** — Navigation Compose is the target, and
+  the Fragment variant would be migrated twice. Same reason Hilt (cu-185) follows the screens.
+  **Notifications and Android Auto stay outside Compose permanently**: a notification is rendered by
+  the system process from `NotificationCompat`/`RemoteViews`, and the car host draws Auto from
+  `MediaBrowser` items.
+
 - **ViewBinding, not DataBinding** (cu-58). Layouts have no `<layout>` wrapper and no `@{...}` expressions; view state is
   set from Kotlin. Two traps when converting or reviewing UI code: a view whose visibility is Kotlin-driven needs
   `android:visibility="gone"` in XML or it flashes its default for a frame; and a binding-adapter-backed type such as

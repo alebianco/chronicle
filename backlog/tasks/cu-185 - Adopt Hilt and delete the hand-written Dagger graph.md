@@ -43,7 +43,9 @@ whole scenario suite vacuous.
    KAPT-free (cu-8/cu-58) and reintroducing KAPT is a real regression — cu-8 measured the KSP
    incremental cost and accepted it deliberately. **If Hilt requires KAPT, stop and report; do not
    proceed.**
-2. **Sequenced after cu-181's Compose POC**, not before. Hilt's ViewModel story and Compose's
+2. **Sequenced after Compose**, not before. cu-181's POC is done and decision-22 is **Accepted**,
+   so the gate is open in principle — but the reasoning below now points at cu-187/cu-188 rather
+   than the POC: migrate screens first, then the DI framework, or some of it moves twice. Hilt's ViewModel story and Compose's
    `hiltViewModel()` are designed together, and cu-181 may change how many of those 15 ViewModels
    survive in their present shape. DI first means migrating some of it twice — the same reasoning
    that puts Navigation Component after Compose.
