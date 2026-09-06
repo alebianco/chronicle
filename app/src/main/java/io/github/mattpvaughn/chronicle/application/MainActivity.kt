@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
@@ -115,6 +116,12 @@ class MainActivity : AppCompatActivity() {
   @Inject
   lateinit var accountAuthState: AccountAuthState
 
+  /**
+   * The Cast SDK's opt-in propagates from `CastButton` through the details screen and the nav host
+   * to here, where it stops: this is an override nothing else calls. Lint recognises only the
+   * marker annotation for `UnsafeOptInUsageError`, never `@OptIn`.
+   */
+  @UnstableApi
   override fun onCreate(savedInstanceState: Bundle?) {
     Timber.i("MainActivity onCreate()")
 

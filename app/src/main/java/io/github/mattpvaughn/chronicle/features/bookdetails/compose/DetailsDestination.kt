@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.util.UnstableApi
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.chapterRows
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -59,7 +60,11 @@ private const val SYNC_SPIN_MILLIS = 1000
  * `infiniteRepeatable` here — the same appearance, and the `onPrepareMenu` hook that re-applied the
  * icon state "once the menu exists" has nothing left to fix, because state renders whenever it
  * changes.
+ *
+ * Carries `@UnstableApi` because [CastButton] does: the Cast SDK's opt-in propagates to callers,
+ * and lint recognises only the marker annotation for this check, never `@OptIn`.
  */
+@UnstableApi
 @Composable
 fun DetailsDestination(
   plexConfig: PlexConfig,

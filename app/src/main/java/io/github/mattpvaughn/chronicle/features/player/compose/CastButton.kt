@@ -34,8 +34,13 @@ import timber.log.Timber
  * because `setUpMediaRouteButton` throws rather than degrading when Play services is missing — and
  * a throw is caught besides. On a de-Googled device this composable renders nothing at all, which
  * is the same outcome the `android:visible="false"` menu item produced.
+ *
+ * Annotated `@UnstableApi` rather than `@OptIn(UnstableApi::class)`: lint's `UnsafeOptInUsageError`
+ * recognises only the marker annotation, and `CastPlayerProvider` — the other file naming a Cast
+ * type — uses the same form. The marker propagates to every caller, as far as
+ * `MainActivity.onCreate`.
  */
-@OptIn(UnstableApi::class)
+@UnstableApi
 @Composable
 fun CastButton(
   modifier: Modifier = Modifier,

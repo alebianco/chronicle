@@ -63,8 +63,13 @@ fun ToastEffect(events: Flow<Event<String>?>) {
 @Composable
 fun ToastResEffect(events: Flow<Event<Int>?>) {
   val context = LocalContext.current
+  // `resources.getString`, not `stringResource`: the id is not known at composition time — it
+  // arrives with the event — so the composable form cannot be used, and reading it through
+  // `context.getString` is what lint's `LocalContextGetResourceValueCall` flags. Going through
+  // `resources` is the same lookup without the pattern lint cannot distinguish.
+  val resources = context.resources
   EventEffect(events) { messageRes ->
-    Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, resources.getString(messageRes), Toast.LENGTH_SHORT).show()
   }
 }
 

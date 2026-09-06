@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.navigation.compose
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -43,7 +44,12 @@ import io.github.mattpvaughn.chronicle.navigation.decodeArg
  * The **login destinations are ordinary entries here**, not a separate flow. `Navigator` drove them
  * from `IPlexLoginRepo.loginEvent`, and that collector moves to `MainActivity`, which is the one
  * place that can outlive any single screen.
+ *
+ * Carries `@UnstableApi` because the Cast SDK's opt-in reaches here from `CastButton` through
+ * `DetailsDestination`. It carries on to `MainActivity.onCreate` — a lambda call site is still a
+ * usage — which is as far as it goes, since `onCreate` is an override nothing else calls.
  */
+@UnstableApi
 @Composable
 fun ChronicleNavHost(
   navController: NavHostController,
