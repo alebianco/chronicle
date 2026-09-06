@@ -129,7 +129,14 @@ class LibraryFragmentScenarioTest {
             viewModelFactory = realFactory(requireContext())
             prefsRepo = mockk(relaxed = true)
             navigator = mockk(relaxed = true)
-            plexConfig = mockk(relaxed = true)
+            plexConfig =
+              mockk(relaxed = true) {
+                // `isConnected` must be stubbed, not relaxed: a relaxed `StateFlow<Boolean>` hands
+                // back a `StateFlow<Object>`, and `collectAsStateWithLifecycle` throws
+                // ClassCastException the moment Compose reads it (cu-187's finding).
+                every { isConnected } returns MutableStateFlow(true)
+                every { toServerString(any()) } returns "http://localhost/cover.jpg"
+              }
           }
           Unit
         }

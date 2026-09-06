@@ -5,10 +5,12 @@ import android.view.*
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.SearchView
+import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.BOOK_COVER_STYLE_SQUARE
@@ -16,12 +18,13 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentHomeBinding
+import io.github.mattpvaughn.chronicle.features.home.compose.HomeScreen
 import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
-import io.github.mattpvaughn.chronicle.features.library.bindRecyclerView
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
@@ -61,55 +64,30 @@ class HomeFragment : Fragment() {
     // Was compound visibility expressions across three shelves in fragment_home.xml.
     // XML re-ran the whole condition when any source changed; in Kotlin every
     // contributing source has to drive the shared refresh explicitly.
-    fun refreshShelves() {
-      val added = viewModel.recentlyAdded.value
-      val listened = viewModel.recentlyListened.value
-      val downloaded = viewModel.downloaded.value
-      val offline = viewModel.offlineMode.value
-      val allEmpty = added.isEmpty() && listened.isEmpty() && downloaded.isEmpty()
-
-      binding.noBooksMessage.isVisible = allEmpty && !offline
-      binding.offlineEmptyMessage.isVisible = allEmpty && offline
-
-      binding.downloadedTitle.isVisible = downloaded.isNotEmpty()
-      binding.downloadedRecyclerview.isVisible = downloaded.isNotEmpty()
-      binding.recentlyListenedTitle.isVisible = listened.isNotEmpty()
-      binding.onDeckRecyclerview.isVisible = listened.isNotEmpty()
-      binding.recentlyAddedTitle.isVisible = added.isNotEmpty()
-      binding.recentlyAddedRecyclerview.isVisible = added.isNotEmpty()
-
-      bindRecyclerView(binding.downloadedRecyclerview, downloaded)
-      bindRecyclerView(binding.onDeckRecyclerview, listened)
-      bindRecyclerView(binding.recentlyAddedRecyclerview, added)
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.recentlyAdded) { refreshShelves() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.recentlyListened) { refreshShelves() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.downloaded) { refreshShelves() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.offlineMode) { refreshShelves() }
-
-    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
-      bindRecyclerView(binding.downloadedRecyclerview, connected)
-      bindRecyclerView(binding.onDeckRecyclerview, connected)
-      bindRecyclerView(binding.recentlyAddedRecyclerview, connected)
-    }
-
-    binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
-
-    binding.recentlyAddedRecyclerview.adapter = makeAudiobookAdapter(openDetails)
-    binding.recentlyAddedRecyclerview.itemAnimator?.changeDuration = 0
-    // Continue Listening resumes on tap; details stays reachable by long press (cu-18). The other
-    // two shelves open details, which is right for a book you have not started.
-    binding.onDeckRecyclerview.adapter = makeAudiobookAdapter(resumeOnClick)
-    binding.onDeckRecyclerview.itemAnimator?.changeDuration = 0
-    binding.downloadedRecyclerview.adapter = makeAudiobookAdapter(openDetails)
-    binding.downloadedRecyclerview.itemAnimator?.changeDuration = 0
-    val searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
+    // The three shelves and all three empty states are `HomeScreen` now (cu-201). This replaces
+    // `refreshShelves()` — four `.value` reads driving eight independent `isVisible` writes — plus
+    // three `AudiobookAdapter` instances and three `itemAnimator.changeDuration = 0` workarounds
+    // that existed only because a RecyclerView animates a rebind (cu-110).
+    val searchAdapter =
+      GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
     binding.searchResultsList.adapter = searchAdapter
 
-    // Was `searchBookList="@{viewModel.searchResults}"` on the list. Missed when cu-58 converted
-    // this screen off DataBinding — the adapter was set and never given any data, so search
-    // returned nothing however well the query worked. Same omission as the choose-user list; both
-    // were found on the owner's device during cu-73.
+    binding.homeCompose.setContent {
+      val state by viewModel.uiState.collectAsStateWithLifecycle()
+      val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
+
+      ChronicleTheme {
+        HomeScreen(
+          state = state.copy(serverConnected = isConnected),
+          coverUrl = plexConfig::toServerString,
+          onBookClick = ::openAudiobookDetails,
+          // Continue Listening resumes rather than opening details (cu-18).
+          onResumeClick = { viewModel.resume(it) },
+          onDisableOfflineMode = viewModel::disableOfflineMode,
+        )
+      }
+    }
+
     viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { rows ->
       searchAdapter.submitList(rows)
     }

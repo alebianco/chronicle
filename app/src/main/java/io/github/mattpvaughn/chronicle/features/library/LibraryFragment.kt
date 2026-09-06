@@ -6,14 +6,13 @@ import android.view.*
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.SearchView
+import androidx.compose.runtime.getValue
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView.Adapter.StateRestorationPolicy
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
 import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN
@@ -21,17 +20,16 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.BOOK_COVER_STYLE_SQUARE
-import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
+import io.github.mattpvaughn.chronicle.features.library.compose.LibraryScreen
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
-import io.github.mattpvaughn.chronicle.util.isDifferentListById
 import io.github.mattpvaughn.chronicle.views.checkRadioButtonWithTag
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
@@ -78,31 +76,9 @@ class LibraryFragment : Fragment() {
     val binding = FragmentLibraryBinding.inflate(inflater, container, false)
     searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
 
-    // Was compound visibility expressions in fragment_library.xml. XML combined
-    // several LiveData sources implicitly; in Kotlin each source has to re-run
-    // the whole condition, so the shared logic is factored into one function.
-    // `books` and `isOffline` are cold `Flow`s, so there is no `.value` to read (cu-52). The two
-    // collectors below keep these locals current and call this; a `StateFlow` would work too, but
-    // the sort is O(library) and there is no reason to run it while the screen is away.
-    var latestBooks: List<Audiobook> = emptyList()
-    var latestOffline = false
-
-    fun refreshEmptyStates() {
-      val books = latestBooks
-      val offline = latestOffline
-      binding.offlineEmptyMessage.isVisible = books.isEmpty() && offline
-      binding.noBooksMessage.isVisible = books.isEmpty() && !offline
-      binding.swipeToRefresh.isVisible = books.isNotEmpty()
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.books) {
-      latestBooks = it
-      refreshEmptyStates()
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.isOffline) {
-      latestOffline = it
-      refreshEmptyStates()
-    }
-
+    // Search is still Views: `GroupedSearchAdapter` is shared with Home and Collections, so it
+    // migrates with them rather than being forked here (cu-187's precedent). Each source re-runs
+    // the whole condition, so the shared logic stays in one function.
     fun refreshSearchStates() {
       val rows = viewModel.searchRows.value
       val active = viewModel.isSearchActive.value
@@ -123,7 +99,6 @@ class LibraryFragment : Fragment() {
       setBottomChooserState(binding.bottomSheetChooser, state)
     }
 
-    binding.disableOfflineMode.setOnClickListener { viewModel.disableOfflineMode() }
     binding.doneFiltering.setOnClickListener { viewModel.setFilterMenuVisible(false) }
     binding.sortByContainer.setOnClickListener { viewModel.toggleSortDirection() }
     viewLifecycleOwner.collectWhileStarted(viewModel.isSortDescending) { descending ->
@@ -137,67 +112,25 @@ class LibraryFragment : Fragment() {
         )
     }
 
-    adapter =
-      AudiobookAdapter(
-        prefsRepo.libraryBookViewStyle,
-        true,
-        prefsRepo.bookCoverStyle == BOOK_COVER_STYLE_SQUARE,
-        object : AudiobookClick {
-          override fun onClick(audiobook: Audiobook) {
-            openAudiobookDetails(audiobook)
-          }
-        },
-        plexConfig::toServerString,
-      ).apply {
-        stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
-      }
+    // The grid is `LibraryScreen` now (cu-201). This replaces an `AudiobookAdapter`, the
+    // hand-rolled `isDifferentListById` diff with its `submitList(null) { submitList(real) }`
+    // scroll-to-top dance, a layout-manager swap, and the two cached locals whose seeds once
+    // rendered "No books found" over a full library — the bug `CollectorCachesItsValueTest` was
+    // written for.
+    binding.libraryCompose.setContent {
+      val state by viewModel.uiState.collectAsStateWithLifecycle()
+      val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
 
-    binding.libraryGrid.adapter = adapter
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.books) { books ->
-      // Adapter is always non-null between view creation and view destruction
-      checkNotNull(adapter) { "Adapter must not be null while view exists" }
-
-      // If there are no previous books, submit normally
-      if (adapter!!.currentList.isEmpty()) {
-        Timber.i("Updating book list: no previous books")
-        adapter!!.submitList(books)
-        return@collectWhileStarted
-      }
-
-      // Sometimes [books] will be the same as [adapter.currentList] so don't do any
-      // submission/diffing if that's the case
-      //
-      // A ListAdapter hands back only an immutable copy of its list, so telling "actually new" from
-      // "same list, one field changed" means comparing. By **id**, not equals: the playing book's
-      // progress changes once a second (cu-110), and a full comparison would scroll to top on every
-      // tick. O(n), and synchronous — it used to sit in `withContext(Dispatchers.IO)` here and in
-      // its twin, which was neither IO nor safe, since `currentList` is a UI object (cu-169).
-      val isNewList = isDifferentListById(books, adapter?.currentList?.map { it.id }) { it.id }
-      if (isNewList) {
-        // submit an empty list to force a scroll-to-top, then when it is done, submit
-        // the real list
-        Timber.i("Updating book list: scroll to top")
-        adapter!!.submitList(null) { adapter?.submitList(books) }
+      ChronicleTheme {
+        LibraryScreen(
+          state = state.copy(serverConnected = isConnected),
+          coverUrl = plexConfig::toServerString,
+          onBookClick = ::openAudiobookDetails,
+          onDisableOfflineMode = viewModel::disableOfflineMode,
+        )
       }
     }
 
-    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { isConnected ->
-      adapter?.setServerConnected(isConnected)
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
-      Timber.i("View style is: $style")
-      val isGrid =
-        viewStyleIsGrid(style)
-      binding.libraryGrid.layoutManager =
-        if (isGrid) {
-          GridLayoutManager(requireContext(), 3)
-        } else {
-          LinearLayoutManager(requireContext())
-        }
-      adapter!!.viewStyle = style
-    }
     binding.searchResultsList.adapter = searchAdapter
 
     binding.swipeToRefresh.setOnRefreshListener {

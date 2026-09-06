@@ -16,6 +16,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_HIDE_P
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_IS_LIBRARY_SORT_DESCENDING
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_LIBRARY_VIEW_STYLE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_OFFLINE_MODE
+import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_AUTHOR
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_DATE_ADDED
@@ -29,13 +30,17 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.CACHED
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.NOT_CACHED
+import io.github.mattpvaughn.chronicle.features.library.compose.LibraryContent
+import io.github.mattpvaughn.chronicle.features.library.compose.LibraryUiState
 import io.github.mattpvaughn.chronicle.features.search.SearchController
 import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import io.github.mattpvaughn.chronicle.util.booksKey
 import io.github.mattpvaughn.chronicle.util.booleanFlow
 import io.github.mattpvaughn.chronicle.util.bytesAvailable
+import io.github.mattpvaughn.chronicle.util.combineDistinct
 import io.github.mattpvaughn.chronicle.util.combineDistinctAsync
 import io.github.mattpvaughn.chronicle.util.stringFlow
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser
@@ -46,9 +51,11 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableStrin
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -323,4 +330,29 @@ class LibraryViewModel(
     Timber.i("toggleHidePlayedAudiobooks")
     prefsRepo.hidePlayedAudiobooks = !prefsRepo.hidePlayedAudiobooks
   }
+
+  /**
+   * Everything the library grid renders, as one value (cu-201).
+   *
+   * The Fragment gated three views on `books.isEmpty()` and `isOffline` through two cached locals
+   * — the pattern `CollectorCachesItsValueTest` guards, because discarding a collector's emission
+   * left the local on its seed and rendered "No books found" over a full library. A sealed
+   * `LibraryContent` seeded to `Loading` makes that unrepresentable.
+   *
+   * `books` is a cold `Flow` on purpose (the O(library) sort must not run while the screen is
+   * away); `WhileSubscribed` preserves that.
+   */
+  internal val uiState: StateFlow<LibraryUiState> =
+    combineDistinct(books, isOffline, viewStyle, isRefreshing) { books, offline, style, refreshing ->
+      LibraryUiState(
+        content =
+          when {
+            books.isNotEmpty() -> LibraryContent.Loaded(books)
+            offline -> LibraryContent.OfflineEmpty
+            else -> LibraryContent.Empty
+          },
+        style = ViewStyleKind.of(style),
+        isRefreshing = refreshing,
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), LibraryUiState())
 }

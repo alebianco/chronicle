@@ -26,53 +26,6 @@ xmlns:tools="http://schemas.android.com/tools"
             app:title="@string/tab_home" />
     </com.google.android.material.appbar.AppBarLayout>
 
-    <TextView
-        android:id="@+id/no_books_message"
-        android:visibility="gone"
-        style="@style/TextAppearance.Title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/no_books_found"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:visibility="gone" />
-
-    <LinearLayout
-        android:id="@+id/offline_empty_message"
-        android:visibility="gone"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/margin_normal"
-        android:elevation="1dp"
-        android:orientation="vertical"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            style="@style/TextAppearance.Title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/margin_normal"
-            android:text="@string/no_downloaded_books_found"
-            android:textAlignment="center"
-            tools:visibility="gone" />
-
-        <Button
-            android:id="@+id/disable_offline_mode"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:text="@string/disable_offline_mode" />
-    </LinearLayout>
-
     <io.github.mattpvaughn.chronicle.views.HorizontalChildReadySwipeRefreshLayout
         android:id="@+id/swipe_to_refresh"
         android:layout_width="0dp"
@@ -82,93 +35,21 @@ xmlns:tools="http://schemas.android.com/tools"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar_layout">
 
-        <ScrollView
+        <!--
+          The three shelves and all three empty states are `HomeScreen` now (cu-201). The
+          `ScrollView` and its nested `LinearLayout` of titles and RecyclerViews go with them, as
+          do the two `gone` empty-state views above: those states are a sealed `HomeContent`
+          seeded to `Loading`, so nothing can claim an empty library before the first emission.
+
+          `HorizontalChildReadySwipeRefreshLayout` stays as the host — it is the
+          horizontal-child-aware subclass, whose `onInterceptTouchEvent` declines the pull once
+          horizontal slop is exceeded. That arbitration exists *because* the shelves scroll
+          sideways, and reimplementing it in Compose buys nothing.
+        -->
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/home_compose"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintRight_toRightOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/toolbar_layout">
-
-                <TextView
-                    android:id="@+id/downloaded_title"
-                    android:visibility="gone"
-                    tools:visibility="visible"
-                    style="@style/TextAppearance.Title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="@dimen/screen_horizontal_padding"
-                    android:layout_marginTop="@dimen/margin_normal"
-                    android:layout_marginRight="@dimen/screen_horizontal_padding"
-                    android:text="@string/available_offline"
-                    app:layout_constraintLeft_toLeftOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/toolbar_layout" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/downloaded_recyclerview"
-                    android:visibility="gone"
-                    tools:visibility="visible"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    app:spanCount="3"
-                    tools:itemCount="9"
-                    tools:listitem="@layout/grid_item_audiobook" />
-
-                <TextView
-                    android:id="@+id/recently_listened_title"
-                    android:visibility="gone"
-                    tools:visibility="visible"
-                    style="@style/TextAppearance.Title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="@dimen/screen_horizontal_padding"
-                    android:layout_marginTop="@dimen/margin_normal"
-                    android:layout_marginRight="@dimen/screen_horizontal_padding"
-                    android:text="@string/recently_listened" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/on_deck_recyclerview"
-                    android:visibility="gone"
-                    tools:visibility="visible"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:itemCount="9"
-                    tools:listitem="@layout/grid_item_audiobook" />
-
-                <TextView
-                    android:id="@+id/recently_added_title"
-                    android:visibility="gone"
-                    tools:visibility="visible"
-                    style="@style/TextAppearance.Title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="@dimen/screen_horizontal_padding"
-                    android:layout_marginTop="@dimen/margin_normal"
-                    android:layout_marginRight="@dimen/screen_horizontal_padding"
-                    android:text="@string/recently_added" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recently_added_recyclerview"
-                    android:visibility="gone"
-                    tools:visibility="visible"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    app:spanCount="3"
-                    tools:itemCount="9"
-                    tools:listitem="@layout/grid_item_audiobook" />
-            </LinearLayout>
-        </ScrollView>
+            android:layout_height="match_parent" />
     </io.github.mattpvaughn.chronicle.views.HorizontalChildReadySwipeRefreshLayout>
 
     <androidx.recyclerview.widget.RecyclerView

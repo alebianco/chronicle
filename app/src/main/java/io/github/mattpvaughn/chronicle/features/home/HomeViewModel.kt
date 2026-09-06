@@ -10,6 +10,8 @@ import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
+import io.github.mattpvaughn.chronicle.features.home.compose.HomeContent
+import io.github.mattpvaughn.chronicle.features.home.compose.HomeUiState
 import io.github.mattpvaughn.chronicle.features.library.LibraryViewModel
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
@@ -252,4 +254,33 @@ class HomeViewModel(
   fun refreshData() {
     librarySyncRepository.refreshLibrary()
   }
+
+  /**
+   * Everything the home screen renders, as one value (cu-201).
+   *
+   * The Fragment read these four by `.value` inside one `refreshShelves()` and made eight
+   * independent `isVisible` decisions from them. The seed is `Loading`, never
+   * `Loaded(empty, empty, empty)` — with three shelves that would render "no books found" on every
+   * cold start before Room's first emission, which is cu-68's flash.
+   *
+   * The `distinctUntilChangedBy { it.booksKey() }` on each shelf source stays where it is: it is
+   * cu-110's load-bearing fix (88% janky frames, GC every ~4s) and lives upstream of this.
+   */
+  val uiState: StateFlow<HomeUiState> =
+    combineDistinct(
+      downloaded,
+      recentlyListened,
+      recentlyAdded,
+      offlineMode,
+    ) { downloaded, listened, added, offline ->
+      val allEmpty = downloaded.isEmpty() && listened.isEmpty() && added.isEmpty()
+      HomeUiState(
+        content =
+          when {
+            !allEmpty -> HomeContent.Loaded(downloaded, listened, added)
+            offline -> HomeContent.OfflineEmpty
+            else -> HomeContent.Empty
+          },
+      )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), HomeUiState())
 }

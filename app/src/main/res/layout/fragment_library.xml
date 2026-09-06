@@ -31,61 +31,27 @@ xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="@dimen/margin_normal"
-            android:elevation="1dp"
-            android:id="@+id/offline_empty_message"
-            android:visibility="gone"
-            android:orientation="vertical">
+        <!--
+          The grid and all three empty states are `LibraryScreen` now (cu-201). The two `gone`
+          TextViews and the offline block are gone with them: their states are a sealed
+          `LibraryContent` seeded to `Loading`, so "no books found" cannot render before the first
+          emission — which is the bug `CollectorCachesItsValueTest` was written for.
 
-            <TextView
-                style="@style/TextAppearance.Title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/margin_normal"
-                android:text="@string/no_downloaded_books_found"
-                android:textAlignment="center"
-                tools:visibility="gone" />
-
-            <Button
-                android:id="@+id/disable_offline_mode"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:text="@string/disable_offline_mode" />
-        </LinearLayout>
-
+          `SwipeRefreshLayout` stays as the Compose view's host, as cu-187 did for collections: it
+          is a working widget the rest of the app uses, and swapping it for a Compose pull-refresh
+          is an unrelated behaviour change inside a screen migration.
+        -->
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipe_to_refresh"
-            android:visibility="gone"
-            tools:visibility="visible"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/library_grid"
+            <androidx.compose.ui.platform.ComposeView
+                android:id="@+id/library_compose"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingLeft="@dimen/margin_small"
-                android:paddingRight="@dimen/margin_small"
-                tools:listitem="@layout/grid_item_audiobook" />
+                android:layout_height="match_parent" />
 
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-        <TextView
-            android:id="@+id/no_books_message"
-            android:visibility="gone"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:drawableTop="@drawable/ic_error_outline_white"
-            android:drawablePadding="@dimen/spacing_micro"
-            android:text="@string/no_books_found" />
 
         <LinearLayout
             android:layout_width="match_parent"
