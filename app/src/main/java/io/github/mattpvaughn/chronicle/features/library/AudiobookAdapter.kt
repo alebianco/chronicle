@@ -12,7 +12,10 @@ import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.BookProgressState
 import io.github.mattpvaughn.chronicle.data.model.isCompleted
+import io.github.mattpvaughn.chronicle.data.model.progressBarMax
+import io.github.mattpvaughn.chronicle.data.model.progressState
 import io.github.mattpvaughn.chronicle.databinding.GridItemAudiobookBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookTextOnlyBinding
 import io.github.mattpvaughn.chronicle.databinding.ListItemAudiobookWithDetailsBinding
@@ -200,14 +203,21 @@ internal fun bindProgressIndicators(
   bookProgress: ProgressBar,
   audiobook: Audiobook,
 ) {
-  val isCompleted = audiobook.isCompleted()
-  val isUnstarted = !isCompleted && audiobook.viewCount == 0L && audiobook.progress == 0L
+  // The decision lives in `Audiobook.progressState()` (cu-198) so the Compose renderer cannot
+  // drift from this one while the two coexist through cu-188's migration. This function is now
+  // only the *painting*.
+  val state = audiobook.progressState()
+  val barMax = audiobook.progressBarMax()
 
-  notPlayedDogEar.isVisible = isUnstarted
-  val barMax = audiobook.duration.toInt().coerceAtLeast(1)
+  notPlayedDogEar.isVisible = state is BookProgressState.Unstarted
   bookProgress.max = barMax
-  bookProgress.progress = if (isCompleted) barMax else audiobook.progress.toInt()
-  bookProgress.isVisible = isCompleted || audiobook.progress > 0L
+  bookProgress.progress =
+    when (state) {
+      is BookProgressState.Completed -> barMax
+      is BookProgressState.InProgress -> state.progressMillis.toInt()
+      is BookProgressState.Unstarted -> 0
+    }
+  bookProgress.isVisible = state !is BookProgressState.Unstarted
 }
 
 class DetailsStyleViewHolder(
