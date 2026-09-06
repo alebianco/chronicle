@@ -1,8 +1,9 @@
 ---
 id: cu-206
 title: Adopt Navigation Compose and retire ViewBinding
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-06'
 labels:
   - R2
@@ -55,9 +56,57 @@ removed before the hazard is.
 cu-185 (Hilt) follows this rather than leading it — `hiltViewModel()` and Navigation Compose are
 designed together, and doing DI first means wiring the Fragment graph twice.
 
+## Scope correction (2026-09-06, from a full Fragment survey)
+
+The description above assumed every screen's *content* was already Compose and only the shells
+remained. A survey of all 17 Fragments found three things it did not account for, each of which is
+real screen work rather than shell replacement:
+
+1. **Three screens are still pure Views**, never migrated by cu-188/cu-203 — `LoginFragment`
+   (OAuth + Custom Tabs), `ModalBottomSheetSpeedChooser` (Slider + ChipGroup + 2 switches, and a
+   `SharedPreferences` listener with an `isRendering` re-entrancy guard) and
+   `ModalBottomSheetBookmarkNote` (text entry). cu-203's "every screen's content is Compose" was
+   true of the *main* screens only.
+2. **`LibraryFragment`'s filter panel is a real XML `BottomSheetBehavior`** — two `ChipGroup`s, a
+   switch, and a two-way binding between the sheet's state and `viewModel.isFilterShown`.
+3. **The Cast button cannot be Compose.** `MediaRouteButtonFactory.setUpMediaRouteButton` takes a
+   `Menu` and an item id, so it requires a View-based menu; there is no Compose equivalent.
+
+**Owner decisions (2026-09-06):** do the whole migration in this one task, and keep the Cast
+button by hosting a real `MediaRouteButton` in an `AndroidView` inside the Compose toolbar. It must
+still degrade to absent on a device without Play services, which is decision-19's condition and
+what `CastMenu` already does.
+
+## Implementation Plan
+
+1. **Routes as data.** `navigation/Destination.kt` — a sealed interface of every destination with
+   its route string, plus `encodeArg`/`decodeArg`. Framework-free and on `FrameworkFreeCoreTest`'s
+   list: a mis-encoded argument matches no pattern and navigates *nowhere, silently*, so the
+   encoding is exactly what a cheap test should pin. **Done, 8 tests.**
+2. **The shell.** `application/compose/ChronicleApp.kt` replaces `activity_main.xml`: a Compose
+   `NavigationBar`, the `NavHost`, and the currently-playing sheet. The sheet stays driven by
+   `MainActivityViewModel.BottomSheetState` rather than `AnchoredDraggable`, because four things
+   read that state back (back handler, notification intent, media-session callbacks, the player
+   itself per cu-198) and a draggable's internal state would be a second copy of it. The XML was
+   never a `BottomSheetBehavior` either — three `ConstraintSet`s and a toggle-only `GestureDetector`.
+3. **Mini player** — `features/currentlyplaying/compose/MiniPlayer.kt`. cu-117's two hand-written
+   per-tick guards (`setTextIfChanged`, the `boundBookTitle`/`boundBookThumb` mirror fields) become
+   structural: a `data class` input means an unchanged tick recomposes nothing. **Done.**
+4. **A shared screen scaffold** for the toolbar shapes the survey found: plain toolbar (6 screens),
+   bare toolbar (Browse), collapsing toolbar (Details, Player), none (Settings, onboarding).
+5. **The three search screens** (Home, Library, Collections) share near-identical `SearchView`
+   wiring through `MenuProvider`; extract it once rather than writing it three times.
+6. **The three pure-View screens** and the Library filter panel.
+7. **Retirement**: `FirstFrameFlashTest`, `buildFeatures.viewBinding`, the `FragmentScenario`
+   apparatus, `ChronicleTheme`'s colour duplication, `expandBottomSheetOnStart`, `FragmentToolbar`,
+   `setToolbarMenu`, `WindowInsetsExt`, and every layout. Order matters: nothing goes while an XML
+   screen remains.
+
 ## Acceptance Criteria
 
 - [ ] Navigation Compose replaces the Fragment shells, with the back stack and deep links preserved
+- [ ] The three pure-View screens (Login, speed chooser, bookmark note) are Compose
+- [ ] The Library filter panel is Compose, and the Cast button survives via `AndroidView`
 - [ ] The bottom navigation and the collapsing toolbars are Compose
 - [ ] Every item on the retirement list above deleted, or kept with recorded reasoning
 - [ ] `buildFeatures.viewBinding` removed

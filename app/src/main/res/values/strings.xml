@@ -127,6 +127,12 @@
     <string name="skip_forwards_reached_last_chapter">You already reached the last chapter/track</string>
     <string name="skip_backwards">Skip backwards</string>
     <string name="pause_play_button">Pause/Play button</string>
+    <!--
+      The up arrow's content description. The XML toolbars had none: `app:navigationIcon` sets the
+      image without a label, so a screen reader announced nothing for the back arrow on six
+      screens. Compose requires one, which is how the gap surfaced (cu-206).
+    -->
+    <string name="back">Back</string>
     <string name="warning_jump_to_chapter_will_clear_progress">This will clear your saved progress. Continue?</string>
     <string name="playback_error">Playback error: %1$s</string>
     <!-- A 401 that survives the automatic token refresh means the account itself is

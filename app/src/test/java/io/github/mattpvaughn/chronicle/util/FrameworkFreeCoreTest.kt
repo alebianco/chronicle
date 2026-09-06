@@ -159,6 +159,11 @@ class FrameworkFreeCoreTest {
         // the list rather than left to fail as "missing", which is what this guard reports for a
         // deleted entry.
         "features/settings/PreferenceModel.kt",
+        // Route strings and their argument encoding (cu-206). Framework-free on purpose: building
+        // a route and parsing one back are pure string work, and a mis-encoded argument matches no
+        // pattern and navigates *nowhere, silently* — exactly the failure a test without a NavHost
+        // can catch cheaply.
+        "navigation/Destination.kt",
         "util/DispatcherProvider.kt",
         "util/DurationFormat.kt",
         "util/FlowCombinators.kt",

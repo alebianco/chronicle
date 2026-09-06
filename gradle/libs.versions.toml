@@ -81,6 +81,9 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.r
 hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.3.0" }
 hilt-work-compiler = { group = "androidx.hilt", name = "hilt-compiler", version = "1.3.0" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version = "1.3.0" }
+# Navigation Compose (cu-206). Held at 2.9.x for the same reason as the Compose BOM and
+# lifecycle: 2.10+ requires compileSdk 37 and we are on 36. Raise it with compileSdk.
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version = "2.9.0" }
 javapoet = { group = "com.squareup", name = "javapoet", version = "1.13.0" }
 hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "dagger" }
 moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
@@ -94,6 +97,10 @@ media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "medi
 media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
 media3-datasource = { group = "androidx.media3", name = "media3-datasource", version.ref = "media3" }
 media3-cast = { group = "androidx.media3", name = "media3-cast", version.ref = "media3" }
+# Declared rather than inherited (cu-69's rule) because `CastButton` imports `MediaRouteButton`
+# directly — the Compose toolbar hosts the real View, since the Cast SDK has no Compose surface
+# (cu-206). Pinned at the version media3-cast already resolved to, so this changes nothing today.
+mediarouter = { group = "androidx.mediarouter", name = "mediarouter", version = "1.8.1" }
 fetch = { group = "com.github.tonyofrancis.Fetch", name = "fetch2", version.ref = "fetch" }
 # Lets Fetch2 download through the app's own OkHttp client, so downloads inherit the
 # Plex interceptor, cu-10 re-auth and cu-11 tiering (cu-76).

@@ -224,6 +224,7 @@ dependencies {
   implementation(libs.hilt.work)
   ksp(libs.hilt.work.compiler)
   implementation(libs.hilt.navigation.compose)
+  implementation(libs.navigation.compose)
 
   // Declared explicitly: 23 files import android.support.v4.media / androidx.media
   // (MediaSessionCompat, PlaybackStateCompat, MediaBrowserServiceCompat...), which
@@ -236,6 +237,7 @@ dependencies {
   implementation(libs.media3.session)
   implementation(libs.media3.datasource)
   implementation(libs.media3.cast)
+  implementation(libs.mediarouter)
 
     /*
      * Local Tests
