@@ -1,10 +1,12 @@
 package io.github.mattpvaughn.chronicle.injection.modules
 
+import android.content.ComponentName
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import androidx.core.content.ContextCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
 import com.squareup.moshi.Moshi
 import com.tonyodev.fetch2.Fetch
@@ -21,8 +23,12 @@ import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingSingleton
+import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService
+import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.injection.qualifiers.ApplicationScope
 import io.github.mattpvaughn.chronicle.util.DefaultDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import io.github.mattpvaughn.chronicle.util.ServiceUtils
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -139,6 +145,7 @@ object AppModule {
    */
   @Provides
   @Singleton
+  @ApplicationScope
   fun provideExternalScope(dispatchers: DispatcherProvider): CoroutineScope = CoroutineScope(SupervisorJob() + dispatchers.io)
 
   @Provides
@@ -441,4 +448,45 @@ object AppModule {
   @Provides
   @Singleton
   fun provideCurrentlyPlaying(): CurrentlyPlaying = CurrentlyPlayingSingleton()
+
+  /**
+   * The app's one connection to the media service, reconnecting to a session already running.
+   *
+   * Moved here from `ActivityModule` in cu-185: see [MediaServiceConnection] for why it is a
+   * singleton. It takes the application context, so nothing about it was activity-shaped.
+   */
+  @Provides
+  @Singleton
+  fun mediaServiceConnection(
+    @ApplicationContext context: Context,
+  ): MediaServiceConnection {
+    val conn =
+      MediaServiceConnection(
+        context,
+        ComponentName(context, MediaPlayerService::class.java),
+      )
+    val doesServiceExist =
+      ServiceUtils.isServiceRunning(
+        context,
+        MediaPlayerService::class.java,
+      )
+    Timber.i("Connecting to existing service? $doesServiceExist")
+    if (doesServiceExist) {
+      conn.connect()
+    }
+    return conn
+  }
+
+  /**
+   * The in-process broadcast bus.
+   *
+   * Moved out of `ActivityModule` in cu-185: it is `getInstance`-backed and process-wide, so
+   * activity scope was never meaningful — and the player service and a `@HiltViewModel` both need
+   * it, which an activity-scoped binding cannot serve.
+   */
+  @Provides
+  @Singleton
+  fun provideBroadcastManager(
+    @ApplicationContext context: Context,
+  ): LocalBroadcastManager = LocalBroadcastManager.getInstance(context)
 }

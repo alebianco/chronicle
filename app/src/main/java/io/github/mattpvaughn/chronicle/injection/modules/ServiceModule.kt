@@ -12,7 +12,6 @@ import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.MediaSessionCompat.*
 import androidx.core.app.NotificationManagerCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -35,8 +34,10 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_MAX_BUFFER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.EXOPLAYER_MIN_BUFFER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.artworkFreeExtractorsFactory
+import io.github.mattpvaughn.chronicle.injection.qualifiers.PlayerServiceScope
 import io.github.mattpvaughn.chronicle.util.PackageValidator
 import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.CoroutineScope
 import kotlin.time.ExperimentalTime
 
 /**
@@ -56,10 +57,6 @@ object ServiceModule {
 
   @Provides
   @ServiceScoped
-  fun service(service: Service): Service = service
-
-  @Provides
-  @ServiceScoped
   fun serviceController(service: Service): ServiceController = service.player()
 
   @Provides
@@ -68,7 +65,8 @@ object ServiceModule {
 
   @Provides
   @ServiceScoped
-  fun serviceScope(service: Service) = service.player().serviceScope
+  @PlayerServiceScope
+  fun serviceScope(service: Service): CoroutineScope = service.player().serviceScope
 
   @Provides
   @ServiceScoped
@@ -131,10 +129,6 @@ object ServiceModule {
       setRatingType(RATING_NONE)
       isActive = true
     }
-
-  @Provides
-  @ServiceScoped
-  fun localBroadcastManager(service: Service) = LocalBroadcastManager.getInstance(service)
 
   @Provides
   @ServiceScoped

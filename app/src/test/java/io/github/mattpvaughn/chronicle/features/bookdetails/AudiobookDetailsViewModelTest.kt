@@ -3,6 +3,7 @@ package io.github.mattpvaughn.chronicle.features.bookdetails
 import android.content.Context
 import android.support.v4.media.MediaMetadataCompat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -289,12 +290,20 @@ class AudiobookDetailsViewModelTest {
       bookRepository = bookRepository,
       trackRepository = trackRepository,
       cachedFileManager = cachedFileManager,
-      inputAudiobook = book,
       mediaServiceConnection = mediaServiceConnection,
       plexConfig = plexConfig,
       plexMediaService = mockk<PlexMediaService>(relaxed = true),
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
       appContext = mockk<Context>(relaxed = true),
       dispatchers = TestDispatcherProvider(),
+      // A real handle, not a mock: it is a plain map, and this is the same path production takes
+      // — the Fragment's navigation arguments (cu-185).
+      savedStateHandle =
+        SavedStateHandle(
+          mapOf(
+            AudiobookDetailsViewModel.ARG_AUDIOBOOK_ID to book.id,
+            AudiobookDetailsViewModel.ARG_AUDIOBOOK_TITLE to book.title,
+          ),
+        ),
     )
 }

@@ -1,128 +1,84 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
-import android.content.SharedPreferences
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.lifecycle.Lifecycle
+import dagger.hilt.android.testing.BindValue
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.data.local.BookRepository
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
-import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Collection
-import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
-import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
+import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.TestCoroutineScheduler
-import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Proof of concept for `FragmentScenario` under Robolectric (cu-178).
+ * `FragmentScenario` under Robolectric (cu-178, moved to Hilt in cu-185).
  *
- * Fragments are **9,000 missed instructions — 21% of everything uncovered**, the single largest
+ * Fragments were **9,000 missed instructions — 21% of everything uncovered**, the single largest
  * body in the app, and none of it was reachable on the JVM. `launchFragmentInContainer` drives the
  * real lifecycle without a device, so it counts toward the coverage ratchet in a way an
  * instrumented test does not.
  *
- * `CollectionsFragment` was chosen as the smallest of the eight (806 instructions) whose ViewModel
- * is already tested — so a failure here is unambiguously the new plumbing rather than the screen.
+ * ## What cu-185 changed here
  *
- * ## What this proved, and what it cost
+ * cu-178's blocker was the app's own DI pattern: every Fragment injected itself with
+ * `(activity as MainActivity).activityComponent!!`, naming a concrete Activity and failing with
+ * `ClassCastException` inside a generic host. The fix then was to invert the dependency behind an
+ * `ActivityComponentHost` capability and mock the component in each suite.
  *
- * The library works out of the box. **The blocker was the app's own DI pattern**: every Fragment
- * injected itself with `(activity as MainActivity).activityComponent!!`, naming a concrete Activity
- * and so failing with `ClassCastException` inside `EmptyFragmentActivity` before a line of the
- * screen ran. That is a dependency-inversion problem, not an Android one — the Fragment depended on
- * its host's *type* when it needed a capability.
- *
- * `ActivityComponentHost` is that capability, `MainActivity` implements it (so production is
- * unchanged), and [FragmentHostActivity] implements it for tests. The component is mocked because a
- * scenario needs exactly one of its two dozen members: the `inject` overload for this Fragment.
- *
- * The pattern for the next seven screens: implement the host, stub `inject` to populate the
- * Fragment's `lateinit` fields, launch.
+ * Hilt removes the problem rather than working around it: `@AndroidEntryPoint` gets its graph from
+ * the *application*, not from the host's type, so `ActivityComponentHost`, `injectFromHost` and
+ * the mocked `ActivityComponent` are all gone. `@BindValue` replaces exactly what a scenario needs
+ * — the two collaborators this screen reads — and the ViewModel builds itself from the real test
+ * graph instead of a hand-assembled factory.
  */
+@HiltAndroidTest
 @RunWith(RobolectricTestRunner::class)
 class CollectionsFragmentScenarioTest {
   private val collectionsFlow = MutableStateFlow<List<Collection>>(emptyList())
-  private val scheduler = TestCoroutineScheduler()
 
-  private fun collection(
-    id: String,
-    title: String,
-  ) = Collection(id = id, source = TEST_SOURCE, title = title)
+  @get:Rule
+  val hiltRule = HiltAndroidRule(this)
 
   /**
-   * A **real** [CollectionsViewModel.Factory] over fakes.
+   * The two collaborators the Fragment itself injects.
    *
-   * Not a mock: `ViewModelProvider` picks among several `create` overloads (Class,
-   * Class+CreationExtras, KClass+CreationExtras) and stubbing the wrong one fails at run time with
-   * "no answer found". The production factory is a plain class taking the same dependencies as the
-   * ViewModel, so constructing it is both simpler and closer to what ships.
+   * `isConnected` must be stubbed, not relaxed. A relaxed `StateFlow<Boolean>` hands back a
+   * `StateFlow<Object>`, and `collectAsStateWithLifecycle` then throws `ClassCastException` the
+   * moment Compose reads it — the cu-187 form of the rule that a relaxed mock is wrong for
+   * anything flow-shaped.
    */
-  private fun realFactory(): CollectionsViewModel.Factory {
-    val collectionsRepository =
-      mockk<CollectionsRepository> { every { getAllCollections() } returns collectionsFlow }
-    val syncRepository =
-      mockk<LibrarySyncRepository>(relaxed = true) {
-        every { isRefreshing } returns MutableStateFlow(false)
-        every { errorMessage } returns MutableStateFlow(null)
-      }
-    val prefs =
-      mockk<SharedPreferences>(relaxed = true) {
-        every { getString(any(), any()) } returns "COVER_GRID"
-        every { getBoolean(any(), any()) } answers { secondArg() }
-      }
-    return CollectionsViewModel.Factory(
-      prefsRepo = mockk<PrefsRepo>(relaxed = true) { every { libraryBookViewStyle } returns "COVER_GRID" },
-      collectionsRepository = collectionsRepository,
-      librarySyncRepository = syncRepository,
-      sharedPreferences = prefs,
-      bookRepository = mockk<BookRepository>(relaxed = true),
-      exceptionHandler = CoroutineExceptionHandler { _, _ -> },
-      dispatchers = TestDispatcherProvider(scheduler),
-    )
-  }
+  @BindValue
+  @JvmField
+  val plexConfig: PlexConfig =
+    mockk(relaxed = true) {
+      every { isConnected } returns MutableStateFlow(true)
+      every { toServerString(any()) } returns "http://localhost/cover.jpg"
+    }
+
+  @BindValue
+  @JvmField
+  val navigator: Navigator = mockk(relaxed = true)
+
+  /** The collections the screen reads, bound into the graph the ViewModel builds from. */
+  @BindValue
+  @JvmField
+  val collectionsRepository: CollectionsRepository =
+    mockk { every { getAllCollections() } returns collectionsFlow }
 
   @Before
-  fun installGraph() {
-    val factory = realFactory()
-    val fragmentSlot = slot<CollectionsFragment>()
-    testActivityComponent =
-      mockk<ActivityComponent>(relaxed = true) {
-        // Stands in for Dagger's field injection: populate exactly the `lateinit`s this screen
-        // reads before `onCreateView`.
-        every { inject(capture(fragmentSlot)) } answers {
-          fragmentSlot.captured.apply {
-            viewModelFactory = factory
-            navigator = mockk(relaxed = true)
-            // `isConnected` must be stubbed, not relaxed. A relaxed `StateFlow<Boolean>` hands
-            // back a `StateFlow<Object>`, and `collectAsStateWithLifecycle` then throws
-            // ClassCastException the moment Compose reads it — the cu-187 form of the rule that a
-            // relaxed mock is wrong for anything flow-shaped.
-            plexConfig =
-              mockk(relaxed = true) {
-                every { isConnected } returns MutableStateFlow(true)
-                every { toServerString(any()) } returns "http://localhost/cover.jpg"
-              }
-          }
-          Unit
-        }
-      }
-  }
-
-  @After
-  fun clearGraph() {
-    testActivityComponent = null
+  fun setUp() {
+    hiltRule.inject()
   }
 
   /**

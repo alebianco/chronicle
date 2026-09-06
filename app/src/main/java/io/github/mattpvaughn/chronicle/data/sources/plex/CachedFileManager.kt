@@ -28,6 +28,7 @@ import io.github.mattpvaughn.chronicle.features.download.partialsSafeToPrune
 import io.github.mattpvaughn.chronicle.features.download.prunePartialFiles
 import io.github.mattpvaughn.chronicle.features.download.reconcileCachedTracks
 import io.github.mattpvaughn.chronicle.features.download.scanCachedMediaDir
+import io.github.mattpvaughn.chronicle.injection.qualifiers.ApplicationScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -93,6 +94,7 @@ class CachedFileManager
     private val plexConfig: PlexConfig,
     private val applicationContext: Context,
     private val dispatchers: DispatcherProvider,
+    @ApplicationScope
     private val externalScope: CoroutineScope,
     private val externalFileDirs: List<@JvmSuppressWildcards File>,
   ) : ICachedFileManager {

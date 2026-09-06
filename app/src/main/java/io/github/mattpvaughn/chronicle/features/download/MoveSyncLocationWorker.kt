@@ -37,7 +37,7 @@ class MoveSyncLocationWorker
     @Assisted context: Context,
     @Assisted parameters: WorkerParameters,
     private val prefsRepo: PrefsRepo,
-    private val externalDeviceDirs: List<File>,
+    private val externalDeviceDirs: List<@JvmSuppressWildcards File>,
   ) : CoroutineWorker(context, parameters) {
     private val notificationManager = NotificationManagerCompat.from(applicationContext)
 

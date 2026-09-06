@@ -34,6 +34,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
+import io.github.mattpvaughn.chronicle.injection.qualifiers.PlayerServiceScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -53,6 +54,7 @@ class AudiobookMediaSessionCallback
     private val dataSourceFactory: DefaultHttpDataSource.Factory,
     private val trackRepository: ITrackRepository,
     private val bookRepository: IBookRepository,
+    @PlayerServiceScope
     private val serviceScope: CoroutineScope,
     private val trackListStateManager: TrackListStateManager,
     private val foregroundServiceController: ForegroundServiceController,

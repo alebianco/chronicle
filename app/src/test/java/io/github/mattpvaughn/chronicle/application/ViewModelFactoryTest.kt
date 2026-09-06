@@ -1,72 +1,21 @@
 package io.github.mattpvaughn.chronicle.application
 
-import androidx.lifecycle.ViewModel
-import io.github.mattpvaughn.chronicle.features.browse.BrowseViewModel
-import io.github.mattpvaughn.chronicle.features.collections.CollectionsViewModel
-import io.github.mattpvaughn.chronicle.features.home.HomeViewModel
-import io.github.mattpvaughn.chronicle.features.library.LibraryViewModel
-import io.github.mattpvaughn.chronicle.features.login.ChooseServerViewModel
-import io.github.mattpvaughn.chronicle.features.login.ChooseUserViewModel
-import io.github.mattpvaughn.chronicle.features.login.LoginViewModel
-import io.github.mattpvaughn.chronicle.features.settings.SettingsViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import kotlin.reflect.full.primaryConstructor
 
 /**
- * Every ViewModel's `Factory` supplies everything its ViewModel asks for.
+ * What survives of the ViewModel-factory guards after cu-185.
  *
- * This is the failure mode cu-33 introduced the opportunity for. A ViewModel and its `Factory`
- * declare the same dependency list *twice*, and the compiler only checks the call between them —
- * so a `Factory` that quietly stopped taking a parameter, and passed a default or a stale field
- * instead, would still compile. Nine ViewModels grew a parameter in this task; asserting the two
- * lists agree is cheap and catches the copy that drifts.
+ * **The factory/ViewModel agreement test is retired, not deleted by accident.** It existed because
+ * a ViewModel and its hand-written `Factory` declared the same dependency list *twice* and only
+ * the call between them was compiler-checked, so a `Factory` that quietly stopped taking a
+ * parameter still compiled. `@HiltViewModel` removes the second list entirely — Dagger resolves
+ * the constructor itself and fails the build on a missing binding — so the hazard the test
+ * described cannot occur. A guard kept past the hazard it guards is noise.
  *
- * Reflective on purpose: naming the parameters would just be a third copy of the same list.
+ * The exception-handler check below is unrelated to factories and still applies.
  */
 class ViewModelFactoryTest {
-  private fun assertFactoryMatches(
-    viewModel: Class<out ViewModel>,
-    factory: Class<*>,
-  ) {
-    val vmParams =
-      viewModel.kotlin.primaryConstructor
-        ?.parameters
-        ?.mapNotNull { it.name }
-        ?.toSet()
-        ?: error("${viewModel.simpleName} has no primary constructor")
-    val factoryParams =
-      factory.kotlin.primaryConstructor
-        ?.parameters
-        ?.mapNotNull { it.name }
-        ?.toSet()
-        ?: error("${factory.simpleName} has no primary constructor")
-
-    assertEquals(
-      "${factory.simpleName} does not supply everything ${viewModel.simpleName} asks for. " +
-        "A ViewModel and its Factory declare the same list twice and only the call between " +
-        "them is compiler-checked, so the two can drift.",
-      emptySet<String>(),
-      vmParams - factoryParams,
-    )
-  }
-
-  @Test
-  fun `every factory supplies its view model's constructor parameters`() {
-    // The `inputAudiobook` on AudiobookDetailsViewModel is a `lateinit` set on the Factory rather
-    // than a constructor parameter, and CurrentlyPlaying/MainActivity's factories are covered by
-    // their own tests, so this lists the ones a carve touched and nothing more.
-    assertFactoryMatches(HomeViewModel::class.java, HomeViewModel.Factory::class.java)
-    assertFactoryMatches(LibraryViewModel::class.java, LibraryViewModel.Factory::class.java)
-    assertFactoryMatches(SettingsViewModel::class.java, SettingsViewModel.Factory::class.java)
-    assertFactoryMatches(CollectionsViewModel::class.java, CollectionsViewModel.Factory::class.java)
-    assertFactoryMatches(LoginViewModel::class.java, LoginViewModel.Factory::class.java)
-    assertFactoryMatches(ChooseUserViewModel::class.java, ChooseUserViewModel.Factory::class.java)
-    assertFactoryMatches(ChooseServerViewModel::class.java, ChooseServerViewModel.Factory::class.java)
-    assertFactoryMatches(BrowseViewModel::class.java, BrowseViewModel.Factory::class.java)
-    assertFactoryMatches(MainActivityViewModel::class.java, MainActivityViewModel.Factory::class.java)
-  }
-
   /**
    * No ViewModel takes a `CoroutineExceptionHandler` it does not use, and none launches without
    * one.

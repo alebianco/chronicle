@@ -13,6 +13,7 @@ import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.OnChapterChangeListener
+import io.github.mattpvaughn.chronicle.injection.qualifiers.PlayerServiceScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -25,6 +26,7 @@ class OnMediaChangedCallback
   @Inject
   constructor(
     private val mediaController: MediaControllerCompat,
+    @PlayerServiceScope
     private val serviceScope: CoroutineScope,
     private val notificationBuilder: NotificationBuilder,
     private val mediaSession: MediaSessionCompat,

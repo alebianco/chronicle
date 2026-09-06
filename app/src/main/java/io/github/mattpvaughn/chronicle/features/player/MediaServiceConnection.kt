@@ -8,12 +8,26 @@ import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.Builder
 import android.support.v4.media.session.PlaybackStateCompat.STATE_NONE
-import dagger.hilt.android.scopes.ActivityScoped
 import kotlinx.coroutines.flow.MutableStateFlow
 import timber.log.Timber
 import javax.inject.Inject
+import javax.inject.Singleton
 
-@ActivityScoped
+/**
+ * The app's single connection to the media service.
+ *
+ * **`@Singleton`, not activity-scoped** (cu-185). There is one playback session at a time, so
+ * there is one connection; scoping it to the activity meant a *new* `MediaBrowserCompat` on every
+ * recreation — a rotation, a theme change, a process the system kept — while the previous one was
+ * never torn down, since `disconnect()` had no callers and `onDestroy` only nulled the component
+ * reference. So this was already process-lived in practice, just rebuilt and leaked per activity.
+ *
+ * It takes the **application** context and no activity binding, so nothing here was ever
+ * activity-shaped. Making it a singleton is also what lets a `@HiltViewModel` depend on it:
+ * Hilt's `ViewModelC` may not reference an `@ActivityScoped` binding, and five ViewModels need
+ * the connection.
+ */
+@Singleton
 class MediaServiceConnection
   @Inject
   constructor(

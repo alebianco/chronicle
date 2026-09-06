@@ -17,6 +17,7 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayin
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.BOOK_FINISHED_END_OFFSET_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.NETWORK_CALL_FREQUENCY
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.PROGRESS_SYNC_WORK_TAG
+import io.github.mattpvaughn.chronicle.injection.qualifiers.PlayerServiceScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -90,6 +91,7 @@ interface ProgressUpdater {
 class SimpleProgressUpdater
   @Inject
   constructor(
+    @PlayerServiceScope
     private val serviceScope: CoroutineScope,
     private val trackRepository: ITrackRepository,
     private val bookRepository: IBookRepository,

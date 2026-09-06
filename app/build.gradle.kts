@@ -241,6 +241,8 @@ dependencies {
      * Local Tests
      */
   testImplementation(libs.dagger)
+  testImplementation(libs.hilt.android.testing)
+  kspTest(libs.hilt.compiler)
   kspTest(libs.dagger.compiler)
 
   testImplementation(libs.junit)

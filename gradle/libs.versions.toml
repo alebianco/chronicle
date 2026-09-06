@@ -82,6 +82,7 @@ hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.3.0" }
 hilt-work-compiler = { group = "androidx.hilt", name = "hilt-compiler", version = "1.3.0" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version = "1.3.0" }
 javapoet = { group = "com.squareup", name = "javapoet", version = "1.13.0" }
+hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "dagger" }
 moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
 # Reflection-based adapters. Tests only — production is codegen (cu-62).
 moshi-kotlin-reflect = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshi" }
