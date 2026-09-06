@@ -1,16 +1,14 @@
 package io.github.mattpvaughn.chronicle.espresso
 
-import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
-import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.debug.MockPlexMode
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -40,6 +38,9 @@ class LoggedInLaunchTest {
    * The precondition every other case rests on. If the fixture session is not seeded, the app shows
    * the login screen and every assertion below fails for a misleading reason.
    */
+  @get:Rule
+  val composeRule = createAndroidComposeRule<MainActivity>()
+
   @Test
   fun mockPlexModeIsActive() {
     assertTrue(
@@ -53,22 +54,26 @@ class LoggedInLaunchTest {
    *
    * The nav bar is the discriminator: onboarding has none. Asserting on Home's content instead
    * would be asserting on the fixture data, which is a different test.
+   *
+   * Read through **Compose semantics** since cu-206 — there is no `R.id.bottom_nav` any more, and
+   * `dumpsys` reports one full-screen `AndroidComposeView` rather than a view tree. The Home tab's
+   * content description is the stable handle, and it does not depend on fixture data.
    */
   @Test
   fun launchesIntoTheAppWhenAlreadySignedIn() {
-    ActivityScenario.launch(MainActivity::class.java).use {
-      onView(withId(R.id.bottom_nav)).check(matches(isDisplayed()))
-      onView(withId(R.id.nav_home)).check(matches(isDisplayed()))
-    }
+    composeRule.onNodeWithContentDescription("Home").assertIsDisplayed()
   }
 
-  /** The activity survives a configuration change — the cheapest guard against a state-loss crash. */
+  /**
+   * The activity survives a configuration change — the cheapest guard against a state-loss crash.
+   *
+   * Worth more since cu-206 than it was before: the whole UI is one composition now, and the nav
+   * back stack is what has to be restored rather than a `FragmentManager`'s.
+   */
   @Test
   fun survivesRecreation() {
-    ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-      scenario.recreate()
+    composeRule.activityRule.scenario.recreate()
 
-      onView(withId(R.id.bottom_nav)).check(matches(isDisplayed()))
-    }
+    composeRule.onNodeWithContentDescription("Home").assertIsDisplayed()
   }
 }

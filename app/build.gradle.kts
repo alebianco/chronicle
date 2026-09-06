@@ -288,6 +288,10 @@ dependencies {
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.rules)
   androidTestImplementation(libs.androidx.test.ext.junit)
+  // The instrumented suite asserts on Compose semantics since cu-206: the app has no View ids
+  // left to match on, so `LoggedInLaunchTest` reads the bottom bar's tabs by content description.
+  androidTestImplementation(platform(libs.compose.bom))
+  androidTestImplementation(libs.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.ext.junit.ktx)
 }
 

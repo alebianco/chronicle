@@ -53,7 +53,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 ## Project snapshot (truthful as of 2026-08-31 — verify against build files if in doubt)
 
 - Single module `:app`, Kotlin **2.2.10**, minSdk 27, target/compileSdk **36** (cu-6). Gradle 9.5.1 + AGP 8.13.2 — note AGP 8.x cannot use Gradle >= 9.6.0, and AGP 9.x absorbs the Kotlin plugin (its own migration).
-- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`; the reflective `KotlinJsonAdapterFactory` was removed in cu-62) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · **StateFlow** (LiveData removed in cu-52) + **ViewBinding** *and* **Compose** (DataBinding removed in cu-58; Compose adopted by decision-22, cu-181 — the two run side by side while screens migrate one at a time) · Fetch2 for downloads.
+- MVVM + Repository · Dagger 2.57.2 (hand-rolled components) · Room **2.8.1 (stable, since cu-1) — always write a migration with any schema change; all four DBs export schemas and have migration tests** · Retrofit/OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`; the reflective `KotlinJsonAdapterFactory` was removed in cu-62) · Media3 **1.11.0** (ExoPlayer + MediaSession + Cast; cu-7) · **StateFlow** (LiveData removed in cu-52) + **Compose**, and Compose only (DataBinding removed in cu-58, ViewBinding in cu-206; decision-22 adopted Compose in cu-181 and the migration finished with the navigation shell) · Fetch2 for downloads.
 - **KSP, not KAPT** (cu-8/cu-58). `kotlin-kapt` is gone; Room and Dagger use `ksp(...)`. Any doc claiming KAPT is wrong.
   Note incremental builds are *slower* than they were under KAPT (+13% on an ordinary edit, +97% when an annotated type
   changes) — this is fixed per-invocation overhead in KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating
@@ -106,7 +106,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1641 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **10 instrumented tests** on two managed emulators, which also run on an Automotive image (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1644 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **10 instrumented tests** on two managed emulators, which also run on an Automotive image (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -116,13 +116,13 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - `injection/` — Dagger components/modules/scopes
 - `data/local/` — Room DBs, DAOs · `data/sources/plex/` — Plex API (`PlexService.kt`), login/config, `CachedFileManager.kt`
 - `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`, `data/sources/local/LocalMediaSource.kt` — multi-backend scaffolding. **The ingestion seam is real since cu-80**: `SourceManager.refreshBooks` ingests per source through `IBookRepository.ingest`, and `planIngestion` (`data/sources/IngestionPlan.kt`) decides what a refresh writes and deletes. Still not *registered* — `sources` is empty in production, so it is a no-op until cu-33.1 adds one. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made `SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`.
-- `features/` — Fragment + ViewModel + adapters per feature (**29** files import `data.sources.plex.*` directly — known debt, now task **cu-80**; dominated by `PlexConfig` at **19**, a connection-state holder rather than a fetch API. The count is **not pinned by any test and has drifted** — it read 27 here until the 2026-09-06 audit measured 29; cu-184 is to either ratchet it or stop quoting a number nothing maintains)
-- `navigation/Navigator.kt` — centralized navigation · `views/BindingAdapters.kt` — reusable bindings
+- `features/` — a `compose/` package per feature holding `*Screen` (pure, state in) and `*Destination` (wires a ViewModel to it), plus the ViewModel (**29** files import `data.sources.plex.*` directly — known debt, now task **cu-80**; dominated by `PlexConfig` at **19**, a connection-state holder rather than a fetch API. The count is **not pinned by any test and has drifted** — it read 27 here until the 2026-09-06 audit measured 29; cu-184 is to either ratchet it or stop quoting a number nothing maintains)
+- `navigation/Destination.kt` — every route, framework-free · `navigation/compose/ChronicleNavHost.kt` — the graph · `application/compose/ChronicleApp.kt` — the shell (bottom nav, nav host, player sheet). `Navigator` is gone (cu-206).
 
 ## Conventions (the golden rules)
 
 1. DI via constructor `@Inject`/factories; respect scopes (`@Singleton`, `@ActivityScope`, `@ServiceScope`); never instantiate singletons manually.
-2. UI logic in Fragments/XML; business logic in ViewModels/Repositories; DB never accessed from UI.
+2. UI in Compose — a screen is a `*Destination` composable over a `*Screen` that is a pure function of its state; business logic in ViewModels/Repositories; DB never accessed from UI.
 3. **`StateFlow` for UI state, never `LiveData`** (cu-52): private `MutableStateFlow`, public
    immutable `StateFlow`. Collect in the UI with `collectWhileStarted(flow) { … }` (or
    `collectEventsWhileStarted` for a one-shot `Event`) on `viewLifecycleOwner` in a Fragment, on
@@ -185,7 +185,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
    presentation concern of `features/player`, not properties of a book.
 7. User-facing text in `res/values/strings.xml`, always.
 8. Room schema change ⇒ bump DB version + write a migration in the same PR.
-9. Navigation through `Navigator.kt`; data via Bundles/args.
+9. Navigation through `ChronicleNavHost`; a destination is a `Destination` with a route, and an argument travels in the route and lands in the ViewModel's `SavedStateHandle`. **Reuse the ViewModel's own argument-name constant** — a fresh name compiles and reads null (cu-206).
 10. Playback via `MediaServiceConnection`/`MediaPlayerService` — never touch ExoPlayer from UI.
 11. Network endpoints in `PlexService.kt`; errors handled in repositories; log with Timber (`Timber.e(e, "context")`).
 12. ktlint style; no wildcard imports; new libraries needing keep rules ⇒ update `app/proguard-rules.pro` **and** run `./test_release_build.sh`.
@@ -228,8 +228,10 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   speed popover rendered *only* its title bar there — Material's `BottomSheetDialog` opens
   collapsed and expects a drag, and for a `wrap_content` sheet that peek settled at 96px, shorter
   than the sheet's own 108px title bar, with nothing on screen suggesting anything was draggable.
-  Every modal sheet here calls `expandBottomSheetOnStart()` (`views/ExpandedBottomSheet.kt`) for
-  that reason — all three had the bug, only one had it noticed. **The obvious diagnosis was wrong**:
+  Every modal sheet called `expandBottomSheetOnStart()` for that reason — all three had the bug,
+  only one had it noticed. **Both the helper and the hazard are gone as of cu-206**: every sheet is
+  a `ModalBottomSheet`, which has no peek state to get stuck at. The reading traps below still
+  apply to any on-device diagnosis. **The obvious diagnosis was wrong**:
   the task blamed a `wrap_content` `ConstraintLayout` measuring to zero, but the layout measures
   356px in both orientations with or without any fix. Probe the measurement before believing a
   layout explanation. The layout's `NestedScrollView` + `fillViewport` is a *separate* need: fully
@@ -677,12 +679,14 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   which is what Auto does when it browses.
   **Mock mode seeds the login, not a refresh**, so a freshly-provisioned emulator browses an empty
   library. That is correct, not a bug — a test asserting books exist is testing provisioning.
-- **The bottom navigation *can* be driven by `adb shell input tap` — the trick is the menu inset**
-  (measured 2026-09-05, correcting an earlier claim that it could not).
-  `BottomNavigationView` spans the full width, but `BottomNavigationMenuView` inside it is
-  **centred and narrower**: on the 1200px tablet the bar is `0–1200` while the menu is `220–979`,
-  so a tap at x=200 or x=1000 lands on the bar and does nothing — which is what "cannot be driven"
-  was really describing. Read the geometry rather than guessing at it:
+- **The bottom navigation is driven by `adb shell input tap`, and its geometry changed in cu-206.**
+  It is a Compose `NavigationBar` now, whose items **spread across the full width** — so the
+  centred-inset trap below no longer applies, and the tab centres are simply
+  `width / visibleTabCount` apart (on the 1920px-wide tablet, three visible tabs sit at x≈320, 960,
+  1600 at the bar's own vertical centre). The historical note is kept because the *method* still
+  holds: read the geometry, do not guess it. `dumpsys` now reports one full-screen
+  `AndroidComposeView` rather than a view tree, so read a **screenshot** for anything finer.
+  The pre-cu-206 measurement, for reference:
   ```
   adb shell dumpsys activity top | grep -A 2 "id/bottom_nav}"   # bar bounds, then menu bounds
   ```
@@ -707,22 +711,28 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   "LAN allowance" written that way silently permits nothing and breaks LAN connections at runtime.
   Also note resource shrinking renames the file in release (`res/8G.xml`), so verifying it in an
   APK by its original path returns empty and proves nothing.
-- **Compose is the target for UI; ViewBinding is what has not migrated yet** (decision-22, cu-181).
-  New UI is written in Compose. Existing screens move one per task (cu-187, then cu-188 in bug-density
-  order, player first), each independently shippable and **device-verified in both orientations** —
-  **every screen's content is Compose** as of cu-203, and **no `RecyclerView.Adapter` remains in
-  the app**. What is left is the *navigation shell*: a Fragment per screen inflating a layout that
-  is a toolbar plus a `ComposeView`. Those shells are why `buildFeatures.viewBinding` is still on,
-  so removing it and adopting **Navigation Compose are one task, cu-206** — and **nothing on
-  cu-188's retirement list, `FirstFrameFlashTest` included, may go while any XML screen remains**,
-  or the guard goes before the hazard does.
+- **The UI is Compose, all of it** (decision-22; cu-181 → cu-206). **Zero layouts, zero Fragments,
+  zero `RecyclerView.Adapter`s, no ViewBinding.** The migration ran screen-by-screen through
+  `ComposeView` (cu-187, cu-188, cu-198–cu-203) and finished with the navigation shell in cu-206,
+  which replaced `Navigator`'s `FragmentManager` transactions with Navigation Compose and deleted
+  `activity_main.xml` along with the hand-built `ConstraintSet` player sheet.
+  **One View island remains, deliberately**: `CastButton` hosts a real `MediaRouteButton` in an
+  `AndroidView`, because the Cast SDK has no Compose surface. It still degrades to absent
+  (decision-19), and its `@UnstableApi` marker propagates to every caller up to
+  `MainActivity.onCreate` — lint's `UnsafeOptInUsageError` recognises only that annotation, never
+  `@OptIn`.
+  **`AnimatedVisibility` composes its content while hidden.** The expanded player is gated on a
+  plain `if (sheetState == EXPANDED)` for that reason: an `AnimatedVisibility` there put every
+  per-tick recomposition back behind a collapsed sheet, which is cu-110/cu-117's measured cost.
+  `CollapsedSheetGuardTest` pins it, sabotage-verified — and it caught that bug precisely because
+  it was *repointed* at the new files rather than deleted when it failed.
   **`FormattableString` survives Compose** (cu-203). It looks like a workaround for a `View`
   being unable to resolve a string without a `Context`, but the strings are chosen in
   **ViewModels**, which still cannot hold one — `SettingsViewModel` alone builds 123. Deferring the
   `Resources` lookup to render time is right; `BottomChooser` performs it there.
   **A `ModalBottomSheet` needs no `expandBottomSheetOnStart()`** — it has no peek state to get
-  stuck in, which is cu-142 answered structurally. That helper stays until the last
-  `BottomSheetDialogFragment` goes.
+  stuck in, which is cu-142 answered structurally. The helper went with the last
+  `BottomSheetDialogFragment` in cu-206.
   cu-141, cu-142 and cu-19 were all landscape-only, and a Compose test measures whatever width it is
   told. Four things to know before writing any:
   - **`MaterialTheme` defines `colorScheme.background` but paints nothing.** That is `Surface`'s or
@@ -763,19 +773,14 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   because two screens render the same thing and must not drift. Doing it first also gives the
   behaviour a framework-free test, which is the only kind that can fail for the right reason.
 
-- **ViewBinding, not DataBinding** (cu-58). Layouts have no `<layout>` wrapper and no `@{...}` expressions; view state is
-  set from Kotlin. Two traps when converting or reviewing UI code: a view whose visibility is Kotlin-driven needs
-  `android:visibility="gone"` in XML or it flashes its default for a frame; and a binding-adapter-backed type such as
-  `FormattableString` must go through its helper, since a plain `.text =` renders the data class `toString()` silently.
-  **`FirstFrameFlashTest` is now the gate** (cu-68): it fails the build on any Kotlin-driven view
-  with no XML default. "For a frame" understates it — several sources are cold (a
-  `stateIn(WhileSubscribed)` before anything collects it, a `combine` waiting on a slow source), so
-  the default held
-  long enough to read "No libraries found" over onboarding, with the bottom nav and mini player on
-  top of the login screen. 34 views were swept. The guard also checks the **mirror** risk, which is
-  worse: a view defaulted to `gone` with no writer is *permanently* invisible. It caught two —
-  driven through a local `tempBinding` rather than `binding`, so match `\w*[Bb]inding` when
-  scanning for these, not just `binding`.
+- **The first-frame flash class of bug is structurally gone** (cu-68 → cu-206). It was a
+  Kotlin-driven view with no XML default, which held its default long enough to read "No libraries
+  found" over onboarding — several sources are cold (a `stateIn(WhileSubscribed)` before anything
+  collects it, a `combine` waiting on a slow source), so "for a frame" understated it. A composable
+  renders its state or nothing, so there is no default to flash and no mirror to leave permanently
+  invisible; `FirstFrameFlashTest` retired with the last layout. The lesson that survives is the
+  *seed*: a `stateIn` seed that is a real-looking value (`FacetList.EMPTY`) still renders as one,
+  which is why the sealed `Loading` states exist (cu-201, cu-202).
 
 ## Definition of done
 
