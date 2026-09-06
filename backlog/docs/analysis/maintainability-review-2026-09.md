@@ -784,6 +784,51 @@ work, so it lands on code that has tests.
 
 ---
 
+## Fragment frameworks: is there one that solves this? (2026-09-06)
+
+Asked whether a popular framework — production or test side — would fix the Fragment blocker.
+
+### The test side is already the right tool
+
+`FragmentScenario` **is** the standard answer, and it works: cu-178 got it to `onAttach`
+successfully. Nothing better exists, and nothing else is needed. The blocker is not the tool.
+
+### The production side has a framework answer, and it is too big
+
+The idiomatic solution to "Fragments coupled to their host's toolbar" is the **Navigation
+Component** — `NavigationUI.setupWithNavController` owns toolbar and menu wiring per destination,
+so no Fragment touches its Activity. It is the most widely adopted Android framework for exactly
+this.
+
+This project has **no Navigation Component**: `Navigator.kt` is hand-rolled and convention rule 9
+routes everything through it. Adopting Navigation would mean nav graphs, `NavHostFragment`, and
+rewriting every transition — a large change to fix a menu-routing detail.
+
+### What the measurement says instead
+
+The coupling is thinner than it looks:
+
+- **`MainActivity` has no toolbar of its own** — no `supportActionBar` reference in it at all.
+- **No fragment reads the action bar back.**
+- **`MenuProvider` is already adopted in 4 of the 6** offending fragments, running *alongside*
+  `setSupportActionBar`.
+
+So `setSupportActionBar` does exactly one job: routing the fragment's own `Toolbar` menu through
+the Activity's `MenuHost`. **A `Toolbar` can do that itself.** Six casts removed, no framework
+added, and `AndroidX MenuProvider` — already in use — is the modern idiom for the menu half.
+
+### Recommendation
+
+**DRAFT-180: let the fragments own their toolbars.** It is the cheapest unblocker for the largest
+untested body, it removes coupling rather than adding a layer, and it is a prerequisite for
+Navigation if that is ever adopted — a Fragment that does not reach for its host is easier to move
+under a nav graph, not harder.
+
+Navigation Component remains a reasonable *future* choice on its own merits (type-safe args,
+back-stack handling, deep links). It should not be adopted as a way to fix this.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
