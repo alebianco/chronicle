@@ -1106,3 +1106,40 @@ A guard run reported green against a **stale result file two hours old** — `--
 force re-execution, and the XML timestamp was the only way to notice. Check the result file's
 mtime, or delete it first, before believing a guard that "still passes" after a change that should
 have broken it.
+
+---
+
+## Hilt, revisited — its deciding fact has expired (2026-09-06, later)
+
+The assessment above declined Hilt on one load-bearing argument: that the real blocker was
+`setSupportActionBar`, which Hilt does not touch, so a large migration would buy tidiness while the
+9,000 Fragment instructions stayed unreachable.
+
+**That argument no longer holds.** cu-180 removed every `setSupportActionBar` call, cu-178 removed
+all twelve host casts, and four scenario suites now run on the JVM. Coverage went 40.47% → 50.92%.
+The blocker Hilt "would not fix" is fixed, by other means.
+
+So the case for Hilt is now what the assessment already conceded was real, with the objection gone:
+
+- **360 lines of `ViewModelProvider.Factory` across 15 ViewModels**, all mechanical, each a place a
+  dependency can be silently forgotten. `@HiltViewModel` + `by viewModels()` deletes them.
+- **985 lines of hand-written components and modules.**
+- `@TestInstallIn` / `@BindValue` replace the `testActivityComponent` / `testAppComponent` seams
+  cu-178 had to invent — including the ordering trap those two seams needed (see cu-178 notes),
+  which exists only because the seams are hand-rolled.
+
+**What has not changed, and still gates it:**
+
+- It is a migration, not an addition: three components, three scopes, 149 `@Inject` sites, and
+  `ChronicleWorkerFactory` becoming `@HiltWorker` + `HiltWorkerFactory`.
+- **KSP support must be verified against Dagger 2.57.2 before committing.** This project is
+  deliberately KAPT-free (cu-8/cu-58) and reintroducing KAPT would be a real regression — cu-8
+  measured the KSP incremental-build cost and accepted it; going back is not free either.
+
+**Ordering, which is the actual decision.** Hilt should land *after* cu-181's Compose POC, not
+before. Hilt's ViewModel story and Compose's `hiltViewModel()` are designed together, and cu-181 may
+change how many of those 15 ViewModels survive in their current shape. Migrating the DI framework
+first means migrating some of it twice — the same argument that puts Navigation Component after
+Compose rather than before.
+
+Recommendation: **file it, sequence it after cu-181's POC, and gate it on the KSP check.**
