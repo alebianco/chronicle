@@ -829,6 +829,68 @@ back-stack handling, deep links). It should not be adopted as a way to fix this.
 
 ---
 
+## The Fragment blocker, removed (2026-09-06)
+
+The owner chose toolbars-before-Navigation after the sequencing question below. That ordering
+turned out to matter more than expected.
+
+### What was actually in the way
+
+**Two** host-type casts, not one, and only the first was a DI problem:
+
+| layer | cast | fix |
+|---|---|---|
+| 1 | `(activity as MainActivity).activityComponent` | `ActivityComponentHost` (cu-178) |
+| 2 | `(activity as AppCompatActivity).setSupportActionBar` | `setToolbarMenu` (cu-180) |
+
+Layer 2 was the one that stopped everything, and **neither Hilt nor Navigation Component would
+have fixed it** — `NavigationUI` still wires an *Activity-owned* toolbar. It needed removing, not
+replacing.
+
+It also turned out to be nearly vestigial: `MainActivity` has no toolbar of its own, no fragment
+read the action bar back, and `Toolbar` implements `MenuHost` itself. Its only job was routing a
+menu the fragment already owned.
+
+### The result
+
+| package | before | after |
+|---|---:|---:|
+| `features/home` | 18.44% | **82.47%** |
+| `features/library` | 15.34% | **62.28%** |
+| `features/collections` | 17.09% | **48.26%** |
+| **overall** | 46.89% | **50.43%** |
+
+Three screens, twelve tests. `CollectionsFragment` alone went 0% → 73%.
+
+### The recipe, for the remaining five screens
+
+1. Invert the injection: `check(injectFromHost { it.inject(this) })`.
+2. Build the screen's **real** `ViewModelProvider.Factory` over fakes — not a mock, because
+   `ViewModelProvider` picks among several `create` overloads and stubbing the wrong one fails at
+   run time with "no answer found".
+3. Install a mocked `ActivityComponent` whose `inject` populates the `lateinit`s.
+4. `launchFragmentInContainer<T>(themeResId = R.style.AppTheme)`.
+5. `SharedPreferences` must be a **fake, not a mock**, wherever the screen reads a `preferenceFlow`.
+
+### A regression the device caught that no test would have
+
+Moving the menu onto the toolbar produced **two search icons** on Home. The layouts already
+declare `app:menu="@menu/…"`, and the providers inflated the same menu again — routing through the
+Activity had masked the duplication. Fixed in all four menu-bearing fragments before committing.
+**No unit test would have seen this**, which is why the device pass is not optional.
+
+### Remaining
+
+Five screens un-scenarioed: `AudiobookDetailsFragment` (1,305), `SettingsFragment` (469),
+`SeriesIndexTesterFragment` (496), `ChooseUserFragment` (512), plus the two browse screens. The
+pattern is proven; this is now repetition rather than investigation.
+
+Then, per the owner's sequence: **Navigation Component**, then finish `Injector.get()`, then Hilt.
+Navigation is now much safer to attempt — three of its destinations have scenario tests that would
+catch a broken transition.
+
+---
+
 ## Fakes versus mocks: what this repo already does
 
 Asked whether the "prefer fakes over mocks" advice applies here. **It does, the repo already
