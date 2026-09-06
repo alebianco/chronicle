@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -36,6 +37,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.R
+import io.github.mattpvaughn.chronicle.data.model.Chapter
+import io.github.mattpvaughn.chronicle.data.model.ChapterRow
+import io.github.mattpvaughn.chronicle.features.bookdetails.compose.chapterList
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.PlayerText
 
 /**
@@ -79,20 +83,29 @@ fun PlayerScreen(
   coverUrl: (String) -> String,
   showArtwork: Boolean,
   modifier: Modifier = Modifier,
+  chapterRows: List<ChapterRow> = emptyList(),
+  onChapterClick: (Chapter) -> Unit = {},
 ) {
-  Column(
-    modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    // Landscape drops the cover rather than shrinking it — the same call `values-land`'s
-    // `currently_playing_artwork_visibility` made, expressed where it can be read.
-    if (showArtwork) {
-      PlayerArtwork(state.artwork, coverUrl)
+  // One `LazyColumn` for the transport body *and* the chapters, so they scroll together — the
+  // View version had a separate RecyclerView coordinating with the collapsing toolbar by hand.
+  LazyColumn(modifier = modifier.fillMaxWidth()) {
+    item(key = "player-body") {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+      ) {
+        // Landscape drops the cover rather than shrinking it — the same call `values-land`'s
+        // `currently_playing_artwork_visibility` made, expressed where it can be read.
+        if (showArtwork) {
+          PlayerArtwork(state.artwork, coverUrl)
+        }
+        PlayerReadout(state.text)
+        PlayerSlider(state.slider, actions)
+        TransportRow(state.transport, actions)
+        UtilityRow(state.utility, actions)
+      }
     }
-    PlayerReadout(state.text)
-    PlayerSlider(state.slider, actions)
-    TransportRow(state.transport, actions)
-    UtilityRow(state.utility, actions)
+    chapterList(chapterRows, onChapterClick)
   }
 }
 

@@ -33,12 +33,6 @@ xmlns:tools="http://schemas.android.com/tools"
               adapter is shared with the details screen, and the choosers are shared animated
               widgets. Same call `CollectionsFragment` made for `SwipeRefreshLayout` (cu-187).
             -->
-            <androidx.compose.ui.platform.ComposeView
-                android:id="@+id/player_compose"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="?attr/actionBarSize"
-                app:layout_collapseMode="parallax" />
 
             <androidx.appcompat.widget.Toolbar
                 android:id="@+id/details_toolbar"
@@ -52,14 +46,20 @@ xmlns:tools="http://schemas.android.com/tools"
         </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/tracks"
+    <!--
+      The whole screen body is Compose and it owns its own scrolling (`LazyColumn`), so it is the
+      CoordinatorLayout's **scrolling child** rather than a `parallax` view inside the collapsing
+      header. Two things forced this in cu-201: a `LazyColumn` inside a `wrap_content` ComposeView
+      is measured with infinite height and throws outright, and nesting a scroller inside a
+      collapsing header means two scroll containers fighting — which is what
+      `appbar_scrolling_view_behavior` was arbitrating for the old RecyclerView.
+    -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/player_compose"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/colorPrimaryDark"
-        android:overScrollMode="never"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
 
     <ProgressBar
         android:id="@+id/loading_tracks_spinner"
@@ -69,8 +69,7 @@ xmlns:tools="http://schemas.android.com/tools"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:layout_marginTop="@dimen/margin_normal"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior"
-        app:layout_constraintTop_toTopOf="@id/tracks" />
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
         android:id="@+id/bottom_sheet_chooser"

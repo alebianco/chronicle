@@ -32,16 +32,10 @@ xmlns:tools="http://schemas.android.com/tools"
               the pinned bar keeps the status-bar strip and the scrolling content never draws over
               the toolbar.
 
-              The chapter `RecyclerView`, the pinned bar and `BottomSheetChooser` stay Views.
-              `ChapterListAdapter` is shared with the player, which is still on the View version,
-              so forking it here would leave two implementations of the disc-header logic.
+              The pinned bar and `BottomSheetChooser` stay Views. The chapter list moved into the
+              same `LazyColumn` as the header in cu-201, so it scrolls with it rather than being a
+              second scroll container coordinating through `appbar_scrolling_view_behavior`.
             -->
-            <androidx.compose.ui.platform.ComposeView
-                android:id="@+id/details_compose"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="?attr/actionBarSize"
-                app:layout_collapseMode="parallax" />
 
             <LinearLayout
                 android:id="@+id/pinned_bar"
@@ -95,13 +89,20 @@ xmlns:tools="http://schemas.android.com/tools"
         </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/tracks"
+    <!--
+      The whole screen body is Compose and it owns its own scrolling (`LazyColumn`), so it is the
+      CoordinatorLayout's **scrolling child** rather than a `parallax` view inside the collapsing
+      header. Two things forced this in cu-201: a `LazyColumn` inside a `wrap_content` ComposeView
+      is measured with infinite height and throws outright, and nesting a scroller inside a
+      collapsing header means two scroll containers fighting — which is what
+      `appbar_scrolling_view_behavior` was arbitrating for the old RecyclerView.
+    -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/details_compose"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:overScrollMode="never"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
 
     <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
         android:id="@+id/bottom_sheet_chooser"

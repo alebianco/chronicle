@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -26,6 +27,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.R
+import io.github.mattpvaughn.chronicle.data.model.Chapter
+import io.github.mattpvaughn.chronicle.data.model.ChapterRow
 
 /** What the details header can do. One object rather than seven lambdas (cu-200). */
 data class DetailsActions(
@@ -49,9 +52,27 @@ fun DetailsScreen(
   actions: DetailsActions,
   coverUrl: (String) -> String,
   modifier: Modifier = Modifier,
+  chapterRows: List<ChapterRow> = emptyList(),
+  onChapterClick: (Chapter) -> Unit = {},
+) {
+  // One `LazyColumn` for the header *and* the chapters, so they scroll as a single list. The View
+  // version arranged that with `CollapsingToolbarLayout` plus
+  // `appbar_scrolling_view_behavior` on a separate RecyclerView — two scroll containers
+  // coordinating by hand, which is the pairing cu-105's bug came out of.
+  LazyColumn(modifier = modifier.fillMaxWidth()) {
+    item(key = "header") { DetailsHeader(state, actions, coverUrl) }
+    chapterList(chapterRows, onChapterClick)
+  }
+}
+
+@Composable
+private fun DetailsHeader(
+  state: DetailsUiState,
+  actions: DetailsActions,
+  coverUrl: (String) -> String,
 ) {
   Column(
-    modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp),
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
   ) {
     Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
       AsyncImage(

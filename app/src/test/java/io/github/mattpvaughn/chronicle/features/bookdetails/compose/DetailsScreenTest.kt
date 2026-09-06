@@ -140,4 +140,85 @@ class DetailsScreenTest {
 
     compose.onNodeWithContentDescription("Pause/Play button").assertIsDisplayed()
   }
+
+  // ---- the chapter list, folded into the same LazyColumn (cu-201) ----
+
+  private fun chapter(
+    id: String,
+    title: String,
+    disc: Int = 1,
+    index: Long = 0L,
+  ) = io.github.mattpvaughn.chronicle.data.model.Chapter(
+    id = id,
+    title = title,
+    discNumber = disc,
+    index = index,
+    trackId = "t1",
+  )
+
+  @Test
+  fun `the chapter list renders below the header`() {
+    compose.setContent {
+      ChronicleTheme {
+        DetailsScreen(
+          state = DetailsUiState(book = book()),
+          actions = DetailsActions(),
+          coverUrl = { it },
+          chapterRows =
+            io.github.mattpvaughn.chronicle.data.model.chapterRows(
+              listOf(chapter("1", "An Unexpected Party")),
+              activeChapter = null,
+            ),
+        )
+      }
+    }
+
+    compose.onNodeWithText("The Hobbit").assertIsDisplayed()
+    compose.onNodeWithText("An Unexpected Party").assertIsDisplayed()
+  }
+
+  @Test
+  fun `tapping a chapter reports which one`() {
+    var jumped: String? = null
+    compose.setContent {
+      ChronicleTheme {
+        DetailsScreen(
+          state = DetailsUiState(book = book()),
+          actions = DetailsActions(),
+          coverUrl = { it },
+          chapterRows =
+            io.github.mattpvaughn.chronicle.data.model.chapterRows(
+              listOf(chapter("1", "An Unexpected Party")),
+              activeChapter = null,
+            ),
+          onChapterClick = { jumped = it.title },
+        )
+      }
+    }
+
+    compose.onNodeWithText("An Unexpected Party").performClick()
+
+    assertEquals("An Unexpected Party", jumped)
+  }
+
+  /** A multi-disc book gets its headers; a single-disc one must not (cu-201's shared rule). */
+  @Test
+  fun `a multi-disc book shows disc headers`() {
+    compose.setContent {
+      ChronicleTheme {
+        DetailsScreen(
+          state = DetailsUiState(book = book()),
+          actions = DetailsActions(),
+          coverUrl = { it },
+          chapterRows =
+            io.github.mattpvaughn.chronicle.data.model.chapterRows(
+              listOf(chapter("1", "One"), chapter("2", "Two", disc = 2, index = 1L)),
+              activeChapter = null,
+            ),
+        )
+      }
+    }
+
+    compose.onNodeWithText("Disc 1").assertIsDisplayed()
+  }
 }

@@ -19,9 +19,9 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
+import io.github.mattpvaughn.chronicle.data.model.chapterRows
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState
@@ -37,7 +37,6 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
-import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
@@ -111,10 +110,14 @@ class AudiobookDetailsFragment : Fragment() {
     // line, the four-flow download control, play/pause and the collapsible summary.
     binding.detailsCompose.setContent {
       val state by viewModel.uiState.collectAsStateWithLifecycle()
+      val chapters by viewModel.chapters.collectAsStateWithLifecycle()
+      val activeChapter by viewModel.activeChapter.collectAsStateWithLifecycle()
 
       ChronicleTheme {
         DetailsScreen(
           state = state,
+          chapterRows = chapterRows(chapters, activeChapter),
+          onChapterClick = { viewModel.jumpToChapter(it.bookStartTimeOffset, it.trackId) },
           actions =
             DetailsActions(
               onPlayPause = viewModel::pausePlayButtonClicked,
@@ -140,36 +143,6 @@ class AudiobookDetailsFragment : Fragment() {
 
     // Must run after the tracks adapter is assigned: setChapterList casts
     // recyclerView.adapter, and observe() delivers an already-set value at once.
-    viewLifecycleOwner.collectWhileStarted(viewModel.chapters) {
-      bindChapterList(binding.tracks, it)
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) {
-      setBottomChooserState(binding.bottomSheetChooser, it)
-    }
-
-    val adapter =
-      ChapterListAdapter(
-        object : TrackClickListener {
-          override fun onClick(chapter: Chapter) {
-            Timber.i("Starting chapter with name: ${chapter.title}")
-            viewModel.jumpToChapter(
-              bookStartTimeOffset = chapter.bookStartTimeOffset,
-              trackId = chapter.trackId,
-            )
-          }
-        },
-      )
-    binding.tracks.adapter = adapter
-
-    // Was `chapterList="@{viewModel.chapters}"` on the list, dropped when cu-58 converted this
-    // screen off DataBinding, so the chapter list rendered empty (cu-73). `submitChapters`, not
-    // `submitList`: the adapter inserts section headers, and `submitList` is overridden to route
-    // through it.
-    viewLifecycleOwner.collectWhileStarted(viewModel.chapters) { chapters ->
-      adapter.submitChapters(chapters)
-    }
-
-    detailsToolbar = binding.detailsToolbar
     binding.detailsToolbar.title = null
 
     binding.detailsToolbar.setNavigationOnClickListener {
@@ -178,17 +151,6 @@ class AudiobookDetailsFragment : Fragment() {
 
     viewLifecycleOwner.collectEventsWhileStarted(viewModel.messageForUser) { message ->
       Toast.makeText(context, message.format(resources), LENGTH_SHORT).show()
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.activeChapter) { chapter ->
-      Timber.i(
-        "Updating current chapter: (${chapter.trackId}, ${chapter.discNumber}, ${chapter.index})",
-      )
-      adapter.updateCurrentChapter(
-        trackId = chapter.trackId,
-        discNumber = chapter.discNumber,
-        chapterIndex = chapter.index,
-      )
     }
 
     // Both observers below reach into the toolbar's menu, which is **not always populated when they

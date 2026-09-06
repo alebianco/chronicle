@@ -110,4 +110,92 @@ class AssembleChaptersTest {
   fun `no tracks yields no chapters`() {
     assertEquals(emptyList<Chapter>(), assembleChapters(emptyList()) { emptyList() })
   }
+
+  /**
+   * A chapter spanning a track boundary is reported by **both** tracks (cu-18), and concatenating
+   * the per-track lists therefore listed it twice.
+   *
+   * On the fixture book, chapter 4003 arrives from track 2001 *and* from track 2002. The list read
+   * "Chapter 3: A Short Rest" twice and the header counted ten chapters for an eight-chapter book,
+   * because `Ch n of m` is a size. It went unseen until cu-201: the old adapter was rendering the
+   * empty legacy `Audiobook.chapters` column, so no duplicate could reach it.
+   *
+   * The chapter belongs to the track it **starts** in — which is the rule the `MultiTrackBook`
+   * fixture already encodes for `trackId`, and the frame `bookStartTimeOffset` is expressed in.
+   */
+  @Test
+  fun `a chapter reported by two tracks is listed once`() {
+    val spanning =
+      Chapter(
+        title = "Spans the boundary",
+        id = "4003",
+        index = 3L,
+        bookId = "1001",
+        bookStartTimeOffset = BookOffset(500L),
+        bookEndTimeOffset = BookOffset(1_500L),
+      )
+
+    val chapters =
+      assembleChapters(tracks) { track ->
+        when (track.id) {
+          // Both tracks report it, each claiming it as their own — exactly what Plex returns.
+          "2001", "2002" -> listOf(spanning.copy(trackId = track.id))
+          else -> emptyList()
+        }
+      }
+
+    assertEquals(listOf("4003", "2003"), chapters.map { it.id })
+  }
+
+  /** The surviving copy is the one on the track the chapter starts in, so seeking lands right. */
+  @Test
+  fun `the surviving copy belongs to the track the chapter starts in`() {
+    val spanning =
+      Chapter(
+        title = "Spans the boundary",
+        id = "4003",
+        index = 3L,
+        bookId = "1001",
+        bookStartTimeOffset = BookOffset(500L),
+        bookEndTimeOffset = BookOffset(1_500L),
+      )
+
+    val chapters =
+      assembleChapters(tracks) { track ->
+        if (track.id == "2001" || track.id == "2002") {
+          listOf(spanning.copy(trackId = track.id))
+        } else {
+          emptyList()
+        }
+      }
+
+    assertEquals("2001", chapters.first { it.id == "4003" }.trackId)
+  }
+
+  /**
+   * Two genuinely different chapters that happen to share an id must both survive.
+   *
+   * `Chapter.id` is not unique across a book — the per-track fallback uses the *track* id, and
+   * Plex hands chapter and track ratingKeys from one sequence (cu-49). De-duplicating on id alone
+   * would silently drop a real chapter.
+   */
+  @Test
+  fun `distinct chapters sharing an id both survive`() {
+    val chapters =
+      assembleChapters(tracks) { track ->
+        listOf(
+          Chapter(
+            title = "Chapter on ${track.id}",
+            id = "collision",
+            index = track.index.toLong(),
+            trackId = track.id,
+            bookId = "1001",
+            bookStartTimeOffset = BookOffset(track.index * 1_000L),
+            bookEndTimeOffset = BookOffset(track.index * 1_000L + 500L),
+          ),
+        )
+      }
+
+    assertEquals(3, chapters.size)
+  }
 }

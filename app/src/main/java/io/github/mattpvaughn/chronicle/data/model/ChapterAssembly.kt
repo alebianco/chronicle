@@ -21,13 +21,31 @@ inline fun assembleChapters(
   chaptersForTrack: (MediaItemTrack) -> List<Chapter>,
 ): List<Chapter> {
   val assembled = mutableListOf<Chapter>()
+  // A chapter that spans a track boundary is reported by **both** tracks (cu-18), so concatenating
+  // the per-track lists listed it twice — visibly in the chapter list, and in every `Ch n of m`
+  // readout, since the `m` is a size. Seen on the fixture book, where chapter 4003 arrives from
+  // 2001 and again from 2002.
+  //
+  // The chapter is kept for the track it **starts** in, which is the rule `trackId` already
+  // follows and the frame `bookStartTimeOffset` is measured in — so the first report wins and the
+  // later duplicate is dropped. Identity is the id **and** the book offsets together: `id` alone
+  // is not unique within a book (cu-49), and dropping on it would take a real chapter with it.
+  val seen = mutableSetOf<Triple<String, Long, Long>>()
   var trackStartOffset = BookOffset.ZERO
   for (track in tracks) {
     val reported = chaptersForTrack(track)
     if (reported.isEmpty()) {
       assembled.add(track.asChapter(trackStartOffset))
     } else {
-      assembled.addAll(reported)
+      for (chapter in reported) {
+        val identity =
+          Triple(
+            chapter.id,
+            chapter.bookStartTimeOffset.millis,
+            chapter.bookEndTimeOffset.millis,
+          )
+        if (seen.add(identity)) assembled.add(chapter)
+      }
     }
     trackStartOffset += track.duration
   }

@@ -19,11 +19,9 @@ import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
-import io.github.mattpvaughn.chronicle.data.model.Chapter
+import io.github.mattpvaughn.chronicle.data.model.chapterRows
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCurrentlyPlayingBinding
-import io.github.mattpvaughn.chronicle.features.bookdetails.ChapterListAdapter
-import io.github.mattpvaughn.chronicle.features.bookdetails.TrackClickListener
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.PlayerActions
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.PlayerScreen
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer
@@ -36,7 +34,6 @@ import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarks
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import timber.log.Timber
 import javax.inject.Inject
 
 /** Responsible for playback controls and displaying the currently playing media */
@@ -159,6 +156,8 @@ class CurrentlyPlayingFragment :
 
       val state by viewModel.uiState.collectAsStateWithLifecycle()
       val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
+      val chapters by viewModel.chapters.collectAsStateWithLifecycle()
+      val activeChapter by viewModel.activeChapter.collectAsStateWithLifecycle()
 
       ChronicleTheme {
         PlayerScreen(
@@ -179,6 +178,8 @@ class CurrentlyPlayingFragment :
               onShowBookmarks = ::showBookmarkList,
             ),
           coverUrl = plexConfig::toServerString,
+          chapterRows = chapterRows(chapters, activeChapter),
+          onChapterClick = { viewModel.jumpToChapter(it.bookStartTimeOffset, it.trackId) },
           // Landscape drops the cover, which is the only thing `values-land` ever changed here.
           showArtwork =
             resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT,
@@ -194,39 +195,6 @@ class CurrentlyPlayingFragment :
     }
     viewLifecycleOwner.collectWhileStarted(viewModel.sleepTimerChooserState) {
       setBottomChooserState(binding.sleepTimerChooser, it)
-    }
-
-    val adapter =
-      ChapterListAdapter(
-        object : TrackClickListener {
-          override fun onClick(chapter: Chapter) {
-            viewModel.jumpToChapter(chapter.bookStartTimeOffset, chapter.trackId)
-          }
-        },
-      )
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.activeChapter) { chapter ->
-      Timber.i(
-        "Updating current chapter: (${chapter.trackId}, ${chapter.discNumber}, ${chapter.index})",
-      )
-      adapter.updateCurrentChapter(
-        trackId = chapter.trackId,
-        discNumber = chapter.discNumber,
-        chapterIndex = chapter.index,
-      )
-    }
-
-    binding.tracks.adapter = adapter
-
-    // Same omission as the details screen: the `chapterList` binding was dropped in the cu-58
-    // conversion and nothing fed this adapter, so the chapter list was empty while playing (cu-73).
-    viewLifecycleOwner.collectWhileStarted(viewModel.chapters) { chapters ->
-      adapter.submitChapters(chapters)
-    }
-
-    // Keeps the highlighted row in step with playback; the adapter diffs on the active flag.
-    viewLifecycleOwner.collectWhileStarted(viewModel.currentChapter) { chapter ->
-      adapter.updateCurrentChapter(chapter.trackId, chapter.discNumber, chapter.index)
     }
 
     binding.detailsToolbar.setNavigationOnClickListener {
