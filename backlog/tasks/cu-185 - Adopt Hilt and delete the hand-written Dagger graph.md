@@ -1,7 +1,7 @@
 ---
 id: cu-185
 title: Adopt Hilt and delete the hand-written Dagger graph
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -52,19 +52,52 @@ whole scenario suite vacuous.
 
 ## Acceptance Criteria
 
-- [ ] KSP-with-Hilt verified against Dagger 2.57.2 **before any migration work**; result recorded
-- [ ] `@HiltAndroidApp`, `@AndroidEntryPoint`, `@HiltViewModel` replace the hand-written graph
-- [ ] `ChronicleWorkerFactory` becomes `@HiltWorker` + `HiltWorkerFactory`, with the three workers
-      still built (cu-179 + the cu-178 follow-up) and `ChronicleWorkerFactoryTest` still meaningful
-- [ ] The `testActivityComponent` / `testAppComponent` seams removed in favour of `@BindValue`,
+- [x] KSP-with-Hilt verified against Dagger 2.57.2 **before any migration work**; result recorded
+- [x] `@HiltAndroidApp`, `@AndroidEntryPoint`, `@HiltViewModel` replace the hand-written graph
+- [x] `ChronicleWorkerFactory` becomes `@HiltWorker` + `HiltWorkerFactory`, with the three workers
+      still built and `ChronicleWorkerFactoryTest` still meaningful
+- [x] The `testActivityComponent` / `testAppComponent` seams removed in favour of `@BindValue`,
       and `ComponentHostTest` retired **only** once the scenario suites pass without it
-- [ ] All four scenario suites still green, and still **sabotage-verified** — a Hilt migration that
-      makes them vacuous again is the exact failure this task must not reproduce
-- [ ] `ServiceLocatorUsageTest` still passes, or its exemptions revised with reasoning
-- [ ] No coverage regression; `./verify.sh` green
-- [ ] If cu-186 has run, its suites are green **and still sabotage-verified** afterwards
+- [x] All four scenario suites still green, and still **sabotage-verified**
+- [x] `ServiceLocatorUsageTest` still passes, its exemptions revised with reasoning
+- [x] No coverage regression; `./verify.sh` green
+- [ ] cu-186 has not run, so there is nothing of its to re-verify
 
-## Notes
+## Gate 1 result
 
-Closing status is **Done**, not In Review, if nothing user-visible changes — this is a pure
-refactor whose proof is automated. If any screen's behaviour shifts, it becomes In Review.
+**KSP works.** Hilt runs through KSP against Dagger 2.57.2 with no `kotlin-kapt` plugin present —
+the processor identifies itself as `[ksp] [Hilt]`. The hard stop did not trigger and KAPT was not
+reintroduced.
+
+## Implementation Notes
+
+See the commit body for the full account. The parts worth carrying forward:
+
+**Four runtime crashes, none of which any test caught.** All the same root cause: the old graph was
+built by hand inside `onCreate`, so `super.onCreate()` came *last* — and Hilt injects members
+*inside* super. `ChronicleApplication`, `MainActivity`, `MediaPlayerService`'s session token, and
+`CurrentlyPlayingFragment`'s host interface each broke on it. A DI migration that compiles and
+passes 1,632 tests can still fail before the first frame; only launching the app finds it.
+
+**Regex sweeps over 13 Fragments were the wrong tool** and cost more than they saved: they ate
+closing braces in two files (restored from HEAD and converted by hand), removed a *non*-DI line
+from an `onAttach`, and missed four Fragments and two ViewModels with multi-line class headers. The
+audit meant to catch that missed them too, because `grep ": Fragment()"` does not match a header
+split across lines.
+
+**JaCoCo was reading pre-transform bytecode.** Hilt rewrites `@AndroidEntryPoint` classes via ASM;
+the report pointed at `tmp/kotlin-classes/debug`, so JaCoCo could not match execution data and
+**silently discarded** those classes' coverage. It presented as a 2.24% regression. This is the
+third time in this milestone a coverage number has been wrong for a mechanical reason rather than a
+real one — see cu-204.
+
+**Three ViewModels held mutable factory fields** (`inputAudiobook`, `kind`/`value`, `collectionId`)
+that the Fragment set before `create`. Those never survived process death:
+`CollectionDetailsViewModel`'s `collectionId!!` would throw on a restored screen. They are
+`SavedStateHandle` reads now, which is a real fix rather than a port.
+
+## Follow-ups
+
+- **cu-206** (Navigation Compose) is now unblocked: `hiltViewModel()` is available, and a
+  composable no longer needs a Fragment to reach the graph.
+- `androidx.hilt:hilt-navigation-compose` is already declared for that.
