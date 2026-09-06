@@ -106,7 +106,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1389 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **10 instrumented tests** on two managed emulators, which also run on an Automotive image (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1628 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **10 instrumented tests** on two managed emulators, which also run on an Automotive image (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -518,7 +518,18 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   read with `metadata.firstOrNull()`, so one fixture holding all three tracks answered *track
   2001's* chapters for every track and the player read "Ch 1 of 9" for a 7-chapter book. Each
   track now has its own `track-<id>-chapters.json`. A chapter spanning a track boundary
-  legitimately appears on **both** tracks, so a count above the distinct-chapter count is correct.
+  legitimately appears on **both** tracks — in the *responses*. It must **not** appear twice in the
+  assembled list, which is what `assembleChapters` de-duplicates (cu-201): it concatenated the
+  per-track lists, so the fixture book stored ten rows for eight chapters, read "Chapter 3: A Short
+  Rest" twice and said "Ch 8 of 10", because that readout's `m` is a size. The chapter is kept for
+  the track it **starts** in — the rule `trackId` already follows and the frame
+  `bookStartTimeOffset` is measured in — and identity is the id **plus** both book offsets, since
+  `id` alone is not unique within a book (cu-49) and dropping on it would take a real chapter with
+  it. This was invisible for as long as it existed: the old adapter rendered the legacy
+  `Audiobook.chapters` column, empty since cu-49 and dropped in v14, so no duplicate could reach a
+  screen until the list became Compose. Note `ChapterRepository.loadChapterData` still does **not**
+  call `removeAllForBook` before inserting, unlike `BookRepository.syncAudiobook` — so a shrinking
+  chapter list leaves stale rows on that path.
 - **Plex unofficial endpoints** (`/:/timeline`, scrobble, websockets) are community-documented, not guaranteed — keep them wrapped behind repositories/the MediaSource seam.
 - **Search matches over a projection, then fetches the hits** (cu-161). `searchGrouped` reads five
   columns (`BookDao.searchProjection`), matches, and fetches only the matched books by id —
@@ -699,6 +710,11 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - **Compose is the target for UI; ViewBinding is what has not migrated yet** (decision-22, cu-181).
   New UI is written in Compose. Existing screens move one per task (cu-187, then cu-188 in bug-density
   order, player first), each independently shippable and **device-verified in both orientations** —
+  **six are done**: player (cu-198), library, home, details (cu-200), settings (cu-199) and the login
+  flow, plus the chapter list shared by player and details (cu-201). What is left is cu-202 (browse,
+  facets, collection details, search, the series-index tester) and cu-203 (`BottomSheetChooser`,
+  `BookmarkListAdapter`, then the retirement list). **Nothing on that retirement list — including
+  `buildFeatures.viewBinding` and `FirstFrameFlashTest` — may go while any XML screen remains.**
   cu-141, cu-142 and cu-19 were all landscape-only, and a Compose test measures whatever width it is
   told. Four things to know before writing any:
   - **`MaterialTheme` defines `colorScheme.background` but paints nothing.** That is `Surface`'s or
@@ -718,6 +734,26 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   **Notifications and Android Auto stay outside Compose permanently**: a notification is rendered by
   the system process from `NotificationCompat`/`RemoteViews`, and the car host draws Auto from
   `MediaBrowser` items.
+  **Five things a green Compose suite will not tell you** (cu-198 - cu-201, all found on a device):
+  - A `_white` drawable can carry a **black** fill — the name describes the intended tint, not the
+    asset. It needs an explicit `tint`, or it renders invisible on a dark surface.
+  - **`Icon` flattens a multi-colour drawable to a silhouette.** The play button became a bare
+    circle with no triangle. Use `Image` for a two-colour asset. This shipped unnoticed in the
+    player and was caught only when the same asset reached the details screen.
+  - **Material3's `labelLarge` does not uppercase**, so a title converted from
+    `android:textAllCaps` silently loses its casing. Screenshot the screen *before* migrating it;
+    that comparison is what caught this.
+  - A **`LazyColumn` inside a `wrap_content` `ComposeView` throws outright** — *"Vertically
+    scrollable component was measured with an infinity maximum height constraints"*. A scrolling
+    Compose body must be the `CoordinatorLayout`'s scrolling child
+    (`app:layout_behavior="@string/appbar_scrolling_view_behavior"`, `match_parent`), not a view
+    inside a `CollapsingToolbarLayout`.
+  - A `ComposeView` is **clipped by a View parent that sizes it wrong**, and the semantics tree is
+    perfectly correct while the pixels are not.
+  **Extract the shared decision as a pure function before forking a renderer.**
+  `Audiobook.progressState()` (cu-198) and `chapterRows(chapters, activeChapter)` (cu-201) exist
+  because two screens render the same thing and must not drift. Doing it first also gives the
+  behaviour a framework-free test, which is the only kind that can fail for the right reason.
 
 - **ViewBinding, not DataBinding** (cu-58). Layouts have no `<layout>` wrapper and no `@{...}` expressions; view state is
   set from Kotlin. Two traps when converting or reviewing UI code: a view whose visibility is Kotlin-driven needs

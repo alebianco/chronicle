@@ -8,7 +8,7 @@ io/github/mattpvaughn/chronicle/data/sources/plex/model 84.20
 io/github/mattpvaughn/chronicle/debug 1.96
 io/github/mattpvaughn/chronicle/debug/compose 0.00
 io/github/mattpvaughn/chronicle/features/bookdetails 37.41
-io/github/mattpvaughn/chronicle/features/bookdetails/compose 82.79
+io/github/mattpvaughn/chronicle/features/bookdetails/compose 82.82
 io/github/mattpvaughn/chronicle/features/browse 0.00
 io/github/mattpvaughn/chronicle/features/collections 57.58
 io/github/mattpvaughn/chronicle/features/collections/compose 87.70
