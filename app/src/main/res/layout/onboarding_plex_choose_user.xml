@@ -35,44 +35,16 @@ xmlns:tools="http://schemas.android.com/tools"
             app:layout_constraintLeft_toRightOf="@id/choose_user_title"
             app:layout_constraintTop_toTopOf="@id/choose_user_title" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/user_list"
-            android:visibility="gone"
-            tools:visibility="visible"
+        <!-- The user list, its error message and its spinner are `PickerScreen` now (cu-201). -->
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/user_picker_compose"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginLeft="@dimen/screen_horizontal_padding"
-            android:layout_marginTop="@dimen/margin_large"
-            android:layout_marginRight="@dimen/screen_horizontal_padding"
-            android:layout_marginBottom="@dimen/screen_vertical_padding"
-            app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/choose_user_title"
-            app:spanCount="3"
-            tools:listitem="@layout/list_item_user" />
-
-        <TextView
-            android:id="@+id/no_users_found"
-            android:visibility="gone"
-            tools:visibility="visible"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/no_user_found"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintTop_toBottomOf="@id/choose_user_title" />
 
-        <ProgressBar
-            android:id="@+id/loading_icon"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/choose_user_title" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

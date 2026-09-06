@@ -32,13 +32,16 @@ interface PreferenceClick {
   fun onClick()
 }
 
-enum class PreferenceType { TITLE, CLICKABLE, BOOLEAN, INTEGER, FLOAT }
-
-val prefIntMap =
-  mapOf(
-    PreferenceType.TITLE to 1,
-    PreferenceType.CLICKABLE to 2,
-    PreferenceType.BOOLEAN to 3,
-    PreferenceType.INTEGER to 4,
-    PreferenceType.FLOAT to 5,
-  )
+/**
+ * The three kinds of settings row (cu-201).
+ *
+ * `INTEGER` and `FLOAT` are **deleted**, not renamed: no `makePreferences` row ever constructed
+ * them, and both mapped to the same ViewHolder as `CLICKABLE` — a distinction the code drew and
+ * then ignored. Removing them makes the `when` in `SettingsScreen` exhaustive over states that
+ * actually occur.
+ *
+ * `prefIntMap` went with them. It existed to give `RecyclerView` an integer view type, and
+ * `onCreateViewHolder` recovered the enum with an O(n) reverse lookup that threw on a miss. A
+ * `LazyColumn` needs neither.
+ */
+enum class PreferenceType { TITLE, CLICKABLE, BOOLEAN }

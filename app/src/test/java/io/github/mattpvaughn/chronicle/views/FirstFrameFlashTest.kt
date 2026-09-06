@@ -109,8 +109,14 @@ class FirstFrameFlashTest {
     val mustBeGone =
       mapOf(
         "activity_main.xml" to listOf("bottom_nav", "currently_playing_container"),
-        "onboarding_plex_choose_library.xml" to listOf("no_libraries_found", "library_list"),
-        "onboarding_plex_choose_server.xml" to listOf("no_servers_found", "server_list"),
+        // The two login pickers' entries are **retired, not dropped** (cu-201), for the same
+        // reason `fragment_collections.xml`'s were in cu-187. Both screens render through
+        // `PickerScreen`, where the list, the spinner and the error message are branches of a
+        // `when` over `LoadingStatus` — an enum. The flash this guard prevents is not re-fixed
+        // there, it is **unrepresentable**: exactly one branch renders, and there is no
+        // "before the first emission" state that shows an error, because LOADING is its own
+        // branch. That is also what removes the older hazard these entries encoded, which was
+        // three independent `isVisible` writes spelling out a state machine.
         // `fragment_collections.xml`'s two entries — `offline_mode_container` and
         // `no_books_message` — are **retired, not dropped** (cu-187). Both views are gone: the
         // screen is `CollectionsScreen`, where the same three states are a sealed

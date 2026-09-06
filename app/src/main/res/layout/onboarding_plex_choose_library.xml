@@ -30,39 +30,11 @@ xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:android="http://schema
         app:layout_constraintLeft_toRightOf="@id/choose_library_title"
         app:layout_constraintTop_toTopOf="@id/choose_library_title" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/library_list"
-        android:visibility="gone"
-        tools:visibility="visible"
+    <!-- The list, the error message and the spinner are `PickerScreen` now (cu-201). -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/library_picker_compose"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginLeft="@dimen/screen_horizontal_padding"
-        android:layout_marginTop="@dimen/spacing_normal"
-        android:layout_marginRight="@dimen/screen_horizontal_padding"
-        android:layout_marginBottom="@dimen/screen_vertical_padding"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/choose_library_title"
-        tools:listitem="@layout/list_item_library" />
-
-    <TextView
-        android:id="@+id/no_libraries_found"
-        android:visibility="gone"
-        tools:visibility="visible"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/no_libraries_found"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/choose_library_title" />
-
-    <ProgressBar
-        android:id="@+id/loading_icon"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"

@@ -5,24 +5,22 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.view.isVisible
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
-import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
-import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentFacetBooksBinding
-import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
-import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
+import io.github.mattpvaughn.chronicle.features.library.compose.BookGrid
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
-import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 /**
@@ -46,7 +44,6 @@ class FacetBooksFragment : Fragment() {
   lateinit var viewModelFactory: FacetBooksViewModel.Factory
 
   private lateinit var viewModel: FacetBooksViewModel
-  private var adapter: AudiobookAdapter? = null
 
   override fun onAttach(context: Context) {
     check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
@@ -70,36 +67,23 @@ class FacetBooksFragment : Fragment() {
     viewModel =
       ViewModelProvider(this, viewModelFactory)[FacetBooksViewModel::class.java]
 
-    val bookAdapter =
-      AudiobookAdapter(
-        prefsRepo.libraryBookViewStyle,
-        true,
-        prefsRepo.bookCoverStyle == PrefsRepo.BOOK_COVER_STYLE_SQUARE,
-        object : LibraryFragment.AudiobookClick {
-          override fun onClick(audiobook: Audiobook) {
-            navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
-          }
-        },
-        plexConfig::toServerString,
-      ).apply {
-        stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
+    // The grid is `BookGrid` now (cu-201) — shared with the collection-detail screen, which is
+    // the same shape: a grid, an empty message, and a tap.
+    binding.facetBooksCompose.setContent {
+      val books by viewModel.books.collectAsStateWithLifecycle(initialValue = null)
+      val style by viewModel.viewStyle.collectAsStateWithLifecycle(initialValue = null)
+      val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
+
+      ChronicleTheme {
+        BookGrid(
+          books = books,
+          emptyMessage = stringResource(R.string.no_books_found),
+          serverConnected = isConnected,
+          coverUrl = plexConfig::toServerString,
+          onBookClick = { navigator.showDetails(it.id, it.title, it.isCached) },
+          style = style?.let { ViewStyleKind.of(it) } ?: ViewStyleKind.CoverGrid,
+        )
       }
-    adapter = bookAdapter
-    binding.facetBooksGrid.adapter = bookAdapter
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
-      binding.facetBooksGrid.layoutManager =
-        if (viewStyleIsGrid(style)) {
-          GridLayoutManager(requireContext(), 3)
-        } else {
-          LinearLayoutManager(requireContext())
-        }
-      bookAdapter.viewStyle = style
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.books) { books ->
-      bookAdapter.submitList(books)
-      binding.noBooksMessage.isVisible = books.isEmpty()
     }
 
     // No `setSupportActionBar` (cu-180): this screen has no menu, so the cast bought
@@ -117,7 +101,6 @@ class FacetBooksFragment : Fragment() {
 
   override fun onDestroyView() {
     super.onDestroyView()
-    adapter = null
   }
 
   companion object {

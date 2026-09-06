@@ -64,9 +64,9 @@ fun SettingsScreen(
         when (row.model.type) {
           PreferenceType.TITLE -> SectionTitle(row)
           PreferenceType.BOOLEAN -> SwitchRow(row, onToggle)
-          // CLICKABLE, and the two dead variants INTEGER/FLOAT which no `makePreferences` row
-          // constructs — they mapped to the same ViewHolder here too.
-          else -> ClickableRow(row, onClick)
+          // Exhaustive since cu-201 removed the dead INTEGER/FLOAT variants, so a new kind of row
+          // is a compile error here rather than a silently mis-rendered one.
+          PreferenceType.CLICKABLE -> ClickableRow(row, onClick)
         }
       }
     }

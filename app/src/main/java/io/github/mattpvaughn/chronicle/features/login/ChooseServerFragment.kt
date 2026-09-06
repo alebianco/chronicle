@@ -7,15 +7,19 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
-import androidx.core.view.isVisible
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.databinding.OnboardingPlexChooseServerBinding
+import io.github.mattpvaughn.chronicle.features.login.compose.PickerItem
+import io.github.mattpvaughn.chronicle.features.login.compose.PickerScreen
 import io.github.mattpvaughn.chronicle.injection.components.injectFromAppGraph
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
-import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
 
 class ChooseServerFragment : Fragment() {
@@ -29,8 +33,6 @@ class ChooseServerFragment : Fragment() {
   @Inject
   lateinit var viewModelFactory: ChooseServerViewModel.Factory
   private lateinit var viewModel: ChooseServerViewModel
-
-  private lateinit var serverAdapter: ServerListAdapter
 
   override fun onAttach(context: Context) {
     check(injectFromAppGraph { it.inject(this) }) { "${javaClass.simpleName} needs an AppComponentHost" }
@@ -52,25 +54,27 @@ class ChooseServerFragment : Fragment() {
         viewModelFactory,
       ).get(ChooseServerViewModel::class.java)
 
-    serverAdapter =
-      ServerListAdapter(
-        ServerClickListener { serverModel ->
-          viewModel.chooseServer(serverModel)
-        },
-      )
-
-    binding.serverList.adapter = serverAdapter
     binding.refresh.setOnClickListener { viewModel.refresh() }
 
-    viewLifecycleOwner.collectWhileStarted(viewModel.servers) { servers ->
-      serverAdapter.submitList(servers)
-    }
+    // The list, the spinner and the error message are `PickerScreen` now (cu-201) — shared with
+    // the library and user pickers, which are the same screen. The three `isVisible` writes this
+    // replaces were a `LoadingStatus` state machine spelled as booleans, with nothing stopping two
+    // being true at once.
+    binding.serverPickerCompose.setContent {
+      val servers by viewModel.servers.collectAsStateWithLifecycle()
+      val status by viewModel.loadingStatus.collectAsStateWithLifecycle()
 
-    // Was three `app:loadingStatus` bindings in XML, one per view type.
-    viewLifecycleOwner.collectWhileStarted(viewModel.loadingStatus) { status ->
-      binding.serverList.isVisible = status == LoadingStatus.DONE
-      binding.noServersFound.isVisible = status == LoadingStatus.ERROR
-      binding.loadingIcon.isVisible = status == LoadingStatus.LOADING
+      ChronicleTheme {
+        PickerScreen(
+          status = status,
+          items =
+            servers.map {
+              PickerItem(id = it.serverId, title = it.name, value = it)
+            },
+          errorMessage = stringResource(R.string.no_servers_found),
+          onItemClick = viewModel::chooseServer,
+        )
+      }
     }
 
     viewLifecycleOwner.collectEventsWhileStarted(viewModel.userMessage) { message ->

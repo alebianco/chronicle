@@ -5,22 +5,22 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.view.isVisible
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
-import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
+import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionDetailsBinding
-import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
-import io.github.mattpvaughn.chronicle.features.library.LibraryFragment
+import io.github.mattpvaughn.chronicle.features.library.compose.BookGrid
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -59,8 +59,6 @@ class CollectionDetailsFragment : Fragment() {
   @Inject
   lateinit var viewModelFactory: CollectionDetailsViewModel.Factory
 
-  var adapter: AudiobookAdapter? = null
-
   override fun onAttach(context: Context) {
     check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
     Timber.i("CollectionDetailsFragment onAttach()")
@@ -83,40 +81,23 @@ class CollectionDetailsFragment : Fragment() {
       ViewModelProvider(this, viewModelFactory)
         .get(CollectionDetailsViewModel::class.java)
 
-    adapter =
-      AudiobookAdapter(
-        prefsRepo.libraryBookViewStyle,
-        true,
-        prefsRepo.bookCoverStyle == PrefsRepo.BOOK_COVER_STYLE_SQUARE,
-        object : LibraryFragment.AudiobookClick {
-          override fun onClick(audiobook: Audiobook) {
-            openAudiobookDetails(audiobook)
-          }
-        },
-        plexConfig::toServerString,
-      ).apply {
-        stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
+    // The grid is `BookGrid` now (cu-201) — the same composable the browse-facet screen uses,
+    // since both are a grid, an empty message and a tap.
+    binding.collectionDetailsCompose.setContent {
+      val books by viewModel.booksInCollection.collectAsStateWithLifecycle()
+      val style by viewModel.viewStyle.collectAsStateWithLifecycle(initialValue = null)
+      val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
+
+      ChronicleTheme {
+        BookGrid(
+          books = books,
+          emptyMessage = stringResource(R.string.no_books_found),
+          serverConnected = isConnected,
+          coverUrl = plexConfig::toServerString,
+          onBookClick = ::openAudiobookDetails,
+          style = style?.let { ViewStyleKind.of(it) } ?: ViewStyleKind.CoverGrid,
+        )
       }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.viewStyle) { style ->
-      Timber.i("View style is: $style")
-      val isGrid =
-        viewStyleIsGrid(style)
-      binding.collectionsGrid.layoutManager =
-        if (isGrid) {
-          GridLayoutManager(requireContext(), 3)
-        } else {
-          LinearLayoutManager(requireContext())
-        }
-      adapter!!.viewStyle = style
-    }
-
-    binding.collectionsGrid.adapter = adapter
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.booksInCollection) {
-      adapter!!.submitList(it)
-      // Was an `android:visibility` binding expression in fragment_collection_details.xml.
-      binding.noBooksMessage.isVisible = it.isEmpty()
     }
 
     // No `setSupportActionBar` (cu-180): this screen has no menu, so the cast bought
@@ -139,11 +120,6 @@ class CollectionDetailsFragment : Fragment() {
     binding.toolbarLayout.applyTopSystemBarInset()
 
     return binding.root
-  }
-
-  override fun onDestroyView() {
-    adapter = null
-    super.onDestroyView()
   }
 
   private fun openAudiobookDetails(audiobook: Audiobook) {

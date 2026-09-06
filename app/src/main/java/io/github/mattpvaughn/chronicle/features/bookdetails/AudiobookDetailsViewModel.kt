@@ -166,56 +166,6 @@ class AudiobookDetailsViewModel(
       }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
-  val cacheIconTint: StateFlow<Int> =
-    cacheStatus
-      .map { status ->
-        when (status) {
-          CACHING -> R.color.icon // Doesn't matter, we show a spinner over it
-          NOT_CACHED -> R.color.icon
-          CACHED -> R.color.iconActive
-          null -> R.color.icon
-        }
-      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.color.icon)
-
-  val cacheIconDrawable: StateFlow<Int> =
-    cacheStatus
-      .map { status ->
-        when (status) {
-          CACHING -> R.drawable.ic_cloud_download_white // Doesn't matter, spinner covers it
-          NOT_CACHED -> R.drawable.ic_cloud_download_white
-          CACHED -> R.drawable.ic_cloud_done_white
-          // Not known yet; the control is disabled, so this is only what it renders behind that.
-          null -> R.drawable.ic_cloud_download_white
-        }
-      }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        R.drawable.ic_cloud_download_white,
-      )
-
-  /**
-   * What the download control announces, one label per state (cu-149).
-   *
-   * Derived from `cacheStatus` **immediately beside the icon it labels**, so the two cannot
-   * diverge: the label used to be a static `android:contentDescription="@string/download"` in the
-   * layout while the icon swapped in Kotlin, so a screen reader said "Download" for a book that was
-   * already downloaded — one control with two meanings and one label.
-   *
-   * Each string says what a *tap does*, which is what `onCacheButtonClick` actually branches on:
-   * download it, remove the download, or cancel one in flight. `CacheLabelPairingTest` pins the two
-   * `when` blocks to the same states so a new one cannot be added to the icon alone.
-   */
-  val cacheContentDescription: StateFlow<Int> =
-    cacheStatus
-      .map { status ->
-        when (status) {
-          CACHING -> R.string.download_cancel
-          NOT_CACHED -> R.string.download
-          CACHED -> R.string.download_remove
-          null -> R.string.download
-        }
-      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), R.string.download)
-
   /** Whether the book in the current view is also the same on in the [MediaController] */
   private val isBookInViewActive: StateFlow<Boolean> =
     combineDistinct(currentlyPlaying.book, audiobook) { activeBook, currentBook ->
@@ -719,10 +669,12 @@ class AudiobookDetailsViewModel(
   /**
    * The download control, as one exhaustive state.
    *
-   * Replaces four flows — `cacheStatus`, `cacheIconDrawable`, `cacheContentDescription` and
+   * Replaced four flows — `cacheStatus`, `cacheIconDrawable`, `cacheContentDescription` and
    * `cacheIconTint` — each a `map` over the same source with its own `null ->` branch meaning
-   * "not resolved yet". The four stay for now because `CacheLabelPairingTest` reads two of them
-   * out of this file's source text; the screen renders from this.
+   * "not resolved yet". The other three are **deleted** as of cu-201: nothing read them once the
+   * screen rendered from this, and `CacheLabelPairingTest` — which checked the icon and its
+   * spoken label branched on the same states by parsing this file's *source text* — went with
+   * them. One sealed type means the compiler enforces what that scan approximated (cu-149).
    */
   private val downloadState: StateFlow<DownloadState> =
     cacheStatus

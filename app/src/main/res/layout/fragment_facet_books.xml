@@ -33,23 +33,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/facet_books_grid"
+        <!-- The grid and its empty message are `BookGrid` now (cu-201). -->
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/facet_books_compose"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingLeft="@dimen/margin_small"
-            android:paddingRight="@dimen/margin_small"
-            tools:listitem="@layout/grid_item_audiobook" />
-
-        <TextView
-            android:id="@+id/no_books_message"
-            android:visibility="gone"
-            tools:visibility="visible"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:drawableTop="@drawable/ic_error_outline_white"
-            android:drawablePadding="@dimen/spacing_micro"
-            android:text="@string/no_books_found" />
+            android:layout_height="match_parent" />
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </LinearLayout>
