@@ -112,6 +112,65 @@ The declared-and-tracked ones are **not** in scope — `fragment-testing` (cu-17
 - **Gradle convention plugins** — single-module today, so this only matters if cu-182's Wear case
   or a second module ever lands. Note and defer.
 
+## 5. Libraries that raise the portable share
+
+Owner ask, 2026-09-06: include libraries that would **increase the multiplatform share of code**.
+
+[[cu-182]] measured `app/src/main` at **23.7% portable** (7,710 of 32,508 lines). Its conclusion —
+that KMP would share where sharing is least needed — is about *adopting KMP*, and stands. This is
+the different, cheaper question: **which libraries raise that percentage as a side effect of work
+we would do anyway, whether or not KMP is ever adopted?**
+
+That framing matters. Nothing below is justified by multiplatform alone. Each has to earn its place
+on Android first; the portability gain is a tie-breaker, exactly as cu-195 treats it. But it means
+a "yes" here compounds, and picking the JVM-only option forecloses cu-182 quietly.
+
+Read against cu-182's own breakdown of the unportable 74.2%, the movable slices are:
+
+| slice | lines | % of Android-bound | candidate |
+|---|---:|---:|---|
+| other platform (Context, Uri, **prefs**) | 3,957 | 16.4% | DataStore (§2), Okio |
+| lifecycle/ViewModel | 1,620 | 6.7% | Molecule (§1), `lifecycle-viewmodel` KMP |
+
+UI (53.0%) and media/playback (10.1%) are not movable and should not be pretended otherwise — a
+background media service and lock-screen transport get written twice, which is cu-182's point.
+WorkManager (13.8%) has no KMP equivalent.
+
+### Candidates, each also justified on Android
+
+- **Okio** (Square, Apache-2.0) — `java.io.File` appears in **15 files**. Note the precise
+  situation, because it is easy to overstate: `FrameworkFreeCoreTest` bans `android.*`/`androidx.*`
+  imports, **not** JVM ones, so `java.io.File` does not by itself keep a file off that list —
+  `MediaItemTrack.kt` is excluded because it imports `android.net.Uri`, and `java.io.File` would
+  remain a portability blocker even after that was fixed. The guard is therefore *aligned with* this
+  work rather than evidence for it. **Android justification independent of KMP:** Okio's
+  `FakeFileSystem` makes file logic testable without a temp dir, and file handling is the
+  highest-risk area in the app — four tasks (cu-85, cu-81, cu-153, cu-76) have failure modes that
+  end in *deleted audio*. Weigh against cu-195, which touches the same paths; sequence them.
+- **kotlinx-serialization** vs Moshi — already flagged in §2. Note the interaction: Moshi is
+  JVM-only, so **every model stays Android-bound while it is the serializer.** Moshi codegen works
+  and landed in cu-62, so this is not urgent; it is the single change that would move the most
+  model code, and it is worth knowing that before another 20 models are written against Moshi.
+- **kotlinx-datetime** — only if JVM date/time APIs actually appear in otherwise-portable code.
+  Measure first; `util/DurationFormat.kt` is already pure over millis, which suggests this may be a
+  non-issue. **Do not adopt on principle.**
+- **Room is believed KMP-capable at our version** (2.8.1; support landed in the 2.7 line), which
+  would mean SQLDelight is *not* required for portability. **Confirm against the Room release notes
+  before relying on it** — it is the kind of version-dependent claim this repo has been burned by
+  (cu-166's "Fetch2 is maintained"). Recorded because "KMP means SQLDelight" is the assumption §2
+  might otherwise invite; if it holds, Room stays.
+- **`lifecycle-viewmodel` KMP artifacts** — relevant only alongside Molecule (§1) and after
+  cu-181/cu-188, since Compose Multiplatform is what makes a shared ViewModel useful at all.
+
+### The thing to get right
+
+**Do not let this become a KMP adoption by increments.** cu-182 owns that decision and is R4;
+nothing here may pre-empt it, and no `commonMain` source set is created by this task. The test for
+each candidate is: *would we choose this on Android alone?* If no, it does not go in. If yes, prefer
+the KMP-capable option and record the portability delta.
+
+Re-measure the 23.7% after any adoption, so cu-182 inherits a current number rather than this one.
+
 ## Explicitly out of scope
 
 - **Hilt** — has its own task, cu-185.
@@ -137,5 +196,12 @@ The declared-and-tracked ones are **not** in scope — `fragment-testing` (cu-17
       pin
 - [ ] Outcomes recorded as an ADR where a choice is architectural; the task file suffices for a
       list of declines
+- [ ] For each candidate, the portability delta is recorded — but **no candidate is adopted on
+      multiplatform grounds alone**; each must stand up on Android by itself
+- [ ] `java.io.File` usage measured (15 files today) and the Okio question answered — noting that
+      `FrameworkFreeCoreTest` bans framework imports, not JVM ones, so it is not itself the argument
+- [ ] cu-182's 23.7% portable figure re-measured if anything here is adopted, so it inherits a
+      current number
+- [ ] No `commonMain` source set is created and no KMP plugin applied — cu-182 owns that decision
 - [ ] Any adoption lands as its own task, not inside this one — this task decides, it does not
       implement
