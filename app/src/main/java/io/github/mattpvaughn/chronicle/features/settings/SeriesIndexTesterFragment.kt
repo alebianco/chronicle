@@ -11,9 +11,9 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.model.PatternOrder
 import io.github.mattpvaughn.chronicle.databinding.FragmentSeriesIndexTesterBinding
+import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
@@ -36,7 +36,7 @@ class SeriesIndexTesterFragment : Fragment() {
   private lateinit var viewModel: SeriesIndexTesterViewModel
 
   override fun onAttach(context: Context) {
-    (requireActivity() as MainActivity).activityComponent!!.inject(this)
+    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
     super.onAttach(context)
   }
 

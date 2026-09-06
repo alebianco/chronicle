@@ -27,6 +27,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.features.download.ChronicleWorkerFactory
 import io.github.mattpvaughn.chronicle.injection.components.AppComponent
+import io.github.mattpvaughn.chronicle.injection.components.AppComponentHost
 import io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
@@ -44,6 +45,7 @@ import javax.inject.Singleton
 open class ChronicleApplication :
   Application(),
   Configuration.Provider,
+  AppComponentHost,
   SingletonImageLoader.Factory {
   /**
    * Builds workers with their dependencies passed in rather than fetched (cu-179).
@@ -67,6 +69,15 @@ open class ChronicleApplication :
   val appComponent by lazy {
     initializeComponent()
   }
+
+  /**
+   * The graph, reached as a capability rather than by casting to this class (cu-178).
+   *
+   * The login screens used to do `(activity.application as ChronicleApplication).appComponent`,
+   * which named this concrete type and so could not be hosted by anything else.
+   */
+  override val appComponentForInjection: AppComponent
+    get() = appComponent
 
   init {
     INSTANCE = this

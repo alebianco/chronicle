@@ -10,10 +10,10 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.tabs.TabLayout
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.model.FacetList
 import io.github.mattpvaughn.chronicle.databinding.FragmentBrowseBinding
+import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import javax.inject.Inject
@@ -38,7 +38,7 @@ class BrowseFragment : Fragment() {
   private var binding: FragmentBrowseBinding? = null
 
   override fun onAttach(context: Context) {
-    (requireActivity() as MainActivity).activityComponent!!.inject(this)
+    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
     super.onAttach(context)
   }
 

@@ -14,7 +14,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.media3.common.util.UnstableApi
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -30,6 +29,7 @@ import io.github.mattpvaughn.chronicle.databinding.FragmentAudiobookDetailsBindi
 import io.github.mattpvaughn.chronicle.features.player.CastMenu
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.PlayServicesCastAvailability
+import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
@@ -115,7 +115,7 @@ class AudiobookDetailsFragment : Fragment() {
   lateinit var viewModel: AudiobookDetailsViewModel
 
   override fun onAttach(context: Context) {
-    (requireActivity() as MainActivity).activityComponent!!.inject(this)
+    check(injectFromHost { it.inject(this) }) { "${javaClass.simpleName} needs an ActivityComponentHost" }
     Timber.i("AudiobookDetailsFragment onAttach()")
     super.onAttach(context)
   }
