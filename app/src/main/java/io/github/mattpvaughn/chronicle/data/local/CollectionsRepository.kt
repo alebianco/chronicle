@@ -42,6 +42,35 @@ class CollectionsRepository
         .countCollections(currentSourceId)
         .map { it > 0 }
 
+    /**
+     * Claims collections that carry no usable scope for the connected server.
+     *
+     * Two markers, for two different accidents:
+     *
+     * - [SourceId.LEGACY_PLEX] is what `COLLECTIONS_MIGRATION_2_3` stamped on rows that predate
+     *   cu-127, exactly as the book and track migrations do.
+     * - [SourceId.UNKNOWN] is what **cu-197** is fixing: `Collection.from` hardcoded it and the
+     *   repository never resolved a real one, so every row written between cu-127 and cu-197 —
+     *   including rows the migration had correctly marked `LEGACY_PLEX`, which the next refresh
+     *   then overwrote — is unreachable by every scoped read.
+     *
+     * Adopting `UNKNOWN` is safe in a way adopting an arbitrary foreign scope would not be: an
+     * unscoped row belongs to no server, so there is no first server for a second one to steal it
+     * from. `LEGACY_PLEX` carries the same argument, which is why `BookDao.adoptLegacyRows` matches
+     * the marker only and never a resolved id.
+     */
+    suspend fun adoptUnscopedRows() {
+      val scope = currentSourceId
+      if (!scope.isKnown) return
+      withContext(dispatchers.io) {
+        val legacy = collectionsDao.adoptLegacyRows(newSource = scope, legacySource = SourceId.LEGACY_PLEX)
+        val unscoped = collectionsDao.adoptLegacyRows(newSource = scope, legacySource = SourceId.UNKNOWN)
+        if (legacy + unscoped > 0) {
+          Timber.i("Adopted ${legacy + unscoped} unscoped collections into the connected server's scope")
+        }
+      }
+    }
+
     suspend fun refreshCollectionsPaginated() {
       prefsRepo.lastRefreshTimeStamp = System.currentTimeMillis()
       val networkCollections: MutableList<Collection> = mutableListOf()
@@ -70,6 +99,21 @@ class CollectionsRepository
 
       withContext(dispatchers.io) {
         try {
+          // Stamp the connected server's scope, exactly as `planIngestion` does for books
+          // (cu-127). `Collection.from` cannot know which server it is parsing for, so it emits
+          // `SourceId.UNKNOWN` and the repository — which does know — resolves it here.
+          //
+          // An unresolved scope writes **nothing** rather than filing rows under a key no later
+          // refresh can match. That is not a hypothetical: before cu-197 every collection was
+          // stored with `UNKNOWN` while `getAllCollections` and `hasCollections` both filtered by
+          // `currentSourceId`, so every row was invisible to every read of it and the Collections
+          // tab was hidden for every user. `SourceId.UNKNOWN` is inert, never a wildcard.
+          val scope = currentSourceId
+          if (!scope.isKnown) {
+            Timber.i("Skipping collection ingestion: no source resolved")
+            return@withContext
+          }
+
           val collectionsWithChildIds =
             networkCollections.map {
               val collectionItems =
@@ -78,7 +122,7 @@ class CollectionsRepository
                   .asAudiobooks()
 
               val childIds = collectionItems.map { book -> book.id }
-              it.copy(childIds = childIds)
+              it.copy(childIds = childIds, source = scope)
             }
           collectionsDao.insertAll(collectionsWithChildIds)
         } catch (t: Throwable) {

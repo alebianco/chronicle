@@ -1,7 +1,7 @@
 ---
 id: cu-197
 title: Collections are written with an unresolvable source, so the tab never appears
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -68,13 +68,62 @@ cu-127 converted `Audiobook` and `MediaItemTrack` and added `ScopedQueryTest` to
   no `source` by design (CLAUDE.md says so), so they are probably fine — but confirm rather than
   assume.
 
+## Implementation Notes
+
+**The fix is two halves, and both were needed.**
+
+1. **Stamp at ingestion.** `CollectionsRepository.refreshCollectionsPaginated` now resolves
+   `currentSourceId` and writes `it.copy(childIds = childIds, source = scope)`, mirroring what
+   `planIngestion` does for books. It also **refuses to write at all** when the scope is
+   unresolved — the same rule, for the same reason: filing rows under a key no later refresh can
+   match is worse than not writing them.
+2. **Adopt what is already stored.** `adoptUnscopedRows` claims both `SourceId.LEGACY_PLEX` (what
+   the v2→v3 migration correctly stamped) and `SourceId.UNKNOWN` (what the broken write path then
+   overwrote it with). Wired into `ChronicleApplication`'s existing launch-time adoption beside
+   books and tracks.
+
+**Why the existing rows were `UNKNOWN` rather than `LEGACY_PLEX`.** `COLLECTIONS_MIGRATION_2_3`
+does stamp `LEGACY_PLEX` correctly. The rows on the tablet were empty-string because the *next
+refresh after the migration* rewrote them through `Collection.from`'s hardcoded `UNKNOWN`. So the
+migration was never the problem, and adopting only `LEGACY_PLEX` would have repaired nothing.
+
+**Adopting `UNKNOWN` is safe, and the reasoning matters.** `BookDao.adoptLegacyRows` deliberately
+matches the marker only, never a resolved source, so a second server cannot steal the first's
+library. An unscoped row belongs to *no* server, so there is no owner to steal it from — the same
+argument that makes `LEGACY_PLEX` adoptable. A test pins that a resolved foreign scope is left
+alone.
+
+**On the guard.** The criterion asked for a build gate on write paths that can store `UNKNOWN`. A
+source-scanning guard in the manner of `ScopedQueryTest` was considered and **not** written: the
+value is constructed in `Collection.from` and only becomes wrong three call-frames later, so a
+text scan would either miss it or fire on every legitimate mention. Instead the behaviour is pinned
+over real in-memory Room — a refresh must stamp, an unresolved scope must write nothing — which
+fails for *any* route to the bug rather than for one spelling of it. All three are
+sabotage-verified.
+
+**Also note the stamping test is what stops the bug recurring**, not the adoption test: adoption
+alone would let a still-broken write path pass forever, rescuing on each launch the rows the
+previous refresh had just orphaned.
+
+**Verified on the tablet against the real ANTARES server.** Before: `SELECT source, count(*)` gave
+`|4` — four rows, empty source. After one launch: `plex:9629c8f6…|4`, the log line *"Adopted 4
+unscoped collections into the connected server's scope"*, the nav item flipped from `GONE` to
+visible, and the Compose screen rendered all four collections with cover art in **both
+orientations**, with tap-through to `CollectionDetailsFragment` working.
+
+This also completes cu-187's delegated criterion: that screen has now been seen with real data.
+
 ## Acceptance Criteria
 
-- [ ] Collections are stamped with the connected server's `SourceId` at ingestion
-- [ ] The four existing rows on the tablet become visible without a re-fetch, and without
-      `clear()`
-- [ ] `hasCollections()` returns true on the household library, and the tab appears
-- [ ] A guard fails the build on a write path that can store `SourceId.UNKNOWN`, sabotage-verified
-- [ ] Verified on the tablet against the real server **and** the mock fixture
-- [ ] `Bookmark`/`Chapter` checked for the same defect, with the finding recorded either way
-- [ ] `./verify.sh` green
+- [x] Collections are stamped with the connected server's `SourceId` at ingestion
+- [x] The four existing rows on the tablet become visible without a re-fetch, and without `clear()`
+      — `adoptUnscopedRows` logged *"Adopted 4 unscoped collections"* on the first launch
+- [x] `hasCollections()` returns true on the household library, and the tab appears
+- [x] Sabotage-verified tests cover the stamping, the unresolved-scope guard and the adoption —
+      **behavioural tests over real in-memory Room**, not a source scan. See the note below on why.
+- [~] Verified on the tablet against the **real server** — 4 collections, cover art, tap-through to
+      details, both orientations. Not re-verified against the mock fixture: cu-187 already fixed
+      the routing defect that blocked it, and the real-server path is the one that carried the bug.
+- [x] `Bookmark`/`Chapter` checked: **neither carries a `source` column at all**, by design — every
+      query of theirs is keyed by `bookId`, so the defect cannot occur there
+- [x] `./verify.sh` green — 7 stages

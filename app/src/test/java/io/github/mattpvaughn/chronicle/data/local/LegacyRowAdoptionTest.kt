@@ -4,15 +4,22 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
+import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainer
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
 import io.github.mattpvaughn.chronicle.testing.OTHER_TEST_SOURCE
 import io.github.mattpvaughn.chronicle.testing.TEST_SERVER_ID
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,6 +49,7 @@ import org.robolectric.RobolectricTestRunner
 class LegacyRowAdoptionTest {
   private lateinit var bookDb: BookDatabase
   private lateinit var trackDb: TrackDatabase
+  private lateinit var collectionsDb: CollectionsDatabase
 
   private val prefsRepo = mockk<PrefsRepo>(relaxed = true) { every { offlineMode } returns false }
 
@@ -55,12 +63,15 @@ class LegacyRowAdoptionTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     bookDb = Room.inMemoryDatabaseBuilder(context, BookDatabase::class.java).allowMainThreadQueries().build()
     trackDb = Room.inMemoryDatabaseBuilder(context, TrackDatabase::class.java).allowMainThreadQueries().build()
+    collectionsDb =
+      Room.inMemoryDatabaseBuilder(context, CollectionsDatabase::class.java).allowMainThreadQueries().build()
   }
 
   @After
   fun tearDown() {
     bookDb.close()
     trackDb.close()
+    collectionsDb.close()
   }
 
   private fun bookRepository() =
@@ -81,6 +92,172 @@ class LegacyRowAdoptionTest {
       plexPrefs = plexPrefsRepo,
       dispatchers = TestDispatcherProvider(),
     )
+
+  private fun emptyContainer() = PlexMediaContainerWrapper(PlexMediaContainer())
+
+  /** One collection, shaped as `/library/sections/N/collections` returns it. */
+  private fun collectionsResponse(
+    id: String,
+    title: String,
+  ) = PlexMediaContainerWrapper(
+    PlexMediaContainer(
+      metadata = listOf(PlexDirectory(ratingKey = id, title = title, type = "collection")),
+      size = 1,
+      totalSize = 1,
+      offset = 0,
+    ),
+  )
+
+  private fun collectionsRepository() =
+    CollectionsRepository(
+      plexMediaService = mockk<PlexMediaService>(relaxed = true),
+      prefsRepo = prefsRepo,
+      plexPrefsRepo = plexPrefsRepo,
+      collectionsDao = collectionsDb.collectionsDao,
+      dispatchers = TestDispatcherProvider(),
+    )
+
+  // ---- collections (cu-197) ----
+
+  /**
+   * The cu-197 bug, as a test.
+   *
+   * `Collection.from` hardcoded `SourceId.UNKNOWN` and the repository never resolved a real one,
+   * while `getAllCollections` and `hasCollections` both filter by `currentSourceId`. So every
+   * stored collection was invisible to every read of it and the Collections tab — gated on
+   * `hasCollections` — was hidden for every user on every library. Measured on the household
+   * tablet: four real collections, all with an empty source.
+   */
+  @Test
+  fun `an unscoped collection becomes visible once adopted`() =
+    runTest {
+      collectionsDb.collectionsDao.insertAll(
+        listOf(Collection(id = "c1", source = SourceId.UNKNOWN, title = "Darkover")),
+      )
+      val repo = collectionsRepository()
+      assertEquals(
+        "before adoption an UNKNOWN-scoped row must be invisible",
+        emptyList<Collection>(),
+        repo.getAllCollections().first(),
+      )
+
+      repo.adoptUnscopedRows()
+
+      assertEquals(listOf("Darkover"), repo.getAllCollections().first().map { it.title })
+      assertEquals("the tab is gated on this", true, repo.hasCollections().first())
+    }
+
+  /** The migration's marker is claimed too, exactly as books and tracks do. */
+  @Test
+  fun `a legacy collection is adopted as well`() =
+    runTest {
+      collectionsDb.collectionsDao.insertAll(
+        listOf(Collection(id = "c1", source = SourceId.LEGACY_PLEX, title = "From before")),
+      )
+      val repo = collectionsRepository()
+
+      repo.adoptUnscopedRows()
+
+      assertEquals(listOf("From before"), repo.getAllCollections().first().map { it.title })
+    }
+
+  /**
+   * The same narrowness books enforce: adoption claims rows belonging to *no* server, never rows
+   * belonging to another one. An unscoped row has no owner to steal it from; a resolved one does.
+   */
+  @Test
+  fun `adoption never claims another source's collections`() =
+    runTest {
+      collectionsDb.collectionsDao.insertAll(
+        listOf(
+          Collection(id = "c1", source = SourceId.UNKNOWN, title = "Unscoped"),
+          Collection(id = "c2", source = OTHER_TEST_SOURCE, title = "Another server's"),
+        ),
+      )
+
+      collectionsRepository().adoptUnscopedRows()
+
+      assertEquals(
+        "a second server must not be able to steal the first's collections",
+        OTHER_TEST_SOURCE,
+        collectionsDb.collectionsDao.getCollections(OTHER_TEST_SOURCE).single().source,
+      )
+      assertEquals(
+        listOf("Unscoped"),
+        collectionsDb.collectionsDao.getCollections(TEST_SOURCE).map { it.title },
+      )
+    }
+
+  /**
+   * The fix itself, not just the repair: a refresh must **stamp** the connected server's scope.
+   *
+   * Adoption alone would make this test suite pass over a still-broken write path — every launch
+   * would rescue rows the previous refresh had just orphaned. This asserts the row is written
+   * correctly in the first place, which is what stops the bug recurring the moment adoption is
+   * removed.
+   */
+  @Test
+  fun `a refresh stamps collections with the connected server's scope`() =
+    runTest {
+      val service =
+        mockk<PlexMediaService>(relaxed = true) {
+          coEvery { retrieveCollectionsPaginated(any(), any(), any()) } returns
+            collectionsResponse(id = "c1", title = "Darkover")
+          coEvery { fetchBooksInCollection(any()) } returns emptyContainer()
+        }
+      val repo =
+        CollectionsRepository(
+          plexMediaService = service,
+          prefsRepo = prefsRepo,
+          plexPrefsRepo = plexPrefsRepo,
+          collectionsDao = collectionsDb.collectionsDao,
+          dispatchers = TestDispatcherProvider(),
+        )
+
+      repo.refreshCollectionsPaginated()
+
+      assertEquals(
+        "a refresh must write the resolved scope, not SourceId.UNKNOWN",
+        TEST_SOURCE,
+        collectionsDb.collectionsDao.getCollections(TEST_SOURCE).single().source,
+      )
+      assertEquals("and the tab must light up", true, repo.hasCollections().first())
+    }
+
+  /**
+   * An unresolved scope writes nothing rather than filing rows under a key no later refresh can
+   * match — the same rule `planIngestion` applies to books (cu-127). `UNKNOWN` reaches here
+   * mid-login or after a `clear()`.
+   */
+  @Test
+  fun `a refresh with no server resolved writes nothing`() =
+    runTest {
+      val noServer =
+        mockk<PlexPrefsRepo>(relaxed = true) {
+          every { server } returns null
+          every { library } returns PlexLibrary(name = "Books", type = MediaType.ARTIST, id = "1")
+        }
+      val service =
+        mockk<PlexMediaService>(relaxed = true) {
+          coEvery { retrieveCollectionsPaginated(any(), any(), any()) } returns
+            collectionsResponse(id = "c1", title = "Darkover")
+          coEvery { fetchBooksInCollection(any()) } returns emptyContainer()
+        }
+
+      CollectionsRepository(
+        plexMediaService = service,
+        prefsRepo = prefsRepo,
+        plexPrefsRepo = noServer,
+        collectionsDao = collectionsDb.collectionsDao,
+        dispatchers = TestDispatcherProvider(),
+      ).refreshCollectionsPaginated()
+
+      assertEquals(
+        "an unresolved scope must store nothing, not an UNKNOWN-scoped row",
+        emptyList<Collection>(),
+        collectionsDb.collectionsDao.getCollections(SourceId.UNKNOWN),
+      )
+    }
 
   @Test
   fun `a legacy book becomes visible once adopted`() =

@@ -16,6 +16,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import io.github.mattpvaughn.chronicle.BuildConfig
+import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -120,6 +121,9 @@ open class ChronicleApplication :
 
   @Inject
   lateinit var trackRepository: ITrackRepository
+
+  @Inject
+  lateinit var collectionsRepository: CollectionsRepository
 
   @Inject
   lateinit var unhandledExceptionHandler: CoroutineExceptionHandler
@@ -242,6 +246,8 @@ open class ChronicleApplication :
     applicationScope.launch(unhandledExceptionHandler) {
       bookRepository.adoptLegacyRows()
       trackRepository.adoptLegacyRows()
+      // Collections additionally adopt `SourceId.UNKNOWN` rows — see `adoptUnscopedRows` (cu-197).
+      collectionsRepository.adoptUnscopedRows()
     }
   }
 

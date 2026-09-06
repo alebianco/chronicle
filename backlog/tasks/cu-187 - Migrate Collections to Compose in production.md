@@ -55,11 +55,12 @@ result there; verify with the mock fixture or a library that has collections.
       written past its `EMPTY` seed. The task's scope list was wrong about it.
 - [x] `CollectionsFragmentScenarioTest` rewritten — its adapter assertion became a `ComposeView`
       host assertion, which is what is actually worth pinning
-- [>] Verified on a device with collections present: **blocked by cu-197**, filed from this task.
-      Collections are written with `SourceId.UNKNOWN` and read back scoped, so the tab is hidden
-      for every user on every library. The screen itself was verified through
-      `ComposePreviewActivity` in **both orientations** — loaded, empty and offline — with the
-      adaptive grid reflowing 6 columns landscape / 4 portrait.
+- [x] Verified on a device with collections present. Was blocked by [[cu-197]] (collections were
+      written with `SourceId.UNKNOWN` and read back scoped, so the tab was hidden for everyone);
+      **cu-197 landed and this was then verified against the real ANTARES server** — four
+      collections with cover art, tap-through to details, in both orientations. The three states
+      were separately verified through `ComposePreviewActivity`, with the adaptive grid reflowing
+      6 columns landscape / 4 portrait.
 - [x] `./verify.sh` green — 7 stages
 
 ## Implementation Notes
