@@ -47,6 +47,8 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserLis
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString
+import io.github.mattpvaughn.chronicle.views.SpeedChooserState
+import io.github.mattpvaughn.chronicle.views.SpeedDestination
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -1082,6 +1084,91 @@ class CurrentlyPlayingViewModel
 
     fun showPlaybackSpeedChooser() {
       _showModalBottomSheetSpeedChooser.value = Event(Unit)
+    }
+
+    /**
+     * What the speed popover should show (cu-206).
+     *
+     * Moved here from `ModalBottomSheetSpeedChooser`, which held the book as a **mutable field**
+     * snapshotted at creation and re-rendered itself through a `SharedPreferences` change listener.
+     * As a flow the popover simply renders the current value, so the `isRendering` re-entrancy flag
+     * that guarded every programmatic write has nothing left to guard.
+     */
+    val speedChooserState: StateFlow<SpeedChooserState> =
+      combineDistinct(
+        currentlyPlaying.book,
+        sharedPrefs.floatFlow(PrefsRepo.KEY_PLAYBACK_SPEED, prefsRepo.playbackSpeed),
+      ) { book, globalSpeed ->
+        SpeedChooserState.of(book, globalSpeed)
+      }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        SpeedChooserState.of(EMPTY_AUDIOBOOK, prefsRepo.playbackSpeed),
+      )
+
+    /** Whether silence-skipping is on. */
+    val skipSilence: StateFlow<Boolean> =
+      sharedPrefs
+        .booleanFlow(PrefsRepo.KEY_SKIP_SILENCE, prefsRepo.skipSilence)
+        .stateIn(
+          viewModelScope,
+          SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+          prefsRepo.skipSilence,
+        )
+
+    fun setSkipSilence(enabled: Boolean) {
+      prefsRepo.skipSilence = enabled
+    }
+
+    /**
+     * Writes [speed] where this book says it belongs — the book row, or the global preference.
+     *
+     * `destinationFor` is the same decision the popover made; only the plumbing moved.
+     */
+    fun setPlaybackSpeed(speed: Float) {
+      val book = currentlyPlaying.book.value
+      when (SpeedChooserState.destinationFor(book)) {
+        SpeedDestination.THIS_BOOK -> persistBookSpeed(book, speed)
+        SpeedDestination.GLOBAL -> prefsRepo.playbackSpeed = speed
+      }
+    }
+
+    /**
+     * Turns the per-book override on or off.
+     *
+     * Turning it **on** adopts the speed already showing, so the switch alone never changes how the
+     * book sounds; turning it **off** clears the row so the book follows the global preference
+     * again. The shown speed comes from [speedChooserState], which is what the popover is
+     * rendering — not from `prefsRepo`, which is only one of the two things that can be shown.
+     */
+    fun setSpeedOverrideEnabled(enabled: Boolean) {
+      val shownSpeed = speedChooserState.value.speed
+      persistBookSpeed(
+        currentlyPlaying.book.value,
+        SpeedChooserState.speedForToggle(enabled, shownSpeed),
+      )
+    }
+
+    private fun persistBookSpeed(
+      book: Audiobook,
+      speed: Float,
+    ) {
+      if (!SpeedChooserState.of(book, prefsRepo.playbackSpeed).canOverride) {
+        Timber.w("No book playing; cannot store a per-book speed")
+        return
+      }
+      val bookId = book.id
+      // Publish before the DB write so the player picks the speed up now. `ProgressUpdater` would
+      // re-read the book and republish it eventually, but only while playing — a change made while
+      // paused would otherwise not apply until playback resumed (cu-20).
+      currentlyPlaying.updateSpeedOverride(bookId, speed)
+      viewModelScope.launch {
+        try {
+          bookRepository.updatePlaybackSpeed(bookId, speed)
+        } catch (e: Throwable) {
+          Timber.e(e, "Failed to store per-book speed for $bookId")
+        }
+      }
     }
 
     private fun hideSleepTimerChooser() {

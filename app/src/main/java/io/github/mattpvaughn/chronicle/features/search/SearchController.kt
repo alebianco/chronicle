@@ -32,6 +32,21 @@ class SearchController(
   private val _isQueryEmpty = MutableStateFlow(true)
   val isQueryEmpty: StateFlow<Boolean> get() = _isQueryEmpty
 
+  /**
+   * The text in the search field.
+   *
+   * New in cu-206, and it belongs here for the same reason the rest of this class exists. Under
+   * `SearchView` the *widget* owned the text and pushed changes out, so the ViewModel never held
+   * it — which is why nothing here needed it before. A Compose text field is stateless, so the
+   * query has to live somewhere that survives recomposition and rotation, and putting it in the
+   * one place all three screens already share means they cannot drift about it.
+   *
+   * It is deliberately the raw text, not the trimmed one [search] matches on: the field must show
+   * exactly what the user typed, spaces included.
+   */
+  private val _query = MutableStateFlow("")
+  val query: StateFlow<String> get() = _query
+
   private val _isSearchActive = MutableStateFlow(false)
   val isSearchActive: StateFlow<Boolean> get() = _isSearchActive
 
@@ -51,6 +66,7 @@ class SearchController(
   /** Runs a search for [query] after the debounce interval, superseding any pending one. */
   fun search(query: String) {
     pending?.cancel()
+    _query.value = query
     val trimmed = query.trim()
     _isQueryEmpty.value = trimmed.isEmpty()
     if (trimmed.isEmpty()) {
@@ -72,6 +88,7 @@ class SearchController(
 
   private fun clear() {
     pending?.cancel()
+    _query.value = ""
     _isQueryEmpty.value = true
     publish(GroupedSearchResults(emptyList()))
   }

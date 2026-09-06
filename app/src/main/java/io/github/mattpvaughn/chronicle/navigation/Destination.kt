@@ -1,6 +1,9 @@
 package io.github.mattpvaughn.chronicle.navigation
 
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
+import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsViewModel
+import io.github.mattpvaughn.chronicle.features.browse.FacetBooksViewModel
+import io.github.mattpvaughn.chronicle.features.collections.CollectionDetailsViewModel
 
 /**
  * Every screen the app can navigate to, and the route strings Navigation Compose addresses them by
@@ -93,7 +96,16 @@ sealed interface Destination {
 
     companion object {
       const val PREFIX = "book"
-      const val ARG_BOOK_ID = "bookId"
+
+      /**
+       * The argument name is [AudiobookDetailsViewModel.ARG_AUDIOBOOK_ID], not a fresh one.
+       *
+       * cu-185 moved these three screens off mutable factory fields and onto `SavedStateHandle`,
+       * which is what makes them survive process death. Navigation Compose puts a route argument
+       * into that same handle, so reusing the existing name means the ViewModels need **no change
+       * at all** — a new name here would compile, and the ViewModel would silently read null.
+       */
+      const val ARG_BOOK_ID = AudiobookDetailsViewModel.ARG_AUDIOBOOK_ID
       const val ROUTE_PATTERN = "$PREFIX/{$ARG_BOOK_ID}"
     }
   }
@@ -103,7 +115,9 @@ sealed interface Destination {
 
     companion object {
       const val PREFIX = "collection"
-      const val ARG_COLLECTION_ID = "collectionId"
+
+      /** [CollectionDetailsViewModel.ARG_COLLECTION_ID] — see [BookDetails.ARG_BOOK_ID]. */
+      const val ARG_COLLECTION_ID = CollectionDetailsViewModel.ARG_COLLECTION_ID
       const val ROUTE_PATTERN = "$PREFIX/{$ARG_COLLECTION_ID}"
     }
   }
@@ -113,8 +127,12 @@ sealed interface Destination {
 
     companion object {
       const val PREFIX = "facet"
-      const val ARG_KIND = "kind"
-      const val ARG_VALUE = "value"
+
+      /** [FacetBooksViewModel.ARG_KIND] — see [BookDetails.ARG_BOOK_ID]. */
+      const val ARG_KIND = FacetBooksViewModel.ARG_KIND
+
+      /** [FacetBooksViewModel.ARG_VALUE] — see [BookDetails.ARG_BOOK_ID]. */
+      const val ARG_VALUE = FacetBooksViewModel.ARG_VALUE
       const val ROUTE_PATTERN = "$PREFIX/{$ARG_KIND}/{$ARG_VALUE}"
     }
   }

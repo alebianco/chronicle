@@ -11,10 +11,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,7 +32,15 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
  *   there — the old code expressed the same thing by simply not calling
  *   `setNavigationOnClickListener`.
  * @param actions the toolbar's menu items, replacing the `MenuProvider` + menu XML pairs. Only
- *   `AudiobookDetailsScreen` needs a non-Compose item, and it uses [CastButton].
+ *   `AudiobookDetailsScreen` needs a non-Compose item, and it uses `CastButton`.
+ *
+ * `TopAppBar` is still experimental in Material3. The `@OptIn` here (rather than
+ * `@ExperimentalMaterial3Api` on the function) stops the requirement propagating to all twelve
+ * screens that use this — the same containment `BottomChooser` uses.
+ *
+ * A `scrollBehavior` parameter was tried and removed: `TopAppBarScrollBehavior` is itself
+ * experimental, so naming it in this signature re-exported the opt-in to every caller and defeated
+ * that containment. Only two screens have a collapsing bar (details, player); they build their own.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,14 +49,10 @@ fun ChronicleScaffold(
   modifier: Modifier = Modifier,
   onNavigateUp: (() -> Unit)? = null,
   actions: @Composable () -> Unit = {},
-  scrollBehavior: TopAppBarScrollBehavior? = null,
   content: @Composable (PaddingValues) -> Unit,
 ) {
   Scaffold(
-    modifier =
-      modifier
-        .fillMaxSize()
-        .let { if (scrollBehavior != null) it.nestedScroll(scrollBehavior.nestedScrollConnection) else it },
+    modifier = modifier.fillMaxSize(),
     containerColor = ChronicleColors.Primary,
     topBar = {
       TopAppBar(
@@ -80,7 +82,6 @@ fun ChronicleScaffold(
             navigationIconContentColor = ChronicleColors.TextPrimary,
             actionIconContentColor = ChronicleColors.TextPrimary,
           ),
-        scrollBehavior = scrollBehavior,
       )
     },
   ) { padding ->

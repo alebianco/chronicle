@@ -175,6 +175,10 @@ class CollectionsViewModel
     val isQueryEmpty: StateFlow<Boolean>
       get() = searchController.isQueryEmpty
 
+    /** The search field's text (cu-206) — see [SearchController.query]. */
+    val searchQuery: StateFlow<String>
+      get() = searchController.query
+
     private var _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
     val bottomChooserState: StateFlow<BottomSheetChooser.BottomChooserState>
       get() = _bottomChooserState

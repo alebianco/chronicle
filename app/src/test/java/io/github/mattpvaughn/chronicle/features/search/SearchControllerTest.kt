@@ -160,6 +160,52 @@ class SearchControllerTest {
       assertEquals(0, counting.calls)
     }
 
+  /**
+   * The query text is state here, not in the widget (cu-206).
+   *
+   * Under `SearchView` the widget owned the text, so nothing in this class held it. A Compose
+   * text field renders whatever it is given, so a query that is not published here shows an empty
+   * field while the results below it answer the query the user typed — the field and the results
+   * disagreeing about what was searched for.
+   */
+  @Test
+  fun `the query text is published as typed`() =
+    runTest {
+      val controller = SearchController(CountingRepo(library).repo(), this)
+
+      controller.search("du")
+      assertEquals("du", controller.query.value)
+      controller.search("dune")
+      advanceUntilIdle()
+
+      assertEquals("dune", controller.query.value)
+    }
+
+  @Test
+  fun `the query keeps the spaces the user typed`() =
+    runTest {
+      // Matching trims, but the field must show exactly what was typed or the caret jumps.
+      val controller = SearchController(CountingRepo(library).repo(), this)
+
+      controller.search("dune ")
+      advanceUntilIdle()
+
+      assertEquals("dune ", controller.query.value)
+    }
+
+  @Test
+  fun `closing search clears the query as well as the results`() =
+    runTest {
+      val controller = SearchController(CountingRepo(library).repo(), this)
+      controller.search("dune")
+      advanceUntilIdle()
+
+      controller.setSearchActive(false)
+      advanceUntilIdle()
+
+      assertEquals("", controller.query.value)
+    }
+
   @Test
   fun `closing search clears the results`() =
     runTest {

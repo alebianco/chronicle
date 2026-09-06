@@ -107,7 +107,14 @@ class LibraryViewModel
         false,
       )
 
-    private val sortKey =
+    /**
+     * The chosen sort key.
+     *
+     * Public since cu-206: the filter panel is Compose now, so it renders the selected chip from
+     * this rather than reading `prefsRepo.bookSortKey` once. A direct property read is not
+     * observable — the chip would show whatever was stored when the sheet opened and never move.
+     */
+    val sortKey =
       sharedPreferences.stringFlow(KEY_BOOK_SORT_BY, SORT_KEY_TITLE)
     val isOffline = sharedPreferences.booleanFlow(KEY_OFFLINE_MODE, false)
 
@@ -179,6 +186,10 @@ class LibraryViewModel
 
     val isQueryEmpty: StateFlow<Boolean>
       get() = searchController.isQueryEmpty
+
+    /** The search field's text (cu-206) — see [SearchController.query]. */
+    val searchQuery: StateFlow<String>
+      get() = searchController.query
 
     private var _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
     val bottomChooserState: StateFlow<BottomSheetChooser.BottomChooserState>

@@ -119,6 +119,10 @@ class HomeViewModel
     val isQueryEmpty: StateFlow<Boolean>
       get() = searchController.isQueryEmpty
 
+    /** The search field's text (cu-206) — see [SearchController.query]. */
+    val searchQuery: StateFlow<String>
+      get() = searchController.query
+
     /**
      * A `SharedPreferences` listener fires on whichever thread called `apply()`, and a settings
      * *import* writes this key off the main thread (`SettingsBackup.BACKUP_SETTING_KEYS` includes

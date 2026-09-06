@@ -1,6 +1,9 @@
 package io.github.mattpvaughn.chronicle.navigation
 
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
+import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsViewModel
+import io.github.mattpvaughn.chronicle.features.browse.FacetBooksViewModel
+import io.github.mattpvaughn.chronicle.features.collections.CollectionDetailsViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -23,7 +26,30 @@ class DestinationTest {
   @Test
   fun `book route matches its own pattern shape`() {
     assertEquals("book/12345", Destination.BookDetails("12345").route)
-    assertEquals("book/{bookId}", Destination.BookDetails.ROUTE_PATTERN)
+    assertEquals(
+      "book/{${AudiobookDetailsViewModel.ARG_AUDIOBOOK_ID}}",
+      Destination.BookDetails.ROUTE_PATTERN,
+    )
+  }
+
+  /**
+   * The route argument names *are* the names the ViewModels read from `SavedStateHandle`.
+   *
+   * This is the one that would fail silently in production. Navigation Compose puts a route
+   * argument into the same `SavedStateHandle` the ViewModel reads, so a route declaring
+   * `{bookId}` while `AudiobookDetailsViewModel` reads `"audiobook_id"` compiles, navigates, and
+   * renders an **empty screen** — the ViewModel reads null and falls back to its default. Asserting
+   * the constants are shared is what stops the two drifting apart.
+   */
+  @Test
+  fun `route argument names are the ones the ViewModels read`() {
+    assertEquals(AudiobookDetailsViewModel.ARG_AUDIOBOOK_ID, Destination.BookDetails.ARG_BOOK_ID)
+    assertEquals(
+      CollectionDetailsViewModel.ARG_COLLECTION_ID,
+      Destination.CollectionDetails.ARG_COLLECTION_ID,
+    )
+    assertEquals(FacetBooksViewModel.ARG_KIND, Destination.FacetBooks.ARG_KIND)
+    assertEquals(FacetBooksViewModel.ARG_VALUE, Destination.FacetBooks.ARG_VALUE)
   }
 
   @Test
