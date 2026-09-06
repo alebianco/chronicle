@@ -1,10 +1,13 @@
 ---
-id: DRAFT-180
+id: cu-180
 title: Let the fragments own their toolbars
-status: Draft
+status: In Progress
+assignee: []
+created_date: ''
 labels:
   - R2
   - maintainability
+dependencies: []
 priority: high
 ---
 

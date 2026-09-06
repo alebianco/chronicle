@@ -5,11 +5,9 @@ import android.view.*
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.SearchView
-import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity
@@ -27,6 +25,7 @@ import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
+import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import javax.inject.Inject
 
 class HomeFragment : Fragment() {
@@ -155,8 +154,6 @@ class HomeFragment : Fragment() {
       Toast.makeText(context, getString(messageRes), LENGTH_SHORT).show()
     }
 
-    (activity as MainActivity).setSupportActionBar(binding.toolbar)
-
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
 
     binding.toolbarLayout.applyTopSystemBarInset()
@@ -170,14 +167,17 @@ class HomeFragment : Fragment() {
   ) {
     super.onViewCreated(view, savedInstanceState)
 
-    val menuHost: MenuHost = requireActivity()
-    menuHost.addMenuProvider(
+    // The toolbar owns its menu (cu-180): no host cast, no activity MenuHost.
+    setToolbarMenu(
+      view.findViewById(R.id.toolbar),
       object : MenuProvider {
         override fun onCreateMenu(
           menu: Menu,
           menuInflater: MenuInflater,
         ) {
-          menuInflater.inflate(R.menu.home_menu, menu)
+          // The toolbar inflates `R.menu.home_menu` itself via `app:menu` in the layout (cu-180), so
+          // inflating again here would double every item — which it did, visibly, as two
+          // search icons. This provider only wires the items up.
           val searchView = menu.findItem(R.id.search).actionView as SearchView
           val searchItem = menu.findItem(R.id.search)
 
@@ -215,8 +215,6 @@ class HomeFragment : Fragment() {
           return menuItem.itemId == R.id.search
         }
       },
-      viewLifecycleOwner,
-      Lifecycle.State.RESUMED,
     )
   }
 

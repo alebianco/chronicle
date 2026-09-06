@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.features.collections
 
 import android.content.SharedPreferences
 import androidx.fragment.app.testing.launchFragmentInContainer
+import androidx.lifecycle.Lifecycle
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.BookRepository
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
@@ -19,7 +20,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.After
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -119,43 +120,38 @@ class CollectionsFragmentScenarioTest {
   }
 
   /**
-   * How far the scenario gets today, and where it stops.
+   * The question this proof of concept existed to answer, now answerable: a Fragment of this app
+   * launches into a **generic host** and reaches `RESUMED`.
    *
-   * `onAttach` now succeeds — the DI seam works — and the failure has moved into `onCreateView`:
-   *
-   * ```
-   * ClassCastException: EmptyFragmentActivity cannot be cast to AppCompatActivity
-   *   at CollectionsFragment.onCreateView   // (activity as AppCompatActivity).setSupportActionBar
-   * ```
-   *
-   * That is a **second** host-type dependency, and it is in six of the ten fragments. Unlike the
-   * DI cast it cannot be inverted with an interface: `setSupportActionBar` is AppCompat's own API,
-   * so the host genuinely has to be an `AppCompatActivity`. `FragmentScenario` hosts everything in
-   * its `EmptyFragmentActivity` and offers no overload that accepts a host class — verified against
-   * `fragment-testing` 1.8.9, whose four `launch`/`launchInContainer` signatures take only a
-   * fragment class, args, a theme and a factory.
-   *
-   * So the remaining route is a **debug-manifest `AppCompatActivity` host** plus
-   * `ActivityScenario`, which is a larger change than a proof of concept should make unattended —
-   * it means a new `src/debug/AndroidManifest.xml` and a launcher activity shipped in the debug
-   * build. Recorded in cu-178 rather than attempted.
-   *
-   * This test asserts the progress that is real: the fragment attaches and injects in a generic
-   * host, which it could not do before.
+   * Two host casts had to go first. cu-178 inverted the DI one
+   * (`(activity as MainActivity).activityComponent`) behind `ActivityComponentHost`; cu-180
+   * removed `(activity as AppCompatActivity).setSupportActionBar`, which was routing the
+   * fragment's own toolbar menu through the Activity and pinning the screen to an AppCompat host
+   * for no other reason.
    */
   @Test
-  fun `the fragment attaches and injects in a generic host`() {
-    val error =
-      runCatching {
-        launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).close()
-      }.exceptionOrNull()
+  fun `the fragment reaches a resumed state in a generic host`() {
+    launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
+      scenario.moveToState(Lifecycle.State.RESUMED)
+      scenario.onFragment { assertNotNull("the view must be created", it.view) }
+    }
+  }
 
-    // Attach succeeded if we got past it: the failure, if any, is the AppCompat host cast in
-    // `onCreateView`, never the `ActivityComponentHost` check in `onAttach`.
-    val message = generateSequence(error) { it.cause }.mapNotNull { it.message }.joinToString(" | ")
-    assertFalse(
-      "injection should no longer fail in onAttach, but did: $message",
-      message.contains("needs an ActivityComponentHost"),
-    )
+  /** The lifecycle is really driven: the adapter exists once the view is up. */
+  @Test
+  fun `the fragment builds its adapter`() {
+    launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
+      scenario.moveToState(Lifecycle.State.RESUMED)
+      scenario.onFragment { assertNotNull("onCreateView must have run", it.adapter) }
+    }
+  }
+
+  /** A rotation is a destroy/recreate, which is where most Fragment bugs here have come from. */
+  @Test
+  fun `the fragment survives a recreation`() {
+    launchFragmentInContainer<CollectionsFragment>(themeResId = R.style.AppTheme).use { scenario ->
+      scenario.recreate()
+      scenario.onFragment { assertNotNull(it.view) }
+    }
   }
 }

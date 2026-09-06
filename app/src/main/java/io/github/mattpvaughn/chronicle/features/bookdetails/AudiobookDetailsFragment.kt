@@ -7,13 +7,10 @@ import android.os.Bundle
 import android.view.*
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.media3.common.util.UnstableApi
 import io.github.mattpvaughn.chronicle.R
@@ -39,6 +36,7 @@ import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.bindImageRounded
 import io.github.mattpvaughn.chronicle.views.setBottomChooserState
+import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
 import javax.inject.Inject
@@ -268,7 +266,6 @@ class AudiobookDetailsFragment : Fragment() {
     }
 
     detailsToolbar = binding.detailsToolbar
-    (activity as AppCompatActivity).setSupportActionBar(binding.detailsToolbar)
     binding.detailsToolbar.title = null
 
     binding.detailsToolbar.setNavigationOnClickListener {
@@ -344,8 +341,9 @@ class AudiobookDetailsFragment : Fragment() {
   ) {
     super.onViewCreated(view, savedInstanceState)
 
-    val menuHost: MenuHost = requireActivity()
-    menuHost.addMenuProvider(
+    // The toolbar owns its menu (cu-180): no host cast, no activity MenuHost.
+    setToolbarMenu(
+      view.findViewById(R.id.details_toolbar),
       object : MenuProvider {
         // @UnstableApi for the Cast route button below; scoped to this callback rather than the
         // Fragment so the opt-in does not silently cover unrelated screen code.
@@ -354,7 +352,9 @@ class AudiobookDetailsFragment : Fragment() {
           menu: Menu,
           menuInflater: MenuInflater,
         ) {
-          menuInflater.inflate(R.menu.audiobook_details_menu, menu)
+          // The toolbar inflates `R.menu.audiobook_details_menu` itself via `app:menu` in the layout (cu-180), so
+          // inflating again here would double every item — which it did, visibly, as two
+          // search icons. This provider only wires the items up.
           // Reveals the route button only where Cast can actually work; a no-op otherwise, which
           // is why the menu item ships hidden (cu-168).
           CastMenu.setUp(requireContext(), menu, PlayServicesCastAvailability(requireContext()))
@@ -387,8 +387,6 @@ class AudiobookDetailsFragment : Fragment() {
           }
         }
       },
-      viewLifecycleOwner,
-      Lifecycle.State.RESUMED,
     )
   }
 

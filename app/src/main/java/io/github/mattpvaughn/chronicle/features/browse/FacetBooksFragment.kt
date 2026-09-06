@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
@@ -103,7 +102,8 @@ class FacetBooksFragment : Fragment() {
       binding.noBooksMessage.isVisible = books.isEmpty()
     }
 
-    (activity as AppCompatActivity).setSupportActionBar(binding.toolbar)
+    // No `setSupportActionBar` (cu-180): this screen has no menu, so the cast bought
+    // nothing and only pinned the fragment to an AppCompat host.
     binding.toolbar.title = value
     binding.toolbar.setNavigationOnClickListener {
       parentFragmentManager.popBackStack()

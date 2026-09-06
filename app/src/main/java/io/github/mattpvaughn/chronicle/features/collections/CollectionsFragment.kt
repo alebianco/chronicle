@@ -5,13 +5,10 @@ import android.os.Bundle
 import android.view.*
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
-import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -30,6 +27,7 @@ import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.util.isDifferentListById
+import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -178,16 +176,17 @@ class CollectionsFragment : Fragment() {
       }
     }
 
-    (activity as AppCompatActivity).setSupportActionBar(binding.toolbar)
-
-    val menuHost: MenuHost = requireActivity()
-    menuHost.addMenuProvider(
+    // The toolbar owns its menu (cu-180): no host cast, no activity MenuHost.
+    setToolbarMenu(
+      binding.toolbar,
       object : MenuProvider {
         override fun onCreateMenu(
           menu: Menu,
           menuInflater: MenuInflater,
         ) {
-          menuInflater.inflate(R.menu.collections_menu, menu)
+          // The toolbar inflates `R.menu.collections_menu` itself via `app:menu` in the layout (cu-180), so
+          // inflating again here would double every item — which it did, visibly, as two
+          // search icons. This provider only wires the items up.
           val searchView = menu.findItem(R.id.search).actionView as SearchView
           val searchItem = menu.findItem(R.id.search)
 
@@ -225,8 +224,6 @@ class CollectionsFragment : Fragment() {
           return menuItem.itemId == R.id.search
         }
       },
-      viewLifecycleOwner,
-      Lifecycle.State.RESUMED,
     )
 
     // targetSdk 36 is edge-to-edge; the toolbar must inset itself (cu-63).
