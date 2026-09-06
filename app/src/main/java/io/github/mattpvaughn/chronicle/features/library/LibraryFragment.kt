@@ -20,7 +20,6 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.BOOK_COVER_STYLE_SQUARE
 import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
@@ -28,6 +27,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
+import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
@@ -369,7 +369,9 @@ class LibraryFragment : Fragment() {
   }
 
   override fun onAttach(context: Context) {
-    (activity as MainActivity).activityComponent!!.inject(this)
+    // Host capability, not host type (cu-178) — what makes this screen launchable by
+    // `FragmentScenario`.
+    check(injectFromHost { it.inject(this) }) { "LibraryFragment needs an ActivityComponentHost" }
     super.onAttach(context)
     Timber.i("Reattached!")
   }
