@@ -7,24 +7,13 @@ xmlns:tools="http://schemas.android.com/tools"
     android:layout_height="match_parent"
     android:background="@color/colorPrimaryDark">
 
-    <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
-        android:id="@+id/bottom_sheet_chooser"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:elevation="1dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:layout="@layout/view_bottom_sheet_chooser" />
 
     <!--
       The rows are `SettingsScreen` now (cu-199). `SettingsList` — a FrameLayout wrapping a
       programmatic RecyclerView, three ViewHolders and a DiffUtil — is deleted with it.
 
-      `BottomSheetChooser` above stays a View: it is shared, animated, and its state carries a
-      listener object. Same call cu-187 made for SwipeRefreshLayout and cu-198 for the chapter
-      list. It keeps its elevation so it still draws over the rows.
+      The chooser is `BottomChooser` now (cu-203) — a `ModalBottomSheet` drawing in its own
+      window, so it needs no elevation and no place in this hierarchy.
     -->
     <androidx.compose.ui.platform.ComposeView
         android:id="@+id/settings_compose"

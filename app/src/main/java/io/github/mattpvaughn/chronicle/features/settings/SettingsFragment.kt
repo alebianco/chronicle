@@ -31,8 +31,8 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
+import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 import io.github.mattpvaughn.chronicle.views.getString
-import io.github.mattpvaughn.chronicle.views.setBottomChooserState
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -129,11 +129,6 @@ class SettingsFragment : Fragment() {
   ): View? {
     val binding = FragmentSettingsBinding.inflate(inflater, container, false)
 
-    // Was `bottomChooserState` / `preferences` binding adapters in fragment_settings.xml.
-    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->
-      setBottomChooserState(binding.bottomSheetChooser, state)
-    }
-
     // The rows are `SettingsScreen` now (cu-199). This replaces `SettingsList` entirely — a
     // FrameLayout wrapping a programmatic RecyclerView, three ViewHolders, a DiffUtil, and a
     // reverse lookup through `prefIntMap` that threw `NoWhenBranchMatchedException` on a miss.
@@ -144,12 +139,18 @@ class SettingsFragment : Fragment() {
     binding.settingsCompose.setContent {
       val rows by viewModel.settingsRows.collectAsStateWithLifecycle()
 
+      val chooser by viewModel.bottomChooserState.collectAsStateWithLifecycle()
+
       ChronicleTheme {
         SettingsScreen(
           rows = rows,
           onClick = { it.click.onClick() },
           onToggle = viewModel::setSwitch,
         )
+
+        // The chooser is `BottomChooser` now (cu-203). It draws in its own window, so it is a
+        // sibling of the screen rather than an overlay inside it.
+        BottomChooser(chooser)
       }
     }
 

@@ -31,7 +31,7 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.checkRadioButtonWithTag
-import io.github.mattpvaughn.chronicle.views.setBottomChooserState
+import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import timber.log.Timber
 import javax.inject.Inject
@@ -80,6 +80,8 @@ class LibraryFragment : Fragment() {
       val isQueryEmpty by viewModel.isQueryEmpty.collectAsStateWithLifecycle()
       val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
 
+      val chooser by viewModel.bottomChooserState.collectAsStateWithLifecycle()
+
       ChronicleTheme {
         SearchOverlay(
           state = searchOverlayState(isSearchActive, isQueryEmpty, rows),
@@ -87,11 +89,11 @@ class LibraryFragment : Fragment() {
           coverUrl = plexConfig::toServerString,
           onBookClick = ::openAudiobookDetails,
         )
-      }
-    }
 
-    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->
-      setBottomChooserState(binding.bottomSheetChooser, state)
+        // The chooser is `BottomChooser` now (cu-203), hosted here because this composition is
+        // always present — the grid's is not, on an empty library.
+        BottomChooser(chooser)
+      }
     }
 
     binding.doneFiltering.setOnClickListener { viewModel.setFilterMenuVisible(false) }

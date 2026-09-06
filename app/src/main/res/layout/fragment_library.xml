@@ -70,12 +70,6 @@ xmlns:tools="http://schemas.android.com/tools"
                 android:elevation="8dp" />
         </LinearLayout>
 
-        <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
-            android:id="@+id/bottom_sheet_chooser"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:elevation="1dp"
-            tools:layout="@layout/view_bottom_sheet_chooser" />
 
         <!-- TODO: figure out how to <include /> with databinding -->
         <androidx.constraintlayout.widget.ConstraintLayout

@@ -83,7 +83,6 @@ class FrameworkFreeCoreTest {
         "application/Injector.kt",
         "data/local/BookRepository.kt",
         "data/local/BookmarkRepository.kt",
-        "data/local/ChapterRepository.kt",
         "data/local/CollectionsRepository.kt",
         "data/local/LibrarySyncRepository.kt",
         "data/local/SeriesIndexRulesLoader.kt",

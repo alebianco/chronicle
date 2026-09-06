@@ -146,7 +146,6 @@ class RepositoryDispatcherTest {
       listOf(
         BookRepository::class,
         TrackRepository::class,
-        ChapterRepository::class,
         CollectionsRepository::class,
       )
 
@@ -155,7 +154,6 @@ class RepositoryDispatcherTest {
       listOf(
         "BookRepository",
         "TrackRepository",
-        "ChapterRepository",
         "CollectionsRepository",
         "LibrarySyncRepository",
       ).map { "src/main/java/io/github/mattpvaughn/chronicle/data/local/$it.kt" }

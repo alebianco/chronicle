@@ -31,25 +31,16 @@
         android:layout_height="wrap_content"
         android:background="@color/colorPrimaryDark">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/bookmarks_list"
-            android:visibility="gone"
-            tools:visibility="visible"
+        <!--
+          The list and its empty message are `BookmarkList` now (cu-203). The `maxHeight` stays on
+          this host: a book with many bookmarks would otherwise make the sheet fill the screen,
+          and Compose has no `maxHeight` on `LazyColumn` — it is a constraint on the container.
+        -->
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/bookmarks_compose"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:maxHeight="@dimen/bookmark_list_max_height"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-
-        <!-- Kotlin-driven visibility, so GONE in XML to avoid a one-frame flash (cu-58). -->
-        <TextView
-            android:id="@+id/bookmarks_empty"
-            style="@style/TextAppearance.Body2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="@dimen/screen_horizontal_padding"
-            android:text="@string/bookmark_none"
-            android:textColor="@color/textSecondary"
-            android:visibility="gone" />
+            android:maxHeight="@dimen/bookmark_list_max_height" />
 
     </FrameLayout>
 

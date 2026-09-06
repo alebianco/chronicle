@@ -1,7 +1,7 @@
 ---
 id: cu-205
 title: loadChapterData leaves stale chapter rows behind
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -45,3 +45,24 @@ distinct `parentKey` set is safe here.
 - [ ] A shrinking chapter list drops its stale rows on **both** write paths
 - [ ] Sabotage-verified: removing the call makes the test fail
 - [ ] The tracks-not-a-book signature question resolved, with the reasoning recorded
+
+## Resolution: the premise was wrong, and the class is deleted
+
+`ChapterRepository.loadChapterData` has **zero callers**. Its own KDoc said so —
+
+> **Scaffolding, not load-bearing.** Nothing injects this […] the live chapter fetch is in
+> `BookRepository.loadChapterData`. cu-49 moves chapters into their own table and makes this real.
+
+— but cu-49 put the live path in `BookRepository` instead and left this behind. So there is no
+"second write path" to fix: the missing `removeAllForBook` is in code that never runs.
+
+Two parts of that KDoc had also gone stale: it claimed no Dagger module provides it (`AppModule`
+did, and `AppComponent` exposed `chapterRepo()`, which nothing called), and it described chapters
+as living in the `Audiobook.chapters` column, dropped in v14.
+
+Deleted, with its Dagger provider and component accessor. `FrameworkFreeCoreTest` and
+`RepositoryDispatcherTest` both held it on committed lists, updated in the same change — which is
+those guards working as designed: a deleted file has to be removed from the list deliberately
+rather than silently dropping out.
+
+**No behaviour change**, and no test to write: the code was unreachable.

@@ -32,7 +32,7 @@ xmlns:tools="http://schemas.android.com/tools"
               the pinned bar keeps the status-bar strip and the scrolling content never draws over
               the toolbar.
 
-              The pinned bar and `BottomSheetChooser` stay Views. The chapter list moved into the
+              The pinned bar stays a View. The chapter list moved into the
               same `LazyColumn` as the header in cu-201, so it scrolls with it rather than being a
               second scroll container coordinating through `appbar_scrolling_view_behavior`.
             -->
@@ -104,10 +104,5 @@ xmlns:tools="http://schemas.android.com/tools"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
 
-    <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
-        android:id="@+id/bottom_sheet_chooser"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:elevation="4dp" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

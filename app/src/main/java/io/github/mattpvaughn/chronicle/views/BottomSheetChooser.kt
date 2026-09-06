@@ -1,216 +1,32 @@
 package io.github.mattpvaughn.chronicle.views
 
-import android.animation.ObjectAnimator
-import android.content.Context
-import android.content.Context.LAYOUT_INFLATER_SERVICE
 import android.content.res.Resources
-import android.util.AttributeSet
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import androidx.annotation.StringRes
-import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
-import androidx.recyclerview.widget.RecyclerView
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.databinding.ViewBottomSheetChooserBinding
-import io.github.mattpvaughn.chronicle.databinding.ViewBottomSheetChooserItemBinding
 
 /**
- * A [bottom sheet](https://material.io/develop/android/components/bottom-sheet-behavior/) which can
- * be used to show a list of strings along with accompanying listeners to handle their being clicked.
+ * The data a chooser sheet renders, and the deferred strings it renders.
  *
- * Note: while this could be juiced up with keys/values for each string, different item types, etc.,
- * I'm going to put a higher value on the simple interface and current flexibility. Subject to change
- * in the future, but think about it first.
+ * **This was a `FrameLayout`** with a hand-rolled show/hide animation, an inner `RecyclerView`
+ * adapter and a `DiffUtil`; cu-203 replaced the rendering with `views/compose/BottomChooser.kt`
+ * and left the *types* here, because they are not view code and are named
+ * `BottomSheetChooser.FormattableString` at some 200 call sites.
+ *
+ * **Why [FormattableString] survives Compose.** It looks like a workaround for a `View` being
+ * unable to resolve a string resource without a `Context` — and Compose's `stringResource()` would
+ * indeed remove that need *if the choice of string were made in the composable*. It is not: these
+ * strings are chosen in **ViewModels**, which still cannot hold a `Context`. `SettingsViewModel`
+ * alone builds 123 of them. Deferring the `Resources` lookup to render time is the right shape,
+ * and `BottomChooser` performs it there.
  */
-class BottomSheetChooser : FrameLayout {
-  constructor(context: Context) : this(context, null)
-  constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
-  constructor(context: Context, attrs: AttributeSet?, defStyle: Int) : super(
-    context,
-    attrs,
-    defStyle,
-  )
-
-  fun setOptions(options: List<FormattableString>) {
-    // Was the `options` binding adapter on the RecyclerView.
-    optionsAdapter.submitList(options)
-  }
-
-  fun setTitle(newTitle: FormattableString) {
-    // Was `android:text="@{title}"` via the FormattableString binding adapter.
-    binding.bottomSheetTitle.text = newTitle.format(resources)
-  }
-
-  var listener = BottomChooserListener.emptyListener
-
-  fun setOptionsSelectedListener(listener: BottomChooserListener) {
-    // Was the `listener` binding adapter on the RecyclerView.
-    this.listener = listener
-    optionsAdapter.setListener(listener)
-    optionsAdapter.notifyDataSetChanged()
-  }
-
+object BottomSheetChooser {
   /**
-   * A [BottomChooserListener], but only handles item clicks
+   * A chooser's contents.
+   *
+   * [listener] is part of the state rather than a separate callback because the options are
+   * dynamic: what a tap *means* depends on which list is showing, and pairing the two makes them
+   * impossible to mismatch.
    */
-  abstract class BottomChooserItemListener : BottomChooserListener {
-    abstract override fun onItemClicked(formattableString: FormattableString)
-
-    override fun onChooserClosed(wasBackgroundClicked: Boolean) {}
-  }
-
-  interface BottomChooserListener {
-    /** Triggers when an item in the chooser is clicked */
-    fun onItemClicked(formattableString: FormattableString)
-
-    /**
-     * Triggers when the chooser is closed. Passes a boolean, [wasBackgroundClicked] indicating
-     * whether the chooser was closed as the result of an item being selected, or whether it
-     * was closed as a result of [ViewBottomSheetChooserBinding.tapToClose] being clicked
-     */
-    fun onChooserClosed(wasBackgroundClicked: Boolean = false)
-
-    companion object {
-      val emptyListener =
-        object : BottomChooserListener {
-          override fun onItemClicked(formattableString: FormattableString) {}
-
-          override fun onChooserClosed(wasBackgroundClicked: Boolean) {}
-        }
-    }
-  }
-
-  private val optionsAdapter = OptionsListAdapter(BottomChooserListener.emptyListener)
-
-  private val binding: ViewBottomSheetChooserBinding =
-    ViewBottomSheetChooserBinding.inflate(
-      context.getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater,
-      this,
-      false,
-    )
-
-  fun hide(wasBackgroundClicked: Boolean) {
-    listener.onChooserClosed(wasBackgroundClicked)
-    val animDuration = context.resources.getInteger(R.integer.short_animation_ms).toLong()
-    // If the height has not been determined yet, don't animate
-    if (measuredHeight != 0) {
-      ObjectAnimator.ofFloat(
-        binding.bottomSheetContainer,
-        "translationY",
-        measuredHeight.toFloat(),
-      )
-        .apply {
-          duration = animDuration
-          start()
-        }
-      ObjectAnimator.ofFloat(binding.tapToClose, "alpha", 0F).apply {
-        duration = animDuration
-        start()
-        postDelayed({
-          binding.tapToClose.visibility = View.GONE
-        }, animDuration)
-      }
-    }
-  }
-
-  fun show() {
-    binding.bottomSheetContainer.visibility = View.VISIBLE
-    binding.bottomSheetContainer.translationY = measuredHeight.toFloat()
-    binding.tapToClose.visibility = View.VISIBLE
-    ObjectAnimator.ofFloat(binding.bottomSheetContainer, "translationY", 0F).apply {
-      duration = context.resources.getInteger(R.integer.short_animation_ms).toLong()
-      start()
-    }
-    ObjectAnimator.ofFloat(binding.tapToClose, "alpha", 1F).apply {
-      duration = context.resources.getInteger(R.integer.short_animation_ms).toLong()
-      start()
-    }
-  }
-
-  init {
-    // Always expand to size of parent so the click-to-close dummy view will be expanded
-//        layoutParams = LayoutParams(MATCH_PARENT, MATCH_PARENT)
-    addView(binding.root)
-    binding.bottomSheetOptions.adapter = optionsAdapter
-    binding.tapToClose.setOnClickListener {
-      hide(wasBackgroundClicked = true)
-    }
-    setTitle(FormattableString.LiteralString("Title"))
-    setOptions(emptyList())
-    setOptionsSelectedListener(BottomChooserListener.emptyListener)
-  }
-
-  class OptionsListAdapter(private var listener: BottomChooserListener) :
-    ListAdapter<FormattableString, OptionsListAdapter.OptionViewHolder>(
-      FormattableStringDiffUtilCallback(),
-    ) {
-    override fun onCreateViewHolder(
-      parent: ViewGroup,
-      viewType: Int,
-    ): OptionViewHolder {
-      return OptionViewHolder.from(parent)
-    }
-
-    fun setListener(_listener: BottomChooserListener) {
-      listener = _listener
-    }
-
-    override fun onBindViewHolder(
-      holder: OptionViewHolder,
-      position: Int,
-    ) {
-      holder.bind(getItem(position), listener)
-    }
-
-    class OptionViewHolder(val binding: ViewBottomSheetChooserItemBinding) :
-      RecyclerView.ViewHolder(binding.root) {
-      fun bind(
-        option: FormattableString,
-        listener: BottomChooserListener,
-      ) {
-        // Was binding expressions in view_bottom_sheet_chooser_item.xml. The old layout also
-        // had an `isChosen` variable driving textActive/textPrimary, but nothing ever set it,
-        // so the null Boolean always took the false branch — textPrimary. Behaviour preserved;
-        // the unused variable is dropped rather than carried over as dead state.
-        val context = binding.root.context
-        binding.chooserItemText.text = option.format(context.resources)
-        binding.chooserItemText.setTextColor(
-          ContextCompat.getColor(context, R.color.textPrimary),
-        )
-        binding.chooserItemRoot.setOnClickListener { listener.onItemClicked(option) }
-      }
-
-      companion object {
-        fun from(viewGroup: ViewGroup): OptionViewHolder {
-          val inflater = LayoutInflater.from(viewGroup.context)
-          val binding =
-            ViewBottomSheetChooserItemBinding.inflate(inflater, viewGroup, false)
-          return OptionViewHolder(binding)
-        }
-      }
-    }
-  }
-
-  class FormattableStringDiffUtilCallback : DiffUtil.ItemCallback<FormattableString>() {
-    override fun areItemsTheSame(
-      oldItem: FormattableString,
-      newItem: FormattableString,
-    ): Boolean {
-      return oldItem === newItem
-    }
-
-    override fun areContentsTheSame(
-      oldItem: FormattableString,
-      newItem: FormattableString,
-    ): Boolean {
-      return oldItem == newItem
-    }
-  }
-
   data class BottomChooserState(
     val title: FormattableString,
     val options: List<FormattableString>,
@@ -228,6 +44,41 @@ class BottomSheetChooser : FrameLayout {
     }
   }
 
+  /** A [BottomChooserListener] that only handles item clicks. */
+  abstract class BottomChooserItemListener : BottomChooserListener {
+    abstract override fun onItemClicked(formattableString: FormattableString)
+
+    override fun onChooserClosed(wasBackgroundClicked: Boolean) {}
+  }
+
+  interface BottomChooserListener {
+    /** Triggers when an item in the chooser is clicked */
+    fun onItemClicked(formattableString: FormattableString)
+
+    /**
+     * Triggers when the chooser is closed.
+     *
+     * [wasBackgroundClicked] distinguishes a *cancellation* from a choice — three callers depend
+     * on the difference, so a dismissed sheet must not read as "picked the first option".
+     */
+    fun onChooserClosed(wasBackgroundClicked: Boolean = false)
+
+    companion object {
+      val emptyListener =
+        object : BottomChooserListener {
+          override fun onItemClicked(formattableString: FormattableString) {}
+
+          override fun onChooserClosed(wasBackgroundClicked: Boolean) {}
+        }
+    }
+  }
+
+  /**
+   * A string that resolves against [Resources] at render time.
+   *
+   * Lets a ViewModel choose *which* string without holding a `Context`. See the class KDoc for why
+   * this outlives the View it was written for.
+   */
   sealed class FormattableString {
     data class LiteralString(val string: String) : FormattableString() {
       override fun format(resources: Resources): String {

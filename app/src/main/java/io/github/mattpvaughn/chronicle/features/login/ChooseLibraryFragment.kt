@@ -21,9 +21,7 @@ import io.github.mattpvaughn.chronicle.features.login.compose.PickerScreen
 import io.github.mattpvaughn.chronicle.injection.components.injectFromAppGraph
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
-import io.github.mattpvaughn.chronicle.util.collectWhileStarted
-import io.github.mattpvaughn.chronicle.views.setBottomChooserState
-import timber.log.Timber
+import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 import javax.inject.Inject
 
 class ChooseLibraryFragment : Fragment() {
@@ -38,8 +36,6 @@ class ChooseLibraryFragment : Fragment() {
   lateinit var viewModelFactory: ChooseLibraryViewModel.Factory
 
   private lateinit var viewModel: ChooseLibraryViewModel
-
-  private lateinit var libraryAdapter: LibraryListAdapter
 
   @Inject
   lateinit var plexConfig: PlexConfig
@@ -66,23 +62,7 @@ class ChooseLibraryFragment : Fragment() {
         viewModelFactory,
       ).get(ChooseLibraryViewModel::class.java)
 
-    libraryAdapter =
-      LibraryListAdapter(
-        LibraryClickListener { library ->
-          Timber.i("Library name: $library")
-          // Through the ViewModel, not the repo directly: switching to a *different* library has
-          // to drop the previous one's cached catalogue, or the app shows a union of two (cu-126).
-          viewModel.chooseLibrary(library)
-        },
-      )
-
     binding.refresh.setOnClickListener { viewModel.refresh() }
-
-    // Asks about the previous library's downloads on a genuine library change (cu-130). Reuses the
-    // shared renderer so the sheet looks and behaves exactly as it does in Settings.
-    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->
-      setBottomChooserState(binding.bottomSheetChooser, state)
-    }
 
     // The list, the spinner and the error message are `PickerScreen` now (cu-201), shared with the
     // server and user pickers.
@@ -113,6 +93,11 @@ class ChooseLibraryFragment : Fragment() {
           // to drop the previous one's cached catalogue, or the app shows a union of two (cu-126).
           onItemClick = viewModel::chooseLibrary,
         )
+
+        // Asks about the previous library's downloads on a genuine library change (cu-130). Now
+        // `BottomChooser` (cu-203), the same renderer Settings and the player use.
+        val chooser by viewModel.bottomChooserState.collectAsStateWithLifecycle()
+        BottomChooser(chooser)
       }
     }
 

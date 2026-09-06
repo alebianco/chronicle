@@ -60,8 +60,6 @@ interface AppComponent {
 
   fun bookmarkRepo(): IBookmarkRepository
 
-  fun chapterRepo(): IChapterRepository
-
   fun bookRepos(): BookRepository
 
   fun workManager(): WorkManager

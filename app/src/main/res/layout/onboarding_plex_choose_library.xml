@@ -42,15 +42,5 @@ xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:android="http://schema
 
     <!-- Last child so it draws above the list; elevation matches fragment_settings.xml. Asks
          whether to keep the previous library's downloads on a genuine library change (cu-130). -->
-    <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
-        android:id="@+id/bottom_sheet_chooser"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:elevation="1dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:layout="@layout/view_bottom_sheet_chooser" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

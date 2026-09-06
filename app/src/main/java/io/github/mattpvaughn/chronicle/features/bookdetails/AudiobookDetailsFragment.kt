@@ -37,6 +37,7 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInsetAsPinnedBar
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
+import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 import io.github.mattpvaughn.chronicle.views.setToolbarMenu
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import timber.log.Timber
@@ -132,6 +133,13 @@ class AudiobookDetailsFragment : Fragment() {
             ),
           coverUrl = plexConfig::toServerString,
         )
+
+        // The chooser is `BottomChooser` now (cu-203) — and this screen never rendered one at all:
+        // the layout carried a `BottomSheetChooser` but no code ever bound state to it, so
+        // `toggleWatched`'s confirmation prompt was built and published to nothing. Same class of
+        // silent loss as the player's bookmark button in cu-198.
+        val chooser by viewModel.bottomChooserState.collectAsStateWithLifecycle()
+        BottomChooser(chooser)
       }
     }
 

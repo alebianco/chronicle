@@ -28,10 +28,9 @@ xmlns:tools="http://schemas.android.com/tools"
               block in landscape. Compose branches on an orientation boolean the Fragment passes,
               where it can be read.
 
-              The toolbar below, the chapter `RecyclerView` and both `BottomSheetChooser`s stay as
-              Views: the toolbar owns the collapsing-scroll contract with the list, the chapter
-              adapter is shared with the details screen, and the choosers are shared animated
-              widgets. Same call `CollectionsFragment` made for `SwipeRefreshLayout` (cu-187).
+              The toolbar stays a View: it owns the collapsing-scroll contract with the body
+              below. Everything else here is Compose — the chapter list since cu-201, and both
+              choosers since cu-203, which draw in their own windows as `ModalBottomSheet`s.
             -->
 
             <androidx.appcompat.widget.Toolbar
@@ -71,18 +70,6 @@ xmlns:tools="http://schemas.android.com/tools"
         android:layout_marginTop="@dimen/margin_normal"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
-        android:id="@+id/bottom_sheet_chooser"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:elevation="4dp" />
 
-    <io.github.mattpvaughn.chronicle.views.BottomSheetChooser
-        android:id="@+id/sleep_timer_chooser"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:elevation="4dp"
-        app:layout_anchor="@+id/bottom_sheet_chooser"
-        app:layout_anchorGravity="center" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

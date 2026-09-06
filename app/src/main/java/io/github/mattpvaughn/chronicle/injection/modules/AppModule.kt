@@ -147,10 +147,6 @@ class AppModule(private val app: Application) {
 
   @Provides
   @Singleton
-  fun provideChapterRepo(chapterRepository: ChapterRepository): IChapterRepository = chapterRepository
-
-  @Provides
-  @Singleton
   fun provideBookmarkDao(): BookmarkDao = getBookmarkDatabase(app.applicationContext).bookmarkDao
 
   @Provides

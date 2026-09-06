@@ -106,7 +106,7 @@ This file is the **single source of truth for agents and humans**. `.github/copi
   the next cold start. Hence `force-stop` **and poll until the process is actually gone** (it
   returns before the kill completes) before touching `shared_prefs/`. And the device holds a
   *stale* flag from any earlier mock session, so `status` before assuming which mode you are in.
-- Tests: **1628 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **10 instrumented tests** on two managed emulators, which also run on an Automotive image (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
+- Tests: **1641 unit tests** (`app/src/test/...`), including `RoomMigrationTest` which drives the historical migration chains through real SQLite via **Robolectric** (Room's `MigrationTestHelper` is instrumented-only), plus **10 instrumented tests** on two managed emulators, which also run on an Automotive image (see above). Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
 - CI: `.github/workflows/ci.yml` — a single `verify` job that runs `./verify.sh` and uploads the APK, test results and coverage report. All build logic lives in `verify.sh`/Gradle, never in the workflow (D12 rule 6).
 
 ## Map (fast navigation)
@@ -710,11 +710,19 @@ This file is the **single source of truth for agents and humans**. `.github/copi
 - **Compose is the target for UI; ViewBinding is what has not migrated yet** (decision-22, cu-181).
   New UI is written in Compose. Existing screens move one per task (cu-187, then cu-188 in bug-density
   order, player first), each independently shippable and **device-verified in both orientations** —
-  **six are done**: player (cu-198), library, home, details (cu-200), settings (cu-199) and the login
-  flow, plus the chapter list shared by player and details (cu-201). What is left is cu-202 (browse,
-  facets, collection details, search, the series-index tester) and cu-203 (`BottomSheetChooser`,
-  `BookmarkListAdapter`, then the retirement list). **Nothing on that retirement list — including
-  `buildFeatures.viewBinding` and `FirstFrameFlashTest` — may go while any XML screen remains.**
+  **every screen's content is Compose** as of cu-203, and **no `RecyclerView.Adapter` remains in
+  the app**. What is left is the *navigation shell*: a Fragment per screen inflating a layout that
+  is a toolbar plus a `ComposeView`. Those shells are why `buildFeatures.viewBinding` is still on,
+  so removing it and adopting **Navigation Compose are one task, cu-206** — and **nothing on
+  cu-188's retirement list, `FirstFrameFlashTest` included, may go while any XML screen remains**,
+  or the guard goes before the hazard does.
+  **`FormattableString` survives Compose** (cu-203). It looks like a workaround for a `View`
+  being unable to resolve a string without a `Context`, but the strings are chosen in
+  **ViewModels**, which still cannot hold one — `SettingsViewModel` alone builds 123. Deferring the
+  `Resources` lookup to render time is right; `BottomChooser` performs it there.
+  **A `ModalBottomSheet` needs no `expandBottomSheetOnStart()`** — it has no peek state to get
+  stuck in, which is cu-142 answered structurally. That helper stays until the last
+  `BottomSheetDialogFragment` goes.
   cu-141, cu-142 and cu-19 were all landscape-only, and a Compose test measures whatever width it is
   told. Four things to know before writing any:
   - **`MaterialTheme` defines `colorScheme.background` but paints nothing.** That is `Surface`'s or

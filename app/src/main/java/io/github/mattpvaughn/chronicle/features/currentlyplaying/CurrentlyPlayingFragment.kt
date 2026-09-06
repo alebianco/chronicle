@@ -32,7 +32,7 @@ import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarkNote
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetBookmarks
 import io.github.mattpvaughn.chronicle.views.ModalBottomSheetSpeedChooser
-import io.github.mattpvaughn.chronicle.views.setBottomChooserState
+import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import javax.inject.Inject
 
@@ -184,17 +184,20 @@ class CurrentlyPlayingFragment :
           showArtwork =
             resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT,
         )
+
+        // Both choosers are `BottomChooser` now (cu-203). They are siblings of the screen rather
+        // than part of it: a modal sheet draws in its own window, and this one carries *two*
+        // independent states — the speed chooser and the sleep timer — which the View version
+        // needed two overlapping `FrameLayout`s to express.
+        val chooser by viewModel.bottomChooserState.collectAsStateWithLifecycle()
+        val sleepTimerChooser by viewModel.sleepTimerChooserState.collectAsStateWithLifecycle()
+        BottomChooser(chooser)
+        BottomChooser(sleepTimerChooser)
       }
     }
 
     viewLifecycleOwner.collectWhileStarted(viewModel.isLoadingTracks) {
       binding.loadingTracksSpinner.isVisible = it
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) {
-      setBottomChooserState(binding.bottomSheetChooser, it)
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.sleepTimerChooserState) {
-      setBottomChooserState(binding.sleepTimerChooser, it)
     }
 
     binding.detailsToolbar.setNavigationOnClickListener {
