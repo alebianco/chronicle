@@ -46,7 +46,7 @@ class MainActivityViewModel
     private val mediaServiceConnection: MediaServiceConnection,
     collectionsRepository: CollectionsRepository,
     private val exceptionHandler: CoroutineExceptionHandler,
-  ) : ViewModel(), MainActivity.CurrentlyPlayingInterface {
+  ) : ViewModel() {
     /** The status of the bottom sheet which contains "currently playing" info */
     enum class BottomSheetState {
       COLLAPSED,
@@ -93,8 +93,16 @@ class MainActivityViewModel
     val currentlyPlayingLayoutState: StateFlow<BottomSheetState>
       get() = _currentlyPlayingLayoutState
 
-    /** Satisfies [MainActivity.CurrentlyPlayingInterface]'s read side (cu-198). */
-    override val bottomSheetState: StateFlow<BottomSheetState>
+    /**
+     * The sheet's state.
+     *
+     * Was `CurrentlyPlayingInterface`'s read side (cu-198) — an interface the activity implemented
+     * so `CurrentlyPlayingFragment` could ask "am I on screen?" without inferring it from view
+     * geometry. With the player composed directly by the activity there is no host to ask, so the
+     * interface is gone and this is simply a property. It is kept distinct from
+     * [currentlyPlayingLayoutState] only as a name; both read the same flow.
+     */
+    val bottomSheetState: StateFlow<BottomSheetState>
       get() = _currentlyPlayingLayoutState
 
     private val audiobookId = MutableStateFlow(NO_AUDIOBOOK_FOUND_ID)
@@ -314,7 +322,7 @@ class MainActivityViewModel
       }
     }
 
-    override fun setBottomSheetState(state: BottomSheetState) {
+    fun setBottomSheetState(state: BottomSheetState) {
       _currentlyPlayingLayoutState.value = state
     }
 

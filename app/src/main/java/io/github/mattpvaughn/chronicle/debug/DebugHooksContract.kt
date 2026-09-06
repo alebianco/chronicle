@@ -9,7 +9,6 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
-import io.github.mattpvaughn.chronicle.navigation.Navigator
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -95,28 +94,27 @@ interface DebugHooksContract {
   /**
    * Opens the browse-by-facet screen when `show_browse` is set (cu-24).
    *
-   * Exists because the bottom navigation is **not reachable** from `adb shell input tap`: a
-   * `BottomNavigationItemView` sits under the system bars, which is the same obstacle that left tab
-   * navigation uncovered in cu-54's instrumented suite. Without this, the browse screen could not
-   * be opened on a device at all except by hand.
+   * Takes a **navigate-by-route callback** rather than a `Navigator` since cu-206, which deleted
+   * that class. The reason for the hook is unchanged but narrower than it was written: a tab *can*
+   * be driven by `adb shell input tap` once the menu's centred inset is accounted for (measured
+   * 2026-09-05), so what this really buys is a coordinate-free route that survives a different
+   * screen size or a scrolled list.
    */
   fun onShowBrowseIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigator: Navigator,
+    navigateTo: (String) -> Unit,
   )
 
   /**
    * Opens the settings screen, so it can be checked without tapping a bottom-nav tab (cu-33).
    *
-   * Settings sits behind a `BottomNavigationItemView`, which `input tap` cannot drive — the
-   * obstacle recorded in cu-54 — and unlike Browse it has no other entry point, so the screen was
-   * unreachable from a script entirely.
+   * See [onShowBrowseIntent] on why this takes a route callback.
    */
   fun onShowSettingsIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigator: Navigator,
+    navigateTo: (String) -> Unit,
   )
 
   /**

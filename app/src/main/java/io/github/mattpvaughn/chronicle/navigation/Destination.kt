@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.navigation
 
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
+import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsViewModel
 import io.github.mattpvaughn.chronicle.features.browse.FacetBooksViewModel
 import io.github.mattpvaughn.chronicle.features.collections.CollectionDetailsViewModel
@@ -177,3 +178,28 @@ fun decodeArg(encoded: String): String =
     .replace("%23", "#")
     // `%25` last: decoding it first would let a literal "%252F" decode twice into "/".
     .replace("%25", "%")
+
+/**
+ * Where a login state should navigate to, or null when it should not navigate at all (cu-206).
+ *
+ * This was the `when` inside `Navigator`'s init block, which collected `IPlexLoginRepo.loginEvent`
+ * and committed a `FragmentManager` transaction per branch. Pulled out as a pure function so the
+ * routing is testable without an Activity — and because two of its branches are deliberately
+ * *nothing*, which is the kind of thing a test should pin rather than a reader infer.
+ *
+ * `FAILED_TO_LOG_IN` and `AWAITING_LOGIN_RESULTS` stay on the current screen on purpose: the login
+ * screen reports both itself, and navigating away from it would discard the message.
+ *
+ * The `else ->` branch that used to `throw NoWhenBranchMatchedException` is gone. An unknown state
+ * crashing the app was never the right response to a login event, and the enum is exhaustive here.
+ */
+fun destinationForLogin(state: IPlexLoginRepo.LoginState): Destination? =
+  when (state) {
+    IPlexLoginRepo.LoginState.LOGGED_IN_NO_USER_CHOSEN -> Destination.ChooseUser
+    IPlexLoginRepo.LoginState.LOGGED_IN_NO_SERVER_CHOSEN -> Destination.ChooseServer
+    IPlexLoginRepo.LoginState.LOGGED_IN_NO_LIBRARY_CHOSEN -> Destination.ChooseLibrary
+    IPlexLoginRepo.LoginState.LOGGED_IN_FULLY -> Destination.Home
+    IPlexLoginRepo.LoginState.NOT_LOGGED_IN -> Destination.Login
+    IPlexLoginRepo.LoginState.FAILED_TO_LOG_IN -> null
+    IPlexLoginRepo.LoginState.AWAITING_LOGIN_RESULTS -> null
+  }

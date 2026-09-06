@@ -9,7 +9,6 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
-import io.github.mattpvaughn.chronicle.navigation.Navigator
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -47,13 +46,13 @@ object DebugHooks : DebugHooksContract {
   override fun onShowBrowseIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigator: Navigator,
+    navigateTo: (String) -> Unit,
   ) = Unit
 
   override fun onShowSettingsIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigator: Navigator,
+    navigateTo: (String) -> Unit,
   ) = Unit
 
   override fun onShowPlayerIntent(

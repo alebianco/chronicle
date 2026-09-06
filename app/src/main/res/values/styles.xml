@@ -73,20 +73,11 @@
         <item name="android:textSize">32sp</item>
     </style>
 
-    <!-- Searchbar style courtesy of: https://stackoverflow.com/questions/30369246/implementing-searchview-as-per-the-material-design-guidelines -->
-    <style name="SearchViewTheme" parent="Widget.AppCompat.SearchView.ActionBar">
-        <item name="layout">@layout/toolbar_search_view</item>
-        <item name="colorControlNormal">@color/material_light_active_icon</item>
-        <item name="colorControlHighlight">@color/material_ripple_light</item>
-        <item name="android:maxWidth">9999dp</item>
-    </style>
-
     <style name="ToolbarTheme" parent="ThemeOverlay.AppCompat.Dark.ActionBar">
         <item name="background">@color/colorPrimary</item>
         <item name="android:background">@color/colorPrimary</item>
         <item name="fontWeight">400</item>
         <item name="fontFamily">@font/lato</item>
-        <item name="searchViewStyle">@style/SearchViewTheme</item>
     </style>
 
     <!-- Progress Slider -->

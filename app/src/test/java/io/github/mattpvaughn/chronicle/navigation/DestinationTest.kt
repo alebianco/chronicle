@@ -1,10 +1,12 @@
 package io.github.mattpvaughn.chronicle.navigation
 
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
+import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsViewModel
 import io.github.mattpvaughn.chronicle.features.browse.FacetBooksViewModel
 import io.github.mattpvaughn.chronicle.features.collections.CollectionDetailsViewModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -103,5 +105,45 @@ class DestinationTest {
       "facet/Author/Tolkien, J.R.R.",
       Destination.FacetBooks(FacetKind.Author, "Tolkien, J.R.R.").route,
     )
+  }
+
+  /**
+   * Login routing (cu-206), which was the `when` inside `Navigator`'s init block.
+   *
+   * The two null branches are the interesting half: staying put is a decision, and a reader
+   * skimming the `when` could easily "fix" them into navigation. The login screen reports both
+   * states itself, so navigating away would discard the message.
+   */
+  @Test
+  fun `each login state routes where the Navigator sent it`() {
+    assertEquals(
+      Destination.ChooseUser,
+      destinationForLogin(IPlexLoginRepo.LoginState.LOGGED_IN_NO_USER_CHOSEN),
+    )
+    assertEquals(
+      Destination.ChooseServer,
+      destinationForLogin(IPlexLoginRepo.LoginState.LOGGED_IN_NO_SERVER_CHOSEN),
+    )
+    assertEquals(
+      Destination.ChooseLibrary,
+      destinationForLogin(IPlexLoginRepo.LoginState.LOGGED_IN_NO_LIBRARY_CHOSEN),
+    )
+    assertEquals(Destination.Home, destinationForLogin(IPlexLoginRepo.LoginState.LOGGED_IN_FULLY))
+    assertEquals(Destination.Login, destinationForLogin(IPlexLoginRepo.LoginState.NOT_LOGGED_IN))
+  }
+
+  @Test
+  fun `a failed or in-flight login does not navigate`() {
+    assertNull(destinationForLogin(IPlexLoginRepo.LoginState.FAILED_TO_LOG_IN))
+    assertNull(destinationForLogin(IPlexLoginRepo.LoginState.AWAITING_LOGIN_RESULTS))
+  }
+
+  /** Guards the guard: a state added later must be routed deliberately, not silently dropped. */
+  @Test
+  fun `every login state is accounted for`() {
+    val routed = IPlexLoginRepo.LoginState.entries.map { it to destinationForLogin(it) }
+
+    assertEquals(7, routed.size)
+    assertEquals(2, routed.count { it.second == null })
   }
 }

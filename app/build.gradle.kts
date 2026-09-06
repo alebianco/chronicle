@@ -67,11 +67,10 @@ android {
     freeCompilerArgs += "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
   }
   buildFeatures {
-    viewBinding = true
     buildConfig = true
-    // Compose runs *alongside* ViewBinding, not instead of it (cu-181). The migration is
-    // screen-by-screen through `ComposeView`, so both must build for as long as any XML
-    // layout remains.
+    // ViewBinding is gone as of cu-206: there are no layouts left to generate bindings for.
+    // decision-22's migration ran screen-by-screen through `ComposeView` with both enabled;
+    // the navigation shell was the last thing holding XML, and Navigation Compose replaced it.
     compose = true
   }
 

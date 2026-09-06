@@ -18,7 +18,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.injection.chronicleGraph
-import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.navigation.Destination
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -257,19 +257,19 @@ object DebugHooks : DebugHooksContract {
   override fun onShowBrowseIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigator: Navigator,
+    navigateTo: (String) -> Unit,
   ) {
     if (intent == null || !intent.getBooleanExtra(EXTRA_SHOW_BROWSE, false)) {
       return
     }
-    // Posted, not called straight away: this runs from `onCreate`, where the FragmentManager has
-    // no host yet and a `commit()` throws `FragmentManager has not been attached to a host`. The
-    // `show_player` hook sidesteps the same problem by observing LiveData; this needs no state, so
-    // one pass of the main loop is enough.
+    // Posted, not called straight away: this runs from `onCreate`, before the composition has run
+    // and set the activity's NavController. The reason has changed with cu-206 — it used to be
+    // that a `commit()` from `onCreate` throws "FragmentManager has not been attached to a host" —
+    // but the fix is the same, and one pass of the main loop is still enough.
     Timber.i("Opening the browse screen (show_browse)")
     activity.window.decorView.post {
       if (!activity.isFinishing && !activity.isDestroyed) {
-        navigator.showBrowse()
+        navigateTo(Destination.Browse.ROUTE)
       }
     }
   }
@@ -282,17 +282,16 @@ object DebugHooks : DebugHooksContract {
    *   io.github.mattpvaughn.chronicle.application.MainActivity --ez show_settings true
    * ```
    *
-   * Settings is reachable *only* from its bottom-nav tab, and a `BottomNavigationItemView` sits
-   * under the system bars where `input tap` cannot reach it (cu-54) — so unlike Browse, which at
-   * least has a facet entry point, the screen could not be opened from a script at all.
+   * Settings is reachable only from its bottom-nav tab. A tab *can* be tapped from a script once
+   * the menu's centred inset is accounted for (measured 2026-09-05, correcting the cu-54 note this
+   * comment used to cite), so what the hook buys is a route that does not depend on screen size.
    *
-   * Posted for the same reason as `show_browse`: called straight from `onCreate` a `commit()`
-   * throws `FragmentManager has not been attached to a host`.
+   * Posted for the same reason as `show_browse`.
    */
   override fun onShowSettingsIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigator: Navigator,
+    navigateTo: (String) -> Unit,
   ) {
     if (intent == null || !intent.getBooleanExtra(EXTRA_SHOW_SETTINGS, false)) {
       return
@@ -300,7 +299,7 @@ object DebugHooks : DebugHooksContract {
     Timber.i("Opening the settings screen (show_settings)")
     activity.window.decorView.post {
       if (!activity.isFinishing && !activity.isDestroyed) {
-        navigator.showSettings()
+        navigateTo(Destination.Settings.ROUTE)
       }
     }
   }

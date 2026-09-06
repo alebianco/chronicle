@@ -1,59 +1,59 @@
 package io.github.mattpvaughn.chronicle.application
 
-import android.annotation.SuppressLint
 import android.app.SearchManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
-import android.view.GestureDetector
-import android.view.MotionEvent
-import android.view.View
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isVisible
-import androidx.core.view.updateLayoutParams
-import androidx.core.view.updatePadding
-import androidx.lifecycle.Lifecycle
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.google.android.material.snackbar.Snackbar
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.scopes.ActivityScoped
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.EXPANDED
+import io.github.mattpvaughn.chronicle.application.compose.ChronicleApp
+import io.github.mattpvaughn.chronicle.application.compose.MiniPlayerHost
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
+import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.sources.plex.AccountAuthState
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
-import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.LOGGED_IN_FULLY
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
-import io.github.mattpvaughn.chronicle.databinding.ActivityMainBinding
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
-import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingFragment
-import io.github.mattpvaughn.chronicle.features.currentlyplaying.setBottomSheetState
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingViewModel
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.PlayerDestination
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
-import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.navigation.Destination
+import io.github.mattpvaughn.chronicle.navigation.compose.ChronicleNavHost
+import io.github.mattpvaughn.chronicle.navigation.destinationForLogin
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
-import io.github.mattpvaughn.chronicle.util.collectWhileStarted
-import io.github.mattpvaughn.chronicle.util.setImageResourceIfChanged
-import io.github.mattpvaughn.chronicle.util.setTextIfChanged
-import io.github.mattpvaughn.chronicle.views.bindImageRounded
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -67,21 +67,32 @@ class MainActivity : AppCompatActivity() {
 
   private val viewModel: MainActivityViewModel by viewModels()
 
+  /**
+   * The player's ViewModel, owned by the activity.
+   *
+   * The player sheet is drawn *above* the nav host rather than inside it, because it covers
+   * whatever screen the user is on and survives navigating between them — the relationship
+   * `currently_playing_container` had to `fragNavHost`. So it cannot use `hiltViewModel()`, which
+   * scopes to a back-stack entry.
+   */
+  private val currentlyPlayingViewModel: CurrentlyPlayingViewModel by viewModels()
+
   @Inject
   lateinit var plexLoginRepo: IPlexLoginRepo
 
-  @Inject
-  lateinit var navigator: Navigator
-
-  /** Held so the standing revocation notice can be dismissed when the account recovers. */
-  private var signedOutSnackbar: Snackbar? = null
-
-  /** What the mini player currently shows, so a per-tick re-emission can be skipped (cu-117). */
-  private var boundBookTitle: String? = null
-  private var boundBookThumb: String? = null
+  /**
+   * Set from the composition so the back handler and the notification intent path can reach it.
+   *
+   * Both run after a frame has been drawn, so neither can observe the null. Cleared in
+   * `onDestroy`, since the controller holds the whole graph.
+   */
+  private var navController: NavHostController? = null
 
   @Inject
   lateinit var plexPrefsRepo: PlexPrefsRepo
+
+  @Inject
+  lateinit var prefsRepo: PrefsRepo
 
   @Inject
   lateinit var bookRepository: IBookRepository
@@ -110,8 +121,7 @@ class MainActivity : AppCompatActivity() {
     // **Before the debug hooks and before `viewModel` is touched** (cu-185). Hilt injects this
     // activity's members inside `super.onCreate()`, and `by viewModels()` needs the activity at
     // CREATED — reading either earlier crashed on launch with "You can 'consumeRestoredStateForKey'
-    // only after the corresponding component has moved to the 'CREATED' state". The hooks below
-    // read `viewModel`, `navigator` and `mediaServiceConnection`, so they all move after it.
+    // only after the corresponding component has moved to the 'CREATED' state".
     super.onCreate(savedInstanceState)
 
     // No-op in release: the release source set provides an empty DebugHooks, so
@@ -120,9 +130,9 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onFailSyncIntent(intent)
     DebugHooks.onInvalidateServerTokenIntent(intent)
     DebugHooks.onShowPlayerIntent(intent, this, viewModel)
-    DebugHooks.onShowBrowseIntent(intent, this, navigator)
+    DebugHooks.onShowBrowseIntent(intent, this, ::navigateToRoute)
+    DebugHooks.onShowSettingsIntent(intent, this, ::navigateToRoute)
     DebugHooks.onMoveSyncLocationIntent(intent, this)
-    DebugHooks.onShowSettingsIntent(intent, this, navigator)
     // Debug-only: `--el play_book <id>` starts playback once the media service is
     // connected. connect{} is required — transportControls is null until then,
     // which is why driving playback from a bare intent alone does not work.
@@ -134,141 +144,67 @@ class MainActivity : AppCompatActivity() {
       }
     }
 
-    // Debug-only: `--el download_book <id>` starts a download. The details screen's download
-    // button cannot be reached by `input tap` — the currently-playing sheet takes the coordinates
-    // — so a sync had no scriptable entry point at all (cu-132).
+    // Debug-only: `--el download_book <id>` starts a download (cu-132).
     DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
 
     localBroadcastManager = LocalBroadcastManager.getInstance(this)
 
-    val binding =
-      ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
+    // The whole UI is Compose now (cu-206). This replaces `activity_main.xml` — a
+    // `ConstraintLayout` holding a `BottomNavigationView`, a `FragmentContainerView` and a
+    // hand-built player sheet moved between three `ConstraintSet`s — along with every write that
+    // drove it, including `applyWindowInsets`, whose guideline arithmetic recomputed the collapsed
+    // player's position from the system bar inset (cu-73). `ChronicleApp` reads the insets itself.
+    setContent {
+      val sheetState by viewModel.currentlyPlayingLayoutState.collectAsStateWithLifecycle()
+      val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+      val hasCollections by viewModel.hasCollections.collectAsStateWithLifecycle()
+      val controller = rememberNavController()
+      navController = controller
 
-    applyWindowInsets(binding)
-    registerBackHandler(binding)
+      LoginNavigation(controller)
 
-    // Was binding expressions in activity_main.xml.
-    collectWhileStarted(viewModel.currentlyPlayingLayoutState) { state ->
-      setBottomSheetState(binding.mainRoot, state)
-    }
-    collectWhileStarted(viewModel.isLoggedIn) { loggedIn ->
-      binding.bottomNav.isVisible = loggedIn
-      // INVISIBLE, not GONE: the collapsed player keeps its layout slot so the
-      // content above it does not reflow when it appears.
-      binding.currentlyPlayingContainer.visibility =
-        if (loggedIn) View.VISIBLE else View.INVISIBLE
-    }
-    // The mini player is on every screen, so this is the one per-tick view write that no screen
-    // can avoid. `setText` re-lays-out even when handed an equal string, and a chapter title is
-    // identical for minutes at a time (cu-117).
-    collectWhileStarted(viewModel.currentChapterTitle) {
-      binding.chapterTitle.setTextIfChanged(it)
-    }
-    // Bind only when the *displayed* fields change. `audiobook` is Room-backed and
-    // `ProgressUpdater` writes `Audiobook.progress` once a second during playback, so this emits
-    // at tick rate with a book whose title and artwork are identical — and `bindImageRounded` does
-    // a Dagger lookup, a `Uri` parse and a Coil load on every call. Measured: main-thread CPU went
-    // from **1 jiffy / 10 s** paused to **285 playing**, and backgrounding the app (same playback,
-    // same ticks, no views) dropped it to **15** — so the cost was rendering, not the data layer
-    // (cu-117, same shape as cu-110).
-    collectWhileStarted(viewModel.audiobook) { book ->
-      val title = book.title
-      val thumb = book.thumb
-      if (title == boundBookTitle && thumb == boundBookThumb) {
-        return@collectWhileStarted
+      ChronicleTheme {
+        ChronicleApp(
+          navController = controller,
+          isLoggedIn = isLoggedIn,
+          showCollectionsTab = hasCollections,
+          sheetState = sheetState,
+          onTabSelected = { destination ->
+            controller.navigate(destination.route) {
+              // Tabs are roots, not a stack. `Navigator` cleared the back stack by hand before
+              // every switch with `while (backStackEntryCount > 0) popBackStackImmediate()`.
+              popUpTo(controller.graph.startDestinationId) { saveState = true }
+              launchSingleTop = true
+              restoreState = true
+            }
+            viewModel.minimizeCurrentlyPlaying()
+          },
+          miniPlayer = { MiniPlayerHost(viewModel, plexConfig) },
+          expandedPlayer = {
+            PlayerDestination(
+              plexConfig = plexConfig,
+              onCollapse = { viewModel.setBottomSheetState(COLLAPSED) },
+              viewModel = currentlyPlayingViewModel,
+            )
+          },
+          navHost = { navModifier ->
+            ChronicleNavHost(
+              navController = controller,
+              prefsRepo = prefsRepo,
+              plexConfig = plexConfig,
+              modifier = navModifier,
+            )
+          },
+        )
+
+        AccountRevokedNotice { controller.navigate(Destination.Settings.ROUTE) }
       }
-      boundBookTitle = title
-      boundBookThumb = thumb
-      binding.bookTitle.text = title
-      binding.currentlyPlayingThumb.contentDescription = title
-      bindImageRounded(
-        binding.currentlyPlayingThumb,
-        thumb,
-        plexConfig.isConnected.value,
-        plexConfig::toServerString,
-      )
     }
-    collectWhileStarted(viewModel.isPlaying) { playing ->
-      // A button shows the action a tap performs, not the current state: while
-      // playing it must offer pause. The drawables are state-named, which is how
-      // this got inverted during the cu-58 conversion — the other two play/pause
-      // buttons (CurrentlyPlayingFragment, AudiobookDetailsFragment) both map
-      // playing -> pause icon, and NotificationBuilder is not a counterexample
-      // because that is a status icon rather than a button.
-      binding.pausePlayButton.setImageResourceIfChanged(
-        if (playing) {
-          R.drawable.ic_notification_icon_paused
-        } else {
-          R.drawable.ic_notification_icon_playing
-        },
-      )
-    }
-    collectWhileStarted(viewModel.isAudioLoading) { loading ->
-      // Spinner instead of the icon, INVISIBLE so the mini player's layout does not reflow — the
-      // same treatment as the expanded player (cu-95).
-      binding.miniAudioLoadingSpinner.isVisible = loading
-      binding.pausePlayButton.visibility = if (loading) View.INVISIBLE else View.VISIBLE
-    }
-    binding.pausePlayButton.setOnClickListener { viewModel.pausePlayButtonClicked() }
 
-    binding.currentlyPlayingHandle.setOnClickListener {
-      viewModel.onCurrentlyPlayingClicked()
-    }
+    registerBackHandler()
 
     collectEventsWhileStarted(viewModel.errorMessage) { errorMessage ->
       Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
-    }
-
-    // A revoked account is a standing condition the user has to act on, not a passing error, so
-    // it gets an indefinite Snackbar rather than the Toast above — which would vanish before it
-    // was read and leave the app looking merely broken. Before decision-17 nothing was shown at
-    // all: `account_signed_out` existed as a string and was referenced nowhere (cu-73).
-    //
-    // The action routes to Settings, where "Sign in again" already restores sync without losing
-    // the server, library or downloads; this adds discovery, not a new recovery path.
-    lifecycleScope.launch {
-      repeatOnLifecycle(Lifecycle.State.STARTED) {
-        accountAuthState.state.collect { state ->
-          if (state == AccountAuthState.State.Revoked) {
-            if (signedOutSnackbar?.isShown != true) {
-              signedOutSnackbar =
-                Snackbar
-                  .make(binding.root, R.string.account_signed_out, Snackbar.LENGTH_INDEFINITE)
-                  .setAction(R.string.settings_reauthenticate) { navigator.showSettings() }
-                  .also { it.show() }
-            }
-          } else {
-            signedOutSnackbar?.dismiss()
-            signedOutSnackbar = null
-          }
-        }
-      }
-    }
-
-    // TODO: show/hide this item on launch more performantly
-    collectWhileStarted(viewModel.hasCollections) {
-      binding.bottomNav.menu.findItem(R.id.nav_collections).isVisible = it
-    }
-
-    binding.bottomNav.setOnItemSelectedListener {
-      when (it.itemId) {
-        R.id.nav_settings -> navigator.showSettings()
-        R.id.nav_library -> navigator.showLibrary()
-        R.id.nav_collections -> navigator.showCollections()
-        R.id.nav_home -> navigator.showHome()
-        else -> throw NoWhenBranchMatchedException("Unknown bottom tab id: ${it.itemId}")
-      }
-      viewModel.minimizeCurrentlyPlaying()
-      return@setOnItemSelectedListener true
-    }
-
-    if (savedInstanceState == null) {
-      setupCurrentlyPlaying()
-      plexLoginRepo.loginEvent.value.let {
-        if (it.peekContent() == LOGGED_IN_FULLY) {
-          navigator.showHome()
-        }
-      }
     }
 
     // If the app is being launched by voice assistant with a query
@@ -283,116 +219,140 @@ class MainActivity : AppCompatActivity() {
   }
 
   /**
+   * Navigates by route, for the debug hooks.
+   *
+   * They are posted to the next main-loop pass, so [navController] is set by the time this runs.
+   */
+  private fun navigateToRoute(route: String) {
+    navController?.navigate(route)
+  }
+
+  /**
+   * Routes on login state, which was `Navigator`'s init block.
+   *
+   * The decision itself is [destinationForLogin], a pure function with its own tests; this is only
+   * the plumbing. It lives on the activity rather than in a screen because it must outlive any one
+   * of them — a login event can arrive while the user is anywhere.
+   *
+   * Each destination becomes a fresh root: `popUpTo(graph.id) { inclusive = true }` clears
+   * everything behind it, so backing out of onboarding cannot land on a stale Home rendered from
+   * the previous session's Room data (cu-124).
+   */
+  @Composable
+  private fun LoginNavigation(controller: NavHostController) {
+    LaunchedEffect(controller) {
+      plexLoginRepo.loginEvent.collect { event ->
+        if (event.hasBeenHandled) return@collect
+        val destination = destinationForLogin(event.peekContent()) ?: return@collect
+        event.getContentIfNotHandled() ?: return@collect
+        Timber.i("Login event changed to ${event.peekContent()}")
+        controller.navigate(destination.route) {
+          popUpTo(controller.graph.id) { inclusive = true }
+        }
+      }
+    }
+  }
+
+  /**
+   * The standing notice for a revoked account (decision-17).
+   *
+   * A revoked account is a condition the user has to act on, not a passing error, so it gets an
+   * indefinite Snackbar rather than a Toast — which would vanish before it was read and leave the
+   * app looking merely broken. Before decision-17 nothing was shown at all: `account_signed_out`
+   * existed as a string and was referenced nowhere (cu-73).
+   *
+   * The action routes to Settings, where "Sign in again" already restores sync without losing the
+   * server, library or downloads; this adds discovery, not a new recovery path.
+   */
+  @Composable
+  private fun AccountRevokedNotice(onReauthenticate: () -> Unit) {
+    val state by accountAuthState.state.collectAsStateWithLifecycle()
+    val hostState = remember { SnackbarHostState() }
+    val message = stringResource(R.string.account_signed_out)
+    val action = stringResource(R.string.settings_reauthenticate)
+
+    LaunchedEffect(state) {
+      if (state != AccountAuthState.State.Revoked) {
+        // Recovering dismisses the notice, which `signedOutSnackbar?.dismiss()` did by hand.
+        hostState.currentSnackbarData?.dismiss()
+        return@LaunchedEffect
+      }
+      val result =
+        hostState.showSnackbar(
+          message = message,
+          actionLabel = action,
+          duration = SnackbarDuration.Indefinite,
+        )
+      if (result == SnackbarResult.ActionPerformed) {
+        onReauthenticate()
+      }
+    }
+
+    SnackbarHost(hostState)
+  }
+
+  /**
    * Back handling, registered with [androidx.activity.OnBackPressedDispatcher].
    *
    * **Not** an `onBackPressed()` override. At `targetSdk` 36 on Android 16 the platform's
    * predictive-back gesture is mandatory and the legacy override is never called — so every branch
-   * below, including collapsing the player and the onboarding navigation, was silently dead. A back
-   * press went straight to the platform default and quit the app (cu-73).
-   *
-   * Registered in `onCreate` so it is active for the activity's whole life.
+   * below was silently dead and a back press quit the app (cu-73).
    */
-  private fun registerBackHandler(binding: ActivityMainBinding) {
+  private fun registerBackHandler() {
     onBackPressedDispatcher.addCallback(
       this,
       object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
-          // The expanded player is over the fragments, so back closes it first.
+          // The expanded player is over everything, so back closes it first.
           if (viewModel.currentlyPlayingLayoutState.value == EXPANDED) {
             viewModel.setBottomSheetState(COLLAPSED)
-            return
-          }
-
-          if (navigator.onBackPressed()) {
             return
           }
 
           // Onboarding is not somewhere to escape *into the app* from. Back used to fall through
           // to the Home-tab branch below, landing the user on a Home that looks fully working —
           // because it renders the previous session's books out of Room — while the app's own
-          // state still said LOGGED_IN_NO_LIBRARY_CHOSEN and the prefs had no library at all.
-          // Owner's words: "super confusing for a user" (cu-124).
-          //
-          // Leaving the app is the honest response: nothing was chosen, so there is nothing to
-          // show. The user re-enters onboarding on next launch, or finishes it now.
+          // state still said LOGGED_IN_NO_LIBRARY_CHOSEN and the prefs had no library at all
+          // (cu-124). Leaving is the honest response: nothing was chosen, so there is nothing to
+          // show.
           if (viewModel.isOnboarding.value) {
-            isEnabled = false
-            onBackPressedDispatcher.onBackPressed()
+            leaveApp()
             return
           }
 
-          // Tabs are swapped with `replace(...).commit()` and never added to the back stack, so it
-          // is always empty. Home is the root: from anywhere else, back goes there first rather
-          // than leaving the app.
-          if (binding.bottomNav.selectedItemId != R.id.nav_home) {
-            binding.bottomNav.selectedItemId = R.id.nav_home
+          val controller = navController
+          if (controller == null) {
+            leaveApp()
             return
           }
 
-          if (supportFragmentManager.backStackEntryCount > 0) {
-            supportFragmentManager.popBackStack()
+          if (controller.popBackStack()) {
             return
           }
 
-          // Nothing left to unwind. Disable this callback and let the platform take the press, so
-          // the predictive-back animation runs instead of a bare finish().
+          // Home is the root: from another tab, back goes there rather than leaving the app.
+          val current = controller.currentBackStackEntry?.destination?.route
+          if (current != null && current != Destination.Home.ROUTE) {
+            controller.navigate(Destination.Home.ROUTE) {
+              popUpTo(controller.graph.startDestinationId) { inclusive = true }
+              launchSingleTop = true
+            }
+            return
+          }
+
+          leaveApp()
+        }
+
+        /**
+         * Hands the press back to the platform, so the predictive-back animation runs instead of a
+         * bare `finish()`.
+         */
+        private fun leaveApp() {
           isEnabled = false
           onBackPressedDispatcher.onBackPressed()
         }
       },
     )
-  }
-
-  @SuppressLint("ClickableViewAccessibility")
-  private fun setupCurrentlyPlaying() {
-    val transaction = supportFragmentManager.beginTransaction()
-    transaction.replace(
-      R.id.currently_playing_fragment_container,
-      CurrentlyPlayingFragment.newInstance(),
-    )
-    transaction.commit()
-    val handle = findViewById<View>(R.id.currently_playing_handle)
-    val gd =
-      GestureDetector(
-        this,
-        object : GestureDetector.SimpleOnGestureListener() {
-          override fun onScroll(
-            e1: MotionEvent?,
-            e2: MotionEvent,
-            distanceX: Float,
-            distanceY: Float,
-          ): Boolean {
-            if (distanceY > distanceX) {
-              viewModel.onCurrentlyPlayingHandleDragged()
-            }
-            return super.onScroll(e1, e2, distanceX, distanceY)
-          }
-        },
-      )
-    handle.setOnTouchListener { v, event ->
-      gd.onTouchEvent(event)
-      v.onTouchEvent(event)
-    }
-  }
-
-  interface CurrentlyPlayingInterface {
-    fun setBottomSheetState(state: MainActivityViewModel.BottomSheetState)
-
-    /**
-     * The sheet's state, so the player can stop inferring it from view geometry (cu-198).
-     *
-     * The interface was write-only, so `CurrentlyPlayingFragment` established "am I on screen?"
-     * with `!seekbar.isShown || root.height == 0`. That inference is the direct cause of cu-141
-     * and cu-19: a collapsed sheet is **zero height with every child still `VISIBLE`**, so
-     * `isShown` alone reads true while nothing is on screen, and the obvious alternative probe was
-     * a view that `values-land` hides. Reading the state the sheet is actually in removes both
-     * failure modes, and it is a `StateFlow` a composable can consume directly.
-     */
-    val bottomSheetState: StateFlow<MainActivityViewModel.BottomSheetState>
-  }
-
-  fun getCurrentlyPlayingInterface(): CurrentlyPlayingInterface {
-    return viewModel
   }
 
   override fun onStart() {
@@ -407,49 +367,10 @@ class MainActivity : AppCompatActivity() {
     super.onStop()
   }
 
-  /**
-   * Insets the app content for the system bars.
-   *
-   * `targetSdk 36` enforces edge-to-edge: Android no longer insets content, so
-   * without this the toolbar draws under the status bar and the bottom nav under
-   * the gesture bar (cu-63, a regression shipped by cu-6).
-   *
-   * Applied once here rather than per-screen: every fragment is hosted inside
-   * `main_root`, so padding the shared chrome covers all of them and there is one
-   * place to reason about instead of nine. Fragments with their own toolbar get
-   * top padding via [applyTopInsetToToolbar] as they are created.
-   */
-  private fun applyWindowInsets(binding: ActivityMainBinding) {
-    val navBarContentHeight = resources.getDimensionPixelSize(R.dimen.bottom_nav_bar_height)
-    val collapsedPlayerGuideline =
-      resources.getDimensionPixelSize(R.dimen.bottom_nav_bar_height_plus_handle_height)
-    ViewCompat.setOnApplyWindowInsetsListener(binding.mainRoot) { view, windowInsets ->
-      val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-      // Left/right matter in landscape and on devices with a cutout; the bottom
-      // nav takes the bottom inset so it sits above the gesture bar.
-      view.updatePadding(left = bars.left, right = bars.right)
-      // The bar has a *fixed* height (`@dimen/bottom_nav_bar_height`), so padding alone does not
-      // move it clear of the system bar — it eats into the 64dp of content instead, squeezing the
-      // icons while the bar still ends at the screen edge. Grow the view by the inset and pad by
-      // the same amount, so the content keeps its 64dp and the extra sits under the system bar.
-      //
-      // Found on the owner's phone in 3-button navigation mode, where the bar is 48dp rather than
-      // a gesture pill: the bottom nav rendered under it and looked absent (cu-73). Gesture mode
-      // hides this — the inset is small enough that the icons still land on screen.
-      binding.bottomNav.updateLayoutParams {
-        height = navBarContentHeight + bars.bottom
-      }
-      binding.bottomNav.updatePadding(bottom = bars.bottom)
-      // The collapsed mini-player sits on this guideline, which was a hardcoded 136dp from the
-      // bottom — `bottom_nav_bar_height_plus_handle_height`, i.e. 64 + 72. That arithmetic assumed
-      // the nav bar was exactly its declared 64dp, so growing it by the inset above squeezed the
-      // handle from 72dp to 24dp and the mini player looked swallowed by the bar. Move the
-      // guideline by the same inset, computed rather than hardcoded: the inset differs between
-      // gesture and 3-button navigation and between devices (cu-73).
-      binding.currentlyPlayingCollapsedTop.setGuidelineEnd(collapsedPlayerGuideline + bars.bottom)
-      // Consume nothing: fragments still need the top inset for their toolbars.
-      windowInsets
-    }
+  override fun onDestroy() {
+    // The controller outlives the composition otherwise, and it holds the whole graph.
+    navController = null
+    super.onDestroy()
   }
 
   // Non-null since androidx.activity 1.10 (raised to 1.13.0 by Compose, cu-181). The body already
@@ -463,9 +384,9 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onFailSyncIntent(intent)
     DebugHooks.onInvalidateServerTokenIntent(intent)
     DebugHooks.onShowPlayerIntent(intent, this, viewModel)
-    DebugHooks.onShowBrowseIntent(intent, this, navigator)
+    DebugHooks.onShowBrowseIntent(intent, this, ::navigateToRoute)
+    DebugHooks.onShowSettingsIntent(intent, this, ::navigateToRoute)
     DebugHooks.onMoveSyncLocationIntent(intent, this)
-    DebugHooks.onShowSettingsIntent(intent, this, navigator)
     DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
     if (mediaServiceConnection.isConnected.value) {
       DebugHooks.onPlayBookIntent(intent, mediaServiceConnection)
@@ -491,14 +412,14 @@ class MainActivity : AppCompatActivity() {
         ?: NO_AUDIOBOOK_FOUND_ID
     if (openAudiobookWithId != NO_AUDIOBOOK_FOUND_ID) {
       lifecycleScope.launch {
-        // Only the DB read goes to IO. `showDetails` commits a FragmentManager transaction and
-        // must run on the main thread — it used to sit inside the IO block (cu-169).
+        // Only the DB read goes to IO. The navigation must run on the main thread — it used to sit
+        // inside the IO block (cu-169).
         val audiobook =
           withContext(dispatchers.io) {
             bookRepository.getAudiobookAsync(openAudiobookWithId)
           }
         if (audiobook != null && audiobook != EMPTY_AUDIOBOOK) {
-          navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)
+          navController?.navigate(Destination.BookDetails(audiobook.id).route)
         }
       }
     }
