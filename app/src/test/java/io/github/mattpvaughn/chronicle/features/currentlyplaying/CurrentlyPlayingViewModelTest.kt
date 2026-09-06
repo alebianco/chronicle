@@ -35,7 +35,9 @@ import io.mockk.slot
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -220,6 +222,69 @@ class CurrentlyPlayingViewModelTest {
         settledValues(viewModel.chapterProgress, viewModel.chapterProgressForSlider)
 
       assertEquals(readout, slider)
+    }
+
+  /**
+   * The slider must catch up once the drag guard opens (cu-198).
+   *
+   * `isSliding` was a plain `var` read inside `.filter { !isSliding }` on the two slider flows. A
+   * predicate reading a mutable field **outside** the stream is not part of that stream's state,
+   * so flipping it re-emits nothing: whatever arrived while the guard was closed is dropped for
+   * good, and the thumb only recovers when the upstream next ticks. Paused, it never does.
+   *
+   * The same defect blocks the Compose migration outright — Compose renders `state.value` and has
+   * no "write time" at which to consult a field — which is why this landed before the screen moved.
+   *
+   * **The test has to move the position while the guard is closed.** Asserting only that the value
+   * is right afterwards passes against the broken code too, since the last *pre-drag* emission is
+   * already correct. What separates the two is a position that changed during the drag: the
+   * observable guard republishes it on release, the `var` never does.
+   */
+  @Test
+  fun `the slider catches up on a position that moved during the drag`() =
+    runTest(mainDispatcherRule.testDispatcher) {
+      val position = MutableStateFlow(MultiTrackBook.MID_BOOK_OFFSET)
+      val tracks = MultiTrackBook.midBookTracks()
+      val activeTrack = tracks.single { it.id == MultiTrackBook.MID_TRACK_ID }
+      val chapterThree = MultiTrackBook.chapters().single { it.id == MultiTrackBook.MID_CHAPTER_ID }
+      val currentlyPlaying =
+        mockk<CurrentlyPlaying>(relaxed = true) {
+          every { this@mockk.book } returns MutableStateFlow(MultiTrackBook.book())
+          every { track } returns MutableStateFlow(activeTrack)
+          every { chapter } returns MutableStateFlow(chapterThree)
+          every { bookPosition } returns position
+        }
+      val viewModel = viewModel(currentlyPlaying)
+
+      // `UnconfinedTestDispatcher` so each emission is collected as it is produced. On the
+      // rule's `StandardTestDispatcher` the collectors are merely *queued*, and every list reads
+      // empty — which looks exactly like the bug under test.
+      val slider = mutableListOf<Long>()
+      backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+        viewModel.chapterProgressForSlider.collect { slider.add(it) }
+      }
+      val readout = mutableListOf<Long>()
+      backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+        viewModel.chapterProgress.collect { readout.add(it) }
+      }
+      advanceUntilIdle()
+
+      viewModel.onSlideStart()
+      // Playback moves on while the user is dragging. The guard must swallow this...
+      position.value = BookOffset(MultiTrackBook.MID_BOOK_OFFSET.millis + 30_000L)
+      advanceUntilIdle()
+      assertEquals("the drag must not be overwritten mid-gesture", 150_000L, slider.last())
+
+      viewModel.onSlideFinished()
+      advanceUntilIdle()
+
+      // ...and then publish it, with no further tick from the player.
+      assertEquals(
+        "on release the slider must catch up to where playback actually is",
+        readout.last(),
+        slider.last(),
+      )
+      assertEquals("and that is the moved position, not the pre-drag one", 180_000L, slider.last())
     }
 
   /**

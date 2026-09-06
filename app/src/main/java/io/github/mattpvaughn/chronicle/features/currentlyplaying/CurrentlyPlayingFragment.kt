@@ -222,7 +222,7 @@ class CurrentlyPlayingFragment :
     // only two of them carried the `isSliding` filter — `currentTrack` and `chapterDuration` are
     // unfiltered and fire on every playback tick, so the stale position reached the thumb anyway.
     // Filtering the flows was not enough; this is the single line that moves the slider (cu-93).
-    if (viewModel.isSliding) {
+    if (viewModel.isSliding.value) {
       return
     }
 

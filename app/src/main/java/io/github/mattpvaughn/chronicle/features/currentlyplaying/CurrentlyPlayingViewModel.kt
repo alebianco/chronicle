@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -308,23 +309,55 @@ class CurrentlyPlayingViewModel(
       millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
 
+  private val _isSliding = MutableStateFlow(false)
+
+  /**
+   * Suppresses slider writes while the user owns the position.
+   *
+   * True from touch-down until the seek has actually landed — **not** until touch-up. Releasing it
+   * on touch-up left a window of up to one progress tick in which the old position was written
+   * back, so the thumb snapped to where it was before jumping forward when the seek completed. The
+   * owner described exactly that: *"seeking moves the timeline where I clicked, then back at the
+   * previous place, then starts playing and goes back to where I requested"* (cu-93).
+   * [awaitSeek] closes it again once the reported position is near the requested one.
+   *
+   * **Observable rather than a plain `var` (cu-198).**
+   *
+   * It was `var isSliding = false`, read inside `.filter { !isSliding }` on the two slider flows.
+   * A predicate reading a mutable field **outside** the stream is not part of that stream's state,
+   * so flipping the field re-emits nothing — the values suppressed during a drag are simply lost,
+   * and the slider only recovers when the upstream next ticks. Paused, it never does.
+   *
+   * As a `StateFlow` it is a real input: `combine` re-runs when the guard opens, so the current
+   * position is republished immediately. It is also the only form Compose can consume, which is
+   * why this had to land before the screen could migrate.
+   */
+  val isSliding: StateFlow<Boolean> = _isSliding.asStateFlow()
+
   val chapterProgressForSlider: StateFlow<Long> =
     currentlyPlaying.chapter
       .combine(currentlyPlaying.bookPosition) { chapter, bookPosition ->
         millisIntoChapter(chapter, bookPosition).coerceAtLeast(0L)
-      }.filter { !isSliding }
-      // distinctUntilChanged, because `currentlyPlaying` publishes book, track *and* chapter on
-      // every progress tick and each fans out through this combine. The device logged 228
-      // recomputations in one minute — four a second for a value that changes once a second — and
-      // every one of them wrote to the slider. That churn is what made seeking feel unstable
-      // however well the in-flight guard worked (cu-93).
+      }
+      // distinctUntilChanged *before* the guard, not after: it exists because `currentlyPlaying`
+      // publishes book, track *and* chapter on every progress tick and each fans out through this
+      // combine — the device logged 228 recomputations a minute for a value that changes once a
+      // second (cu-93). Applied after the guard it would also swallow the catch-up emission below,
+      // since that republishes a value the flow already saw.
       .distinctUntilChanged()
+      // Suppress while the user is dragging, then republish on release. A `filter` reading a plain
+      // `var` could only do the first half — the suppressed position was lost for good and the
+      // thumb stayed frozen until the next tick, which never comes while paused (cu-198).
+      .combine(_isSliding) { progress, sliding -> progress to sliding }
+      .filter { (_, sliding) -> !sliding }
+      .map { (progress, _) -> progress }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
 
   val trackProgressForSlider: StateFlow<Long> =
     currentlyPlaying.track
-      .filter { !isSliding }
-      .map { it.progress }
+      .combine(_isSliding) { track, sliding -> track.progress to sliding }
+      .filter { (_, sliding) -> !sliding }
+      .map { (progress, _) -> progress }
       .distinctUntilChanged()
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0L)
 
@@ -384,20 +417,6 @@ class CurrentlyPlayingViewModel(
     )
 
   /**
-   * Suppresses slider writes while the user owns the position.
-   *
-   * True from touch-down until the seek has actually landed — **not** until touch-up. Releasing it
-   * on touch-up left a window of up to one progress tick in which the old position was written
-   * back, so the thumb snapped to where it was before jumping forward when the seek completed. The
-   * owner described exactly that: *"seeking moves the timeline where I clicked, then back at the
-   * previous place, then starts playing and goes back to where I requested"* (cu-93).
-   *
-   * [awaitSeek] closes it again once the reported position is near the requested one.
-   */
-  var isSliding = false
-    private set
-
-  /**
    * The settle job for the seek currently in flight, so a second seek can cancel the first.
    *
    * Without this, rapid taps released the guard too early: tap one starts waiting for target A,
@@ -408,7 +427,24 @@ class CurrentlyPlayingViewModel(
   private var seekSettleJob: Job? = null
 
   fun onSlideStart() {
-    isSliding = true
+    _isSliding.value = true
+  }
+
+  /**
+   * Opens the guard when a drag ends without a seek being issued.
+   *
+   * The View screen had no such call: `Slider.OnSliderTouchListener.onStopTrackingTouch` always
+   * seeked, so the guard was only ever released by [awaitSeek]. Compose's
+   * `Slider(onValueChangeFinished = …)` fires on *every* drag end, including one the user cancels,
+   * and without this the guard would latch closed and freeze the thumb for good.
+   *
+   * A no-op while a seek is settling: [awaitSeek] owns the guard then, and releasing early is the
+   * cu-93 snap-back.
+   */
+  fun onSlideFinished() {
+    if (seekSettleJob?.isActive != true) {
+      _isSliding.value = false
+    }
   }
 
   /**
@@ -428,7 +464,7 @@ class CurrentlyPlayingViewModel(
             abs(TrackOffset(track.progress) - target) < SEEK_SETTLE_TOLERANCE
           }
         }
-        isSliding = false
+        _isSliding.value = false
       }
   }
 
