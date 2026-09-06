@@ -25,29 +25,43 @@ import java.io.File
  * `BottomSheetBehavior` driving it, so the collapsed state was unreachable from a unit test.
  *
  * cu-198 removed the mechanism rather than re-guarding it. The body is `PlayerScreen`, composed
- * only when the sheet reports `EXPANDED` — read from `MainActivityViewModel`'s own state, which
- * the fragment now gets through `CurrentlyPlayingInterface`. So "is the player on screen?" is a
- * fact the Activity already knows instead of something inferred from view geometry, and the
+ * only when the sheet reports `EXPANDED`. cu-206 moved *where* that gate lives: the fragment and
+ * its `CurrentlyPlayingInterface` are gone, and `ChronicleApp` composes the player under a plain
+ * `if (sheetState == EXPANDED)`. So "is the player on screen?" is a fact the shell already knows
+ * instead of something inferred from view geometry, and the
  * failure mode is **unrepresentable**: there is no write site left at which a guard could be
  * forgotten.
  *
  * The scan is kept, inverted: it now asserts the geometry inference has not come back. That is
  * cheap and it is the only thing still worth pinning here — the positive behaviour (a collapsed
  * sheet renders nothing) is pinned by `PlayerScreenTest` against the state itself.
+ *
+ * **The `if` in `ChronicleApp` is load-bearing and this test is why it is not an
+ * `AnimatedVisibility`.** That composable keeps its content composed while hidden, so the player
+ * would recompose once a second behind a collapsed sheet — the exact cost cu-110 and cu-117
+ * measured. The first cu-206 draft used one, and repointing this guard is what caught it.
  */
 class CollapsedSheetGuardTest {
-  private val fragment =
+  private val player =
     File(
-      "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/" +
-        "CurrentlyPlayingFragment.kt",
+      "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/compose/" +
+        "PlayerDestination.kt",
     )
 
+  private val shell =
+    File("src/main/java/io/github/mattpvaughn/chronicle/application/compose/ChronicleApp.kt")
+
   @Test
-  fun `fragment source is present`() {
+  fun `player and shell sources are present`() {
     assertTrue(
-      "CurrentlyPlayingFragment.kt not found at ${fragment.absolutePath} — if it moved, " +
+      "PlayerDestination.kt not found at ${player.absolutePath} — if it moved, " +
         "update this test rather than deleting it.",
-      fragment.isFile,
+      player.isFile,
+    )
+    assertTrue(
+      "ChronicleApp.kt not found at ${shell.absolutePath} — if it moved, " +
+        "update this test rather than deleting it.",
+      shell.isFile,
     )
   }
 
@@ -65,15 +79,14 @@ class CollapsedSheetGuardTest {
     // words would mean the next person cannot be told why the guard went away. (This is not
     // hypothetical: the first run of this test flagged its own explanatory comment.)
     val source =
-      fragment.readLines()
+      player.readLines()
         .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
         .joinToString("\n")
 
     assertFalse(
       "`isShown` reads true for a collapsed sheet, because it only checks visibility flags and " +
         "the sheet collapses to zero height with its children VISIBLE. Gate composition on the " +
-        "sheet's own state (CurrentlyPlayingInterface.bottomSheetState) instead — that is what " +
-        "cu-198 replaced this guard with.",
+        "sheet's own state instead — that is what cu-198 replaced this guard with.",
       source.contains(".isShown"),
     )
     assertFalse(
@@ -86,13 +99,31 @@ class CollapsedSheetGuardTest {
   /** The replacement is actually in place, so this file cannot pass by the screen being gutted. */
   @Test
   fun `composition is gated on the sheet's reported state`() {
-    val source = fragment.readText()
+    val source = shell.readText()
 
     assertTrue(
-      "the player body must be composed only while the sheet is EXPANDED, read from " +
-        "CurrentlyPlayingInterface.bottomSheetState — otherwise this file's assertions above " +
-        "pass vacuously against a screen that guards nothing at all.",
-      source.contains("bottomSheetState") && source.contains("EXPANDED"),
+      "the player body must be composed only while the sheet is EXPANDED — otherwise this " +
+        "file's assertions above pass vacuously against a shell that guards nothing at all.",
+      source.contains("if (sheetState == EXPANDED)"),
+    )
+  }
+
+  /**
+   * The gate is a plain `if`, never an `AnimatedVisibility`.
+   *
+   * `AnimatedVisibility` composes its content while hidden, so wrapping the player in one would
+   * put every per-tick recomposition back behind a collapsed sheet while this file's other
+   * assertions still passed. The collapsed *handle* may animate — it is cheap and always composed
+   * — so this checks only the expanded branch.
+   */
+  @Test
+  fun `the expanded player is not wrapped in AnimatedVisibility`() {
+    val expandedBranch = shell.readText().substringAfter("if (sheetState == EXPANDED)", "")
+
+    assertFalse(
+      "the expanded player must not sit inside an AnimatedVisibility: it keeps content composed " +
+        "while hidden, which is the per-second work cu-110 and cu-117 measured and removed.",
+      expandedBranch.contains("AnimatedVisibility"),
     )
   }
 }

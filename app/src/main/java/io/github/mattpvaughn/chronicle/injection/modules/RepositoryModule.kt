@@ -22,7 +22,7 @@ import javax.inject.Singleton
 /**
  * The repositories, split out of `AppModule` so a test can replace them (cu-185).
  *
- * These are the bindings a screen test wants to fake — a `FragmentScenario` needs a book
+ * These are the bindings a screen test wants to fake — a screen test needs a book
  * repository returning a known list, not one backed by a real database. `@BindValue` alone cannot
  * do it: a value bound in a test is a *second* binding for the type, which Dagger rejects as a
  * duplicate rather than treating as an override.

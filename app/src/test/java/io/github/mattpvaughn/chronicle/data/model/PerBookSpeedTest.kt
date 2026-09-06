@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * The per-book playback-speed override (cu-20).
@@ -76,24 +76,30 @@ class PerBookSpeedTest {
   }
 
   /**
-   * `Slider.setValue` throws for a value off its step grid, so the constant the popover snaps with
-   * must match the layout. Reading the XML rather than restating the number is the only version of
-   * this check that can fail if the layout changes.
+   * The slider's step grid is derived from [SpeedChooserState.SPEED_STEP], not restated.
+   *
+   * This read `android:stepSize` out of `modal_bottom_sheet_speed_chooser.xml` until cu-206
+   * deleted that layout. The hazard it guarded was specific to the View widget — `Slider.setValue`
+   * **throws** for a value off its grid — and a Compose `Slider` clamps instead, so the crash is
+   * gone. What is still worth pinning is that the popover's `steps` count and the constant
+   * `snapToStep` rounds with describe the *same* grid: if they drift, a preset chip lands between
+   * two steps and the thumb visibly jumps away from where the user tapped.
+   *
+   * `steps` is the count *between* the ends, hence the -1 — the same arithmetic
+   * `SpeedChooserSheet` performs.
    */
   @Test
-  fun `the snap step matches the slider's stepSize`() {
-    val layout = File("src/main/res/layout/modal_bottom_sheet_speed_chooser.xml")
-    assertTrue("layout not found at ${layout.absolutePath}", layout.exists())
-    val stepSize =
-      Regex("android:stepSize=\"([0-9.]+)\"")
-        .find(layout.readText())
-        ?.groupValues
-        ?.get(1)
-        ?.toFloat()
+  fun `the slider's step count matches the snap step`() {
+    val span = SpeedChooserState.SPEED_MAX - SpeedChooserState.SPEED_MIN
+    val steps = (span / SpeedChooserState.SPEED_STEP).roundToInt() - 1
+
+    // 0.5..3.0 in 0.05 steps is 50 intervals, so 49 stops between the ends.
+    assertEquals("the speed range must divide evenly into SPEED_STEP", 49, steps)
     assertEquals(
-      "SPEED_STEP must match android:stepSize, or setValue throws off-grid",
-      stepSize,
-      SpeedChooserState.SPEED_STEP,
+      "a value one step above the minimum must itself be on the grid",
+      SpeedChooserState.SPEED_MIN + SpeedChooserState.SPEED_STEP,
+      SpeedChooserState.snapToStep(SpeedChooserState.SPEED_MIN + SpeedChooserState.SPEED_STEP),
+      0.0001f,
     )
   }
 

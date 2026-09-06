@@ -130,17 +130,24 @@ fun ChronicleApp(
 
       // The expanded player covers the content and the status bar, but stops above the nav bar —
       // the same constraint (`BOTTOM -> bottom_nav TOP`) the expanded ConstraintSet used.
-      AnimatedVisibility(
-        visible = sheetState == EXPANDED,
-        enter =
-          slideInVertically(animationSpec = tween(SHEET_ANIMATION_MS)) { it } +
-            fadeIn(tween(SHEET_ANIMATION_MS)),
-        exit =
-          slideOutVertically(animationSpec = tween(SHEET_ANIMATION_MS)) { it } +
-            fadeOut(tween(SHEET_ANIMATION_MS)),
-        modifier = Modifier.padding(bottom = navBarTotalHeight),
-      ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = ChronicleColors.Primary) {
+      //
+      // A plain `if`, **not** an `AnimatedVisibility`, and that is load-bearing rather than a
+      // simplification. `AnimatedVisibility` keeps its content composed while hidden, so the
+      // player would recompose at tick rate behind a collapsed sheet — `ProgressUpdater` publishes
+      // once a second during playback, and the whole point of cu-198's gate is that a collapsed
+      // player does *no* work (cu-110, cu-117, cu-141). Not composing it at all is a stronger
+      // guarantee than any guard, which is what `CollapsedSheetGuardTest` pins.
+      //
+      // The cost is that the expanded player appears without a slide. The collapsed handle above
+      // keeps its animation because it is cheap and always-composed anyway.
+      if (sheetState == EXPANDED) {
+        Surface(
+          modifier =
+            Modifier
+              .fillMaxSize()
+              .padding(bottom = navBarTotalHeight),
+          color = ChronicleColors.Primary,
+        ) {
           Box(modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars)) {
             expandedPlayer()
           }

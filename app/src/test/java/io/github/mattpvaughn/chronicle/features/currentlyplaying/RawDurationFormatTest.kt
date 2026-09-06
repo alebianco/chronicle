@@ -108,7 +108,7 @@ class RawDurationFormatTest {
     val scanned = playerSources().toList()
 
     assertTrue("expected the player packages to resolve, found $scanned", scanned.size >= 5)
-    assertTrue("expected the fragment to resolve", File(PLAYER_FRAGMENT).isFile)
+    assertTrue("expected the player destination to resolve", File(PLAYER_FRAGMENT).isFile)
     assertTrue("expected the view model to resolve", File(PLAYER_VIEW_MODEL).isFile)
     assertTrue("expected the player screen to resolve", File(PLAYER_SCREEN).isFile)
   }
@@ -139,9 +139,15 @@ class RawDurationFormatTest {
   }
 
   private companion object {
+    /**
+     * The player's host. `CurrentlyPlayingFragment` until cu-206 retired the Fragments; the
+     * destination that replaced it is the same thing for this guard's purposes — the file that
+     * wires the ViewModel's text to the screen, and so the file where a raw `h:mm:ss/h:mm:ss`
+     * pair would reappear.
+     */
     const val PLAYER_FRAGMENT =
-      "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/" +
-        "CurrentlyPlayingFragment.kt"
+      "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/compose/" +
+        "PlayerDestination.kt"
 
     const val PLAYER_SCREEN =
       "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/compose/" +

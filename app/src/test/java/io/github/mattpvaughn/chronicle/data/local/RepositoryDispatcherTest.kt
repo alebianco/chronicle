@@ -167,18 +167,22 @@ class RepositoryDispatcherTest {
       ).map { "src/main/java/io/github/mattpvaughn/chronicle/features/player/$it.kt" }
 
     /**
-     * The layer converted in cu-169 — ViewModels, Fragments, `application/` and `PlexConfig`.
+     * The layer converted in cu-169 — ViewModels, screens, `application/` and `PlexConfig`.
      *
      * Unscanned until then, which is how ten hardcoded dispatchers stayed green: this test named
      * only repositories and the player, and CLAUDE.md attributed the rest to cu-72, a *closed*
      * task. A layer nothing scans is a layer that drifts.
+     *
+     * The two Fragments here were representative UI files rather than special ones; cu-206
+     * replaced them with the destinations below, which is where a hardcoded dispatcher would now
+     * be written.
      */
     val UI_AND_APPLICATION_SOURCES: List<String> =
       listOf(
         "features/settings/SettingsViewModel",
         "features/bookdetails/AudiobookDetailsViewModel",
-        "features/library/LibraryFragment",
-        "features/collections/CollectionsFragment",
+        "features/library/compose/LibraryDestination",
+        "features/collections/compose/CollectionsDestination",
         "application/MainActivity",
         "application/ChronicleApplication",
         "data/sources/plex/PlexConfig",
