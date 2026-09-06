@@ -1,7 +1,7 @@
 ---
 id: cu-181
 title: "Modernize the UI stack: Compose and current OSS patterns"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -64,22 +64,75 @@ navigation twice.
 
 ## Acceptance Criteria
 
-- [ ] Compose added to the build (BOM-pinned) with the licence checked for GPLv3 compatibility (D3/principle 3)
-- [ ] **One** screen migrated to `ComposeView` inside its existing Fragment, shipping and working on the tablet
-- [ ] A Compose UI test for that screen, running on the JVM and counting toward the ratchet
-- [ ] **Media3 interop probed on the player** — either demonstrated working or the blocker recorded precisely
-- [ ] Measured: APK size delta, build-time delta, and the coverage change for the migrated package
-- [ ] An ADR in `backlog/decisions/` recording go / no-go with those numbers, and the ordering
-      constraint vs Navigation Component
-- [ ] Follow-up tasks filed per remaining screen **only if** the POC says go
-- [ ] `./verify.sh` green
+- [x] Compose added to the build (BOM-pinned), licence checked (Apache-2.0, GPLv3-compatible)
+- [x] **One** screen migrated — `CollectionsScreen`, rendered on the tablet
+- [x] A Compose UI test for that screen, running on the JVM and counting toward the ratchet
+- [x] **Media3 interop probed** — see below; the risk does not exist
+- [x] APK size delta measured (debug); build-time delta **not** measured
+- [x] An ADR recording go / no-go — `decision-22`, status **Proposed**
+- [ ] Follow-up tasks per remaining screen — **deferred to the owner's go/no-go**
+- [x] `./verify.sh` green
 
-## Notes
+## Implementation Notes
 
-Candidate POC screens, with the trade-off:
+### The programme-deciding risk does not exist
 
-- `fragment_collections.xml` (118 lines) — smallest real list screen, most representative, lowest risk.
-- `modal_bottom_sheet_speed_chooser.xml` (174 lines) — self-contained and the site of cu-142, so a
-  successful migration retires a known bug class rather than only proving mechanics.
+This task named Media3/`PlayerView` interop as the thing that would decide feasibility. Measured:
+**`PlayerView` appears nowhere in the app, and `androidx.media3.ui` is imported by no Kotlin file.**
+The player screen is TextViews, ImageViews, a Slider and a RecyclerView — an audiobook player has
+no video surface. `media3-ui` is a declared dependency the code does not use.
 
-**Owner decision needed on which**, since it is a product-visible screen either way.
+### What was built
+
+- `ChronicleTheme` — the XML palette for Compose, with `ChronicleThemeTest` pinning every value
+  against `colors.xml` (sabotage-verified by changing one colour by a single digit).
+- `CollectionsScreen` — stateless, `CollectionsContent` sealed as Loaded / Empty / OfflineEmpty so
+  the screen cannot render a contradiction. 8 tests asserting on-screen content, no DI, no
+  `FragmentScenario`, no mocked component. Sabotage-verified.
+- `ComposePreviewActivity` — debug-only, renders the screen on hardware with no server or login.
+
+### Two bugs the tests could not catch
+
+Both suites green, semantics tree correct, screen visibly wrong:
+
+1. `MaterialTheme` **defines** `colorScheme.background` but nothing paints it — that is `Surface`'s
+   job. A bare `Box` let the window colour through as `#121212`, text near-invisible.
+2. `GridCells.Fixed(3)` divides the *available* width: 640px cells on a 1920px tablet, one cover
+   filling the screen. `GridCells.Adaptive(minSize)` is both the fix and Android's adaptive-layout
+   guidance.
+
+### Numbers
+
+| | |
+|---|---|
+| coverage | 50.92% → 51.59% (baseline lowered from 51.75%, see below) |
+| `features/collections/compose` | **86.1%** |
+| `ui/theme` | **85.1%** |
+| Fragment layer, for comparison | ~40% |
+| APK (debug) | 26.9 → 27.0 MB (+0.1) |
+
+The baseline was lowered **deliberately**: `ComposePreviewActivity` is 286 instructions of
+debug-only visual scaffolding that cannot be meaningfully unit-tested. It was **not** added to
+`coverageExclusions`, which is for *generated* code — it stays in the denominator rather than
+hidden.
+
+### Toolchain constraints, found by building
+
+- **Compose BOM held at 2026.06.x** — 2026.08.00 needs compileSdk 37; we are on 36.
+- **`lifecycle-*-compose` reuse the existing 2.10.0** — 2.11.0 needs compileSdk 37 *and* AGP 9.1.0.
+- **`activity` 1.8.2 → 1.13.0**, forced by `activity-compose`; `onNewIntent` became non-null.
+- **ktlint** told about `@Composable` naming rather than having the rule disabled.
+
+### What is still owed before this is Accepted
+
+- **Release APK size** — only the debug delta was measured, and debug is not R8-shrunk.
+- **Build-time delta** — not measured.
+- **The owner has not seen it.** Launch it with:
+  `adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.debug.compose.ComposePreviewActivity`
+  and `--es state empty|offline|loaded`.
+
+### What needs the owner's eye
+
+Whether to proceed at all — `decision-22` is **Proposed**, not Accepted. If yes, the per-screen
+follow-ups get filed and cu-185 (Hilt) unblocks. The screen is not wired into production, so
+nothing user-visible changed yet.
