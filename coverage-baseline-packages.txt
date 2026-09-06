@@ -11,12 +11,13 @@ io/github/mattpvaughn/chronicle/features/bookdetails 37.24
 io/github/mattpvaughn/chronicle/features/bookdetails/compose 80.01
 io/github/mattpvaughn/chronicle/features/browse 0.00
 io/github/mattpvaughn/chronicle/features/collections 60.06
-io/github/mattpvaughn/chronicle/features/collections/compose 87.39
+io/github/mattpvaughn/chronicle/features/collections/compose 87.70
 io/github/mattpvaughn/chronicle/features/currentlyplaying 31.26
 io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 83.81
 io/github/mattpvaughn/chronicle/features/download 32.26
 io/github/mattpvaughn/chronicle/features/home 82.47
 io/github/mattpvaughn/chronicle/features/library 62.15
+io/github/mattpvaughn/chronicle/features/library/compose 74.30
 io/github/mattpvaughn/chronicle/features/login 39.74
 io/github/mattpvaughn/chronicle/features/player 40.53
 io/github/mattpvaughn/chronicle/features/search 84.91
