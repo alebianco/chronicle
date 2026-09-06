@@ -1,40 +1,39 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 /**
- * A guard that decides whether the expanded player is on screen must test the sheet's **height**,
- * never `isShown` alone (cu-141).
+ * A collapsed player does no rendering work — now enforced by structure, not by a guard (cu-198).
  *
- * The player lives in a bottom sheet whose container collapses to **zero height** rather than
- * going GONE. Every child therefore keeps `VISIBLE` with real bounds inside a container with no
- * room, and `isShown` — which walks only the visibility *flags* up the ancestor chain — stays
- * `true` throughout. Measured on the tablet while fully collapsed:
+ * ## What this used to be, and why it changed
  *
- * ```
- * container = 0,990-1920,990   (zero height)
- * seekbar   = 48,108-1872,180  isShown=true  width=1824
- * root height = 0
- * ```
- *
- * Two failures followed from that, and both were intermittent, which is what made this expensive
- * to find:
+ * The player lives in a bottom sheet that collapses to **zero height with every child still
+ * `VISIBLE`**, so `isShown` stays true while nothing is on screen. Two bugs came out of that:
  *
  * 1. `renderPlayerText` passed its guard while collapsed and wrote text into a hierarchy with no
- *    room, so `wrap_content` readouts below the collapsed region measured to **zero width**. The
- *    book-progress line was blank in landscape depending only on which tick happened to land
- *    after an expand — six attempts at the *constraints* found nothing, because the constraints
- *    were never wrong.
- * 2. The re-render listener keyed on an `isShown` transition that never fired: `wasShown` went
- *    true while still collapsed, so the `shown && !wasShown` edge was missed on every expand.
+ *    room, so `wrap_content` readouts measured to zero width. The book-progress line was blank in
+ *    landscape depending only on which tick landed after an expand — six attempts at the
+ *    *constraints* found nothing, because the constraints were never wrong (cu-141).
+ * 2. The re-render listener keyed on an `isShown` transition that never fired, so the stale text
+ *    written while collapsed was never corrected.
  *
- * A source guard rather than a rendering test, because a Robolectric view is laid out at its
- * measured size with no `BottomSheetBehavior` driving it — the collapsed state this protects
- * against is not reachable from a unit test at all. The check is deliberately narrow: it asserts
- * only that the two guards in this file, and the listener that re-renders on expand, mention a
- * height. It does not try to parse the condition.
+ * This was a **source scan** — it asserted that every `isShown` in the fragment sat within three
+ * lines of a `height` check — because a Robolectric view is laid out at its measured size with no
+ * `BottomSheetBehavior` driving it, so the collapsed state was unreachable from a unit test.
+ *
+ * cu-198 removed the mechanism rather than re-guarding it. The body is `PlayerScreen`, composed
+ * only when the sheet reports `EXPANDED` — read from `MainActivityViewModel`'s own state, which
+ * the fragment now gets through `CurrentlyPlayingInterface`. So "is the player on screen?" is a
+ * fact the Activity already knows instead of something inferred from view geometry, and the
+ * failure mode is **unrepresentable**: there is no write site left at which a guard could be
+ * forgotten.
+ *
+ * The scan is kept, inverted: it now asserts the geometry inference has not come back. That is
+ * cheap and it is the only thing still worth pinning here — the positive behaviour (a collapsed
+ * sheet renders nothing) is pinned by `PlayerScreenTest` against the state itself.
  */
 class CollapsedSheetGuardTest {
   private val fragment =
@@ -52,39 +51,48 @@ class CollapsedSheetGuardTest {
     )
   }
 
+  /**
+   * No `isShown` probe returns to this screen.
+   *
+   * `isShown` cannot answer the question this screen asks. It reports the visibility *flags* up
+   * the ancestor chain, and a collapsed sheet's children are all `VISIBLE` — so it reads true
+   * while nothing is on screen. Any reappearance means someone has started inferring
+   * on-screen-ness from the view tree again, which is cu-141.
+   */
   @Test
-  fun `every isShown guard is paired with a height check`() {
-    val lines = fragment.readLines()
-    val offenders = mutableListOf<String>()
+  fun `the player does not infer visibility from view geometry`() {
+    // Code only. A comment naming the old mechanism is how the reasoning survives — banning the
+    // words would mean the next person cannot be told why the guard went away. (This is not
+    // hypothetical: the first run of this test flagged its own explanatory comment.)
+    val source =
+      fragment.readLines()
+        .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+        .joinToString("\n")
 
-    lines.forEachIndexed { index, line ->
-      if (!line.contains(".isShown")) return@forEachIndexed
-      // The guard may wrap, so look at the statement rather than the single line.
-      val statement = lines.subList(index, minOf(index + 3, lines.size)).joinToString(" ")
-      if (!statement.contains("height")) {
-        offenders += "line ${index + 1}: ${line.trim()}"
-      }
-    }
-
-    assertTrue(
-      "An `isShown` check in CurrentlyPlayingFragment is not paired with a height check.\n" +
-        "A collapsed bottom sheet keeps every child VISIBLE at zero height, so `isShown` alone " +
-        "reports the expanded player as on screen when it is not (cu-141).\n" +
-        offenders.joinToString("\n"),
-      offenders.isEmpty(),
+    assertFalse(
+      "`isShown` reads true for a collapsed sheet, because it only checks visibility flags and " +
+        "the sheet collapses to zero height with its children VISIBLE. Gate composition on the " +
+        "sheet's own state (CurrentlyPlayingInterface.bottomSheetState) instead — that is what " +
+        "cu-198 replaced this guard with.",
+      source.contains(".isShown"),
+    )
+    assertFalse(
+      "`root.height == 0` is the other half of the same inference (cu-141). The sheet's state is " +
+        "available directly; do not re-derive it from measurement.",
+      Regex("""\broot\.height\b""").containsMatchIn(source),
     )
   }
 
+  /** The replacement is actually in place, so this file cannot pass by the screen being gutted. */
   @Test
-  fun `the expand listener watches height rather than an isShown transition`() {
+  fun `composition is gated on the sheet's reported state`() {
     val source = fragment.readText()
 
     assertTrue(
-      "The layout-change listener that re-renders the player on expand must key on the root's " +
-        "height. An `isShown` transition never fires, because the sheet collapses to zero " +
-        "height with its children still VISIBLE — so the stale text written while collapsed is " +
-        "never corrected (cu-141).",
-      source.contains("addOnLayoutChangeListener") && source.contains("view.height > 0"),
+      "the player body must be composed only while the sheet is EXPANDED, read from " +
+        "CurrentlyPlayingInterface.bottomSheetState — otherwise this file's assertions above " +
+        "pass vacuously against a screen that guards nothing at all.",
+      source.contains("bottomSheetState") && source.contains("EXPANDED"),
     )
   }
 }

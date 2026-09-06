@@ -1,5 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying.compose
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +54,8 @@ data class PlayerActions(
   val onSlideFinished: () -> Unit = {},
   val onChangeSpeed: () -> Unit = {},
   val onSleepTimer: () -> Unit = {},
+  val onAddBookmark: () -> Unit = {},
+  val onShowBookmarks: () -> Unit = {},
 )
 
 /**
@@ -216,10 +220,15 @@ private fun TransportRow(
       Icon(
         painterResource(R.drawable.ic_skip_previous_white),
         stringResource(R.string.skip_to_previous),
+        tint = MaterialTheme.colorScheme.onBackground,
       )
     }
     IconButton(onClick = actions.onSkipBackwards) {
-      Icon(painterResource(transport.jumpBackwardsIcon), stringResource(R.string.skip_backwards))
+      Icon(
+        painterResource(transport.jumpBackwardsIcon),
+        stringResource(R.string.skip_backwards),
+        tint = MaterialTheme.colorScheme.onBackground,
+      )
     }
 
     // The spinner replaces the button in place rather than hiding it — the Fragment used
@@ -235,23 +244,30 @@ private fun TransportRow(
             ),
             stringResource(R.string.pause_play_button),
             modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.primary,
           )
         }
       }
     }
 
     IconButton(onClick = actions.onSkipForwards) {
-      Icon(painterResource(transport.jumpForwardsIcon), stringResource(R.string.skip_forwards))
+      Icon(
+        painterResource(transport.jumpForwardsIcon),
+        stringResource(R.string.skip_forwards),
+        tint = MaterialTheme.colorScheme.onBackground,
+      )
     }
     IconButton(onClick = actions.onSkipToNext) {
       Icon(
         painterResource(R.drawable.ic_skip_next_white),
         stringResource(R.string.skip_to_next),
+        tint = MaterialTheme.colorScheme.onBackground,
       )
     }
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UtilityRow(
   utility: UtilityState,
@@ -286,6 +302,30 @@ private fun UtilityRow(
           color = MaterialTheme.colorScheme.onBackground,
         )
       }
+    }
+
+    // Tap marks this moment, long-press lists them. A tap is the frequent action and gets the
+    // plain press; browsing is rarer, so it takes the long one — §3.1 rule 2, one tray icon per
+    // job (cu-22).
+    // A `Box` with `combinedClickable` rather than an `IconButton`: `IconButton` takes only
+    // `onClick`, and the long-press is not optional here — it is the only route to the bookmark
+    // list. The 48dp size keeps the touch target, which `IconButton` would have supplied (cu-47).
+    Box(
+      modifier =
+        Modifier
+          .size(48.dp)
+          .combinedClickable(
+            onClick = actions.onAddBookmark,
+            onLongClick = actions.onShowBookmarks,
+            onClickLabel = stringResource(R.string.bookmark_add),
+          ),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        painterResource(R.drawable.ic_bookmark_add),
+        stringResource(R.string.bookmark_add),
+        tint = MaterialTheme.colorScheme.onBackground,
+      )
     }
   }
 }

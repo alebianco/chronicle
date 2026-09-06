@@ -11,8 +11,8 @@ io/github/mattpvaughn/chronicle/features/bookdetails 33.44
 io/github/mattpvaughn/chronicle/features/browse 0.00
 io/github/mattpvaughn/chronicle/features/collections 60.06
 io/github/mattpvaughn/chronicle/features/collections/compose 87.70
-io/github/mattpvaughn/chronicle/features/currentlyplaying 30.17
-io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 82.99
+io/github/mattpvaughn/chronicle/features/currentlyplaying 31.67
+io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 83.81
 io/github/mattpvaughn/chronicle/features/download 32.26
 io/github/mattpvaughn/chronicle/features/home 82.47
 io/github/mattpvaughn/chronicle/features/library 62.28

@@ -25,26 +25,40 @@ import java.io.File
  */
 class RawDurationFormatTest {
   /**
-   * Each of the four progress views is written from one of the two human formatters.
+   * The player's readouts are rendered from [PlayerText], not from a raw duration (cu-198).
    *
-   * This is the criterion — "no raw h:mm:ss/h:mm:ss anywhere in the player" — expressed as
-   * something a scan can check: the `setTextIfChanged` call for each view must not reach
-   * `DateUtils`, and must reach `formatCoarseDuration` or `formatPrecisePosition` through the
-   * helper it calls.
+   * Was a scan for `binding.<view>.setTextIfChanged(...)` on four named views. Those writes are
+   * gone: the body is `PlayerScreen`, so there are no `binding` writes left to inspect and the old
+   * assertion failed by construction. The rule is unchanged — §3.1 rule 3, a two-level human
+   * readout and never `47:12:33/52:04:11` — so the scan follows it to its new address.
+   *
+   * `PlayerScreenTest` asserts the *rendered strings* directly (`6h 12m left in book`), which is
+   * the stronger check. This keeps the source scan as the cheap guard against a `DateUtils` call
+   * creeping back in beside it.
    */
   @Test
-  fun `the progress views are written from the human formatters`() {
-    val fragment = File(PLAYER_FRAGMENT).readText().withoutComments()
+  fun `the player screen renders its readouts through PlayerText`() {
+    val screen = File(PLAYER_SCREEN).readText().withoutComments()
 
-    PROGRESS_VIEWS.forEach { view ->
-      val call = Regex("""binding\.$view\.setTextIfChanged\(([^\n]*)""").find(fragment)
-      assertTrue("no setTextIfChanged found for $view", call != null)
-      assertFalse(
-        "$view must not be written from DateUtils (§3.1 rule 3, cu-19)",
-        RAW_FORMAT.containsMatchIn(call!!.groupValues[1]),
+    assertTrue(
+      "$PLAYER_SCREEN not found — if the screen moved, update this test rather than deleting it",
+      File(PLAYER_SCREEN).isFile,
+    )
+    listOf("bookProgress", "chapterPosition", "chapterRemaining").forEach { readout ->
+      assertTrue(
+        "the player body must render $readout through PlayerText, which is where the wording " +
+          "rule lives (cu-173)",
+        screen.contains("PlayerText.$readout("),
       )
     }
+    assertFalse(
+      "the player body must not format a duration itself (§3.1 rule 3, cu-19)",
+      RAW_FORMAT.containsMatchIn(screen),
+    )
+  }
 
+  @Test
+  fun `the formatters themselves use the human helpers`() {
     // And the helpers those calls name do use the human formatters. Those helpers moved out of
     // the fragment into `PlayerText` (cu-173) — they never needed a view, and inside a 408-line
     // `onCreateView` no unit test could reach them. The rule is unchanged; only its address is.
@@ -96,10 +110,7 @@ class RawDurationFormatTest {
     assertTrue("expected the player packages to resolve, found $scanned", scanned.size >= 5)
     assertTrue("expected the fragment to resolve", File(PLAYER_FRAGMENT).isFile)
     assertTrue("expected the view model to resolve", File(PLAYER_VIEW_MODEL).isFile)
-    assertTrue(
-      "expected all four progress views to be found",
-      PROGRESS_VIEWS.size == 4,
-    )
+    assertTrue("expected the player screen to resolve", File(PLAYER_SCREEN).isFile)
   }
 
   /** And that both matchers can actually fire. */
@@ -132,6 +143,10 @@ class RawDurationFormatTest {
       "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/" +
         "CurrentlyPlayingFragment.kt"
 
+    const val PLAYER_SCREEN =
+      "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/compose/" +
+        "PlayerScreen.kt"
+
     const val PLAYER_TEXT =
       "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/PlayerText.kt"
 
@@ -139,11 +154,7 @@ class RawDurationFormatTest {
       "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/" +
         "CurrentlyPlayingViewModel.kt"
 
-    /** The four TextViews the player's progress block writes. */
-    val PROGRESS_VIEWS =
-      listOf("progress", "progressPercentage", "chapterProgress", "chapterDuration")
-
-    /** Relative to the `app` module dir, the unit tests' working directory. */
+    /** Both player packages, so a readout added anywhere in them is scanned. */
     val PLAYER_ROOTS =
       listOf(
         "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying",
