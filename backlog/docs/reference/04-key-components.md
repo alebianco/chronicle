@@ -17,7 +17,7 @@ This document explains the most important classes in Chronicle and what they do.
 **What it does**:
 - Initializes the entire app when it starts
 - Creates the Dagger dependency injection graph
-- Sets up image loading (Fresco)
+- Sets up image loading (Coil 3)
 - Configures logging (Timber)
 - Registers for network connectivity changes
 
@@ -133,7 +133,7 @@ This document explains the most important classes in Chronicle and what they do.
 - Check if book is cached
 
 ### PrefsRepo
-**Location**: `data/local/PrefsRepo.kt`
+**Location**: `data/local/SharedPreferencesPrefsRepo.kt` (`PrefsRepo` is the interface there)
 
 **What it does**:
 - Wrapper around SharedPreferences
@@ -328,14 +328,25 @@ This document explains the most important classes in Chronicle and what they do.
 - Contains all audiobook metadata
 
 **Key properties**:
-- `id` - Unique identifier
-- `title` - Book title
-- `author` - Book author
-- `duration` - Total length in milliseconds
-- `progress` - Current listening position
-- `isCached` - Whether book is downloaded
-- `thumb` - Cover art URL
-- `chapters` - List of chapters
+- `id` — **`String`**, not `Int` (cu-71, so a non-numeric backend can be represented). A DAO
+  parameter bound against it must also be `String`: SQLite compares across storage classes, so a
+  numeric bind matches **no row, silently**.
+- `title`, `author` — book metadata
+- `duration` — total length in milliseconds
+- `progress` — cached derivation of the **tracks'** position, never authoritative
+  ([[decision-16]]). `merge` carries the local value and never adopts `network.progress`.
+- `isCached` — whether the book is downloaded
+- `thumb` — cover art URL
+- `source` — **`SourceId`** (cu-127, [[decision-21]]): which source instance owns this row. A
+  local-only column, so it must be named in **both** arms of `merge` or a refresh blanks it.
+- `playbackSpeed` — per-book override, `NO_SPEED_OVERRIDE` (`0f`) when the book follows the global
+  preference. Read only through `effectiveSpeed(global)`.
+- `seriesIndex` — parsed from `titleSort` in hundredths (cu-146), not from Plex's `index`.
+
+**There is no `chapters` property.** The column was dropped in `BookDatabase` v14 (cu-159);
+chapters live in `ChapterDatabase` and are read through `resolveChapters` /
+`resolveChaptersFromCache` (`data/model/ChapterAssembly.kt`). Do not reintroduce a serialized copy
+on the book.
 
 ### MediaItemTrack
 **Location**: `data/model/MediaItemTrack.kt`
@@ -345,11 +356,14 @@ This document explains the most important classes in Chronicle and what they do.
 - Room entity
 
 **Key properties**:
-- `id` - Unique identifier
-- `title` - Track/chapter title
-- `duration` - Track length
-- `progress` - Listening position in this track
-- `index` - Track number/order
+- `id` — **`String`** (cu-71), same binding caveat as `Audiobook.id`
+- `title` — track title
+- `duration` — track length
+- `progress` — the track's `viewOffset`. This is the **single source of truth** for listening
+  position ([[decision-16]]); Plex stores no album-level offset.
+- `index` — track number/order
+- `parentKey` — the owning book
+- `source` — `SourceId`, as on `Audiobook`
 
 ## How Components Work Together
 

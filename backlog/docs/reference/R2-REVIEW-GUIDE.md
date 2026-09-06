@@ -7,13 +7,19 @@ created_date: '2026-09-05'
 
 # R2 review guide
 
-**What this is.** Everything in milestone `m-2` that is waiting for you, what it does, and how to
-check it. Written 2026-09-05, after the adversarial review pass, against branch
-`integration/r2-review` (28 commits ahead of `feature/agentic-dev`, linear, no merges).
+> **Point-in-time snapshot, 2026-09-05.** Written after the adversarial review pass against branch
+> `integration/r2-review`. Two things in it have since moved: **cu-166 has shipped** (Fetch2 is now
+> vendored at `libs/fetch2-mirror`), and **Compose was adopted** ([[decision-22]], cu-181), which
+> this guide predates and does not cover. The gate figures below are frozen at the moment of
+> writing — re-run `./verify.sh` for current numbers. The task list has also grown; see the roundup
+> in the m-2 milestone rather than treating the count here as current.
 
-**State of the gate:** `./verify.sh` green on all 6 stages — ktlint, **1334 unit tests, 0
-failures**, coverage ratchet (39.77% aggregate, all 23 packages at or above their floor), debug APK,
-lint, release compile.
+**What this is.** Everything in milestone `m-2` that was waiting for you as of 2026-09-05, what it
+does, and how to check it.
+
+**State of the gate at the time of writing:** `./verify.sh` green on all 6 stages — ktlint, 1334
+unit tests, 0 failures, coverage ratchet (39.77% aggregate, all 23 packages at or above their
+floor), debug APK, lint, release compile.
 
 **Why there is so much to review.** The rule in CLAUDE.md is *"can a machine prove this was right?"*
 Bug fixes with a failing-then-passing test go straight to `Done`; anything that changed a screen or
@@ -49,7 +55,7 @@ under the system bars), so they have debug hooks:
 
 ---
 
-## The 30 tasks waiting on you
+## The tasks waiting on you (30 as of 2026-09-05)
 
 Grouped by what kind of judgement each needs. Each task file's closing notes say the same thing in
 more detail — this is the map, not a replacement.

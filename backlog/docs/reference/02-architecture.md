@@ -32,7 +32,8 @@ graph TD
 ### View (UI Layer)
 - **Fragments**: Each screen is a Fragment (HomeFragment, LibraryFragment, etc.)
 - **Activities**: Single MainActivity hosts all fragments
-- **Data Binding**: XML layouts bind directly to ViewModel properties
+- **Compose** for new and migrated screens ([[decision-22]]); **ViewBinding** for the rest.
+  DataBinding was removed in cu-58 — layouts have no `<layout>` wrapper and no `@{...}` expressions
 - **Responsibilities**: Display data, handle user input, navigation
 
 ### ViewModel (Presentation Layer)
@@ -72,12 +73,6 @@ graph TD
     style C fill:#f3e5f5
     style E fill:#e8f5e9
 ```
-
-**Why Dagger?**
-- Compile-time dependency verification
-- No reflection overhead
-- Clear dependency graph
-- Easy testing with mock implementations
 
 ### 2. Repository Pattern
 
@@ -129,7 +124,7 @@ graph TD
     A[MediaPlayerService<br/>Background Service]
     B[ExoPlayer<br/>Actual audio playback]
     C[MediaSession<br/>Android media controls]
-    D[MediaSessionConnector<br/>Connects ExoPlayer to MediaSession]
+    D[AudiobookMediaSessionCallback<br/>Handles transport controls and playFromMediaId]
     E[NotificationBuilder<br/>Now Playing notification]
     
     A --> B
@@ -154,14 +149,25 @@ graph TD
 - **PlexMediaRepository**: Manages Plex data
 - **PlexLoginRepo**: Handles authentication
 
-### 2. Room Database (Local)
-- **BookDatabase**: Stores audiobook metadata
-- **TrackDatabase**: Stores track/chapter information
-- **CollectionsDatabase**: Stores collection data
+### 2. Room Database (Local) — **five separate databases**
+
+Each has its own version and migration list, so a schema change means finding the right one. None
+use `fallbackToDestructiveMigration`, deliberately: a bad migration must crash, never silently wipe
+listening progress.
+
+- **BookDatabase** (v14): audiobook metadata
+- **TrackDatabase** (v7): tracks. `viewOffset` here is the source of truth for position
+  ([[decision-16]])
+- **ChapterDatabase** (v3): chapters — and **nowhere else** since cu-159 dropped
+  `Audiobook.chapters`
+- **CollectionsDatabase** (v3): Plex collections
+- **BookmarkDatabase** (v1): bookmarks, kept **outside `BookDatabase` on purpose** so the sync path
+  cannot delete a note the user wrote (cu-22)
 
 ### 3. File System (Local Cache)
 - **CachedFileManager**: Manages downloaded audio files
-- **Fetch**: Library for downloading files
+- **Fetch2**: download library, **vendored** at `libs/fetch2-mirror` (cu-166 — upstream is
+  abandoned and was arriving via JitPack)
 
 ## Navigation
 
@@ -204,14 +210,11 @@ graph TD
 - **Database**: Persisted data state
 - **PlexConfig**: Plex-specific configuration and state
 
-## Benefits of This Architecture
+## What the layering buys
 
-1. **Separation of Concerns**: Each layer has clear responsibilities
-2. **Testability**: Easy to mock dependencies and test in isolation
-3. **Maintainability**: Changes in one layer don't break others
-4. **Lifecycle Management**: ViewModels scope work to `viewModelScope`; Views collect through `collectWhileStarted`, which is what makes collection lifecycle-aware
-5. **Offline Support**: Repository pattern makes it easy to switch between online/offline data
-6. **Scalability**: New features follow established patterns
+The one non-obvious point: **lifecycle management**. ViewModels scope work to `viewModelScope`, and
+Views collect through `collectWhileStarted` — that extension is what makes collection
+lifecycle-aware, and a bare `lifecycleScope.launch` keeps collecting while backgrounded.
 
 ## Common Patterns Used
 

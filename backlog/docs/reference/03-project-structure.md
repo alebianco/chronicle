@@ -28,8 +28,9 @@ chronicle/
 │   │   ├── androidTest/              # Instrumented tests
 │   │   └── testShared/               # Shared test utilities
 │   ├── build.gradle.kts              # App module build configuration
-│   └── schemas/                      # Room database schemas
-├── docs/                             # Documentation (you are here!)
+│   └── schemas/                      # Room exported schemas — **committed**, all five DBs
+├── backlog/docs/reference/           # Documentation (you are here!)
+├── backlog/                          # Tasks, decisions, analysis, research (D13)
 ├── gradle/                           # Gradle configuration
 ├── build.gradle.kts                  # Root build configuration
 ├── settings.gradle.kts               # Gradle settings
@@ -45,8 +46,7 @@ application/
 ├── MainActivity.kt             # Single activity hosting all fragments
 ├── MainActivityViewModel.kt    # ViewModel for shared app state
 ├── Injector.kt                 # Dagger component accessor
-├── Constants.kt                # App-wide constants
-└── ChronicleBillingManager.kt  # In-app billing/purchases (if any)
+└── Constants.kt                # App-wide constants
 ```
 
 **Purpose**: App initialization, single activity container, global state management
@@ -60,7 +60,7 @@ data/
 │   ├── CollectionsRepository.kt # Collections data
 │   ├── BookDatabase.kt         # Room database for books
 │   ├── TrackDatabase.kt        # Room database for tracks
-│   ├── PrefsRepo.kt            # SharedPreferences wrapper
+│   ├── SharedPreferencesPrefsRepo.kt  # PrefsRepo interface + impl
 │   └── LibrarySyncRepository.kt # Library sync state
 ├── sources/                    # Data source implementations
 │   ├── plex/                   # Plex API integration
@@ -156,7 +156,7 @@ navigation/
 util/
 ├── StorageUtils.kt             # File system utilities
 ├── JavaLangExt.kt              # Kotlin extensions
-├── FrescoExt.kt                # Fresco image loading extensions
+├── ImageViewExt.kt             # Coil image loading extensions
 └── (other utility files)
 ```
 
@@ -208,7 +208,8 @@ res/
 - **`README.md`**: Main project readme
 - **`CONTRIBUTING.md`**: Contribution guidelines
 - **`LICENSE`**: Project license
-- **`todo.md`**: Development roadmap and tasks
+- **`backlog/`**: all non-code knowledge — tasks, decisions, reference docs (D13). Upstream's
+  `todo.md` is gone; its live items became tasks in cu-46.
 
 ## Package Naming Convention
 

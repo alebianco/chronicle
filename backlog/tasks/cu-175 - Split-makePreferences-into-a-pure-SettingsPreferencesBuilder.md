@@ -9,6 +9,7 @@ labels:
   - maintainability
 dependencies: []
 priority: medium
+milestone: m-2
 ---
 
 ## Status note (2026-09-05): rescoped — the premise was wrong

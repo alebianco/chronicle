@@ -209,7 +209,7 @@ private fun updateProgress() {
 }
 
 // In BookRepository
-suspend fun updateProgress(bookId: Int, currentTime: Long, progress: Long) {
+suspend fun updateProgress(bookId: String, currentTime: Long, progress: Long) {
     withContext(Dispatchers.IO) {
         // Update local database
         bookDao.updateProgress(bookId, currentTime, progress)
@@ -362,14 +362,10 @@ suspend fun refreshData(): Result<Unit> {
 // In ViewModel
 fun refreshData() {
     viewModelScope.launch {
-        when (val result = repository.refreshData()) {
-            is Result.Success -> {
-                _message.value = Event("Refreshed successfully")
-            }
-            is Result.Failure -> {
-                _message.value = Event("Failed to refresh: ${result.error.message}")
-            }
-        }
+        repository.refreshData().fold(
+            onSuccess = { _message.value = Event("Refreshed successfully") },
+            onFailure = { _message.value = Event("Failed to refresh: ${it.message}") },
+        )
     }
 }
 ```
@@ -389,22 +385,12 @@ fun getAllBooks(): Flow<List<Audiobook>> {
 }
 ```
 
-## Data Flow Best Practices
+## Data flow rules
 
-1. **Single Source of Truth**: Repository is always the source of truth, not the ViewModel
-2. **Unidirectional Flow**: Data always flows down (Repository → ViewModel → View)
-3. **Events go up**: User actions flow up (View → ViewModel → Repository)
-4. **No direct DB access**: ViewModels never access database directly, always through Repository
-5. **Async in Repository**: All async work happens in Repository, ViewModels just call suspend functions
-6. **StateFlow for UI**: expose `StateFlow` and collect it with `collectWhileStarted`
-7. **Coroutines for work**: Use coroutines for async operations
-
-## Summary
-
-- **Data down**: Repository → ViewModel → View (via `StateFlow`)
-- **Events up**: View → ViewModel → Repository (via method calls)
-- **Async**: Use coroutines in Repositories
-- **Thread-safe**: Room runs `Flow` queries off the main thread; ViewModels use `viewModelScope`
-- **Single source**: Database is source of truth
-- **Reactive**: UI automatically updates when data changes
-
+1. **One direction.** Data flows down (repository → ViewModel → View), events flow up.
+2. **`StateFlow` for state, `Event<T>` for one-shots.** `StateFlow` conflates — a repeated
+   identical value is dropped, and a re-subscription replays the last one.
+3. **Never touch the database from the UI.** Repositories own it.
+4. **Never hardcode a dispatcher.** Inject `DispatcherProvider`; a build gate enforces it.
+5. **Combine with `combineDistinct`**, not a bare `combine`.
+6. **Offline mode is a read that must be honoured on every path**, not a special case.

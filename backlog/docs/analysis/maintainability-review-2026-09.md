@@ -1,3 +1,10 @@
+---
+id: maintainability-review-2026-09
+title: Maintainability review 2026-09
+type: analysis
+created_date: '2026-09-05'
+---
+
 # Maintainability review — 2026-09-05
 
 A structural quality pass over `app/src/main` (208 Kotlin files, 32,178 lines): layout

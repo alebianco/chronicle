@@ -20,7 +20,7 @@ Welcome to the Chronicle Audiobook Player documentation. This guide will help yo
 7. **[Visual Architecture Guide](./07-visual-guide.md)** - Diagrams and visual representations
 8. **[Glossary](./08-glossary.md)** - Terms and concepts explained
 
-Technical debt and the improvement roadmap now live as tracked tasks in [`../../tasks/`](../../tasks/) (analysis in [`../analysis/`](../analysis/)); the old `09-project-analysis-and-tasks.md` was dissolved into them.
+Technical debt and the improvement roadmap live as tracked tasks in [`../../tasks/`](../../tasks/), with optional deep-reference in [`../analysis/`](../analysis/).
 
 ## Quick Start
 
@@ -41,39 +41,37 @@ If you're new to the project, we recommend reading the documentation in order:
 
 ## Key Technologies
 
-- **Language**: Kotlin
-- **UI**: Android Views with Data Binding
-- **Async**: Coroutines
-- **Dependency Injection**: Dagger 2
-- **Database**: Room
-- **Media Playback**: ExoPlayer
-- **Networking**: Retrofit + OkHttp
-- **Image Loading**: Fresco & Glide
+- **Language**: Kotlin 2.2.10 (minSdk 27, target/compileSdk 36)
+- **UI**: **Compose** for new and migrated screens ([[decision-22]]); **ViewBinding** for the screens not yet migrated. DataBinding was removed in cu-58 and LiveData in cu-52 — UI state is `StateFlow`.
+- **Async**: Coroutines with an injected `DispatcherProvider` (never `Dispatchers.*` directly, never `GlobalScope`)
+- **Dependency Injection**: Dagger 2.57.2, hand-rolled components, via **KSP** (not KAPT)
+- **Database**: Room 2.8.1 — **five** databases, each with its own version and migration list
+- **Media Playback**: Media3 1.11.0 (ExoPlayer + MediaSession + Cast)
+- **Networking**: Retrofit + OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`)
+- **Image Loading**: **Coil 3** (Fresco and Glide were both removed in cu-43)
+- **Downloads**: Fetch2
 
-## Android 14 Compatibility (API 34)
+## Platform notes
 
-- Foreground services:
-  - Declared types: `mediaPlayback` for `MediaPlayerService`, `dataSync` for WorkManager foreground service.
-  - Manifest: `app/src/main/AndroidManifest.xml` has `android:foregroundServiceType` set.
-- Notifications:
-  - `POST_NOTIFICATIONS` declared; runtime request required on API 33+.
-  - Channels are created in `application/ChronicleApplication.kt`.
-- Exact alarms:
-  - Not used; no `SCHEDULE_EXACT_ALARM` present.
-- Media permissions:
-  - No `READ_MEDIA_AUDIO` declared; app primarily streams/handles app-scoped downloads.
+- Foreground services: `mediaPlayback` for `MediaPlayerService`, `dataSync` for the WorkManager
+  foreground service; `android:foregroundServiceType` is set in `app/src/main/AndroidManifest.xml`.
+- Notifications: `POST_NOTIFICATIONS` declared, runtime request required on API 33+; channels are
+  created in `application/ChronicleApplication.kt`.
+- Exact alarms: not used; no `SCHEDULE_EXACT_ALARM`.
+- Media permissions: no `READ_MEDIA_AUDIO` — the app streams and manages app-scoped downloads.
+- Cleartext HTTP is refused app-wide (`res/xml/network_security_config.xml`), with a debug-only
+  loopback exception for the mock server.
 
 ## Quick Commands
 
+`./verify.sh` **is** the definition of "the build is fine" — run it, not the individual Gradle
+tasks:
+
 ```zsh
-./gradlew ktlintCheck
-./gradlew assembleDebug
-./gradlew lintDebug
+./verify.sh            # full gate: ktlint, unit tests, coverage ratchet, debug APK, lint, release compile
+./verify.sh --quick    # inner loop: ktlint + unit tests + coverage
+./verify.sh --format   # ktlintFormat first, then the full gate
 ```
 
-## Testing Notes
-
-Run manual tests on API 27/30/31/33/34 focusing on:
-- Playback and media notification persistence
-- Downloads via WorkManager (foreground notification visible)
-- Notification permission denied path (no crash)
+Instrumented tests are opt-in (`./verify.sh --instrumented`, two Gradle Managed Devices).
+See [`/CLAUDE.md`](../../../CLAUDE.md) §Verify loop for what each stage catches and why.

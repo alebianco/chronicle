@@ -1,7 +1,7 @@
 ---
 id: decision-22
 title: "Adopt Compose for new and migrated UI"
-status: Accepted
+status: accepted
 created_date: '2026-09-06'
 ---
 

@@ -1,11 +1,15 @@
 ---
-id: DRAFT-176
+id: cu-191
 title: The details screen still shows a raw duration pair
-status: Draft
+status: To Do
+assignee: []
+created_date: ''
 labels:
   - R2
   - polish
+dependencies: []
 priority: low
+milestone: m-2
 ---
 
 ## Description

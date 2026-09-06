@@ -1,11 +1,16 @@
 ---
-id: DRAFT-170
-title: "Settings cloud sync to the user's own Drive"
-status: Draft
+id: cu-189
+title: Settings cloud sync to the user's own Drive
+status: To Do
 assignee: []
-labels: [comfort, feature]
+created_date: ''
+labels:
+  - R2
+  - comfort
+  - feature
 dependencies: []
 priority: medium
+milestone: m-2
 ---
 
 ## Description

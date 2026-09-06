@@ -100,7 +100,18 @@ SQLite database library that provides an abstraction layer over SQLite for easie
 API for scheduling background tasks that need guaranteed execution.
 
 ### Data Binding
-Library that allows binding UI components in layouts to data sources using declarative format.
+**Removed in cu-58.** Kept here only so the term is recognisable in older commits. Layouts have no
+`<layout>` wrapper and no `@{...}` expressions; view state is set from Kotlin. See **ViewBinding**
+and **Compose**.
+
+### ViewBinding
+Generated type-safe accessors for the views in a layout (`FragmentHomeBinding.inflate(...)`). What
+the not-yet-migrated screens use. Unlike DataBinding it has no `viewModel`/`lifecycleOwner`
+property.
+
+### Compose
+Declarative UI toolkit, and the **target for all new and migrated UI** ([[decision-22]], cu-181).
+Compose and ViewBinding run side by side while screens migrate one at a time.
 
 ## Dagger 2 Terms
 
@@ -119,7 +130,9 @@ Annotation that marks where dependencies should be provided.
 ## Media Playback Terms
 
 ### ExoPlayer
-Google's media player library for Android that plays audio and video.
+Google's media player. It arrives here as **Media3** (`androidx.media3`, 1.11.0) — the standalone
+`com.google.android.exoplayer2` library is deprecated and appears nowhere in this codebase, so
+search for `androidx.media3`.
 
 ### MediaSession
 Android framework class that allows apps to communicate with media controllers and the system.
@@ -200,17 +213,13 @@ Operations that don't block execution; the result comes later via callback or co
 
 ## Git/Version Control Terms
 
-### Branch
-An independent line of development in Git.
+Standard Git vocabulary is assumed. The two **project-specific** rules:
 
-### Commit
-A snapshot of changes in the repository.
-
-### Pull Request (PR)
-A request to merge code changes from one branch into another.
-
-### Merge
-Combining changes from different branches.
+- **History is flat.** Rebase onto the base branch, never merge. One task = one branch, replayed
+  linearly.
+- **Commit messages are [Scoped Commits](https://scopedcommits.com/)** — `<scope>: <description>`,
+  where the scope is the *subsystem* (`features/library`, `data/local`, `build`), never the task id.
+  The task id goes in a `Task: cu-NN` trailer. No agent-attribution trailers.
 
 ## Build System Terms
 
@@ -227,7 +236,8 @@ Tools that shrink, optimize, and obfuscate code for release builds.
 External library or module that the project uses.
 
 ### KSP (Kotlin Symbol Processing)
-Annotation processing tool for Kotlin, used by Room and Dagger.
+Annotation processing tool for Kotlin, used by Room and Dagger. **KAPT is gone** (cu-8/cu-58) —
+`kotlin-kapt` is not applied, and any doc claiming otherwise is wrong.
 
 ## Testing Terms
 
@@ -255,7 +265,32 @@ An individual audio file, usually a chapter or part of a chapter.
 A logical division of an audiobook, may span multiple tracks.
 
 ### Collection
-A group of related audiobooks (e.g., a book series).
+A **Plex collection** entity, stored in `CollectionsDatabase`. Not the same thing as a *series* —
+see **Series**.
+
+### Series
+A reading order, carried by Plex's `Mood` tag as `"Series: <name>"`. Distinct from **Collection**.
+`Mood` also carries bare author names, so taking the first tag files books under an author as a
+series — `seriesName()` prefers a prefixed tag for that reason. The position within a series is
+parsed from `titleSort` by `SeriesIndexPatterns.kt`, in hundredths, **not** from Plex's `index`.
+
+### SourceId
+`"plex:<clientIdentifier>"` — which source instance owns a stored row (cu-127, [[decision-21]]).
+Carried by `Audiobook`, `Collection` and `MediaItemTrack`; a read returning rows must filter by it
+or `ScopedQueryTest` fails the build.
+
+### DispatcherProvider
+The injected seam for coroutine dispatchers. Referencing `Dispatchers.IO`/`Default` directly is a
+build failure in repositories, ViewModels and the player layer.
+
+### collectWhileStarted
+The extension used to collect a `StateFlow` in the UI, lifecycle-aware — on `viewLifecycleOwner`
+in a Fragment, on the Activity itself in an Activity. Never a bare `lifecycleScope.launch`.
+
+### Event<T>
+A one-shot wrapper for something that should fire once (a toast, a navigation) rather than re-fire
+on every re-collection. `StateFlow` conflates, so a repeated identical value would otherwise be
+dropped — and a re-subscription would replay the last one.
 
 ### Scrobble
 Syncing playback progress to the Plex server.

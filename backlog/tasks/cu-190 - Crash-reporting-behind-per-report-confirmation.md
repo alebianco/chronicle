@@ -1,11 +1,16 @@
 ---
-id: DRAFT-171
+id: cu-190
 title: Crash reporting behind per-report confirmation
-status: Draft
+status: To Do
 assignee: []
-labels: [trust, feature]
+created_date: ''
+labels:
+  - R2
+  - trust
+  - feature
 dependencies: []
 priority: low
+milestone: m-2
 ---
 
 ## Description

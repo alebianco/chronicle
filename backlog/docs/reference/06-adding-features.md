@@ -20,362 +20,224 @@ This guide walks you through implementing new features in Chronicle following th
 7. **Test**: Verify functionality
 8. **Polish**: Handle edge cases, errors, loading states
 
-## Example: Adding a "Favorites" Feature
+## Worked example: a per-book "favorite" flag
 
-Let's walk through adding a feature to favorite/unfavorite audiobooks.
+`Audiobook.favorited` already exists, so this is a *shape* to copy, not work to redo. Every snippet
+below compiles against the current codebase.
 
-### Step 1: Plan
+### 1. Data layer
 
-**Requirements**:
-- Users can mark books as favorites
-- Favorites are saved persistently
-- Show favorites section on home screen
-- Show favorite indicator on book cards
-
-### Step 2: Data Layer
-
-#### Update Data Model
-
-**File**: `data/model/Audiobook.kt`
+**Entity** (`data/model/Audiobook.kt`). A flag the server knows nothing about is a **local-only
+column**, and that has a specific hazard: a library refresh merges a network copy without loading
+tracks, and the field is always the default on that copy. So it must be named in **both** arms of
+`Audiobook.merge` or every refresh wipes it (cu-20). `progress` and `playbackSpeed` document the
+same rule.
 
 ```kotlin
 @Entity
 data class Audiobook(
-    // ... existing fields ...
-    val favorited: Boolean = false,  // Add this field
-    // ... rest of fields ...
+    @PrimaryKey val id: String,   // String, not Int (cu-71)
+    // ...
+    val favorited: Boolean = false,
 )
 ```
 
-#### Update Database
-
-**File**: `data/local/BookDatabase.kt`
-
-Add a database migration:
+**Database.** Bump the version and write the migration in the same change. `exportSchema` stays
+**`true`** — the exported JSON is the authority a later migration's column list is written from,
+and `RoomSchemaTest` checks each file's name against the version inside it.
 
 ```kotlin
-val BOOK_MIGRATION_8_9 = object : Migration(8, 9) {
+@Database(entities = [Audiobook::class], version = 15, exportSchema = true)
+abstract class BookDatabase : RoomDatabase() { /* ... */ }
+
+val BOOK_MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE Audiobook ADD COLUMN favorited INTEGER NOT NULL DEFAULT 0")
     }
 }
-
-// Update database version and add migration
-@Database(entities = [Audiobook::class], version = 9, exportSchema = false)
-abstract class BookDatabase : RoomDatabase() {
-    abstract val bookDao: BookDao
-}
-
-// In getBookDatabase function, add the migration:
-.addMigrations(
-    // ... existing migrations ...
-    BOOK_MIGRATION_8_9
-)
 ```
 
-#### Update DAO
+Then add a case to `RoomMigrationTest`. **A migration is only tested if a *file* is opened through
+Room** — an in-memory database is created fresh at the current version and never migrated, so
+`RoomSchemaTest` is the load-bearing check. Verify it by deliberate sabotage; a check that cannot
+fail proves nothing.
 
-**File**: `data/local/BookDatabase.kt` (BookDao interface)
+**DAO.** Bind the id as `String`.
 
 ```kotlin
-@Dao
-interface BookDao {
-    // ... existing methods ...
-    
-    @Query("UPDATE Audiobook SET favorited = :favorited WHERE id = :bookId")
-    suspend fun updateFavorited(bookId: Int, favorited: Boolean)
-    
-    @Query("SELECT * FROM Audiobook WHERE favorited = 1 ORDER BY titleSort")
-    fun getFavoritedBooks(): Flow<List<Audiobook>>
-}
+@Query("UPDATE Audiobook SET favorited = :favorited WHERE id = :bookId")
+suspend fun updateFavorited(bookId: String, favorited: Boolean)
 ```
 
-#### Update Repository
+A read returning *rows* must also filter by `source`, or `ScopedQueryTest` fails the build
+(cu-127). A query keyed on the primary key, as above, is exempt.
 
-**File**: `data/local/BookRepository.kt`
+**Repository.** Take the dispatcher as an injected `DispatcherProvider` — never `Dispatchers.IO`
+directly, which `RepositoryDispatcherTest` fails the build on.
 
 ```kotlin
-class BookRepository @Inject constructor(
-    // ... existing dependencies ...
-) : IBookRepository {
-    
-    // Add interface method
-    override suspend fun setFavorited(bookId: Int, favorited: Boolean) {
-        withContext(Dispatchers.IO) {
-            bookDao.updateFavorited(bookId, favorited)
-            // Optionally sync to Plex server
-            try {
-                plexMediaService.updateMetadata(bookId, favorited)
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to sync favorite state")
-            }
-        }
-    }
-    
-    override fun getFavoritedBooks(): Flow<List<Audiobook>> {
-        return bookDao.getFavoritedBooks()
-    }
-}
+override suspend fun setFavorited(bookId: String, favorited: Boolean) =
+    withContext(dispatchers.io) { bookDao.updateFavorited(bookId, favorited) }
+```
 
-// Update interface
-interface IBookRepository {
-    // ... existing methods ...
-    suspend fun setFavorited(bookId: Int, favorited: Boolean)
-    fun getFavoritedBooks(): Flow<List<Audiobook>>
+### 2. ViewModel
+
+Private `MutableStateFlow`, public immutable `StateFlow`. Never `LiveData`, never `postValue`
+(banned by `PostValueUsageTest` — it defers to the next main-loop pass, so a read-after-write sees
+a stale value).
+
+```kotlin
+private val _favorites = MutableStateFlow<List<Audiobook>>(emptyList())
+val favorites: StateFlow<List<Audiobook>> = _favorites.asStateFlow()
+
+fun toggleFavorite(book: Audiobook) = viewModelScope.launch {
+    bookRepository.setFavorited(book.id, !book.favorited)
 }
 ```
 
-### Step 3: ViewModel Layer
+Take every dependency as a **constructor parameter**. Never call `Injector.get()` — a class that
+fetches its own dependencies cannot be constructed in a unit test at all, and
+`ServiceLocatorUsageTest` fails the build on a new call.
 
-#### Update HomeViewModel
+When combining flows use `combineDistinct` (`util/FlowCombinators.kt`), not a bare `combine`. If a
+click handler reads `.value` without collecting, the flow needs `stateIn(..., Eagerly)` — under
+`WhileSubscribed` it reads the seed.
 
-**File**: `features/home/HomeViewModel.kt`
+### 3. UI
 
-```kotlin
-class HomeViewModel(
-    // ... existing dependencies ...
-) : ViewModel() {
-    
-    // Add favorites list
-    val favoritedBooks = bookRepository.getFavoritedBooks()
-    
-    // ... rest of existing code ...
-}
-```
-
-#### Update AudiobookDetailsViewModel
-
-**File**: `features/bookdetails/AudiobookDetailsViewModel.kt`
+**New UI is written in Compose** ([[decision-22]]). Wrap the screen in `ChronicleTheme` *and* a
+`Surface` — `MaterialTheme` defines `colorScheme.background` but paints nothing, so a bare `Box`
+renders near-invisible text while every unit test passes.
 
 ```kotlin
-class AudiobookDetailsViewModel(
-    // ... existing dependencies ...
-) : ViewModel() {
-    
-    fun toggleFavorite() {
-        viewModelScope.launch {
-            val currentBook = audiobook.value ?: return@launch
-            val newState = !currentBook.favorited
-            
-            try {
-                bookRepository.setFavorited(currentBook.id, newState)
-                _messageForUser.value = Event(
-                    if (newState) "Added to favorites" else "Removed from favorites"
-                )
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to toggle favorite")
-                _messageForUser.value = Event("Failed to update favorite")
+@Composable
+fun FavoritesScreen(viewModel: HomeViewModel) {
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    ChronicleTheme {
+        Surface {
+            LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 160.dp)) {
+                items(favorites, key = { it.id }) { book -> BookCard(book) }
             }
         }
     }
 }
 ```
 
-### Step 4: View Layer
+Use `GridCells.Adaptive`, not `Fixed(n)` — `Fixed(3)` gives 640px cells on the 1200px tablet and
+one cover fills the screen.
 
-#### Update Home Screen Layout
-
-**File**: `res/layout/fragment_home.xml`
-
-Add a favorites section:
-
-```xml
-<!-- Add after recently listened section -->
-<TextView
-    android:id="@+id/favorites_header"
-    android:text="@string/favorites"
-    android:visibility="@{viewModel.favoritedBooks.size() > 0 ? View.VISIBLE : View.GONE}"
-    ... />
-
-<androidx.recyclerview.widget.RecyclerView
-    android:id="@+id/favorites_recyclerview"
-    android:visibility="@{viewModel.favoritedBooks.size() > 0 ? View.VISIBLE : View.GONE}"
-    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-    app:items="@{viewModel.favoritedBooks}"
-    ... />
-```
-
-#### Update HomeFragment
-
-**File**: `features/home/HomeFragment.kt`
+**On a not-yet-migrated screen** you are in ViewBinding. There is no DataBinding: layouts have no
+`<layout>` wrapper and no `@{...}` expressions, and `binding.viewModel` / `binding.lifecycleOwner`
+do not exist. Set state from Kotlin and collect with `collectWhileStarted` on
+`viewLifecycleOwner`:
 
 ```kotlin
-class HomeFragment : Fragment() {
-    
-    override fun onCreateView(...): View? {
-        val binding = FragmentHomeBinding.inflate(inflater, container, false)
-        
-        // ... existing setup ...
-        
-        // Add favorites RecyclerView
-        binding.favoritesRecyclerview.adapter = makeAudiobookAdapter()
-        binding.favoritesRecyclerview.itemAnimator?.changeDuration = 0
-        
-        return binding.root
-    }
+val binding = FragmentHomeBinding.inflate(inflater, container, false)
+collectWhileStarted(viewModel.favorites) { books ->
+    binding.favoritesSection.isVisible = books.isNotEmpty()
 }
 ```
 
-#### Add Favorite Button to Book Details
+**A view whose visibility is Kotlin-driven needs an XML default**, or it flashes its default for a
+frame — and `FirstFrameFlashTest` fails the build without one. A view defaulted to `gone` with no
+writer is *permanently* invisible, which is the worse half of that guard.
 
-**File**: `res/layout/fragment_audiobook_details.xml`
+### 4. Strings and tests
 
-```xml
-<ImageButton
-    android:id="@+id/favorite_button"
-    android:src="@{viewModel.audiobook.favorited ? @drawable/ic_favorite_filled : @drawable/ic_favorite_outline}"
-    android:onClick="@{() -> viewModel.toggleFavorite()}"
-    android:contentDescription="@string/toggle_favorite"
-    ... />
-```
+User-facing text goes in `res/values/strings.xml`, always.
 
-#### Add Favorite Indicator to Book Cards
+Add tests for the repository and the ViewModel — that is the definition of done (D6/D10), not an
+extra. Testing a `StateFlow` needs **a subscriber *and* a drained dispatcher**: a
+`WhileSubscribed` flow computes only while collected and `MainDispatcherRule` queues rather than
+runs, so `.value` read without both is the `stateIn` seed. Use `keepCollected` / `settledValue`
+from `util/FlowTestExt.kt`.
 
-**File**: `res/layout/audiobook_list_item.xml`
-
-```xml
-<ImageView
-    android:id="@+id/favorite_indicator"
-    android:src="@drawable/ic_favorite_small"
-    android:visibility="@{audiobook.favorited ? View.VISIBLE : View.GONE}"
-    ... />
-```
-
-### Step 5: Resources
-
-#### Add Strings
-
-**File**: `res/values/strings.xml`
-
-```xml
-<string name="favorites">Favorites</string>
-<string name="toggle_favorite">Toggle favorite</string>
-<string name="added_to_favorites">Added to favorites</string>
-<string name="removed_from_favorites">Removed from favorites</string>
-```
-
-#### Add Icons
-
-Add favorite icons to `res/drawable/`:
-- `ic_favorite_filled.xml` (filled heart)
-- `ic_favorite_outline.xml` (outline heart)
-- `ic_favorite_small.xml` (small indicator)
-
-### Step 6: Testing
-
-1. **Manual Testing**:
-   - Favorite a book from details screen
-   - Check it appears in favorites section on home
-   - Unfavorite and verify it disappears
-   - Restart app and verify favorites persist
-   - Check offline mode
-
-2. **Unit Tests** (if applicable):
-
-**File**: `test/.../BookRepositoryTest.kt`
-
-```kotlin
-@Test
-fun `setFavorited updates database`() = runTest {
-    // Given
-    val bookId = 123
-    
-    // When
-    repository.setFavorited(bookId, true)
-    
-    // Then
-    verify(bookDao).updateFavorited(bookId, true)
-}
-```
+Mock a collaborator you only call; **fake** a collaborator that calls you back — a
+`relaxed` mock's silence is indistinguishable from correct behaviour for anything callback- or
+flow-shaped.
 
 ## Common Patterns for Different Features
 
 ### Adding a New Screen
 
-1. **Create Feature Package**: `features/newfeature/`
-2. **Create Fragment**: `NewFeatureFragment.kt`
-3. **Create ViewModel**: `NewFeatureViewModel.kt`
-4. **Create Layout**: `res/layout/fragment_new_feature.xml`
-5. **Update Navigator**: Add navigation method
-6. **Update Dagger**: Inject into ActivityComponent if needed
-7. **Add to Navigation**: Update bottom nav or add menu item
+New screens are **Compose** ([[decision-22]]). Navigation Compose is the target, so **do not adopt
+the Fragment Navigation Component** — it would be migrated twice.
 
-Example structure:
+1. **Create Feature Package**: `features/newfeature/`
+2. **Create ViewModel**: `NewFeatureViewModel.kt` — constructor injection, no `Injector.get()`
+3. **Create the screen**: `features/newfeature/compose/NewFeatureScreen.kt`
+4. **Host it**: a Fragment holding a `ComposeView`, while the app still has XML screens
+5. **Update `Navigator.kt`**: navigation goes through it, data via Bundles/args
+6. **Update Dagger**: inject into `ActivityComponent` if needed
+
 ```kotlin
-// NewFeatureFragment.kt
 class NewFeatureFragment : Fragment() {
     @Inject lateinit var viewModelFactory: NewFeatureViewModel.Factory
     private lateinit var viewModel: NewFeatureViewModel
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         (requireActivity() as MainActivity).activityComponent!!.inject(this)
         super.onCreate(savedInstanceState)
-        viewModel = ViewModelProvider(this, viewModelFactory)
-            .get(NewFeatureViewModel::class.java)
+        viewModel = ViewModelProvider(this, viewModelFactory)[NewFeatureViewModel::class.java]
     }
-    
-    override fun onCreateView(...): View {
-        val binding = FragmentNewFeatureBinding.inflate(inflater, container, false)
-        binding.lifecycleOwner = viewLifecycleOwner
-        binding.viewModel = viewModel
-        return binding.root
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View = ComposeView(requireContext()).apply {
+        setContent { ChronicleTheme { Surface { NewFeatureScreen(viewModel) } } }
     }
 }
 
-// NewFeatureViewModel.kt
 class NewFeatureViewModel(
-    private val repository: SomeRepository
+    private val repository: SomeRepository,
 ) : ViewModel() {
-    
+
     @Suppress("UNCHECKED_CAST")
     class Factory @Inject constructor(
-        private val repository: SomeRepository
+        private val repository: SomeRepository,
     ) : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return NewFeatureViewModel(repository) as T
-        }
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            NewFeatureViewModel(repository) as T
     }
-    
-    // ViewModel logic here
 }
 ```
 
 ### Adding a Setting
 
-1. **Add to PrefsRepo**:
+**There is no settings preference XML.** `res/xml/` holds only the Auto, backup and network-security
+configs; the settings screen is built in Kotlin from `features/settings/SettingsList.kt`.
+
+1. **Add to `PrefsRepo`** — an *interface* in `data/local/SharedPreferencesPrefsRepo.kt`, with
+   `SharedPreferencesPrefsRepo` as the implementation:
 
 ```kotlin
-// PrefsRepo.kt
-class PrefsRepo {
+interface PrefsRepo {
+    var newSetting: Boolean
+
     companion object {
         const val PREF_NEW_SETTING = "new_setting"
         const val DEFAULT_NEW_SETTING = false
     }
-    
-    var newSetting: Boolean
-        get() = sharedPrefs.getBoolean(PREF_NEW_SETTING, DEFAULT_NEW_SETTING)
-        set(value) = sharedPrefs.edit().putBoolean(PREF_NEW_SETTING, value).apply()
 }
+
+// in SharedPreferencesPrefsRepo
+override var newSetting: Boolean
+    get() = sharedPreferences.getBoolean(PREF_NEW_SETTING, DEFAULT_NEW_SETTING)
+    set(value) = sharedPreferences.edit { putBoolean(PREF_NEW_SETTING, value) }
 ```
 
-2. **Add to Settings UI**:
+2. **Add a row** to `SettingsList.kt` (a `PreferenceModel`), with title and summary as string
+   resources.
 
-```xml
-<!-- settings.xml -->
-<SwitchPreferenceCompat
-    app:key="new_setting"
-    app:title="@string/new_setting_title"
-    app:summary="@string/new_setting_summary"
-    app:defaultValue="false" />
-```
+3. **Decide whether it is backed up.** If the setting should survive a restore, add its key to
+   `BACKUP_SETTING_KEYS`. Two rules: never enumerate `sharedPreferences.all` into an export — the
+   allowlist is what keeps a credential out — and the allowlist gates **keys, not values**, so a
+   setting with a closed set of valid options must be validated on import (cu-77).
 
-3. **Use in Code**:
-
-```kotlin
-if (prefsRepo.newSetting) {
-    // Do something
-}
-```
+4. **Read it** through the injected `prefsRepo`. To react to changes, use `util/PreferenceFlow.kt`
+   rather than reading the value once.
 
 ### Adding Network API Call
 
@@ -448,8 +310,8 @@ interface NewEntityDao {
 ```kotlin
 @Database(
     entities = [Audiobook::class, NewEntity::class],  // Add new entity
-    version = 10,  // Increment version
-    exportSchema = false
+    version = 15,          // Increment version
+    exportSchema = true,   // always — RoomSchemaTest reads the exported JSON
 )
 abstract class BookDatabase : RoomDatabase() {
     abstract val bookDao: BookDao
@@ -457,11 +319,11 @@ abstract class BookDatabase : RoomDatabase() {
 }
 
 // Add migration
-val BOOK_MIGRATION_9_10 = object : Migration(9, 10) {
+val BOOK_MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE NewEntity (" +
-            "id INTEGER PRIMARY KEY NOT NULL, " +
+            "id TEXT PRIMARY KEY NOT NULL, " +
             "name TEXT NOT NULL, " +
             "value INTEGER NOT NULL)"
         )
@@ -478,7 +340,7 @@ val BOOK_MIGRATION_9_10 = object : Migration(9, 10) {
    banned by `PostValueUsageTest`
 4. **Handle Errors**: Try-catch in Repositories, show messages in ViewModels
 5. **Test Incrementally**: Test each layer as you build it
-6. **Use Data Binding**: Bind data directly in XML when possible
+6. **Write new UI in Compose** ([[decision-22]]); there is no DataBinding (cu-58)
 7. **Keep UI Thread Free**: All heavy work in background threads
 8. **Log Important Events**: Use Timber for debugging
 9. **Handle Loading States**: Show progress indicators during async operations
@@ -487,7 +349,7 @@ val BOOK_MIGRATION_9_10 = object : Migration(9, 10) {
 ## Code Review Checklist
 
 Before submitting:
-- [ ] Code follows ktlint style (`./gradlew ktlintFormat`)
+- [ ] `./verify.sh` green — that is the definition of "the build is fine", not CI
 - [ ] No direct database access from ViewModels
 - [ ] All async operations use coroutines properly
 - [ ] Error handling implemented

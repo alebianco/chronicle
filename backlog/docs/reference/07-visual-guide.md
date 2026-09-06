@@ -24,7 +24,7 @@ graph TB
         subgraph ViewModel Layer
             E[HomeViewModel]
             F[LibraryViewModel]
-            G[PlayerViewModel]
+            G[CurrentlyPlayingViewModel]
         end
         
         subgraph Repository Layer
@@ -117,7 +117,7 @@ graph TB
         C1[ExoPlayer]
         C2[MediaSession]
         C3[NotificationBuilder]
-        C4[MediaSessionConnector]
+        C4[AudiobookMediaSessionCallback]
         C --> C1
         C --> C2
         C --> C3
@@ -186,7 +186,7 @@ graph TB
     
     subgraph MediaPlayerService - Background Service
         B[MediaSession<br/>Android media framework integration]
-        C[MediaSessionConnector<br/>Connects ExoPlayer to MediaSession]
+        C[AudiobookMediaSessionCallback<br/>Handles transport controls and playFromMediaId]
         D[ExoPlayer<br/>Actual audio playback]
         E[NotificationBuilder<br/>Shows now playing notification]
     end
@@ -281,7 +281,7 @@ graph TB
 ```mermaid
 flowchart TD
     A[1. App Launch<br/>ChronicleApplication.onCreate]
-    B[Initialize Dagger<br/>Setup Fresco, Timber]
+    B[Initialize Dagger<br/>Setup Coil, Timber]
     C{2. Check Login State}
     D[LoginFragment]
     E[3. MainActivity]
@@ -325,10 +325,10 @@ flowchart TD
 | Modify book data            | `data/local/BookRepository.kt`          |
 | Change Plex API calls       | `data/sources/plex/PlexService.kt`      |
 | Modify playback logic       | `features/player/MediaPlayerService.kt` |
-| Add a setting               | `data/local/PrefsRepo.kt`               |
-| Change UI layout            | `res/layout/`                           |
+| Add a setting               | `features/settings/SettingsList.kt` (+ `SharedPreferencesPrefsRepo.kt`) |
+| Change UI layout            | `features/*/compose/` (new) or `res/layout/` (not yet migrated) |
 | Add dependency injection    | `injection/`                            |
 | Modify navigation           | `navigation/Navigator.kt`               |
 | Change app initialization   | `application/ChronicleApplication.kt`   |
-| Add database table/field    | `data/local/BookDatabase.kt`            |
+| Add database table/field    | one of **five** DBs in `data/local/` — chapters live in `ChapterDatabase`, bookmarks in `BookmarkDatabase` |
 
