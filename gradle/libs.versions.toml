@@ -1,5 +1,13 @@
 [versions]
 agp = "8.13.2"
+# Compose is pinned by a BOM (composeBom); the compiler ships with Kotlin 2.x itself
+# (org.jetbrains.kotlin.plugin.compose), so there is no separate compiler version to keep in step.
+#
+# Held at the 2026.06.x line deliberately: BOM 2026.08.00 pulls Compose 1.12.0, whose
+# `material-ripple-android` requires **compileSdk 37**. This project is on 36 (cu-6), and an SDK
+# bump is its own task with its own device verification -- not a side effect of adding Compose.
+# Raise this only together with compileSdk.
+composeBom = "2026.06.01"
 kotlin = "2.2.10"
 coroutines = "1.11.0"
 material = "1.14.0"
@@ -25,7 +33,10 @@ appcompat = "1.8.0"
 # Declared at the version they already resolve to (cu-69), so this pins today's behaviour rather
 # than changing it. They arrive transitively from appcompat/material/room; three transitive-only
 # breakages (cu-60, and two in cu-65) are why the app now names what it imports.
-androidx-activity = "1.8.2"
+# Raised from 1.8.2 with Compose (cu-181): activity-compose 1.13.0 upgrades `activity` anyway, and
+# leaving the catalog behind would state a version the build does not use. In 1.10+ `onNewIntent`
+# takes a non-null Intent -- a real signature change, fixed at the override in MainActivity.
+androidx-activity = "1.13.0"
 androidx-core = "1.16.0"
 androidx-recyclerview = "1.3.0"
 androidx-fragment = "1.8.9"
@@ -128,6 +139,24 @@ androidx-test-ext-junit-ktx = { group = "androidx.test.ext", name = "junit-ktx",
 oss-plugin = { group = "com.google.android.gms", name = "oss-licenses-plugin", version.ref = "ossPlugin" }
 facebook-infer-annotation = { group = "com.facebook.infer.annotation", name = "infer-annotation", version.ref = "inferAnnotation" }
 
+# --- Compose (cu-181) ---------------------------------------------------------------------
+# Everything Compose comes from the BOM so the artifacts cannot drift apart from each other.
+# Declared without a version on purpose: `platform(composeBom)` supplies it.
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-activity = { group = "androidx.activity", name = "activity-compose", version.ref = "androidx-activity" }
+# collectAsStateWithLifecycle — the lifecycle-aware collector; a bare collectAsState keeps
+# collecting while backgrounded, which is the Compose form of the bug CLAUDE.md bans
+# `lifecycleScope.launch` for.
+compose-lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+compose-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
@@ -136,3 +165,4 @@ ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 # droidsonroids fork, not mainline solidsoft: solidsoft is built on JavaPlugin and needs
 # sourceSets.main/test, which com.android.application does not provide (cu-57).
 pitest = { id = "pl.droidsonroids.pitest", version.ref = "pitest" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

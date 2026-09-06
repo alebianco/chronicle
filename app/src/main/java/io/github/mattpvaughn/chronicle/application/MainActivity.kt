@@ -454,7 +454,11 @@ class MainActivity : AppCompatActivity(), ActivityComponentHost {
     }
   }
 
-  override fun onNewIntent(intent: Intent?) {
+  // Non-null since androidx.activity 1.10 (raised to 1.13.0 by Compose, cu-181). The body already
+  // treats the intent as nullable throughout because `handleNotificationIntent` and every
+  // `DebugHooks` entry point still accept `Intent?` -- they are also called from `onCreate`, where
+  // a null intent is genuinely possible.
+  override fun onNewIntent(intent: Intent) {
     handleNotificationIntent(intent)
     // The activity is singleInstance, so a re-launch arrives here rather than in
     // onCreate — the debug hooks have to be handled in both places.

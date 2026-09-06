@@ -3,6 +3,7 @@ plugins {
   alias(libs.plugins.kotlin.android)
   id("kotlin-parcelize")
   alias(libs.plugins.ksp)
+  alias(libs.plugins.compose.compiler)
   id("com.google.android.gms.oss-licenses-plugin")
   alias(libs.plugins.pitest)
   jacoco
@@ -67,6 +68,10 @@ android {
   buildFeatures {
     viewBinding = true
     buildConfig = true
+    // Compose runs *alongside* ViewBinding, not instead of it (cu-181). The migration is
+    // screen-by-screen through `ComposeView`, so both must build for as long as any XML
+    // layout remains.
+    compose = true
   }
 
   // The debug variant serves the cu-16 Plex fixtures as assets so the app can be
@@ -130,6 +135,27 @@ ksp {
 }
 
 dependencies {
+  // --- Compose (cu-181) -------------------------------------------------------------------
+  // The BOM governs every Compose artifact's version, including the test ones, so they cannot
+  // drift apart. `platform(...)` on each configuration that needs it.
+  implementation(platform(libs.compose.bom))
+  implementation(libs.compose.ui)
+  implementation(libs.compose.ui.graphics)
+  implementation(libs.compose.ui.tooling.preview)
+  implementation(libs.compose.material3)
+  implementation(libs.compose.activity)
+  implementation(libs.compose.lifecycle.runtime)
+  implementation(libs.compose.lifecycle.viewmodel)
+  // @Preview rendering and the layout inspector. Debug-only: it pulls in tooling that must not
+  // ship, and `ui-tooling-preview` above is the part release code actually needs.
+  debugImplementation(libs.compose.ui.tooling)
+
+  testImplementation(platform(libs.compose.bom))
+  testImplementation(libs.compose.ui.test.junit4)
+  // Supplies the empty activity `createComposeRule` launches into — the Compose equivalent of
+  // what `fragment-testing` provides, and required for the rule to work at all.
+  debugImplementation(libs.compose.ui.test.manifest)
+
   implementation(libs.material)
   implementation(libs.timber)
   implementation(libs.fetch)
