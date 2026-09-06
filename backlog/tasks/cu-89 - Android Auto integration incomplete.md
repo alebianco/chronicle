@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - claude
 created_date: ''
-updated_date: '2026-09-01 08:37'
+updated_date: '2026-09-06 00:00'
 labels:
   - R2
   - comfort
@@ -163,6 +163,63 @@ and the card/icon appearance — the emulator boots to user 10 and `com.android.
 launched from the shell, so the browse tree was reached but not driven. That is the next step, not
 a blocker.
 
+## Owner clarification, 2026-09-06 — it was real Android Auto, and the layout names the surface
+
+Asked whether the car might have been a non-Android-Auto integration (Ford calls its system
+**SYNC 3**, which can also play Android audio over Bluetooth A2DP/AVRCP or over Ford's own
+**AppLink/SmartDeviceLink** platform). The owner settled it:
+
+> *"it was not via bluetooth, it was wired and the screen was replaced with a different one when the
+> phone was connected. it had pocketcasts pinned at the bottom and on the right side, even while I
+> was playing an audiobook with chronicle, and the navigator on the bigger left area"*
+
+**So all three alternative-integration theories are dead**, and should not be re-investigated:
+
+- **Not Bluetooth.** Wired, and the head unit's own UI was replaced — that is projection.
+- **Not AppLink/SmartDeviceLink.** SDL requires integrating an SDK and registering an App ID with
+  Ford (`FordDev@ford.com` approval). There is no SDL code in this repo, so under AppLink Chronicle
+  would be *entirely absent*, not showing the wrong app. (Adopting SDL is also a poor fit for
+  principle 7 / D13: it is an OEM-gated registration.)
+- **SYNC 3 is therefore not the variable at all.** SYNC 3 v2.0+ supports genuine Android Auto over
+  USB; from that point the head unit is only a display and Google's UI is what draws.
+
+### What the described layout actually is
+
+Navigation in a large left pane, media pinned bottom/right — that is **Android Auto's Coolwalk
+split-screen** (shipped late 2022), not anything Ford draws. The relevant surfaces are Google's
+**media card** and **taskbar media widget**.
+
+### The likely cause, and why nothing reproduced at a desk
+
+Google's documented behaviour for the era described: **the media card tracks the most recently used
+media app *as Android Auto understands it*, and historically showed exactly one at a time.** Switching
+apps replaced the card; getting the previous app's card back required *reopening that app and resuming
+playback from within Android Auto*. That is a plausible exact match for the report — Pocket Casts had
+been used in the car, Chronicle was playing (probably started on the phone), and the card never moved.
+
+This also explains the cu-73/cu-89 non-reproduction: `dumpsys media_session` measures the **platform**
+media session stack, and Chronicle demonstrably wins it (top of stack, `active=true`, media button
+owner, audio focus `GAIN`, 8 controllers, correct metadata, 107-item queue). Android Auto's card is a
+**separate selection made by the Android Auto app**, not a read of that stack. A correct media session
+is necessary but not sufficient, so no amount of session-side evidence could have reproduced this.
+
+Note Google shipped **multiple swipeable media cards** in late 2025, which changes this behaviour. The
+phone's Android Auto version at the time of the report is therefore load-bearing and unknown.
+
+### The one open question, and it needs the car
+
+Whether Chronicle takes the media card **when launched from the Android Auto launcher itself** (rather
+than being already-playing from the phone). If it does, this is Android Auto's documented app-switching
+behaviour and there is **nothing to fix in Chronicle** — close as working-as-intended. If it does not
+even then, it is a genuine Chronicle defect and the browse/session interaction is the place to look.
+
+Owner has no car access until roughly **2026-10**. Blocked on that; do not spend further desk time on
+session-side theories in the meantime.
+
+**Also worth checking in the same sitting** (all cheap once in the car): whether Chronicle appears in
+the Android Auto **launcher** at all, whether the icon is present there, and whether the four browse
+categories render — the still-unticked halves of [[cu-23]] and [[cu-165]].
+
 ## Acceptance Criteria
 
 - [x] Established whether the bug reproduces **on the phone** (lockscreen/shade media controls) or
@@ -177,6 +234,10 @@ a blocker.
       position
 - [x] One candidate cause ruled out cheaply: the session now claims media buttons and transport
       controls, not only queue commands
+- [ ] **Decisive test (needs the car, ~2026-10): launch Chronicle from the Android Auto launcher**
+      and confirm whether it then takes the media card. If yes → Android Auto's documented
+      most-recent-app behaviour, close as working-as-intended, no Chronicle change. If no → a real
+      Chronicle defect, investigate the browse/session interaction
 - [ ] Whatever is fixed is covered by a test where one is meaningful; device-only parts in [[cu-73]]
 
 ## Progress Notes
