@@ -5,7 +5,12 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import com.tonyodev.fetch2.Fetch
+import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexSyncScrobbleWorker
 import java.io.File
 
 /**
@@ -42,6 +47,10 @@ class ChronicleWorkerFactory(
   private val fetch: () -> Fetch,
   private val prefsRepo: PrefsRepo,
   private val externalDeviceDirs: () -> List<File>,
+  private val trackRepository: () -> ITrackRepository,
+  private val bookRepository: () -> IBookRepository,
+  private val plexPrefs: () -> PlexPrefsRepo,
+  private val plexMediaService: () -> PlexMediaService,
 ) : WorkerFactory() {
   override fun createWorker(
     appContext: Context,
@@ -54,6 +63,16 @@ class ChronicleWorkerFactory(
 
       MoveSyncLocationWorker::class.java.name ->
         MoveSyncLocationWorker(appContext, workerParameters, prefsRepo, externalDeviceDirs())
+
+      PlexSyncScrobbleWorker::class.java.name ->
+        PlexSyncScrobbleWorker(
+          appContext,
+          workerParameters,
+          trackRepository(),
+          bookRepository(),
+          plexPrefs(),
+          plexMediaService(),
+        )
 
       // Not ours to build: let WorkManager use the reflective constructor.
       else -> null

@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.work.WorkerParameters
 import com.tonyodev.fetch2.Fetch
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexSyncScrobbleWorker
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -47,6 +48,10 @@ class ChronicleWorkerFactoryTest {
       },
       prefsRepo = prefsRepo,
       externalDeviceDirs = { dirs },
+      trackRepository = { mockk(relaxed = true) },
+      bookRepository = { mockk(relaxed = true) },
+      plexPrefs = { mockk(relaxed = true) },
+      plexMediaService = { mockk(relaxed = true) },
     )
 
   private fun params() = mockk<WorkerParameters>(relaxed = true)
@@ -109,5 +114,26 @@ class ChronicleWorkerFactoryTest {
 
     factory.createWorker(context, DownloadNotificationWorker::class.java.name, params())
     assertEquals("the download worker does", 1, fetchBuilds)
+  }
+
+  /**
+   * The third worker, registered in the cu-178 follow-up.
+   *
+   * cu-179 built this factory and wired **two** of the three workers through it;
+   * `PlexSyncScrobbleWorker` kept three `Injector.get()` field initialisers and so stayed
+   * unconstructable — a half-finished migration that the service-locator guard could not see,
+   * because the file was still on its exemption list and the list was therefore still accurate.
+   */
+  @Test
+  fun `it builds the plex scrobble worker`() {
+    val worker =
+      factory().createWorker(
+        context,
+        PlexSyncScrobbleWorker::class.java.name,
+        params(),
+      )
+
+    assertNotNull("the factory must build the scrobble worker", worker)
+    assertEquals(PlexSyncScrobbleWorker::class.java, worker!!.javaClass)
   }
 }

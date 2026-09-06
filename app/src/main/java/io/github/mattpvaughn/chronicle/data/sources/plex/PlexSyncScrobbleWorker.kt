@@ -2,7 +2,8 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.content.Context
 import androidx.work.*
-import io.github.mattpvaughn.chronicle.application.Injector
+import io.github.mattpvaughn.chronicle.data.local.IBookRepository
+import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
@@ -24,11 +25,11 @@ import timber.log.Timber
 class PlexSyncScrobbleWorker(
   context: Context,
   workerParameters: WorkerParameters,
+  private val trackRepository: ITrackRepository,
+  private val bookRepository: IBookRepository,
+  private val plexPrefs: PlexPrefsRepo,
+  private val plexMediaService: PlexMediaService,
 ) : CoroutineWorker(context, workerParameters) {
-  private val trackRepository = Injector.get().trackRepo()
-  private val plexPrefs = Injector.get().plexPrefs()
-  private val plexMediaService = Injector.get().plexMediaService()
-
   override suspend fun doWork(): Result {
     // Nothing can be reported without a token, and waiting will not produce one.
     // Re-auth is cu-10's job.
@@ -52,7 +53,7 @@ class PlexSyncScrobbleWorker(
         // and one extra network round-trip per progress tick to answer "is this already finished"
         // would cost more than the duplicate scrobble it prevents.
         lookupBookViewCount = { bookId ->
-          Injector.get().bookRepo().getAudiobookAsync(bookId)?.viewCount ?: 0L
+          bookRepository.getAudiobookAsync(bookId)?.viewCount ?: 0L
         },
       )
 

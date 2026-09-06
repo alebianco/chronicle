@@ -1052,3 +1052,57 @@ Two ideas, without the libraries:
 
 No adoption. The stated sequence (Navigation Component → finish `Injector.get()` → Hilt) is
 unaffected by this assessment; none of these libraries is a substitute for any step in it.
+
+---
+
+## Audit: are other migrations half-finished? (2026-09-06)
+
+Checked every migration CLAUDE.md claims complete against the code, rather than trusting the prose.
+
+### Genuinely complete
+
+| migration | check | result |
+|---|---|---|
+| cu-52 LiveData → StateFlow | `MutableLiveData`/`.observe(` in `app/src/main` | **0 in code** — the 5 hits were all comments |
+| cu-58 DataBinding → ViewBinding | `<layout>` wrappers; `dataBinding` flag | 0 layouts, flag not enabled |
+| cu-8/58 KAPT → KSP | `kotlin-kapt`, `kapt(` | absent |
+| cu-108 credential split | direct token reads from prefs | none outside the credential helpers |
+| cu-136 value-class offsets | 138 typed-offset references | consistent |
+| cu-127 SourceId scoping | `LEGACY_PLEX` only in migrations + `adoptLegacyRows` | as documented |
+| cu-15/72/169 DispatcherProvider | hardcoded `Dispatchers.*` | exactly the 4 sanctioned sites |
+
+### One real half-finished migration — fixed
+
+**cu-179 wired two of the three workers through `ChronicleWorkerFactory` and left the third.**
+`PlexSyncScrobbleWorker` still had three `Injector.get()` field initialisers, so it was
+unconstructable in a unit test — exactly the defect cu-179 existed to remove.
+
+**Why no guard caught it.** `ServiceLocatorUsageTest` checks that every exemption is still *needed*,
+and this one still was: the file genuinely called the locator, so the list was accurate. The guard
+can detect a *stale* exemption but not a *lingering* one — nothing says "this exemption was supposed
+to be temporary". That is a real gap in the guard's design, not an oversight in its list.
+
+Fixed: constructor-injected, registered with the factory, exemption dropped, and a factory test
+added (sabotage-verified — neutering the registration fails exactly that test).
+
+### Known-deliberate incompletes, left alone
+
+- **The multi-backend seam** (`PlexMediaSource`/`LocalMediaSource` are 13 `TODO("Not yet implemented")`).
+  Owned by cu-33.1, documented in CLAUDE.md, and `sources` is empty in production so it is inert.
+
+### Drift worth noting
+
+- **`features/` → `data.sources.plex` coupling is 29 files, not the 27 CLAUDE.md states.** No test
+  pins that number, so it drifts silently. Either pin it with a ratchet-style guard or stop quoting
+  a count that nothing maintains.
+- **Two deprecated-API tails**, both flagged by the compiler on every build and neither tracked:
+  `LocalBroadcastManager` (5 files, deprecated by AndroidX) and `Activity.onBackPressed()`
+  (3 call sites, deprecated in favour of `OnBackPressedDispatcher` — which `MainActivity` already
+  uses, so these three are inconsistent with the rest of the app).
+
+### Method note
+
+A guard run reported green against a **stale result file two hours old** — `--rerun-tasks` did not
+force re-execution, and the XML timestamp was the only way to notice. Check the result file's
+mtime, or delete it first, before believing a guard that "still passes" after a change that should
+have broken it.

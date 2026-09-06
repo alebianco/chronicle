@@ -62,6 +62,10 @@ open class ChronicleApplication :
             fetch = { appComponent.fetch() },
             prefsRepo = appComponent.prefsRepo(),
             externalDeviceDirs = { appComponent.externalDeviceDirs() },
+            trackRepository = { appComponent.trackRepo() },
+            bookRepository = { appComponent.bookRepo() },
+            plexPrefs = { appComponent.plexPrefs() },
+            plexMediaService = { appComponent.plexMediaService() },
           ),
         ).build()
 

@@ -119,12 +119,13 @@ class ServiceLocatorUsageTest {
      * - `DownloadNotificationWorker` keeps one call in its **companion** `enqueue` helper, which
      *   reaches `workManager()` to schedule itself. That is a static entry point, not a dependency
      *   of the instance, and injecting it would mean threading a `WorkManager` through every caller.
-     * - `PlexSyncScrobbleWorker` has not been converted; it is a candidate for the same treatment.
+     * - `PlexSyncScrobbleWorker` **has** been converted: cu-179 wired two of the three workers
+     *   through [ChronicleWorkerFactory] and left this one behind, and the cu-178 follow-up
+     *   finished it. Its dependencies are constructor parameters now, so it came off this list.
      */
     val EXEMPT_WORKERS =
       setOf(
         "DownloadNotificationWorker.kt",
-        "PlexSyncScrobbleWorker.kt",
       )
 
     /**
