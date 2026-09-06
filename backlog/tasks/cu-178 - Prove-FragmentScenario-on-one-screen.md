@@ -1,7 +1,7 @@
 ---
 id: cu-178
 title: Prove FragmentScenario on one screen
-status: To Do
+status: In Progress
 assignee: []
 created_date: ''
 labels:

@@ -1,7 +1,7 @@
 ---
 id: cu-180
 title: Let the fragments own their toolbars
-status: In Progress
+status: In Review
 assignee: []
 created_date: ''
 labels:
@@ -68,9 +68,9 @@ rework must preserve both**, and the `onPrepareMenu` equivalent on a self-owned 
 
 ## Acceptance Criteria
 
-- [ ] No fragment calls `setSupportActionBar`
-- [ ] Each fragment's toolbar inflates and handles its own menu
+- [x] No fragment calls `setSupportActionBar`
+- [x] Each fragment's toolbar inflates and handles its own menu
 - [ ] The cu-102 lock/unlock crash does not return — verified on device
-- [ ] `CollectionsFragmentScenarioTest` reaches `RESUMED` and asserts real screen behaviour
+- [x] `CollectionsFragmentScenarioTest` reaches `RESUMED` and asserts real screen behaviour
 - [ ] At least two more fragments get scenario tests, proving the pattern generalises
 - [ ] `features/*` coverage rises measurably

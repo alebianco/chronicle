@@ -10,7 +10,6 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import io.github.mattpvaughn.chronicle.R
-import io.github.mattpvaughn.chronicle.application.MainActivity
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.BOOK_COVER_STYLE_SQUARE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
@@ -21,6 +20,7 @@ import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
 import io.github.mattpvaughn.chronicle.features.library.bindRecyclerView
 import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
+import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
@@ -44,7 +44,9 @@ class HomeFragment : Fragment() {
   lateinit var plexConfig: PlexConfig
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    (requireActivity() as MainActivity).activityComponent!!.inject(this)
+    // Asks the host for a graph rather than casting to `MainActivity` (cu-178), which is what
+    // lets this screen be launched into a generic host by `FragmentScenario`.
+    check(injectFromHost { it.inject(this) }) { "HomeFragment needs an ActivityComponentHost" }
     super.onCreate(savedInstanceState)
     viewModel = ViewModelProvider(this, viewModelFactory).get(HomeViewModel::class.java)
   }
