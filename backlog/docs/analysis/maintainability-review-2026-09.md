@@ -981,3 +981,74 @@ several files and none is a correctness fix.
   targeted; a blanket rule would generate noise and get suppressed.
 - Splitting `MediaPlayerService` (1048 lines). It is long but cohesive — one Android component
   with a mandated lifecycle — and it sits at 37.75% coverage, the best of any `features/` package.
+
+---
+
+## Assessed and declined: Koin, Circuit, Decompose, multiplatform (2026-09-06)
+
+Asked whether Koin is a more modern choice than Dagger, and whether Circuit/Decompose could open up
+desktop, Wear and iOS targets. Two measurements decide most of it.
+
+### There is no Compose in this codebase
+
+42 XML layouts, `viewBinding = true`, zero Compose dependencies. **Circuit is Compose-only by
+construction** and **Decompose's UI layer is Compose Multiplatform**. Adopting either means adopting
+Compose first — a rewrite of all 42 screens, not a library swap. Neither is a candidate today.
+
+### The code is not portable, and the unportable part is the app
+
+Of 32,508 lines in `app/src/main`:
+
+| | lines | |
+|---|---:|---|
+| pure Kotlin (portable today) | 7,710 | 23.7% |
+| Android framework | 24,122 | 74.2% |
+| Room/entity only | 676 | 2.1% |
+
+The Android-bound three quarters, by what it actually touches:
+
+| | lines | |
+|---|---:|---|
+| UI (views, fragments) | 12,790 | 53.0% |
+| other platform (Context, Uri, prefs) | 3,957 | 16.4% |
+| WorkManager | 3,324 | 13.8% |
+| media/playback (ExoPlayer, MediaSession) | 2,431 | 10.1% |
+| lifecycle/ViewModel | 1,620 | 6.7% |
+
+That 10% of ExoPlayer + MediaSession is not incidental coupling to refactor around — it *is* an
+audiobook player: a background media service, an audio focus policy, a lock-screen transport,
+offline downloads to a filesystem, Android Auto. iOS has AVPlayer and `MPNowPlayingInfoCenter`, and
+no shared abstraction spans them; it is written twice. Same for WorkManager's 13.8%. So the
+realistically shareable surface is the **23.7%** — model, parsers, ingestion planning — which is
+already the best-tested part of the tree (`data/model` is the highest-coverage package). KMP's build
+complexity would be paid to share the part that needs the least help.
+
+**Wear OS is the exception and stays open.** Wear *is* Android — same Media3, same Room, same
+WorkManager. A Wear companion would be a module in this repo sharing everything but the UI, needing
+no KMP, no Koin and no Decompose. Nothing in this assessment blocks it.
+
+### Koin is a different trade, not a newer one
+
+- **Dagger validates the graph at compile time; Koin resolves at runtime.** A missing binding becomes
+  a crash on the screen that needed it. For an agent-maintained repo whose safety net is `verify.sh`,
+  trading compile-time errors for runtime ones is a downgrade.
+- **The usual reason to pick Koin is KMP** (Dagger is JVM/Android-only). The table above says we are
+  not going multiplatform, so that motivation does not apply.
+- **It would not move coverage.** What blocked Fragment tests was the *host cast*, not the DI
+  framework — cu-178 and cu-180 removed it in ~45 lines, and coverage went 40% → 50% without Dagger
+  being touched. The earlier Hilt assessment stands and applies doubly here.
+
+### What is worth keeping from the panorama
+
+Two ideas, without the libraries:
+
+1. **Circuit's "screen = state + events, UI is a pure function of it"** — what the `StateFlow` +
+   `collectWhileStarted` convention already approximates, and the direction remaining Fragment logic
+   should keep moving in.
+2. **Decompose's "component owns its own lifecycle, host-agnostic"** — precisely what cu-178 and
+   cu-180 did by hand, and why `FragmentScenario` works at all now.
+
+### Verdict
+
+No adoption. The stated sequence (Navigation Component → finish `Injector.get()` → Hilt) is
+unaffected by this assessment; none of these libraries is a substitute for any step in it.
