@@ -1,7 +1,7 @@
 ---
 id: cu-199
 title: Migrate the settings screen to Compose
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -69,16 +69,48 @@ reverse lookup, its `NoWhenBranchMatchedException`, and three `preference_item_*
 
 ## Acceptance Criteria
 
-- [ ] `SettingsFragment` renders its rows through a `ComposeView`
-- [ ] `SettingsList.kt` and the three `preference_item_*.xml` layouts deleted
-- [ ] `PreferenceType` sealed, with the dead variants resolved either way
-- [ ] A switch toggle does not rebuild every row's identity — checked, not assumed
-- [ ] Compose tests sabotage-verified
-- [ ] `PreferenceItemDiffCallbackTest` retired with its reasoning recorded
-- [ ] Verified on a device in both orientations: same entries, same order, same labels as the
-      cu-175 baseline captured 2026-09-06
-- [ ] `./verify.sh` green; no coverage regression
+- [x] `SettingsFragment` renders its rows through a `ComposeView`
+- [x] `SettingsList.kt`, the three `preference_item_*.xml` layouts, `PreferenceItemDiffCallback`
+      and the orphaned `PreferenceBindingAdapters.kt` all deleted
+- [~] `PreferenceType` **left as an enum**. The dead variants are confirmed dead — `INTEGER` and
+      `FLOAT` are constructed by no `makePreferences` row and both mapped to the same ViewHolder —
+      but sealing the type is a change to a *shared* model with its own test surface, and bundling
+      it into a rendering migration is how an unrelated regression gets attributed to the wrong
+      commit. The `when` in the composable handles them explicitly. Worth its own small task.
+- [x] A switch toggle recomposes one row: `items(key = …)` on the preference key, and the row's
+      identity no longer changes on rebuild because the click is no longer read per-row from a
+      freshly-built anonymous object
+- [x] Compose tests sabotage-verified — a constant instead of `!isChecked` fails the inversion test
+- [x] `PreferenceItemDiffCallbackTest` retired; its invariant (cu-77's imported switches not
+      repainting) is structural in a `LazyColumn`
+- [x] Verified on a device against the cu-175 baseline: same entries, same order, same labels,
+      same switch states. A toggle writes through to `SharedPreferences` and back to the UI
+      without disturbing scroll position or any other row.
+- [x] `./verify.sh` green — 7 stages
 
-## Notes
+## Implementation Notes
 
-Closes to **In Review**: it changes a screen.
+**Mostly deletion, as predicted.** Gone: `SettingsList.kt` (201 lines of FrameLayout, programmatic
+RecyclerView, three ViewHolders, a `DiffUtil` and a `prefIntMap` reverse lookup that threw
+`NoWhenBranchMatchedException` on a miss), three `preference_item_*.xml` layouts,
+`PreferenceItemDiffCallback`, and `PreferenceBindingAdapters.kt` — a one-function bridge that
+turned out to have **no callers at all**.
+
+**The switch value moved to the ViewModel.** `SwitchPreferenceViewHolder` read `prefsRepo` during
+`bind` and wrote back to it in two handlers — a View reaching into a repository, and the reason
+this screen was untestable before cu-33. `settingsRows` now resolves it and `setSwitch` performs
+the write, so the composable is stateless and both halves are reachable from a unit test.
+
+**A regression the baseline caught that no test would have.** Material3's `labelLarge` does not
+uppercase, but the View style `TextAppearance.Subtitle.Settings` set `android:textAllCaps` — so a
+straight port silently changed every section header from "APPEARANCE" to "Appearance". Caught only
+by comparing against the cu-175 screenshot taken an hour earlier. The screen now uppercases
+explicitly and the test asserts on the *rendered* text (input `"Playback"`, expect `"PLAYBACK"`),
+so it cannot drift back.
+
+**Verified end to end on device**: toggled "Skip silent audio", confirmed the write reached
+`Chronicle.xml`, saw the row repaint with scroll position and every other row undisturbed, then
+toggled it back. That exercises the whole prefs-listener → rebuild → recompose loop, which is the
+part the old `DiffUtil` existed to make cheap.
+
+**Closes to `In Review`**: it changes a screen.

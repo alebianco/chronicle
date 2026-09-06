@@ -18,8 +18,16 @@ xmlns:tools="http://schemas.android.com/tools"
         app:layout_constraintTop_toTopOf="parent"
         tools:layout="@layout/view_bottom_sheet_chooser" />
 
-    <io.github.mattpvaughn.chronicle.features.settings.SettingsList
-        android:id="@+id/settings_list"
+    <!--
+      The rows are `SettingsScreen` now (cu-199). `SettingsList` — a FrameLayout wrapping a
+      programmatic RecyclerView, three ViewHolders and a DiffUtil — is deleted with it.
+
+      `BottomSheetChooser` above stays a View: it is shared, animated, and its state carries a
+      listener object. Same call cu-187 made for SwipeRefreshLayout and cu-198 for the chapter
+      list. It keeps its elevation so it still draws over the rows.
+    -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/settings_compose"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_constraintBottom_toBottomOf="parent"

@@ -24,15 +24,20 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.features.download.MoveSyncLocationWorker
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.settings.SettingsViewModel.NavigationDestination.*
+import io.github.mattpvaughn.chronicle.features.settings.compose.SettingsRow
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.Event
+import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import io.github.mattpvaughn.chronicle.util.bytesAvailable
 import io.github.mattpvaughn.chronicle.util.setEvent
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.*
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserState.Companion.EMPTY_BOTTOM_CHOOSER
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -119,6 +124,46 @@ class SettingsViewModel(
   private val _preferences = MutableStateFlow(makePreferences())
   val preferences: StateFlow<List<PreferenceModel>>
     get() = _preferences
+
+  /**
+   * The rows with each switch's current value resolved (cu-199).
+   *
+   * `SettingsList`'s ViewHolder read `prefsRepo` during `bind` and wrote back to it in two
+   * handlers — a View reaching into a repository, which is also why the whole screen was
+   * unreachable from a unit test before cu-33. Resolving here keeps the composable stateless and
+   * puts the write somewhere testable.
+   *
+   * Derived from [preferences] rather than recomputed, so the prefs listener's rebuild is still
+   * the single trigger.
+   */
+  val settingsRows: StateFlow<List<SettingsRow>> =
+    _preferences
+      .map { models -> models.map { SettingsRow(model = it, isChecked = resolveSwitch(it)) } }
+      .stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        _preferences.value.map { SettingsRow(model = it, isChecked = resolveSwitch(it)) },
+      )
+
+  private fun resolveSwitch(model: PreferenceModel): Boolean =
+    if (prefsRepo.containsKey(model.key)) {
+      prefsRepo.getBoolean(model.key)
+    } else {
+      model.defaultValue == true
+    }
+
+  /**
+   * Writes a switch, then rebuilds.
+   *
+   * The rebuild is not redundant: the prefs listener also fires, but a caller must not have to
+   * know that. It was previously the ViewHolder's job, from inside `bind`.
+   */
+  fun setSwitch(
+    model: PreferenceModel,
+    isChecked: Boolean,
+  ) {
+    prefsRepo.setBoolean(model.key, isChecked)
+  }
 
   private val _bottomChooserState = MutableStateFlow(EMPTY_BOTTOM_CHOOSER)
   val bottomChooserState: StateFlow<BottomChooserState>

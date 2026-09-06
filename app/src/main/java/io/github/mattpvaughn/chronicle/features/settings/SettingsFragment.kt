@@ -10,8 +10,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
@@ -22,8 +24,10 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.databinding.FragmentSettingsBinding
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.features.settings.compose.SettingsScreen
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
+import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.applyTopSystemBarInset
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
@@ -130,8 +134,23 @@ class SettingsFragment : Fragment() {
       setBottomChooserState(binding.bottomSheetChooser, state)
     }
 
-    viewLifecycleOwner.collectWhileStarted(viewModel.preferences) { preferences ->
-      binding.settingsList.setPreferences(preferences, prefsRepo)
+    // The rows are `SettingsScreen` now (cu-199). This replaces `SettingsList` entirely — a
+    // FrameLayout wrapping a programmatic RecyclerView, three ViewHolders, a DiffUtil, and a
+    // reverse lookup through `prefIntMap` that threw `NoWhenBranchMatchedException` on a miss.
+    //
+    // The switch value comes resolved from the ViewModel rather than being read out of
+    // `prefsRepo` during bind, which is what the ViewHolder did — a View reaching into a
+    // repository, and the reason this screen was untestable before cu-33.
+    binding.settingsCompose.setContent {
+      val rows by viewModel.settingsRows.collectAsStateWithLifecycle()
+
+      ChronicleTheme {
+        SettingsScreen(
+          rows = rows,
+          onClick = { it.click.onClick() },
+          onToggle = viewModel::setSwitch,
+        )
+      }
     }
 
     viewLifecycleOwner.collectEventsWhileStarted(viewModel.messageForUser) { formattableString ->
@@ -173,7 +192,7 @@ class SettingsFragment : Fragment() {
 
     // Settings has no toolbar, so the list itself takes the top inset (cu-63).
 
-    binding.settingsList.applyTopSystemBarInset()
+    binding.settingsCompose.applyTopSystemBarInset()
 
     return binding.root
   }

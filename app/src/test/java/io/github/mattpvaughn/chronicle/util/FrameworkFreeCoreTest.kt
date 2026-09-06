@@ -155,7 +155,11 @@ class FrameworkFreeCoreTest {
         "features/player/TrackListStateManager.kt",
         "features/search/SearchController.kt",
         "features/search/SearchRow.kt",
-        "features/settings/PreferenceBindingAdapters.kt",
+        // `features/settings/PreferenceBindingAdapters.kt` was here until cu-199. It is deleted,
+        // not moved: it was a one-function bridge to `SettingsList.setPreferences`, called from
+        // nowhere, and both went with the Compose migration of the settings screen. Removed from
+        // the list rather than left to fail as "missing", which is what this guard reports for a
+        // deleted entry.
         "features/settings/PreferenceModel.kt",
         "injection/scopes/ActivityScope.kt",
         "injection/scopes/ServiceScope.kt",
