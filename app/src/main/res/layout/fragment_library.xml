@@ -58,26 +58,16 @@ xmlns:tools="http://schemas.android.com/tools"
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/search_results_list"
-                android:visibility="gone"
+            <!--
+              The search overlay is `SearchOverlay` now (cu-202). It replaces a RecyclerView with
+              `GroupedSearchAdapter` and a "no results" TextView whose visibility was computed
+              from three flows here, in Home and in Collections — three copies that had drifted.
+            -->
+            <androidx.compose.ui.platform.ComposeView
+                android:id="@+id/search_compose"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@color/colorPrimaryDark"
-                android:elevation="8dp"
-                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                tools:itemCount="9"
-                tools:listitem="@layout/list_item_search_result_audiobook" />
-
-            <TextView
-                android:id="@+id/no_search_results_message"
-                android:visibility="gone"
-                style="@style/TextAppearance.Body1"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/margin_normal"
-                android:elevation="8dp"
-                android:text="@string/no_books_found" />
+                android:elevation="8dp" />
         </LinearLayout>
 
         <io.github.mattpvaughn.chronicle.views.BottomSheetChooser

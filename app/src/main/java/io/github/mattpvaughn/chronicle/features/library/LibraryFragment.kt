@@ -9,7 +9,6 @@ import androidx.appcompat.widget.SearchView
 import androidx.compose.runtime.getValue
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.MenuProvider
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,7 +23,8 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentLibraryBinding
 import io.github.mattpvaughn.chronicle.features.library.compose.LibraryScreen
-import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
+import io.github.mattpvaughn.chronicle.features.search.compose.SearchOverlay
+import io.github.mattpvaughn.chronicle.features.search.searchOverlayState
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
@@ -57,15 +57,12 @@ class LibraryFragment : Fragment() {
   @Inject
   lateinit var plexConfig: PlexConfig
 
-  var adapter: AudiobookAdapter? = null
-
   /**
    * The grouped search results (cu-25).
    *
    * Created per view rather than held across one, because it is handed to the RecyclerView in
    * [onCreateView] and must not outlive it.
    */
-  private lateinit var searchAdapter: GroupedSearchAdapter
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -74,25 +71,23 @@ class LibraryFragment : Fragment() {
   ): View? {
     Timber.i("Lib frag view create")
     val binding = FragmentLibraryBinding.inflate(inflater, container, false)
-    searchAdapter = GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
+    // Search is Compose now (cu-202), shared with home and collections through `SearchOverlay`.
+    // The three-source `refreshSearchStates()` becomes `searchOverlayState`, which the other two
+    // screens call as well — they had already drifted on whether an empty query says "no results".
+    binding.searchCompose.setContent {
+      val rows by viewModel.searchRows.collectAsStateWithLifecycle()
+      val isSearchActive by viewModel.isSearchActive.collectAsStateWithLifecycle()
+      val isQueryEmpty by viewModel.isQueryEmpty.collectAsStateWithLifecycle()
+      val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
 
-    // Search is still Views: `GroupedSearchAdapter` is shared with Home and Collections, so it
-    // migrates with them rather than being forked here (cu-187's precedent). Each source re-runs
-    // the whole condition, so the shared logic stays in one function.
-    fun refreshSearchStates() {
-      val rows = viewModel.searchRows.value
-      val active = viewModel.isSearchActive.value
-      val queryEmpty = viewModel.isQueryEmpty.value
-      binding.searchResultsList.isVisible = active
-      binding.noSearchResultsMessage.isVisible = rows.isEmpty() && active && !queryEmpty
-      searchAdapter.submitList(rows)
-    }
-    viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { refreshSearchStates() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.isSearchActive) { refreshSearchStates() }
-    viewLifecycleOwner.collectWhileStarted(viewModel.isQueryEmpty) { refreshSearchStates() }
-
-    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
-      searchAdapter.setServerConnected(connected)
+      ChronicleTheme {
+        SearchOverlay(
+          state = searchOverlayState(isSearchActive, isQueryEmpty, rows),
+          serverConnected = isConnected,
+          coverUrl = plexConfig::toServerString,
+          onBookClick = ::openAudiobookDetails,
+        )
+      }
     }
 
     viewLifecycleOwner.collectWhileStarted(viewModel.bottomChooserState) { state ->
@@ -130,8 +125,6 @@ class LibraryFragment : Fragment() {
         )
       }
     }
-
-    binding.searchResultsList.adapter = searchAdapter
 
     binding.swipeToRefresh.setOnRefreshListener {
       viewModel.refreshData()
@@ -310,7 +303,6 @@ class LibraryFragment : Fragment() {
   }
 
   override fun onDestroyView() {
-    adapter = null
     super.onDestroyView()
   }
 

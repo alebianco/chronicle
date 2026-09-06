@@ -7,6 +7,8 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.model.FacetList
 import io.github.mattpvaughn.chronicle.data.model.facetsBy
+import io.github.mattpvaughn.chronicle.features.browse.compose.BrowseContent
+import io.github.mattpvaughn.chronicle.features.browse.compose.BrowseUiState
 import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
 import io.github.mattpvaughn.chronicle.util.combineDistinct
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -45,6 +48,15 @@ class BrowseViewModel(
     get() = _kind
 
   /**
+   * Whether a real grouping has happened yet.
+   *
+   * Tracked separately because `stateIn`'s seed is indistinguishable from its first computed value
+   * when that value is also empty — a library with no books groups to exactly `FacetList.EMPTY`.
+   * Only the *arrival* of a book list can tell the two apart, so this flips there.
+   */
+  private val _hasGrouped = MutableStateFlow(false)
+
+  /**
    * The whole library, deduped at the source.
    *
    * Room re-emits the `Audiobook` table on every write — once a second during playback — and this
@@ -52,7 +64,9 @@ class BrowseViewModel(
    * is the shape cu-110 was about.
    */
   private val allBooks =
-    bookRepository.getAllBooks().distinctUntilChangedBy { books ->
+    bookRepository.getAllBooks().onEach {
+      _hasGrouped.value = true
+    }.distinctUntilChangedBy { books ->
       // The facet-relevant projection only: a progress change must not trigger a regroup.
       books.map { "${'$'}{it.id}|${'$'}{it.author}|${'$'}{it.narrator}|${'$'}{it.series}|${'$'}{it.seriesIndex}" }
     }
@@ -72,6 +86,35 @@ class BrowseViewModel(
       scope = viewModelScope,
       started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
       initialValue = FacetList.EMPTY,
+    )
+
+  /**
+   * The screen's whole state, with "not grouped yet" distinguishable from "nothing to group".
+   *
+   * [facets] is seeded with `FacetList.EMPTY`, which reads as a facet with no values — so a screen
+   * driven straight off it announces "No narrators yet" before the first grouping has run. The
+   * sealed type makes that impossible to express: the seed is [BrowseContent.Loading] and only a
+   * real grouping can produce [BrowseContent.Empty].
+   *
+   * Note the *selected* tab comes from [_kind] rather than from `FacetList.kind`, so the tab
+   * highlights immediately on tap instead of waiting for the regroup — which is O(library) and,
+   * on the owner's 196 books, visible.
+   */
+  val uiState: StateFlow<BrowseUiState> =
+    combineDistinct(facets, _kind, _hasGrouped) { facets, selected, hasGrouped ->
+      BrowseUiState(
+        selected = selected,
+        content =
+          when {
+            !hasGrouped -> BrowseContent.Loading
+            facets.facets.isEmpty() -> BrowseContent.Empty(facets.kind)
+            else -> BrowseContent.Loaded(facets)
+          },
+      )
+    }.stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+      initialValue = BrowseUiState(),
     )
 
   fun showFacet(kind: FacetKind) {

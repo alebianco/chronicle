@@ -2,10 +2,7 @@ package io.github.mattpvaughn.chronicle.views
 
 import android.app.Activity
 import android.net.Uri
-import android.os.Build
-import android.view.View
 import android.widget.ImageView
-import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import coil3.load
 import coil3.request.crossfade
@@ -72,14 +69,4 @@ fun bindImageRounded(
     error(R.drawable.book_cover_missing_placeholder)
     crossfade(true)
   }
-}
-
-// NOTE: this will not work for Android versions HoneyComb and below, and DataBinding overrides the
-// tag set on all outermost layouts in a data bound layout xml
-@RequiresApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-fun bindTag(
-  view: View,
-  o: Any,
-) {
-  view.tag = o
 }

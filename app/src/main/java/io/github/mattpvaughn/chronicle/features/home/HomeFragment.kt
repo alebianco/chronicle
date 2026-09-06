@@ -7,21 +7,18 @@ import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.SearchView
 import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.BOOK_COVER_STYLE_SQUARE
-import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE_COVER_GRID
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentHomeBinding
 import io.github.mattpvaughn.chronicle.features.home.compose.HomeScreen
-import io.github.mattpvaughn.chronicle.features.library.AudiobookAdapter
 import io.github.mattpvaughn.chronicle.features.library.LibraryFragment.AudiobookClick
-import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
+import io.github.mattpvaughn.chronicle.features.search.compose.SearchOverlay
+import io.github.mattpvaughn.chronicle.features.search.searchOverlayState
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
@@ -68,13 +65,17 @@ class HomeFragment : Fragment() {
     // `refreshShelves()` — four `.value` reads driving eight independent `isVisible` writes — plus
     // three `AudiobookAdapter` instances and three `itemAnimator.changeDuration = 0` workarounds
     // that existed only because a RecyclerView animates a rebind (cu-110).
-    val searchAdapter =
-      GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
-    binding.searchResultsList.adapter = searchAdapter
-
+    // Search is Compose too now (cu-202) — `GroupedSearchAdapter` was instantiated separately by
+    // three screens, and the "is there anything to show" decision was written out in each. It is
+    // `searchOverlayState` once, so home can no longer differ from library about what an empty
+    // query means. The three dropped XML bindings this used to compensate for (cu-73) are gone
+    // with the RecyclerView.
     binding.homeCompose.setContent {
       val state by viewModel.uiState.collectAsStateWithLifecycle()
       val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
+      val rows by viewModel.searchRows.collectAsStateWithLifecycle()
+      val isSearchActive by viewModel.isSearchActive.collectAsStateWithLifecycle()
+      val isQueryEmpty by viewModel.isQueryEmpty.collectAsStateWithLifecycle()
 
       ChronicleTheme {
         HomeScreen(
@@ -85,29 +86,15 @@ class HomeFragment : Fragment() {
           onResumeClick = { viewModel.resume(it) },
           onDisableOfflineMode = viewModel::disableOfflineMode,
         )
+
+        // Drawn *over* the shelves, which is what the RecyclerView's `elevation="8dp"` did.
+        SearchOverlay(
+          state = searchOverlayState(isSearchActive, isQueryEmpty, rows),
+          serverConnected = isConnected,
+          coverUrl = plexConfig::toServerString,
+          onBookClick = ::openAudiobookDetails,
+        )
       }
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { rows ->
-      searchAdapter.submitList(rows)
-    }
-
-    // The old layout carried *three* bindings on this list and the cu-58 conversion dropped all
-    // of them: the data above, this visibility toggle, and a connected-state one. Without the
-    // toggle the list stays at its XML default of `gone`, so search returned results into an
-    // invisible view — fixing the data alone changed nothing on screen (cu-73).
-    //
-    // `gone` in XML is the correct default and stays: it is what stops the list flashing over the
-    // shelves for a frame before this observer first fires.
-    viewLifecycleOwner.collectWhileStarted(viewModel.isSearchActive) { isActive ->
-      binding.searchResultsList.isVisible = isActive
-    }
-
-    // The third dropped binding, `serverConnectedSearch`. The shelves above get this through
-    // `bindRecyclerView` in the isConnected observer, which runs before this adapter exists — so
-    // the search list needs its own. It gates cover-art loading when the server is unreachable.
-    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { connected ->
-      searchAdapter.setServerConnected(connected)
     }
 
     binding.swipeToRefresh.setOnRefreshListener {
@@ -222,16 +209,6 @@ class HomeFragment : Fragment() {
         return true
       }
     }
-
-  private fun makeAudiobookAdapter(audiobookClick: AudiobookClick): AudiobookAdapter {
-    return AudiobookAdapter(
-      initialViewStyle = VIEW_STYLE_COVER_GRID,
-      isVertical = false,
-      isSquare = prefsRepo.bookCoverStyle == BOOK_COVER_STYLE_SQUARE,
-      audiobookClick = audiobookClick,
-      coverUrl = plexConfig::toServerString,
-    )
-  }
 
   fun openAudiobookDetails(audiobook: Audiobook) {
     navigator.showDetails(audiobook.id, audiobook.title, audiobook.isCached)

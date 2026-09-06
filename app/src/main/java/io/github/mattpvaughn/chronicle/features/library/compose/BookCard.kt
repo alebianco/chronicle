@@ -138,7 +138,7 @@ private fun Cover(
  * The progress bar and the unstarted marker.
  *
  * Reads `progressState()` — the shared decision extracted in cu-198 — so this and
- * `bindProgressIndicators` cannot drift on cu-86's rule while both renderers exist.
+ * cu-86's rule is stated once in `progressState()`, so no renderer can drift from it.
  */
 @Composable
 private fun ProgressOverlay(

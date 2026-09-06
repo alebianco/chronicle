@@ -13,7 +13,6 @@ import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.widget.SearchView
 import androidx.compose.runtime.getValue
 import androidx.core.view.MenuProvider
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,7 +22,8 @@ import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.databinding.FragmentCollectionsBinding
 import io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsScreen
-import io.github.mattpvaughn.chronicle.features.search.GroupedSearchAdapter
+import io.github.mattpvaughn.chronicle.features.search.compose.SearchOverlay
+import io.github.mattpvaughn.chronicle.features.search.searchOverlayState
 import io.github.mattpvaughn.chronicle.injection.components.injectFromHost
 import io.github.mattpvaughn.chronicle.navigation.Navigator
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
@@ -84,26 +84,22 @@ class CollectionsFragment : Fragment() {
       }
     }
 
-    val searchAdapter =
-      GroupedSearchAdapter(onBookClick = { openAudiobookDetails(it) }, coverUrl = plexConfig::toServerString)
-    binding.searchResultsList.adapter = searchAdapter
+    // Search is Compose now (cu-202), shared with library and home through `SearchOverlay`.
+    binding.searchCompose.setContent {
+      val rows by viewModel.searchRows.collectAsStateWithLifecycle()
+      val isSearchActive by viewModel.isSearchActive.collectAsStateWithLifecycle()
+      val isQueryEmpty by viewModel.isQueryEmpty.collectAsStateWithLifecycle()
+      val isConnected by plexConfig.isConnected.collectAsStateWithLifecycle()
 
-    // Search is still Views: `GroupedSearchAdapter` is shared with Library and Home, so it
-    // migrates with them (cu-188) rather than being forked here.
-    //
-    // These must stay below the adapter assignment above, since collection delivers an
-    // already-set value synchronously.
-    viewLifecycleOwner.collectWhileStarted(viewModel.searchRows) { rows ->
-      searchAdapter.submitList(rows)
-      updateSearchVisibility(binding)
+      ChronicleTheme {
+        SearchOverlay(
+          state = searchOverlayState(isSearchActive, isQueryEmpty, rows),
+          serverConnected = isConnected,
+          coverUrl = plexConfig::toServerString,
+          onBookClick = ::openAudiobookDetails,
+        )
+      }
     }
-
-    viewLifecycleOwner.collectWhileStarted(plexConfig.isConnected) { isConnected ->
-      searchAdapter.setServerConnected(isConnected)
-    }
-
-    viewLifecycleOwner.collectWhileStarted(viewModel.isSearchActive) { updateSearchVisibility(binding) }
-    viewLifecycleOwner.collectWhileStarted(viewModel.isQueryEmpty) { updateSearchVisibility(binding) }
 
     // `SwipeRefreshLayout` stays as the Compose view's host rather than moving to a Compose
     // pull-refresh: it is a working widget the rest of the app also uses, and swapping it would be
@@ -193,15 +189,6 @@ class CollectionsFragment : Fragment() {
    * fragment_collections.xml. Both depend on more than one flow, so every source re-evaluates the
    * pair rather than each collector owning one view.
    */
-  private fun updateSearchVisibility(binding: FragmentCollectionsBinding) {
-    val isSearchActive = viewModel.isSearchActive.value
-    val isQueryEmpty = viewModel.isQueryEmpty.value
-    val hasNoResults = viewModel.searchRows.value.isEmpty()
-
-    binding.searchResultsList.isVisible = isSearchActive
-    binding.noSearchResultsMessage.isVisible = hasNoResults && isSearchActive && !isQueryEmpty
-  }
-
   private fun openCollectionDetails(collection: Collection) {
     navigator.showCollectionDetails(collection.id)
   }

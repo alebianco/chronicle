@@ -119,7 +119,7 @@ class BookCardTest {
 
   /**
    * The progress indicator follows `progressState()` — cu-198's shared decision — so this and
-   * `bindProgressIndicators` cannot drift on cu-86's three-state rule while both renderers exist.
+   * cu-86's three-state rule is stated once, so a renderer cannot invent a fourth reading of it.
    */
   @Test
   fun `an unstarted book renders no progress bar`() {

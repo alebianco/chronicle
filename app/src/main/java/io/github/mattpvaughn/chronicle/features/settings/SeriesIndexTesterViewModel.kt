@@ -10,8 +10,11 @@ import io.github.mattpvaughn.chronicle.data.model.LibraryParseSummary
 import io.github.mattpvaughn.chronicle.data.model.PatternAttempt
 import io.github.mattpvaughn.chronicle.data.model.PatternOrder
 import io.github.mattpvaughn.chronicle.data.model.SeriesIndexDiagnostics
+import io.github.mattpvaughn.chronicle.features.settings.compose.RuleOrderLabel
+import io.github.mattpvaughn.chronicle.features.settings.compose.SeriesIndexTesterUiState
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.STOP_TIMEOUT_MILLIS
+import io.github.mattpvaughn.chronicle.util.combineDistinct
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -108,6 +111,52 @@ class SeriesIndexTesterViewModel(
     winningRule
       .map { it?.capturedIndex }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+  /**
+   * The screen's whole state (cu-202).
+   *
+   * Four flows combined rather than collected separately, which removes the workaround the View
+   * version needed: the parse headline could not be driven off [winningRule], because a
+   * `StateFlow` conflates and two different unparseable titles emit `null` twice — the second
+   * dropped, the headline never shown. Here the winner is a *field* of a value that changes
+   * whenever the input does, so there is nothing to conflate.
+   *
+   * `combineDistinct` is capped at four sources, which is exactly what this needs; the rule-order
+   * label is read once rather than combined, since the rule set cannot change while the screen is
+   * open.
+   */
+  val uiState: StateFlow<SeriesIndexTesterUiState> =
+    combineDistinct(_titleSort, _attempts, _summary, _samples) { titleSort, attempts, summary, samples ->
+      SeriesIndexTesterUiState(
+        titleSort = titleSort,
+        attempts = attempts,
+        summary = summary,
+        samples = samples,
+        ruleOrderLabel = ruleOrderLabel(),
+      )
+    }.stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+      initialValue = SeriesIndexTesterUiState(),
+    )
+
+  /**
+   * How to describe where the user's rules sit — or that there are none.
+   *
+   * "No rules of your own" is not one of [PatternOrder]'s values: an order is only meaningful
+   * once a user rule exists, and reporting "tried before the built-in ones" when the user has
+   * written none states something false about their configuration.
+   */
+  private fun ruleOrderLabel(): RuleOrderLabel =
+    if (userRuleCount == 0) {
+      RuleOrderLabel.NoUserRules
+    } else {
+      when (ruleOrder) {
+        PatternOrder.BEFORE -> RuleOrderLabel.Before
+        PatternOrder.AFTER -> RuleOrderLabel.After
+        PatternOrder.REPLACE -> RuleOrderLabel.Replace
+      }
+    }
 
   /** Whether the user's own rules run before, after, or instead of the built-ins. */
   val ruleOrder: PatternOrder

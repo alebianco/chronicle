@@ -55,26 +55,12 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/search_results_list"
+            <!-- The search overlay is `SearchOverlay` now (cu-202), shared with library and home. -->
+            <androidx.compose.ui.platform.ComposeView
+                android:id="@+id/search_compose"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@color/colorPrimaryDark"
-                android:elevation="8dp"
-                android:visibility="gone"
-                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                tools:itemCount="9"
-                tools:listitem="@layout/list_item_search_result_audiobook" />
-
-            <TextView
-                android:id="@+id/no_search_results_message"
-                style="@style/TextAppearance.Body1"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/margin_normal"
-                android:elevation="8dp"
-                android:text="@string/no_books_found"
-                android:visibility="gone" />
+                android:elevation="8dp" />
         </LinearLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
