@@ -1,0 +1,140 @@
+# Dependabot — "what is newer", the counterpart to the dependency-analysis
+# plugin's "what is unused" (cu-212).
+#
+# Why this exists: Room's KMP support landed in 2.8.3 while this project sat on
+# 2.8.1, and that was found by reading release notes by hand. This is the free
+# version of that work.
+#
+# target-branch is deliberate. decision-23 puts all task work on
+# `feature/agentic-dev` until a release is cut, because `develop` has neither
+# the backlog nor verify.sh. Dependabot would otherwise default to the
+# repository default branch (`develop`) and open PRs CI does not test — so
+# ci.yml carries `feature/agentic-dev` in its triggers, and every PR here gets
+# the full eight-stage gate.
+#
+# The `ignore` blocks are pins this project holds on purpose. Each names its
+# reason and the condition that removes it. Without them a weekly PR against
+# each pin trains everyone to ignore the bot, which is worse than no bot.
+version: 2
+
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    target-branch: feature/agentic-dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      # Scoped Commits (constitution): "<scope>: <description>". The scope is
+      # the subsystem, and a dependency bump's subsystem is the build.
+      prefix: "build"
+    groups:
+      # Related updates travel together: a Kotlin bump without its KSP twin is
+      # a broken build, and an AndroidX family split across five PRs is five
+      # times the review for one decision.
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin:*"
+          - "org.jetbrains.kotlin.*"
+          - "com.google.devtools.ksp*"
+      coroutines:
+        patterns:
+          - "org.jetbrains.kotlinx:kotlinx-coroutines-*"
+      androidx-compose:
+        patterns:
+          - "androidx.compose*"
+      androidx-lifecycle:
+        patterns:
+          - "androidx.lifecycle:*"
+      androidx-navigation:
+        patterns:
+          - "androidx.navigation:*"
+      androidx-room:
+        patterns:
+          - "androidx.room:*"
+      androidx-media3:
+        patterns:
+          - "androidx.media3:*"
+      androidx-test:
+        patterns:
+          - "androidx.test*"
+      dagger-hilt:
+        patterns:
+          - "com.google.dagger:*"
+          - "androidx.hilt:*"
+      ktor:
+        patterns:
+          - "io.ktor:*"
+          - "de.jensklingenberg.ktorfit*"
+      androidx-other:
+        patterns:
+          - "androidx.*"
+        exclude-patterns:
+          - "androidx.compose*"
+          - "androidx.lifecycle:*"
+          - "androidx.navigation:*"
+          - "androidx.room:*"
+          - "androidx.media3:*"
+          - "androidx.test*"
+          - "androidx.hilt:*"
+    ignore:
+      # Kotlin + KSP: KSP releases are built against one exact Kotlin version.
+      # There is no KSP release for Kotlin 2.4, so a Kotlin 2.4 PR cannot
+      # build. Remove this ignore when KSP ships for 2.4 (cu-214).
+      - dependency-name: "org.jetbrains.kotlin:*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "com.google.devtools.ksp*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+
+      # Ktorfit >= 2.7 requires kotlin-stdlib 2.4.0, which this project cannot
+      # reach until Kotlin moves. Remove when Kotlin moves (cu-214).
+      - dependency-name: "de.jensklingenberg.ktorfit:*"
+        versions: [">=2.7"]
+      - dependency-name: "de.jensklingenberg.ktorfit"
+        versions: [">=2.7"]
+
+      # Compose BOM beyond the 2026.06.x line pulls Compose 1.12.0, whose
+      # material-ripple-android requires compileSdk 37 (decision-22); this
+      # project is on 36. Remove when cu-214 stage 3 lands compileSdk 37.
+      - dependency-name: "androidx.compose:compose-bom"
+        versions: [">=2026.07.00"]
+
+      # lifecycle-* beyond 2.10.0 requires compileSdk 37 *and* AGP 9.1.
+      # Remove when cu-214 stage 3 lands both.
+      - dependency-name: "androidx.lifecycle:*"
+        versions: [">2.10.0"]
+
+      # Navigation Compose 2.10+ requires compileSdk 37, same as the Compose
+      # BOM and lifecycle. Remove when cu-214 stage 3 lands.
+      - dependency-name: "androidx.navigation:*"
+        versions: [">=2.10.0"]
+
+      # Room 3.0 is a breaking major, still alpha, and nothing consumes it.
+      # Remove when cu-182 names a target version.
+      - dependency-name: "androidx.room:*"
+        versions: [">=3.0.0"]
+
+      # hamcrest-all is held at 1.3 because 2.2 resolves the wrong version for
+      # Espresso — org.hamcrest.Matchers lands in neither jar and every
+      # instrumented test fails at runtime (cu-54). Probably never removed.
+      - dependency-name: "org.hamcrest:hamcrest-all"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: feature/agentic-dev
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "build"
+    groups:
+      actions:
+        patterns:
+          - "*"

@@ -113,6 +113,24 @@ are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaR
 test results and coverage report. **All build logic lives in `verify.sh`/Gradle, never in the
 workflow** (D12 rule 6).
 
+`.github/workflows/codeql.yml` — CodeQL security analysis on the same branches, weekly, and on
+demand. Kotlin is a *compiled* language for CodeQL, so the job builds `assembleDebug` and analyses
+through the `java-kotlin` pack with the `security-extended` query set. Results stay in the
+repository's own Security tab; nothing leaves GitHub and no third-party account exists
+(decision-19). Free because the repository is public.
+
+`.github/dependabot.yml` — weekly `gradle` and `github-actions` updates, **targeting
+`feature/agentic-dev`** (decision-23), which is why that branch is in `ci.yml`'s triggers: without
+it, every bot PR would open against a branch CI does not test. Related updates are grouped (Kotlin
+with KSP, each AndroidX family), and each deliberate pin is ignored with its reason and the
+condition that lifts it — otherwise a weekly PR per pin trains everyone to ignore the bot.
+
+**Not adopted: the Dependency Analysis Gradle plugin.** `buildHealth` analyses every variant, so it
+compiles `releaseUnitTest`, which has never compiled in this repository — `MoveSyncLocationHookTest`
+calls a `DebugHooks` member that exists only in the debug source set, and nothing in `verify.sh`
+builds that half. See draft-221. The plugin's `ignoreSourceSet` filters advice but not the task
+graph, so it is not a workaround.
+
 ## Known debt
 
 **29 files under `features/` import `data.sources.plex.*` directly** — dominated by

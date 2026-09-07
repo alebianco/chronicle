@@ -8,9 +8,12 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, develop ]
+    # feature/agentic-dev is where all task work lands until a release is cut
+    # (decision-23), and it is Dependabot's target-branch — without it here,
+    # every bot PR would open against a branch CI does not test.
+    branches: [ main, master, develop, feature/agentic-dev ]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, feature/agentic-dev ]
   workflow_dispatch:
 
 jobs:

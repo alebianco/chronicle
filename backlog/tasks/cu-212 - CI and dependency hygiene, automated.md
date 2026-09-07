@@ -1,7 +1,7 @@
 ---
 id: cu-212
 title: "CI and dependency hygiene, automated"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -84,29 +84,37 @@ classes whose ProGuard rules are deliberately narrow (cu-45).
 ## Acceptance Criteria
 
 **Dependabot**
-- [ ] `.github/dependabot.yml` covers `gradle` and `github-actions`, weekly
-- [ ] `target-branch: feature/agentic-dev`, and that branch added to `ci.yml`'s `push` and
+- [x] `.github/dependabot.yml` covers `gradle` and `github-actions`, weekly
+- [x] `target-branch: feature/agentic-dev`, and that branch added to `ci.yml`'s `push` and
       `pull_request` triggers
-- [ ] Every pin above ignored with its reason and unblocking condition in a comment
-- [ ] Related updates **grouped** — Kotlin with KSP, each AndroidX family together
+- [x] Every pin above ignored with its reason and unblocking condition in a comment
+- [x] Related updates **grouped** — Kotlin with KSP, each AndroidX family together
 - [ ] Verified by observation: at least one PR has opened against the right branch and been checked
       by CI. A config that has never produced a PR is not known to work
+      — **not met.** Dependabot only reads the config once it is on the default branch at GitHub;
+      nothing observable can happen from an unmerged worktree. Owner check after merge.
 
 **CodeQL**
-- [ ] Runs on push and pull request for the CI branches, `feature/agentic-dev` included
+- [x] Runs on push and pull request for the CI branches, `feature/agentic-dev` included
 - [ ] Confirmed by the run log that it **analysed Kotlin sources**
+      — **not met, and deliberately left unticked.** This needs a real Actions run, which requires
+      the branch pushed. The task itself says a scanner that reports nothing is indistinguishable
+      from one that is not running, so a green config is not evidence.
 - [ ] Every finding triaged — fixed, or dismissed with a reason. An untriaged alert backlog is the
-      same as no scanner
-- [ ] Nothing leaves GitHub; no third-party account created (decision-19)
+      same as no scanner — **blocked on the first run above.**
+- [x] Nothing leaves GitHub; no third-party account created (decision-19)
 
-**Dependency analysis**
+**Dependency analysis** — **not adopted; blocked on a pre-existing defect.** See draft-221.
 - [ ] Applied, with `hamcrest-modern` pre-declared as runtime-only, citing cu-54
-- [ ] First report triaged in full: acted on, or recorded as a deliberate exception
-- [ ] Anything removed is measured — `releaseRuntimeClasspath` diff and APK delta, as cu-167 and
-      cu-192 both did
-- [ ] `./test_release_build.sh` passes after any removal — unused-looking deps are often
-      reflection-reached
-- [ ] `./verify.sh` green
+      — configuration was written and the exception pre-declared as the task required, then backed
+      out: `buildHealth` analyses *every* variant, so it compiles `releaseUnitTest`, which has
+      never compiled in this repo (`MoveSyncLocationHookTest` calls a `DebugHooks` member that
+      exists only in the debug source set). Reproduced on a clean checkout with no plugin applied,
+      so it is not caused by this change. `ignoreSourceSet` filters advice but not the task graph.
+- [ ] First report triaged in full — **no report can be produced until draft-221 is fixed.**
+- [ ] Anything removed is measured — nothing was removed.
+- [ ] `./test_release_build.sh` passes after any removal — not applicable, no removal.
+- [x] `./verify.sh` green — 8/8 stages, run in the task worktree.
 
 ## Notes
 
@@ -115,3 +123,27 @@ Closing status **In Review**: the observed-PR criterion and the triage judgement
 The dependency-analysis part is the lowest-value third — it automates work already done twice, so the
 remaining unused surface is probably small. Its value is preventing the *next* accumulation. If time
 is short, Dependabot and CodeQL are the halves worth having.
+
+## Closing notes (2026-09-07)
+
+Shipped **the two halves the task itself named as the ones worth having**: Dependabot and CodeQL.
+The dependency-analysis third is not adopted, and that is the one judgement here worth the owner's
+eye.
+
+**Why the third was dropped rather than forced.** Applying the plugin surfaced a real defect:
+`compileReleaseUnitTestKotlin` has never succeeded in this repository. Confirmed against a clean
+checkout with the plugin fully reverted, so the plugin exposed it rather than caused it. Two ways
+around it were available and both rejected — modifying app code (the task states three times that
+none of its parts changes app code, and moving test files carries its own verification), or
+configuring the analysis to depend on the breakage persisting, which is the "scanner that reports
+nothing" failure this task explicitly warns against. Filed as draft-221 with three options and a
+recommendation instead.
+
+**What no agent can tick here.** Both remaining Dependabot and CodeQL criteria need the branch
+pushed and a real Actions run — Dependabot does not read its config from an unmerged worktree, and
+CodeQL's "confirmed it analysed Kotlin sources" is by design not satisfiable by a config file.
+Ticking either from a green `verify.sh` would be exactly the substitution the task warns about.
+
+**Verified:** `./verify.sh` green, 8/8 stages. `dependabot.yml` and `codeql.yml` parse, and all six
+documented pins resolve to coordinates that exist in `libs.versions.toml`. No app code was touched —
+the diff is two workflow files, one Dependabot config, one doc section, and one draft.

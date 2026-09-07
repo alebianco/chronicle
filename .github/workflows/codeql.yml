@@ -1,0 +1,85 @@
+# CodeQL — security analysis that stays inside the repository.
+#
+# Why this and not a hosted quality platform: decision-19 bans any dependency
+# or service that extracts the household's data, and decision-12 rule 7 already
+# rejected coverage SaaS on the same ground. CodeQL runs in Actions and the
+# results stay in GitHub's own Security tab — nothing leaves, and no
+# third-party account exists to create. Code scanning with CodeQL is free for
+# public repositories.
+#
+# Kotlin is a *compiled* language for CodeQL: it is analysed through the
+# `java-kotlin` language pack and needs a real build, so this mirrors ci.yml's
+# JDK and Gradle cache setup. `assembleDebug` alone is enough — CodeQL needs
+# the Kotlin sources compiled, not the full eight-stage gate, which ci.yml
+# already runs on the same events.
+#
+# If Sonar-style debt *tracking* is ever wanted once a homelab exists, the
+# options that satisfy decision-19 are self-hosted Sonar CE or `mobsfscan`.
+# Recorded here so it is not researched a second time.
+name: CodeQL
+
+on:
+  push:
+    branches: [ main, master, develop, feature/agentic-dev ]
+  pull_request:
+    branches: [ main, master, develop, feature/agentic-dev ]
+  schedule:
+    # Weekly, so a newly published query reaches this code without a push.
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload the SARIF results to the Security tab.
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          # `java-kotlin` covers both Java and Kotlin sources; this codebase is
+          # Kotlin with a handful of Java files inherited from upstream.
+          languages: java-kotlin
+          # security-extended adds the Android-specific queries (exported
+          # components, insecure WebView settings, cleartext traffic) on top of
+          # the default security set.
+          queries: security-extended
+
+      - name: Grant execute permissions
+        run: chmod +x gradlew
+
+      # Deliberately not autobuild: the implicit build picks its own target and
+      # has no reason to land on assembleDebug. Naming the task keeps what gets
+      # analysed explicit — and a scanner that quietly analysed nothing is
+      # indistinguishable from one that is not running.
+      - name: Build for analysis
+        run: ./gradlew assembleDebug
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"
