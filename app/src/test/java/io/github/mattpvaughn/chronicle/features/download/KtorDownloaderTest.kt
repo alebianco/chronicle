@@ -8,11 +8,15 @@ import io.ktor.client.engine.mock.respondError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -157,13 +161,11 @@ class KtorDownloaderTest {
 
       d.enqueue(listOf(request(dest)))
       d.awaitIdle()
-      collector.cancel()
+      awaitEvent(events, collector, "a 416 must report completion, not failure") {
+        it is DownloadEvent.Completed
+      }
 
       assertEquals("the complete file must be left untouched", WHOLE, dest.readText())
-      assertTrue(
-        "a 416 must report completion, not failure: $events",
-        events.any { it is DownloadEvent.Completed },
-      )
     }
 
   @Test
@@ -179,10 +181,9 @@ class KtorDownloaderTest {
 
       d.enqueue(listOf(request(dest)))
       d.awaitIdle()
-      collector.cancel()
+      awaitEvent(events, collector, "the failure must be reported") { it is DownloadEvent.Failed }
 
       assertEquals("a failure must not discard the partial", HEAD, dest.readText())
-      assertTrue("the failure must be reported: $events", events.any { it is DownloadEvent.Failed })
     }
 
   @Test
@@ -191,10 +192,25 @@ class KtorDownloaderTest {
       // Two coroutines appending to one file is how a download corrupts itself, and re-enqueueing
       // is easy to trigger — a retry on regained network over a queue that has not drained.
       val dest = File(tmp.root, "track-1.mp3")
-      val d = downloader(engine { HttpStatusCode.OK to WHOLE })
+      // The engine blocks until released, so the first download is *provably* still in flight when
+      // the duplicate is enqueued. Without this the test raced its own subject: a job removes
+      // itself from `jobs` when it finishes, so if the first completed first the map was empty, the
+      // duplicate was not a duplicate, and two requests were made. It passed on a fast machine and
+      // failed on a GitHub runner — the guard was fine; the test's premise was not.
+      val inFlight = CompletableDeferred<Unit>()
+      val d =
+        downloader(
+          MockEngine {
+            requestedRanges += it.headers[HttpHeaders.Range]
+            inFlight.await()
+            respond(WHOLE, HttpStatusCode.OK)
+          },
+        )
 
       d.enqueue(listOf(request(dest)))
+      // Both enqueues are done before anything can complete.
       d.enqueue(listOf(request(dest)))
+      inFlight.complete(Unit)
       d.awaitIdle()
 
       assertEquals(
@@ -215,7 +231,9 @@ class KtorDownloaderTest {
 
       d.enqueue(listOf(request(dest)))
       d.awaitIdle()
-      collector.cancel()
+      awaitEvent(events, collector, "the completion must be reported") {
+        it is DownloadEvent.Completed
+      }
 
       val completed = events.filterIsInstance<DownloadEvent.Completed>().single()
       assertEquals("track-1", completed.trackId)
@@ -230,6 +248,32 @@ class KtorDownloaderTest {
     into: MutableList<DownloadEvent>,
   ) = launch { d.events.collect { into.add(it) } }
 
+  /**
+   * Waits for an event matching [predicate], then cancels [collector].
+   *
+   * **`awaitIdle()` alone is not enough, and CI proved it.** It joins the download *job*, but the
+   * event reaches `into` on a separate collector coroutine — so on a loaded machine the job can
+   * finish, the assertion can read an empty list, and the emission can arrive afterwards. Two tests
+   * failed exactly that way on a GitHub runner while passing on a developer machine every time.
+   *
+   * Polling with a timeout rather than sleeping: it returns the moment the event lands, so the fast
+   * path costs nothing, and it fails with the collected events rather than a bare assertion.
+   */
+  private suspend fun awaitEvent(
+    events: List<DownloadEvent>,
+    collector: Job,
+    what: String,
+    predicate: (DownloadEvent) -> Boolean,
+  ) {
+    withTimeoutOrNull(EVENT_TIMEOUT_MS) {
+      while (events.none(predicate)) {
+        yield()
+      }
+    }
+    collector.cancel()
+    assertTrue("$what — collected: $events", events.any(predicate))
+  }
+
   /** A [DispatcherProvider] over real dispatchers, since this exercises real file I/O. */
   private object RealDispatcherProvider : DispatcherProvider {
     override val io = Dispatchers.IO
@@ -238,6 +282,11 @@ class KtorDownloaderTest {
   }
 
   private companion object {
+    /**
+     * Generous on purpose. `awaitEvent` returns the instant the event lands, so a high ceiling
+     * costs a fast machine nothing and stops a loaded CI runner from failing for being slow.
+     */
+    const val EVENT_TIMEOUT_MS = 5_000L
     const val HEAD = "HELLO"
     const val TAIL = "WORLD"
     const val WHOLE = "HELLOWORLD"
