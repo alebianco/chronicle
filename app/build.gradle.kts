@@ -3,11 +3,22 @@ plugins {
   alias(libs.plugins.kotlin.android)
   id("kotlin-parcelize")
   alias(libs.plugins.ksp)
+  alias(libs.plugins.ktorfit)
   alias(libs.plugins.hilt)
   alias(libs.plugins.compose.compiler)
   id("com.google.android.gms.oss-licenses-plugin")
   alias(libs.plugins.pitest)
   jacoco
+}
+
+// The Kotlin compiler options, in the current DSL. `kotlinOptions {}` was deprecated and the
+// Ktorfit Gradle plugin escalates that deprecation to an error, so this had to move — the settings
+// themselves are unchanged.
+kotlin {
+  compilerOptions {
+    jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    freeCompilerArgs.add("-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi")
+  }
 }
 
 android {
@@ -60,11 +71,6 @@ android {
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
-  }
-  kotlinOptions {
-    jvmTarget = "17"
-
-    freeCompilerArgs += "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
   }
   buildFeatures {
     buildConfig = true
@@ -196,6 +202,21 @@ dependencies {
   implementation(libs.retrofit)
   implementation(libs.retrofit.converter)
 
+  implementation(libs.ktor.client.core)
+  implementation(libs.ktor.client.okhttp)
+  implementation(libs.ktor.client.content.negotiation)
+  implementation(libs.ktor.client.logging)
+  // Ktor is the HTTP stack per decision-24. Pinned at 3.2.1 with Ktorfit 2.6.5 because that is
+  // the pair built against Kotlin 2.2.x: Ktorfit 2.7.5 requires kotlin-stdlib 2.4.0, which
+  // upgrades the stdlib underneath KSP and makes unrelated classes resolve as
+  // `error.NonExistentClass` — nine failures in Room and Hilt processing, none of them mentioning
+  // Ktor. Raising either means raising Kotlin first, which is its own task.
+  implementation(libs.ktor.client.core)
+  implementation(libs.ktor.client.okhttp)
+  implementation(libs.ktor.client.content.negotiation)
+  implementation(libs.ktor.client.logging)
+  implementation(libs.ktorfit.lib)
+  ksp(libs.ktorfit.ksp)
   implementation(libs.okhttp3)
   implementation(libs.okhttp3.logging)
 
@@ -250,6 +271,7 @@ dependencies {
   // suite run in the unit-test gate. Room's own MigrationTestHelper is
   // instrumented-only, and instrumented tests are quarantined.
   debugImplementation(libs.okhttp3.mockwebserver)
+  testImplementation(libs.ktor.client.mock)
   testImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.retrofit)
   testImplementation(libs.retrofit.converter)
