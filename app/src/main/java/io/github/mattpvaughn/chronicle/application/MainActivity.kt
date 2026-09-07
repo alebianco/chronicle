@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     Timber.i("MainActivity onCreate()")
 
-    // **Before the debug hooks and before `viewModel` is touched** (cu-185). Hilt injects this
+    // **Before the debug hooks and before `viewModel` is touched**. Hilt injects this
     // activity's members inside `super.onCreate()`, and `by viewModels()` needs the activity at
     // CREATED — reading either earlier crashed on launch with "You can 'consumeRestoredStateForKey'
     // only after the corresponding component has moved to the 'CREATED' state".
@@ -151,16 +151,16 @@ class MainActivity : AppCompatActivity() {
       }
     }
 
-    // Debug-only: `--el download_book <id>` starts a download (cu-132).
+    // Debug-only: `--el download_book <id>` starts a download.
     DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
 
     localBroadcastManager = LocalBroadcastManager.getInstance(this)
 
-    // The whole UI is Compose now (cu-206). This replaces `activity_main.xml` — a
+    // The whole UI is Compose now. This replaces `activity_main.xml` — a
     // `ConstraintLayout` holding a `BottomNavigationView`, a `FragmentContainerView` and a
     // hand-built player sheet moved between three `ConstraintSet`s — along with every write that
     // drove it, including `applyWindowInsets`, whose guideline arithmetic recomputed the collapsed
-    // player's position from the system bar inset (cu-73). `ChronicleApp` reads the insets itself.
+    // player's position from the system bar inset. `ChronicleApp` reads the insets itself.
     setContent {
       val sheetState by viewModel.currentlyPlayingLayoutState.collectAsStateWithLifecycle()
       val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
@@ -243,7 +243,7 @@ class MainActivity : AppCompatActivity() {
    *
    * Each destination becomes a fresh root: `popUpTo(graph.id) { inclusive = true }` clears
    * everything behind it, so backing out of onboarding cannot land on a stale Home rendered from
-   * the previous session's Room data (cu-124).
+   * the previous session's Room data.
    */
   @Composable
   private fun LoginNavigation(controller: NavHostController) {
@@ -266,7 +266,7 @@ class MainActivity : AppCompatActivity() {
    * A revoked account is a condition the user has to act on, not a passing error, so it gets an
    * indefinite Snackbar rather than a Toast — which would vanish before it was read and leave the
    * app looking merely broken. Before decision-17 nothing was shown at all: `account_signed_out`
-   * existed as a string and was referenced nowhere (cu-73).
+   * existed as a string and was referenced nowhere.
    *
    * The action routes to Settings, where "Sign in again" already restores sync without losing the
    * server, library or downloads; this adds discovery, not a new recovery path.
@@ -303,7 +303,7 @@ class MainActivity : AppCompatActivity() {
    *
    * **Not** an `onBackPressed()` override. At `targetSdk` 36 on Android 16 the platform's
    * predictive-back gesture is mandatory and the legacy override is never called — so every branch
-   * below was silently dead and a back press quit the app (cu-73).
+   * below was silently dead and a back press quit the app.
    */
   private fun registerBackHandler() {
     onBackPressedDispatcher.addCallback(
@@ -319,8 +319,8 @@ class MainActivity : AppCompatActivity() {
           // Onboarding is not somewhere to escape *into the app* from. Back used to fall through
           // to the Home-tab branch below, landing the user on a Home that looks fully working —
           // because it renders the previous session's books out of Room — while the app's own
-          // state still said LOGGED_IN_NO_LIBRARY_CHOSEN and the prefs had no library at all
-          // (cu-124). Leaving is the honest response: nothing was chosen, so there is nothing to
+          // state still said LOGGED_IN_NO_LIBRARY_CHOSEN and the prefs had no library at all.
+          // Leaving is the honest response: nothing was chosen, so there is nothing to
           // show.
           if (viewModel.isOnboarding.value) {
             leaveApp()
@@ -380,7 +380,7 @@ class MainActivity : AppCompatActivity() {
     super.onDestroy()
   }
 
-  // Non-null since androidx.activity 1.10 (raised to 1.13.0 by Compose, cu-181). The body already
+  // Non-null since androidx.activity 1.10 (raised to 1.13.0 by the Compose migration). The body already
   // treats the intent as nullable throughout because `handleNotificationIntent` and every
   // `DebugHooks` entry point still accept `Intent?` -- they are also called from `onCreate`, where
   // a null intent is genuinely possible.
@@ -420,7 +420,7 @@ class MainActivity : AppCompatActivity() {
     if (openAudiobookWithId != NO_AUDIOBOOK_FOUND_ID) {
       lifecycleScope.launch {
         // Only the DB read goes to IO. The navigation must run on the main thread — it used to sit
-        // inside the IO block (cu-169).
+        // inside the IO block.
         val audiobook =
           withContext(dispatchers.io) {
             bookRepository.getAudiobookAsync(openAudiobookWithId)

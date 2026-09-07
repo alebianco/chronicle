@@ -17,7 +17,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.CONTENT_STYLE_SUPPORTED
  * @param mediaId the category's **stable** identifier, which `onLoadChildren` matches on.
  * @param title the localized label shown to the user. Never the identifier: this used to default to
  *   the title, so the browse tree was keyed on translated text and every category stopped resolving
- *   after a language change (cu-99).
+ *   after a language change.
  */
 fun makeBrowsable(
   mediaId: String,

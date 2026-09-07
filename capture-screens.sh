@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# capture-screens.sh — screenshot the main screens against the cu-16 mock server.
+# capture-screens.sh — screenshot the main screens against the fixture mock server.
 #
 # Gives UI work a before/after baseline that does not depend on a Plex account or
-# on whatever a real library happens to contain. Intended for cu-58's
+# on whatever a real library happens to contain. Intended for the
 # DataBinding→ViewBinding conversion, where the automated gate can prove the app
 # compiles but not that a screen still renders.
 #
@@ -38,7 +38,7 @@ tap() { adb shell input tap "$1" "$2"; }
 # run reported "captured settings" having captured the library again. The duplicate check caught
 # it, but only after the fact.
 #
-# `uiautomator dump` is usable for this since cu-110: the main thread no longer saturates, so the
+# `uiautomator dump` is usable for this now that the main thread no longer saturates, so the
 # UI actually reaches idle and the dump succeeds. Before that it failed with
 # "could not get idle state", which is why this script was written around blind coordinates.
 tap_id() {

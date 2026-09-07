@@ -27,7 +27,7 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 
 /**
- * The note attached to one bookmark (cu-206).
+ * The note attached to one bookmark.
  *
  * Replaces `ModalBottomSheetBookmarkNote`, the last of the three screens still written in Views.
  * That one had no ViewModel and no injection at all — arguments in, a `Listener` out — which

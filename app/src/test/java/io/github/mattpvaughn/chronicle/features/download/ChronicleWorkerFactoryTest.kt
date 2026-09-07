@@ -18,17 +18,17 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 
 /**
- * The workers are constructible in a unit test — cu-179's actual goal.
+ * The workers are constructible in a unit test — the actual goal.
  *
- * **The factory-contract half of this suite is retired, not lost** (cu-185). It asserted that
+ * **The factory-contract half of this suite is retired, not lost**. It asserted that
  * `ChronicleWorkerFactory` built each of ours and *returned null for anything else*, so WorkManager
  * would fall back to its reflective constructor for a worker added later. That factory is deleted:
  * each worker is `@HiltWorker` with an ordinary `@Inject` constructor, and `HiltWorkerFactory`
  * does the dispatch — including the fallback, which is now the framework's behaviour rather than
  * ours to get right. A guard kept past the code it guards is noise.
  *
- * What is still worth pinning is the property cu-179 was really after. Before it, both workers
- * reached `Injector.get()` in **field initialisers**, and `Injector.get()` is
+ * What is still worth pinning is the property the Hilt migration was really after. Before it,
+ * both workers reached `Injector.get()` in **field initialisers**, and `Injector.get()` is
  * `ChronicleApplication.get()`, whose `INSTANCE!!` throws before the constructor finishes — so the
  * classes could not be instantiated in a test **at all**. They are 2,212 missed instructions,
  * `DownloadNotificationWorker` alone 1,420. If a worker ever regains a graph-reading field

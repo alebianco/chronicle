@@ -20,7 +20,7 @@ import java.io.File
  * exist so we find out here rather than on someone's phone.
  *
  * Room's own `MigrationTestHelper` is instrumented-only and instrumented tests
- * are quarantined (task cu-54), so the chains are driven directly through
+ * are quarantined, so the chains are driven directly through
  * SQLite via Robolectric instead. That keeps migration coverage inside the
  * `verify.sh` unit gate.
  */

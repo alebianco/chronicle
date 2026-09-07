@@ -4,11 +4,12 @@ import androidx.annotation.StringRes
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 
 /**
- * Everything the book-details header renders, as one value (cu-200).
+ * Everything the book-details header renders, as one value.
  *
  * The Fragment collected 17 flows and made twelve independent `isVisible` decisions from them,
  * each anchored on its own boolean or enum comparison. Nothing stopped two being true at once —
- * the same shape cu-187 found rendering "empty" and "offline" together on the collections screen.
+ * the same shape the collections screen's Compose migration found rendering "empty" and
+ * "offline" together.
  */
 data class DetailsUiState(
   val book: BookHeader = BookHeader(),
@@ -33,11 +34,12 @@ data class BookHeader(
 /**
  * The progress readout.
  *
- * **Ported verbatim, not reworded.** [[cu-191]] records that this screen still renders the raw
- * `h:mm:ss/h:mm:ss` pair cu-19 removed from the player — and that the replacement wording is a
+ * **Ported verbatim, not reworded.** This screen still renders the raw
+ * `h:mm:ss/h:mm:ss` pair that was removed from the player — and the replacement wording is a
  * product choice the owner has not made ("a book you have not started may want its total length
  * shown plainly"). Rewording it inside a rendering migration would turn a mechanical change into
- * an unreviewed product decision, so the string arrives already formatted and cu-191 stays open.
+ * an unreviewed product decision, so the string arrives already formatted and the wording
+ * stays open.
  */
 data class ProgressLine(
   val text: String = "",
@@ -45,7 +47,7 @@ data class ProgressLine(
 )
 
 /**
- * The download control, as one exhaustive state (cu-200).
+ * The download control, as one exhaustive state.
  *
  * Was **four** flows — `cacheStatus`, `cacheIconDrawable`, `cacheContentDescription` and
  * `cacheIconTint` — each a `map` over the same source and each carrying its own `null ->` branch

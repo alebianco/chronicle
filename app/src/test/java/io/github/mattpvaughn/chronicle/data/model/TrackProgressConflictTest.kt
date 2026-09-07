@@ -11,7 +11,7 @@ import org.junit.Test
  * an earlier chapter writes a *newer* `lastViewedAt` locally, so the local offset wins and the next
  * sync does not drag them forward again.
  *
- * The comparison only became meaningful in cu-14, which fixed the units: Plex reports `lastViewedAt`
+ * The comparison only became meaningful once the units fix landed: Plex reports `lastViewedAt`
  * in **seconds** while the local DB writes millis, so the network value was ~1000× smaller and could
  * never win. A second device's position was silently discarded on every refresh. These tests use
  * millis on both sides, as `plexTimestampToMillis` now guarantees.

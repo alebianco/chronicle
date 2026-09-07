@@ -5,7 +5,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Every image is either labelled for a screen reader or explicitly marked decorative (cu-47).
+ * Every image is either labelled for a screen reader or explicitly marked decorative.
  *
  * TalkBack announces an unlabelled `ImageView` as "unlabelled image" — or, for a control, says
  * nothing useful at all — so a blind listener cannot tell the skip button from the bookmark one.

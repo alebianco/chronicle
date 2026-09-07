@@ -25,7 +25,7 @@ import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 
 /**
- * The bookmarks of the book being played (cu-22, migrated in cu-203).
+ * The bookmarks of the book being played.
  *
  * Replaces `BookmarkListAdapter` and the two `isVisible` decisions its host made. The empty state
  * is a branch rather than a second view, so "list showing" and "empty message showing" cannot both
@@ -79,7 +79,7 @@ private fun BookmarkRow(
         ),
   ) {
     // The accent bookmark glyph, which the XML row carried and a straight port would have lost —
-    // the class of omission cu-198 shipped with the player's bookmark button.
+    // the class of omission an earlier migration shipped with the player's bookmark button.
     Icon(
       painter = painterResource(R.drawable.ic_bookmark),
       contentDescription = stringResource(R.string.bookmarks_title),
@@ -88,7 +88,7 @@ private fun BookmarkRow(
     )
     Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
       // `formatPrecisePosition`, not `DateUtils` — a position inside a book is shown the same way
-      // the player shows one (cu-19).
+      // the player shows one.
       Text(
         text = formatPrecisePosition(bookmark.position.millis),
         style = MaterialTheme.typography.bodyLarge,

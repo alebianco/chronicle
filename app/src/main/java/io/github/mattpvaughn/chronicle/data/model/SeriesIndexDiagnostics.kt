@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.model
 
 /**
- * What the series-index rules tester shows (cu-151), independent of any UI.
+ * What the series-index rules tester shows, independent of any UI.
  *
  * Kept out of the ViewModel so the interesting decisions — which titles are worth offering, and
  * what a verdict looks like — are testable without Android. The screen is presentation over this.
@@ -14,7 +14,7 @@ object SeriesIndexDiagnostics {
    * The titles a user would most plausibly write a rule for: the ones that currently parse to **no
    * position at all**.
    *
-   * That set, rather than every title, is cu-151's fourth criterion and the reason the tester is
+   * That set, rather than every title, is the fourth criterion and the reason the tester is
    * useful before a user has written anything — it answers "does my library even need a rule?"
    * with their own data.
    *

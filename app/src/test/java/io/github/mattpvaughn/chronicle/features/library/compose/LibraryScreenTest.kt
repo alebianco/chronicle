@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The library grid (cu-201).
+ * The library grid.
  *
  * The states matter more than the grid here: the Fragment decided between them with two cached
  * locals whose seeds once rendered "No books found" over a full library, which is the bug
@@ -60,7 +60,7 @@ class LibraryScreenTest {
    * The seed renders nothing at all.
    *
    * `Loaded(emptyList())` would be indistinguishable from a genuinely empty library, so a cold
-   * start would flash "No books found" before Room's first emission — cu-68's bug, and the reason
+   * start would flash "No books found" before Room's first emission — the bug, and the reason
    * the seed is its own branch.
    */
   @Test
@@ -113,7 +113,7 @@ class LibraryScreenTest {
     assertEquals("Dune", clicked?.title)
   }
 
-  /** All three styles render; a two-way boolean would have dropped Details (cu-201). */
+  /** All three styles render; a two-way boolean would have dropped Details. */
   @Test
   fun `a details-list library renders its books`() {
     setScreen(

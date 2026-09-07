@@ -16,7 +16,7 @@ import java.io.File
  *
  * These assertions are structural rather than behavioural on purpose. Driving the
  * download callbacks needs a real [com.tonyodev.fetch2.Fetch] and a `BroadcastReceiver`,
- * which is instrumented territory (cu-54); what is cheap and worth pinning here is
+ * which is instrumented territory; what is cheap and worth pinning here is
  * that the class cannot reach for a global scope again.
  */
 class CachedFileManagerScopeTest {

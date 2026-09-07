@@ -24,7 +24,7 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 import io.github.mattpvaughn.chronicle.util.compose.ToastResEffect
 
-/** The collections list, as a navigation destination (cu-206). */
+/** The collections list, as a navigation destination. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionsDestination(

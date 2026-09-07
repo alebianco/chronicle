@@ -7,7 +7,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * The player must not print a raw duration (cu-19).
+ * The player must not print a raw duration.
  *
  * RESEARCH_FINDINGS §3.1's convergent-grammar rule 3 is that every well-liked audio app avoids
  * `h:mm:ss/h:mm:ss`; the player printed exactly that, including a literal `"0:00/0:00"` fallback,
@@ -25,7 +25,7 @@ import java.io.File
  */
 class RawDurationFormatTest {
   /**
-   * The player's readouts are rendered from [PlayerText], not from a raw duration (cu-198).
+   * The player's readouts are rendered from [PlayerText], not from a raw duration.
    *
    * Was a scan for `binding.<view>.setTextIfChanged(...)` on four named views. Those writes are
    * gone: the body is `PlayerScreen`, so there are no `binding` writes left to inspect and the old
@@ -47,12 +47,12 @@ class RawDurationFormatTest {
     listOf("bookProgress", "chapterPosition", "chapterRemaining").forEach { readout ->
       assertTrue(
         "the player body must render $readout through PlayerText, which is where the wording " +
-          "rule lives (cu-173)",
+          "rule lives",
         screen.contains("PlayerText.$readout("),
       )
     }
     assertFalse(
-      "the player body must not format a duration itself (§3.1 rule 3, cu-19)",
+      "the player body must not format a duration itself (RESEARCH_FINDINGS §3.1 rule 3)",
       RAW_FORMAT.containsMatchIn(screen),
     )
   }
@@ -60,7 +60,7 @@ class RawDurationFormatTest {
   @Test
   fun `the formatters themselves use the human helpers`() {
     // And the helpers those calls name do use the human formatters. Those helpers moved out of
-    // the fragment into `PlayerText` (cu-173) — they never needed a view, and inside a 408-line
+    // the fragment into `PlayerText` — they never needed a view, and inside a 408-line
     // `onCreateView` no unit test could reach them. The rule is unchanged; only its address is.
     val playerText = File(PLAYER_TEXT).readText().withoutComments()
     assertTrue(
@@ -128,7 +128,7 @@ class RawDurationFormatTest {
   fun `a comment describing the old format is not a violation`() {
     val source =
       """
-      // Was DateUtils.formatElapsedTime, which printed "0:00/0:00" (cu-19).
+      // Was DateUtils.formatElapsedTime, which printed "0:00/0:00".
       /* also 47:12:33/52:04:11 in a KDoc */
       fun format() = formatCoarseDuration(millis)
       """.trimIndent()
@@ -140,10 +140,10 @@ class RawDurationFormatTest {
 
   private companion object {
     /**
-     * The player's host. `CurrentlyPlayingFragment` until cu-206 retired the Fragments; the
-     * destination that replaced it is the same thing for this guard's purposes — the file that
-     * wires the ViewModel's text to the screen, and so the file where a raw `h:mm:ss/h:mm:ss`
-     * pair would reappear.
+     * The player's host. `CurrentlyPlayingFragment` until the Compose migration retired the
+     * Fragments; the destination that replaced it is the same thing for this guard's purposes —
+     * the file that wires the ViewModel's text to the screen, and so the file where a raw
+     * `h:mm:ss/h:mm:ss` pair would reappear.
      */
     const val PLAYER_FRAGMENT =
       "src/main/java/io/github/mattpvaughn/chronicle/features/currentlyplaying/compose/" +
@@ -180,7 +180,7 @@ class RawDurationFormatTest {
 
     /**
      * Strips comments, so a file explaining the format it replaced is not flagged by its own
-     * documentation — the trap cu-138's guard hit when its test matched the comment quoting the
+     * documentation — the trap the guard hit when its test matched the comment quoting the
      * old expression.
      */
     fun String.withoutComments(): String =

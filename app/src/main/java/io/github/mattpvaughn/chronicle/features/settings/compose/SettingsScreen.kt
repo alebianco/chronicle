@@ -24,7 +24,7 @@ import io.github.mattpvaughn.chronicle.features.settings.PreferenceModel
 import io.github.mattpvaughn.chronicle.features.settings.PreferenceType
 
 /**
- * One settings row, resolved (cu-199).
+ * One settings row, resolved.
  *
  * `PreferenceModel` is already the UI state — that is what makes this screen the easy second
  * migration. The one thing it does *not* carry is the switch's current value: `SettingsList`'s
@@ -64,7 +64,7 @@ fun SettingsScreen(
         when (row.model.type) {
           PreferenceType.TITLE -> SectionTitle(row)
           PreferenceType.BOOLEAN -> SwitchRow(row, onToggle)
-          // Exhaustive since cu-201 removed the dead INTEGER/FLOAT variants, so a new kind of row
+          // Exhaustive now that the dead INTEGER/FLOAT variants were removed, so a new kind of row
           // is a compile error here rather than a silently mis-rendered one.
           PreferenceType.CLICKABLE -> ClickableRow(row, onClick)
         }
@@ -81,7 +81,7 @@ private fun SectionTitle(row: SettingsRow) {
     // Uppercased, because the View style did: `TextAppearance.Subtitle.Settings` sets
     // `android:textAllCaps`. Material3's `labelLarge` does not, so a straight port silently
     // changed every section header from "APPEARANCE" to "Appearance" — caught by comparing
-    // against the cu-175 baseline screenshot, not by any test.
+    // against the pre-migration baseline screenshot, not by any test.
     text = row.model.title.format(LocalResources.current).toString().uppercase(),
     style = MaterialTheme.typography.labelLarge,
     color = MaterialTheme.colorScheme.primary,

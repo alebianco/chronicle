@@ -3,7 +3,7 @@ package io.github.mattpvaughn.chronicle.features.player
 /**
  * What a sleep timer should do next, as a pure function of its state and one tick of input.
  *
- * Extracted from [SimpleSleepTimer] (cu-21) so the semantics are testable without a `Service`, a
+ * Extracted from [SimpleSleepTimer] so the semantics are testable without a `Service`, a
  * `MediaControllerCompat`, a `SensorManager` or a real `Handler` — the timer had **no tests at all**
  * before this, and the two behaviours it needed (expiring vs. being cancelled; ending on a chapter
  * boundary rather than a deadline) are exactly the kind that go wrong silently.
@@ -31,8 +31,8 @@ sealed interface SleepTimerMode {
    * Deliberately carries **no deadline** — only the chapter it started in. A duration computed at
    * pick time (which is what this used to be) is wrong twice over: a seek does not change it, so
    * it fires mid-chapter or long after; and it was divided by the playback speed at pick time, so
-   * any later speed change desynced it — now more likely, since cu-20 made speed per book. Asking
-   * "is this still the same chapter?" cannot drift, because it derives no deadline at all.
+   * any later speed change desynced it — now more likely, since speed became a per-book setting.
+   * Asking "is this still the same chapter?" cannot drift, because it derives no deadline at all.
    */
   data class EndOfChapter(val chapterId: String) : SleepTimerMode
 }
@@ -48,7 +48,7 @@ sealed interface SleepTimerState {
   /**
    * The timer fired and playback was paused, but the duration is remembered.
    *
-   * The state that did not exist before cu-21, and whose absence *was* the bug: expiry called the
+   * The state that did not exist before, and whose absence *was* the bug: expiry called the
    * same `cancel()` the user's "cancel" did, zeroing everything — so resuming playback left no
    * timer and the user had to pick a duration again. Distinguishing "fired" from "dismissed" is
    * what lets the timer re-arm on resume.
@@ -123,7 +123,7 @@ object SleepTimerLogic {
    * The state after playback becomes active again.
    *
    * Re-arms an [SleepTimerState.Expired] timer to the duration it fired with — the acceptance
-   * criterion for cu-21. Anything else is returned unchanged, so resuming a *running* timer does
+   * criterion for this fix. Anything else is returned unchanged, so resuming a *running* timer does
    * not reset it and resuming with no timer does not invent one.
    *
    * A re-armed [SleepTimerMode.EndOfChapter] adopts the chapter playing **now**, not the one it

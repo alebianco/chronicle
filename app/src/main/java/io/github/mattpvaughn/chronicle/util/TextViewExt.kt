@@ -11,8 +11,8 @@ import android.widget.TextView
  * tick, and most ticks change none of them. A second of a 47-hour book leaves the percentage
  * identical; a chapter title is identical for many minutes at a time.
  *
- * Introduced for cu-117, where the measured cost of playback jank was re-rendering rather than
- * computation — the same finding cu-110 recorded one layer up. Two guards apply together: this
+ * Introduced when the measured cost of playback jank turned out to be re-rendering rather than
+ * computation — the same finding recorded one layer up. Two guards apply together: this
  * one, for values that repeat, and an `isShown` check at the call site, for views nobody can see.
  *
  * Compares with `==` on the rendered `CharSequence`, which is a plain `String` comparison for the

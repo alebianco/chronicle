@@ -24,28 +24,29 @@ interface CurrentlyPlaying {
    * track list — which is not exposed — and every consumer that tried got it wrong. A
    * `MediaItemTrack.progress` is an offset within *its own track*; subtracting a
    * `Chapter.bookStartTimeOffset` from it mixes the two frames and, on a multi-track book, yields
-   * a large negative number (cu-115). On a single-track book the two are the same value, which is
+   * a large negative number. On a single-track book the two are the same value, which is
    * why it went unnoticed for so long.
    */
   val bookPosition: StateFlow<BookOffset>
 
   /**
-   * The current book's chapters, resolved table-first (cu-82).
+   * The current book's chapters, resolved table-first.
    *
    * Read this rather than `book.value.chapters`: the book's column is the **legacy** source and is
-   * empty for any book synced since cu-49 wrote the table instead. Ten call sites in `PlayerExt`
-   * and `CurrentlyPlayingViewModel` read the column directly and got an empty list for exactly
-   * those books, which is chapter skip silently doing nothing.
+   * empty for any book synced since the table started being written instead. Ten call sites in
+   * `PlayerExt` and `CurrentlyPlayingViewModel` read the column directly and got an empty list for
+   * exactly those books, which is chapter skip silently doing nothing.
    */
   val chapters: List<Chapter>
 
   fun setOnChapterChangeListener(listener: OnChapterChangeListener)
 
   /**
-   * @param chaptersFromTable the book's rows from `ChapterDatabase`, the preferred chapter source
-   *   (cu-82). Passed **in** rather than read here: this runs once a second during playback, so a
-   *   DAO on this class would put a blocking read on every tick — the shape cu-110 removed. All
-   *   three callers already run in IO context. Defaults to empty, which falls back to the legacy
+   * @param chaptersFromTable the book's rows from `ChapterDatabase`, the preferred chapter source.
+   *   Passed **in** rather than read here: this runs once a second during playback, so a
+   *   DAO on this class would put a blocking read on every tick — the shape the per-tick Room
+   *   invalidation fix removed. All three callers already run in IO context. Defaults to empty,
+   *   which falls back to the legacy
    *   `Audiobook.chapters` column exactly as before.
    */
   fun update(
@@ -56,7 +57,7 @@ interface CurrentlyPlaying {
   )
 
   /**
-   * Republishes the current book with a new per-book speed override (cu-20).
+   * Republishes the current book with a new per-book speed override.
    *
    * Narrow on purpose. The override is written to the DB by the popover, and `ProgressUpdater`
    * would eventually re-read the book and republish it — but its tick is gated on `isPlaying`, so
@@ -126,8 +127,8 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
   ) {
     // Assign only on change. `ProgressUpdater` calls this **once a second** during playback, and a
     // `StateFlow` write fans out to every collector even when the value is identical — which is
-    // most ticks, since the book and the track change rarely and only the position moves. cu-110
-    // fixed this shape one layer up (per-tick Room invalidation); this is the same fix here.
+    // most ticks, since the book and the track change rarely and only the position moves. The
+    // per-tick Room invalidation fix fixed this shape one layer up; this is the same fix here.
     //
     // Measured on the 107-track fixture before the guard: 277 main-thread jiffies / 10 s against
     // **1** while paused, 100% janky frames, and `uiautomator dump` failing with "could not get
@@ -152,7 +153,7 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
     this.tracks = tracks
     // The second clause re-resolves once chapter data first becomes available for a book that had
     // none — now from either source, since the table can fill in after the backfill reaches this
-    // book while the column stays empty (cu-82).
+    // book while the column stays empty.
     val haveNewChapterData =
       this.chapters.isEmpty() && chaptersFromTable.isNotEmpty()
     if (shapeChanged || haveNewChapterData) {
@@ -169,11 +170,11 @@ class CurrentlyPlayingSingleton : CurrentlyPlaying {
     if (tracks.isNotEmpty() && chapters.isNotEmpty()) {
       // One lookup, by book position. This was two: `getChapterAt(track.id, track.progress)`
       // first, falling back to `chapterAtBookProgress` when it returned EMPTY_CHAPTER — the
-      // fallback added by cu-87 because publishing EMPTY_CHAPTER left every consumer stale, and
+      // fallback added because publishing EMPTY_CHAPTER left every consumer stale, and
       // that matters beyond display since `PlayerExt` drives skip-to-next/previous-chapter off it.
       //
       // The first lookup was **passing a track offset where `getChapterAt` wants a book one**
-      // (cu-136 — the retype is what surfaced it). So on any multi-track book it matched nothing
+      // (the retype is what surfaced it). So on any multi-track book it matched nothing
       // and the fallback did all the work; on a single-track book the two frames are the same
       // number and it happened to work. Fixed, it would be the fallback plus a redundant track-id
       // filter over the same position, so the two collapse into the one that was always correct.

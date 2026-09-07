@@ -28,7 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * What the *notification actually displays* when the chapter changes (cu-50).
+ * What the *notification actually displays* when the chapter changes.
  *
  * The distinction this pins is easy to miss and was the whole bug. `OnMediaChangedCallback` did
  * rebuild the notification on a chapter boundary — `onChapterChange` has always called
@@ -52,7 +52,7 @@ import org.robolectric.RobolectricTestRunner
  *
  * Robolectric for the same reason as [NotificationStateMachineTest]: the
  * `MediaControllerCompat.Callback` superclass constructor needs a real `Binder`. Must therefore be
- * listed in PIT's `excludedTestClasses` (cu-57).
+ * listed in PIT's `excludedTestClasses`.
  */
 @RunWith(RobolectricTestRunner::class)
 class ChapterSessionMetadataTest {
@@ -171,7 +171,7 @@ class ChapterSessionMetadataTest {
   }
 
   /**
-   * The scrubber must span the **chapter**, not the track (cu-165).
+   * The scrubber must span the **chapter**, not the track.
    *
    * `PlaybackState.position` is chapter-relative, so a track-length duration here would draw a bar
    * of the wrong size with the marker in the wrong place — the title says "Chapter 4" while the bar
@@ -237,7 +237,7 @@ class ChapterSessionMetadataTest {
         mockk(relaxed = true) {
           every { this@mockk.chapter } returns MutableStateFlow(chapter)
           every { book } returns MutableStateFlow(bookForTest)
-          // Stubbed because a relaxed mock cannot satisfy a `StateFlow` return: cu-165 reads this
+          // Stubbed because a relaxed mock cannot satisfy a `StateFlow` return: this is read
           // to scope the published duration to the chapter, and an unstubbed one throws
           // ClassCastException inside the callback.
           every { bookPosition } returns MutableStateFlow(chapter.bookStartTimeOffset)

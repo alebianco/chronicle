@@ -21,14 +21,14 @@ class CastEligibilityTest {
 
   @Test
   fun `plain http is eligible too`() {
-    // Cleartext is refused app-wide by network security config (cu-42), so this cannot arise from
+    // Cleartext is refused app-wide by network security config, so this cannot arise from
     // Plex — but a future source could, and the receiver, not this app, does the fetching.
     assertThat(castEligibilityOf("http://example.test/a.mp3"), equalTo(CastEligibility.Eligible))
   }
 
   @Test
   fun `a downloaded file uri is not castable`() {
-    // The exact shape cu-83 established: Uri.fromFile output, which a receiver cannot reach.
+    // The exact shape established: Uri.fromFile output, which a receiver cannot reach.
     assertThat(
       castEligibilityOf("file:///storage/emulated/0/chronicle/123.mp3"),
       equalTo(CastEligibility.LocalFileOnly),
@@ -37,7 +37,7 @@ class CastEligibilityTest {
 
   @Test
   fun `a bare path is not castable`() {
-    // A legacy row written before cu-83 has no scheme at all; it is still a local path.
+    // A legacy row written before this has no scheme at all; it is still a local path.
     assertThat(
       castEligibilityOf("/storage/emulated/0/chronicle/123.mp3"),
       equalTo(CastEligibility.LocalFileOnly),

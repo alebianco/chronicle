@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Grouping the library into browsable facets (cu-24).
+ * Grouping the library into browsable facets.
  *
  * The interesting cases are the untidy ones a hand-tagged library actually has: a book with two
  * narrators, a book with none, and a series whose books are numbered past ten.
@@ -226,7 +226,7 @@ class BookFacetsTest {
 
   // ---- the titleSort index parse ----
   //
-  // The parser's own cases live in SeriesIndexParserTest (cu-146), which covers the real-world
+  // The parser's own cases live in SeriesIndexParserTest, which covers the real-world
   // formats and the hundredths unit. Kept here is only what BookFacets itself depends on: that an
   // unknown position is the zero sentinel, since inSeriesOrder keys on exactly that.
 

@@ -5,7 +5,7 @@ import io.github.mattpvaughn.chronicle.data.model.GroupedSearchResults
 import io.github.mattpvaughn.chronicle.data.model.SearchField
 
 /**
- * A grouped search result flattened into `RecyclerView` rows (cu-25).
+ * A grouped search result flattened into `RecyclerView` rows.
  *
  * Kept out of the adapter so the flattening — which is where the ordering and the counts are
  * decided — is testable without inflating anything.

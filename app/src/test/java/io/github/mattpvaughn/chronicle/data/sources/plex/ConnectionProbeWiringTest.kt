@@ -19,7 +19,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
 /**
- * The real `checkServer` probe, driven through Retrofit against a fake server (cu-73, cu-11).
+ * The real `checkServer` probe, driven through Retrofit against a fake server.
  *
  * [ConnectionChooserTest] injects the probe lambda — deliberately, and its KDoc says so:
  * "*Injected so this is testable without Retrofit; production passes a `checkServer` call.*"
@@ -29,7 +29,7 @@ import retrofit2.converter.moshi.MoshiConverterFactory
  * Two things can be wrong in that one line and no existing test would notice: the endpoint could
  * 404 (it is `{url}/identity` with an *encoded* path parameter, which is easy to break), and
  * `isSuccessful` could be true for a response that is not a usable server. Both would present as
- * "the app cannot connect", with the chooser's own tests all green — the [[cu-107]] shape of
+ * "the app cannot connect", with the chooser's own tests all green — exactly that shape of
  * blind spot.
  *
  * So these use the real `PlexMediaService` interface over the real Retrofit + Moshi stack, and
@@ -127,7 +127,7 @@ class ConnectionProbeWiringTest {
   @Test
   fun `a dead LAN address falls through to a reachable WAN one`() =
     runTest {
-      // The case cu-73 hit for real on a router with broken DNS: LAN is offered but cannot be
+      // The case hit for real on a router with broken DNS: LAN is offered but cannot be
       // reached, and the app must still connect.
       val lan = Connection(uri = "http://127.0.0.1:1/dead", local = true)
       val wan = connection("")
@@ -149,7 +149,7 @@ class ConnectionProbeWiringTest {
   @Test
   fun `a relay connection is still chosen when it is all there is`() =
     runTest {
-      // Relay is penalised, not banned — cu-11's last-tier rule is what keeps this working.
+      // Relay is penalised, not banned — the last-tier rule is what keeps this working.
       val chosen = chooser().choose(listOf(connection("", relay = true))) { probe(it) }
 
       assertNotNull(chosen)

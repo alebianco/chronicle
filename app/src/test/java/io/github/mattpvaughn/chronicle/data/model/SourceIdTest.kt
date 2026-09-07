@@ -34,7 +34,7 @@ class SourceIdTest {
   /**
    * A server that has not been chosen yet must be distinguishable from one that *has*. Coalescing
    * the two would file every pre-login row under a real server's scope, where the next refresh
-   * for a different server would delete them as absent from its fetch (cu-80).
+   * for a different server would delete them as absent from its fetch.
    */
   @Test
   fun `an unknown source is not any real plex server id`() {
@@ -56,7 +56,7 @@ class SourceIdTest {
   }
 
   /**
-   * The legacy value every existing row carries. cu-80's `planIngestion` compared against the
+   * The legacy value every existing row carries. the `planIngestion` compared against the
    * `0L` constant, so a migration mapping it to the connected server must have something to map
    * *from* that is not itself a valid server id.
    */

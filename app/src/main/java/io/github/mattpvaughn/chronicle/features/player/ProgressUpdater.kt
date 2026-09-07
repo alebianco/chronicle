@@ -106,7 +106,7 @@ class SimpleProgressUpdater
      * The position **within the current track**, straight from the player.
      *
      * Progress is stored per track, but the session's `PlaybackState.position` is what Android Auto
-     * and the notification draw their scrubber from — and since cu-165 that is chapter-relative, so
+     * and the notification draw their scrubber from — and that is now chapter-relative, so
      * reading it here would save a chapter offset as a track offset and destroy the saved position.
      * The player's own position is always track-framed.
      *
@@ -227,8 +227,7 @@ class SimpleProgressUpdater
       }
 
       // One read, not two. `getBookIdForTrack` fetches this very row and throws everything but
-      // `parentKey` away, so asking for the track separately queried the same row twice per tick
-      // (cu-110/cu-104).
+      // `parentKey` away, so asking for the track separately queried the same row twice per tick.
       //
       // A missing row must still stop here. `getBookIdForTrack` signalled that by returning
       // `NO_AUDIOBOOK_FOUND_ID`, which is *not* what `EMPTY_TRACK.parentKey` holds ("-1"), so the
@@ -246,9 +245,10 @@ class SimpleProgressUpdater
       val bookProgress = tracks.getTrackStartTime(track) + progress
       val bookDuration = tracks.getDuration()
 
-      // `chaptersFromTable` is deliberately **not** passed here (cu-82). This runs once a second
-      // for the whole of playback, and a DAO read per tick is the exact cost cu-110 removed. The
-      // singleton only rebuilds its chapter list when the track shape changes or when it has none,
+      // `chaptersFromTable` is deliberately **not** passed here. This runs once a second
+      // for the whole of playback, and a DAO read per tick is the exact cost the per-tick Room
+      // invalidation fix removed. The singleton only rebuilds its chapter list when the track
+      // shape changes or when it has none,
       // and `OnMediaChangedCallback` — which fires on the book actually changing — supplies the
       // rows. `CurrentlyPlayingChapterSourceOrderingTest` pins that a later tick cannot downgrade
       // an already-resolved list back to the legacy column.
@@ -334,7 +334,7 @@ class SimpleProgressUpdater
 
       // A backwards seek across a track boundary leaves the *old* position on a later track, and
       // `getActiveTrack` takes the furthest started track regardless of recency — so the next
-      // re-derivation of the book position silently undid the seek (cu-131). Measured: seeking
+      // re-derivation of the book position silently undid the seek. Measured: seeking
       // back three chapters and refreshing moved the position forward 346 s.
       //
       // Clearing here rather than in the seek path covers every entry point that can move the
@@ -373,7 +373,7 @@ class SimpleProgressUpdater
         bookDuration - bookProgress <= BOOK_FINISHED_END_OFFSET_MILLIS
       ) {
         Timber.i("Marking $bookId as finished")
-        // `setWatched` propagates a server failure since cu-98. Caught here rather than left to
+        // `setWatched` propagates a server failure. Caught here rather than left to
         // escape: this runs on the progress-reporting path, and failing to mark a finished book
         // must not take down the reporting that keeps the listener's position.
         runCatching { bookRepository.setWatched(bookId) }

@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The speed popover's decisions (cu-20).
+ * The speed popover's decisions.
  *
  * Three inputs interact — the global preference, this book's override, and whether a book is
  * loaded at all — and every combination has a different correct answer for what the controls show
@@ -83,7 +83,7 @@ class SpeedChooserStateTest {
 
   /**
    * `Slider.setValue` throws for a value off its step grid, and the global preference is reachable
-   * through a settings import that validates keys but not values (cu-77).
+   * through a settings import that validates keys but not values.
    */
   @Test
   fun `an off-grid speed is snapped onto the step grid`() {

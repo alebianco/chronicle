@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Book position on a **multi-track** book (cu-115).
+ * Book position on a **multi-track** book.
  *
  * On a single-track book — which is every other fixture in this suite — an offset from the start of
  * the track equals an offset from the start of the book, so arithmetic that confuses the two is

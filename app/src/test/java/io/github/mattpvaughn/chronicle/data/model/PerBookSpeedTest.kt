@@ -11,7 +11,7 @@ import org.junit.Test
 import kotlin.math.roundToInt
 
 /**
- * The per-book playback-speed override (cu-20).
+ * The per-book playback-speed override.
  *
  * The interesting behaviour is not "a field stores a float" but the two rules around it: the
  * sentinel that distinguishes "no override" from a speed, and the fact that a *local-only* field
@@ -78,8 +78,8 @@ class PerBookSpeedTest {
   /**
    * The slider's step grid is derived from [SpeedChooserState.SPEED_STEP], not restated.
    *
-   * This read `android:stepSize` out of `modal_bottom_sheet_speed_chooser.xml` until cu-206
-   * deleted that layout. The hazard it guarded was specific to the View widget — `Slider.setValue`
+   * This read `android:stepSize` out of `modal_bottom_sheet_speed_chooser.xml` until the Compose
+   * migration deleted that layout. The hazard it guarded was specific to the View widget — `Slider.setValue`
    * **throws** for a value off its grid — and a Compose `Slider` clamps instead, so the crash is
    * gone. What is still worth pinning is that the popover's `steps` count and the constant
    * `snapToStep` rounds with describe the *same* grid: if they drift, a preset chip lands between

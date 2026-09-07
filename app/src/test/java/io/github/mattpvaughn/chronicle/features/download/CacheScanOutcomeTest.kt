@@ -17,7 +17,7 @@ import java.io.FileFilter
  * or unreadable directory, so both cases became "no files found" — and the scan then marked every
  * track uncached. An unmounted SD card, a sync directory that had moved, or a volume not yet mounted
  * at launch therefore wiped the cached status of a whole library while the audio was still on disk
- * (cu-85: *"book reports no cache even if I'm sure I have downloaded it"*).
+ * (*"book reports no cache even if I'm sure I have downloaded it"*).
  */
 class CacheScanOutcomeTest {
   @get:Rule
@@ -72,7 +72,7 @@ class CacheScanOutcomeTest {
   }
 
   /**
-   * The pattern's job is "is this filename shaped like one of ours?", and since cu-111 that
+   * The pattern's job is "is this filename shaped like one of ours?", and that now
    * includes non-numeric ids — so a stray `notes.txt` is shaped like a track whose id is `notes`
    * and does match. That is deliberate and safe: the caller
    * (`CachedFileManager.refreshTrackDownloadedStatus`) looks the id up in the database and
@@ -143,7 +143,7 @@ class CacheScanOutcomeTest {
   }
 
   /**
-   * The null branch from `listFiles()` — the cu-85 bug itself.
+   * The null branch from `listFiles()` — the bug itself.
    *
    * `listFiles` returns null for a directory that exists but cannot be read, and coalescing that to
    * an empty list un-cached whole libraries. Chmod is skipped when it does not take effect (running

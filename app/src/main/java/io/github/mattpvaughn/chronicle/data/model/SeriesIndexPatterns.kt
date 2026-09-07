@@ -2,17 +2,17 @@ package io.github.mattpvaughn.chronicle.data.model
 
 import timber.log.Timber
 
-// The patterns that read a series position out of a `titleSort` string (cu-147).
+// The patterns that read a series position out of a `titleSort` string.
 //
 // Modelled on tvnamer (https://github.com/dbr/tvnamer), which solves the same problem for TV
 // filenames: the tagging conventions in the wild are open-ended, so the expression list is *data*
 // rather than compiled-in constants, and a user can add their own without a new build.
 //
-// Three things carried over, each for a reason cu-146 ran into:
+// Three things carried over, each for a reason the series-index parser ran into:
 //
 // 1. Named capture groups. A pattern says what it captured (`index`, `series`) instead of relying
 //    on group *number*, so a user editing one cannot silently shift the meaning of group 1 —
-//    cu-146's patterns all captured position in group 1 by convention alone.
+//    the patterns all captured position in group 1 by convention alone.
 // 2. First match wins, in list order. Ordering is the whole mechanism for disambiguation:
 //    `audnexus` must precede `label_first` or "Book 2 of the Saga, Book 5" reads 2.
 // 3. A name per pattern. Which pattern matched is the most useful thing to know when a title
@@ -32,9 +32,9 @@ object SeriesIndexGroups {
   /**
    * The series name, when the pattern happens to isolate it.
    *
-   * Captured but not yet consumed: series name comes from the `Mood` tag (cu-24), which is more
+   * Captured but not yet consumed: series name comes from the `Mood` tag, which is more
    * reliable than a substring of a sort title. Declared so a pattern that names it is valid rather
-   * than rejected, and so cu-143 can use it as a fallback for an untagged library.
+   * than rejected, and so it can be used as a fallback for an untagged library.
    */
   const val SERIES = "series"
 }
@@ -105,13 +105,13 @@ enum class PatternOrder {
  * The ordered rules, compiled once.
  *
  * Compiled **once** and held for the process: `Audiobook.from` runs per book on every library
- * refresh, so at the cu-51 target of 1000+ books a per-call rebuild would recompile several
+ * refresh, so at a target of 1000+ books a per-call rebuild would recompile several
  * thousand expressions.
  */
 class SeriesIndexPatternSet(
   patterns: List<SeriesIndexPattern>,
   /**
-   * How user rules were combined with the built-ins, retained so the tester can say so (cu-151).
+   * How user rules were combined with the built-ins, retained so the tester can say so.
    *
    * [of] consumed this and threw it away, which left the fifth acceptance criterion — show the
    * effective order — unanswerable from the set itself. It matters to a user reading a verdict
@@ -135,7 +135,7 @@ class SeriesIndexPatternSet(
    * An unusable pattern is **dropped with a log line, not fatally** — the tvnamer failure mode
    * worth avoiding is a single bad expression in a config file breaking every parse. Dropping one
    * leaves the rest working, which is the same reasoning `asAudiobooks()` applies to an item with
-   * an unsafe id (cu-111).
+   * an unsafe id.
    */
   val usable: List<SeriesIndexPattern> =
     patterns.filter { pattern ->
@@ -268,7 +268,7 @@ data class PatternAttempt(
   /**
    * Whether this rule came from the user's `series-index-rules.json` rather than being built in.
    *
-   * Surfaced so the cu-151 tester can say which rules are the user's own: "my rule did not match"
+   * Surfaced so a tester can say which rules are the user's own: "my rule did not match"
    * and "a built-in matched first" are different problems with different fixes, and a flat list of
    * names cannot distinguish them.
    */
@@ -299,7 +299,7 @@ data class SeriesIndexMatch(
   val position: Double,
   val series: String = "",
 ) {
-  /** The position in the hundredths [Audiobook.seriesIndex] is stored in (cu-146). */
+  /** The position in the hundredths [Audiobook.seriesIndex] is stored in. */
   val storedIndex: Int
     get() = Math.round(position * Audiobook.SERIES_INDEX_SCALE).toInt()
 }
@@ -313,7 +313,7 @@ private const val INDEX = """(?<index>$NUM)"""
 /**
  * The formats real taggers write, **most specific first**.
  *
- * Order is load-bearing, not cosmetic — see the class KDoc above and cu-146's notes. Each entry
+ * Order is load-bearing, not cosmetic — see the class KDoc above and the notes. Each entry
  * names the convention it serves so a mis-parse can be traced to a rule.
  */
 val DEFAULT_SERIES_INDEX_PATTERNS: List<SeriesIndexPattern> =
@@ -335,7 +335,7 @@ val DEFAULT_SERIES_INDEX_PATTERNS: List<SeriesIndexPattern> =
       description =
         "\"Warhammer 40,000, Book 1, Bequin: ... - Pariah\" — the audnexus shape with a " +
           "sub-series between the number and the title, so the number is terminated by a comma " +
-          "rather than \" - \". Two real values on the household server take this form (cu-155). " +
+          "rather than \" - \". Two real values on the household server take this form. " +
           "Must follow audnexus, which handles the commoner unbroken form. The Book/Vol label " +
           "stays required, which is what stops \"Warhammer 40,000\" — a thousands separator with " +
           "no label — reading as book 40000.",
@@ -377,6 +377,6 @@ val DEFAULT_SERIES_INDEX_PATTERNS: List<SeriesIndexPattern> =
       description =
         "\"Mistborn, 2\" — a trailing bare number after a comma, with no label. Last because it " +
           "is the loosest; it must not win over a labelled form elsewhere in the string. Kept " +
-          "because the pre-cu-146 parser accepted it and dropping it was a regression.",
+          "because the original end-anchored parser accepted it and dropping it was a regression.",
     ),
   )

@@ -25,7 +25,7 @@ data class CastTrack(
  * Builds the list a Cast receiver will play, given each track's local and server URIs.
  *
  * Two things force a separate builder rather than reusing the ExoPlayer path. A receiver is a
- * different machine, so a downloaded `file://` URI (cu-83) is unreachable and the *server* URI must
+ * different machine, so a downloaded `file://` URI is unreachable and the *server* URI must
  * be substituted — casting a downloaded book streams rather than failing. And the receiver fetches
  * the audio itself, with no access to the OkHttp client's `X-Plex-Token` header, so the token has
  * to travel in the query string instead ([appendTokenTo]).
@@ -78,7 +78,7 @@ data class CastSourceCandidate(
  * The receiver issues its own HTTP requests and cannot be given the `X-Plex-Token` *header* the
  * app's OkHttp client uses, so the query parameter — which Plex accepts equivalently — is the only
  * way it can authenticate. An empty token is left off entirely rather than sent as `token=`, which
- * Plex treats as a malformed request rather than an anonymous one (cu-33's "empty counts as
+ * Plex treats as a malformed request rather than an anonymous one (the "empty counts as
  * absent").
  */
 internal fun appendTokenTo(

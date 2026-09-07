@@ -32,7 +32,7 @@ fun getBookmarkDatabase(context: Context): BookmarkDatabase {
 }
 
 /**
- * The bookmark store (cu-22).
+ * The bookmark store.
  *
  * A fifth database rather than a table in `BookDatabase`, so a library re-sync cannot reach it.
  * See [Bookmark] for why that matters. No `fallbackToDestructiveMigration`, like the other four:
@@ -88,7 +88,7 @@ interface BookmarkDao {
    * Updates just the note.
    *
    * `id` binds as `String` deliberately — the column is TEXT, and SQLite compares across storage
-   * classes, so a numeric bind would match no row silently and with no error (cu-71).
+   * classes, so a numeric bind would match no row silently and with no error.
    */
   @Query("UPDATE Bookmark SET note = :note WHERE id = :id")
   suspend fun updateNote(

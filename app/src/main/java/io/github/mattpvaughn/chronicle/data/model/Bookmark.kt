@@ -6,7 +6,7 @@ import androidx.room.TypeConverters
 import java.util.UUID
 
 /**
- * A position in a book the user marked, with an optional note (cu-22).
+ * A position in a book the user marked, with an optional note.
  *
  * Lives in its own database rather than as a table in `BookDatabase`, and that is load-bearing: a
  * library refresh merges `Audiobook` rows and calls `bookDao.removeAll` for books the server no
@@ -22,7 +22,7 @@ data class Bookmark(
    *
    * Two bookmarks may legitimately mark the same moment, and editing a note must not change a
    * bookmark's identity — which it would if the key were `(bookId, position)`. `String` like every
-   * other id in this schema (cu-71, decision-11).
+   * other id in this schema (decision-11).
    */
   @PrimaryKey
   val id: String = UUID.randomUUID().toString(),
@@ -31,7 +31,7 @@ data class Bookmark(
   /**
    * Where in the **book** this points, not where in a track.
    *
-   * A `BookOffset` because cu-136 made the frame a type after six bugs from confusing the two.
+   * A `BookOffset` because the frame was made a type after six bugs from confusing the two.
    * Stored as a plain `INTEGER` via [OffsetConverters], so no migration is implied by the wrapper.
    */
   val position: BookOffset,

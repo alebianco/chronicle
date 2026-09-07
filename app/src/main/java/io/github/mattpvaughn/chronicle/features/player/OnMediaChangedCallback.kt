@@ -67,7 +67,7 @@ class OnMediaChangedCallback
                 book = newBook,
                 track = newTrack,
                 tracks = newTracks,
-                // Table first (cu-82). Read here rather than in the singleton, which is also
+                // Table first. Read here rather than in the singleton, which is also
                 // driven once a second by `ProgressUpdater` and must not gain a per-tick DB read.
                 chaptersFromTable = bookRepo.getChaptersForBook(newBookId),
               )
@@ -104,7 +104,7 @@ class OnMediaChangedCallback
 
     /**
      * Puts the current chapter into the **session** metadata, which is what the notification
-     * actually renders (cu-50).
+     * actually renders.
      *
      * `NotificationBuilder` sets the chapter as the notification's content title, but the
      * notification uses `MediaStyle.setMediaSession()` and Android then draws the session metadata
@@ -141,7 +141,7 @@ class OnMediaChangedCallback
         mediaController.metadata?.let { MediaMetadataCompat.Builder(it) }
           ?: MediaMetadataCompat.Builder()
       // The duration must describe the same span as `PlaybackState.position`, which is
-      // chapter-relative since cu-165. Left at the track's, the bar would be the right shape and
+      // chapter-relative. Left at the track's, the bar would be the right shape and
       // point at the wrong place — worse than the whole-track bar it replaced.
       val chapterDuration =
         chapterScrubberWindow(currentlyPlaying.bookPosition.value, chapter)?.durationMillis
@@ -159,7 +159,7 @@ class OnMediaChangedCallback
     }
 
     /**
-     * Skips a rebuild whose result would be identical to the one already showing (cu-157).
+     * Skips a rebuild whose result would be identical to the one already showing.
      *
      * Measured on the tablet: starting a 107-track book produced **29** builds, because
      * `onPlaybackStateChanged` fires three times per real transition (6 of 9 callbacks were
@@ -182,7 +182,7 @@ class OnMediaChangedCallback
 
       // Built without touching the network: this runs on the path that can *promote* the service
       // to foreground, and awaiting the cover-art fetch first is what could blow the 5 s deadline
-      // (cu-137). The art is attached by postArtwork() after the state machine has run.
+      // . The art is attached by postArtwork() after the state machine has run.
       val notification =
         if (mediaController.sessionToken != null) {
           notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken)
@@ -241,7 +241,7 @@ class OnMediaChangedCallback
     /**
      * Re-posts the standing notification with its cover art attached.
      *
-     * The second half of the cu-137 split. Deliberately does *not* call `startForeground` again:
+     * The second half of the notification-artwork split. Deliberately does *not* call `startForeground` again:
      * the state machine above has already decided this state's foreground status — PAUSED
      * releases it on purpose to stay swipe-dismissable — and re-promoting here would undo that.
      * A plain `notify` updates the picture and nothing else.
@@ -250,7 +250,7 @@ class OnMediaChangedCallback
       val token = mediaController.sessionToken ?: return
 
       // Nothing to add: `buildNotificationWithoutArtwork` already attached the cached bitmap, so
-      // rebuilding here would produce the notification that is already showing (cu-157). This is
+      // rebuilding here would produce the notification that is already showing. This is
       // half of the measured burst — every update built the notification twice.
       if (notificationBuilder.hasArtworkFor(currentlyPlaying.book.value)) {
         return

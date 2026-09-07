@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.player
 
 /**
- * Whether `playBook` may retry after finding no local tracks (cu-97).
+ * Whether `playBook` may retry after finding no local tracks.
  *
  * Extracted from `AudiobookMediaSessionCallback` for the reason `OutgoingBookFlush` was: the class
  * takes sixteen collaborators including an `ExoPlayer` and a `MediaSessionCompat`, while this

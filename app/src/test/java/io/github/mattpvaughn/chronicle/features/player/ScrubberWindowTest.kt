@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The scrubber window Android Auto and the notification draw (cu-165).
+ * The scrubber window Android Auto and the notification draw.
  *
  * Before this, position and duration both described the whole track while the title beside them
  * named the chapter, so on a single-file 47-hour book a small drag skipped hours.
@@ -77,7 +77,7 @@ class ScrubberWindowTest {
 
   /**
    * A first chapter starting at zero is the case where book and chapter frames agree, which is
-   * exactly how a frame bug hides (cu-136). Pinned so it cannot be the only case covered.
+   * exactly how a frame bug hides. Pinned so it cannot be the only case covered.
    */
   @Test
   fun `a chapter starting at zero still reports a chapter-length window`() {

@@ -62,7 +62,7 @@ data class Collection(
  *
  * Room instantiates a `@TypeConverters(::class)` converter reflectively, so this cannot take a
  * dependency by construction without moving to `addTypeConverter` plumbing on every database that
- * uses it. It does not need to: this builds its **own** `Moshi` (cu-79) rather than reaching into
+ * uses it. It does not need to: this builds its **own** `Moshi` rather than reaching into
  * the DI graph, which is what made the model unconstructable in a test without standing up
  * `ChronicleApplication`.
  *
@@ -76,7 +76,7 @@ class CollectionIdConverter {
   private val stringType = Types.newParameterizedType(List::class.java, String::class.java)
   private val stringsAdapter = Moshi.Builder().build().adapter<List<String>>(stringType)
 
-  // The stored form is unchanged by cu-71: this always serialized a JSON array of strings
+  // The stored form is unchanged: this always serialized a JSON array of strings
   // and only converted to Long in Kotlin. Dropping that conversion removes a lossy step —
   // `toLong()` would throw on a non-numeric child id.
   @TypeConverter

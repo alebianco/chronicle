@@ -14,8 +14,8 @@ import org.junit.Test
  * **milliseconds**, around 1.79e12 today.
  *
  * So the network value was ~1000x smaller than any local one and could never win. A position
- * set on a second device was silently discarded on every refresh, which is the drift cu-14
- * exists to resolve.
+ * set on a second device was silently discarded on every refresh, which is the drift the
+ * units fix exists to resolve.
  */
 class SyncDriftTest {
   @Test

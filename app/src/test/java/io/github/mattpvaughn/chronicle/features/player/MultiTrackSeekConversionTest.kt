@@ -8,15 +8,15 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Book-absolute → (track, in-track offset), on a genuinely multi-track book (cu-115).
+ * Book-absolute → (track, in-track offset), on a genuinely multi-track book.
  *
- * `ChapterSeekTarget` has existed since cu-96 and does this conversion correctly, but it was only
+ * `ChapterSeekTarget` has always done this conversion correctly, but it was only
  * ever exercised against single-track fixtures — where the conversion is the identity, so a broken
  * one passes. These cases use the three-track fixture, where a missed conversion is out by a whole
  * track duration.
  *
  * The same arithmetic is inlined at two call sites in `CurrentlyPlayingViewModel` (the
- * jump-to-chapter path from cu-96, and the chapter slider fixed under cu-115). The duplication is
+ * jump-to-chapter path, and the chapter slider, fixed separately). The duplication is
  * a known smell; these tests pin the *rule* so all three agree, and a later consolidation onto
  * `chapterSeekTarget` has something to check itself against.
  */
@@ -35,7 +35,7 @@ class MultiTrackSeekConversionTest {
 
   /**
    * Chapter 2 starts at 300_000 — **inside** track 1, not on a boundary. This is the case a
-   * per-track offset of `0` (the cu-13/cu-49 bug) gets wrong.
+   * per-track offset of `0` gets wrong.
    */
   @Test
   fun `a chapter starting mid-track keeps its in-track offset`() {

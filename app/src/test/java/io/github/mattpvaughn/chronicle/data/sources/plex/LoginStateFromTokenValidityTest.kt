@@ -22,7 +22,7 @@ import org.junit.Test
  * library meant `LOGGED_IN_FULLY`. Plex tokens are invalidated by an **event** — a password change
  * with "sign out connected devices", a server re-claim — never on a timer, so a stored token can be
  * perfectly well-formed and completely dead. The app then showed stale data or an empty library and
- * said nothing (cu-84).
+ * said nothing.
  *
  * This is the branch that decides whether the user is told. The authenticator's side of the same
  * fix is in `PlexTokenAuthenticatorTest`; what is pinned here is that the signal is *acted on*.
@@ -76,7 +76,7 @@ class LoginStateFromTokenValidityTest {
    * `NOT_LOGGED_IN` routes through `Navigator.showLogin()`, which calls `plexConfig.clear()` and
    * wipes server, library and connections — so an expired token cost the user their entire
    * configuration and sent them back through server and library pickers. The owner hit exactly
-   * that in the cu-73 live pass after a password change.
+   * that in a live pass after a password change.
    *
    * So a revoked account now stays `LOGGED_IN_FULLY` — keeping config, cached library and
    * downloads — and the *silence* is fixed where it belongs, by surfacing `account_signed_out`.

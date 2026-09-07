@@ -20,7 +20,7 @@ import coil3.compose.AsyncImage
 private val PlaceholderColor = Color(0x33B998CC)
 
 /**
- * Book artwork, with a placeholder for every way it can be absent (cu-207).
+ * Book artwork, with a placeholder for every way it can be absent.
  *
  * ### Why this exists
  *
@@ -59,7 +59,7 @@ fun CoverImage(
   coverUrl: (String) -> String,
   modifier: Modifier = Modifier,
   // The title beside a cover is the accessible label; describing the image too makes TalkBack read
-  // every item twice (cu-47). A caller with no such label passes one.
+  // every item twice. A caller with no such label passes one.
   contentDescription: String? = null,
   contentScale: ContentScale = ContentScale.Crop,
 ) {

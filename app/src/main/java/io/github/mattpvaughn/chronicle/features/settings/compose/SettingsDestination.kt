@@ -42,7 +42,7 @@ private const val BACKUP_MIME_TYPE = "application/json"
 private val BACKUP_OPEN_MIME_TYPES = arrayOf("*/*")
 
 /**
- * The settings list, as a navigation destination (cu-206).
+ * The settings list, as a navigation destination.
  *
  * ### The document pickers get simpler
  *
@@ -53,7 +53,7 @@ private val BACKUP_OPEN_MIME_TYPES = arrayOf("*/*")
  * the reason for the `by lazy` — simply stop existing.
  *
  * This screen has no toolbar, so it takes the status-bar inset itself; that is what
- * `settingsCompose.applyTopSystemBarInset()` did (cu-63).
+ * `settingsCompose.applyTopSystemBarInset()` did.
  */
 @Composable
 fun SettingsDestination(

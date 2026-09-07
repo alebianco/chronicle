@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The player's three text readouts, now testable (cu-173).
+ * The player's three text readouts, now testable.
  *
  * These lived as local functions inside `CurrentlyPlayingFragment.onCreateView` — a 408-line
  * function — where nothing about them needed a view but **no unit test could reach them**. That is
@@ -47,7 +47,7 @@ class PlayerTextTest {
   fun `book progress is coarse and human, never a raw pair`() {
     val text = PlayerText.bookProgress(progress(millisLeftInBook = 22_320_000L), strings)
 
-    // 6h 12m — `formatCoarseDuration`, per §3.1 rule 3 (cu-19).
+    // 6h 12m — `formatCoarseDuration`, per §3.1 rule 3.
     assertEquals("${R.string.player_left_in_book}(6h 12m)", text)
   }
 

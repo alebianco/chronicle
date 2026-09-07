@@ -32,7 +32,7 @@ import java.io.IOException
  * task gives: a wrong scope here drops or duplicates work rather than failing to compile, so the
  * conversion needs something that would notice.
  *
- * What is worth pinning is the **number of network fetches**, because that is what cu-97 was about:
+ * What is worth pinning is the **number of network fetches**, because that is what this guard was about:
  * an unbounded retry issued one request per pass against the user's Plex server, forever. A
  * dispatcher change that accidentally re-entered the coroutine, or ran it twice, would show up here
  * as a changed call count and nowhere else.
@@ -51,7 +51,7 @@ class PlayBookGuardsTest {
     )
 
   /**
-   * The cu-97 bound. A fetch that succeeds while yielding no tracks must be attempted **once**;
+   * The retry bound. A fetch that succeeds while yielding no tracks must be attempted **once**;
    * the old code recursed and re-fetched on every pass.
    */
   @Test
@@ -66,7 +66,7 @@ class PlayBookGuardsTest {
     callback(trackRepo).onPlayFromMediaId(bookId, Bundle())
 
     assertEquals(
-      "an unbounded retry issues one request per pass against the user's server (cu-97)",
+      "an unbounded retry issues one request per pass against the user's server",
       1,
       fetches,
     )

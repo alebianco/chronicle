@@ -157,7 +157,7 @@ class NotificationBuilder
      * Builds a notification for the current playback state, **waiting for cover art**.
      *
      * Prefer [buildNotificationWithoutArtwork] anywhere a foreground-service deadline is running:
-     * this one suspends on a network fetch. See that method for why (cu-137).
+     * this one suspends on a network fetch. See that method for why.
      */
     suspend fun buildNotification(sessionToken: MediaSessionCompat.Token): Notification =
       withArtwork(buildNotificationWithoutArtwork(sessionToken), currentlyPlaying.book.value)
@@ -171,7 +171,7 @@ class NotificationBuilder
      * media OkHttp client, carrying a 5 s connect plus 15 s read timeout
      * (`AppModule.CONNECT_TIMEOUT_SECONDS` / `READ_TIMEOUT_SECONDS`). Cold artwork on a slow or
      * relayed route could therefore block for up to **20 s** against a 5 s budget, and the comments
-     * above two of those call sites stated the deadline while the code missed it (cu-137).
+     * above two of those call sites stated the deadline while the code missed it.
      *
      * Everything a valid notification needs — actions, media style, small icon, titles — is local.
      * Only the large icon is remote, so it is the only thing deferred: callers post this
@@ -255,12 +255,11 @@ class NotificationBuilder
     }
 
     /**
-     * Whether [book]'s art is already loaded, so a re-post to attach it would change nothing
-     * (cu-157).
+     * Whether [book]'s art is already loaded, so a re-post to attach it would change nothing.
      *
      * [buildNotificationWithoutArtwork] already calls `setLargeIcon(cachedArtworkFor(...))`, so
      * once the bitmap is cached the *first* build carries it and the second one — the whole point
-     * of the cu-137 split — is pure waste: five actions, a `MediaStyle` and an icon lookup rebuilt
+     * of the notification-artwork split — is pure waste: five actions, a `MediaStyle` and an icon lookup rebuilt
      * to attach a bitmap that is already there. Measured as **half** of a 29-build burst.
      */
     fun hasArtworkFor(book: Audiobook): Boolean = cachedArtworkFor(book) != null

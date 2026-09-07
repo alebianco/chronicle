@@ -38,7 +38,7 @@ class OffsetsTest {
   /**
    * A negative seek position throws in Media3, and every conversion that could produce one
    * clamps. Keeping the clamp on the type means a caller cannot forget it and cannot write the
-   * clamp slightly differently, which is how cu-115's sites drifted apart.
+   * clamp slightly differently, which is how the sites drifted apart.
    */
   @Test
   fun `a track offset clamps at zero`() {

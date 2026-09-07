@@ -4,7 +4,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import timber.log.Timber
 
 /**
- * The `CoroutineExceptionHandler` a ViewModel under test is constructed with (cu-33).
+ * The `CoroutineExceptionHandler` a ViewModel under test is constructed with.
  *
  * A real handler rather than a `mockk`, for two reasons. It is the production shape — `AppModule`
  * provides one that logs and swallows — so a test built on it takes the same failure path the app

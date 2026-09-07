@@ -11,7 +11,7 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * Asserts the text palette meets the WCAG-AA contrast floor (cu-4).
+ * Asserts the text palette meets the WCAG-AA contrast floor.
  *
  * Contrast is easy to regress by eye — a colour that looks fine to someone with
  * good vision on a bright screen can be unreadable otherwise — so the ratios are
@@ -86,7 +86,7 @@ class ColorContrastTest {
         "textSecondary" to color(R.color.textSecondary),
         "textActive" to color(R.color.textActive),
         "textActiveSecondary" to color(R.color.textActiveSecondary),
-        // Regressed to 3.81:1 on colorPrimary before cu-4 — error text is
+        // Regressed to 3.81:1 on colorPrimary — error text is
         // exactly where legibility matters most.
         "textError" to color(R.color.textError),
       )

@@ -19,12 +19,12 @@ import java.io.File
  *
  *  1. **A stored path always wins.** This is what stops the sync location from drifting when
  *     `getExternalFilesDirs` reorders its result — which it does when an SD card is unmounted.
- *     cu-85's rule is that an absent volume must read as unavailable rather than silently
+ *     the rule is that an absent volume must read as unavailable rather than silently
  *     resolving somewhere else; persisting the choice is how that is enforced.
  *  2. **First run picks a default and persists it immediately**, so the ordering is consulted
  *     exactly once in the install's lifetime.
  *
- * Getting either wrong strands downloaded files: the prune in cu-81 only ever scans the *active*
+ * Getting either wrong strands downloaded files: the prune only ever scans the *active*
  * `cachedMediaDir`, so a directory the app stops pointing at is never cleaned and never played.
  *
  * Robolectric because the last-resort branch reads `appContext.filesDir`.
@@ -55,7 +55,7 @@ class CachedMediaDirTest {
   }
 
   /**
-   * The cu-85 case: the SD card the user chose is gone, so `externalDeviceDirs` no longer lists
+   * The unmounted-SD-card case: the SD card the user chose is gone, so `externalDeviceDirs` no longer lists
    * it. The stored path must still be returned — reading as unavailable — rather than silently
    * falling back to internal storage, which would leave the downloads on the card orphaned and
    * invisible to the prune.

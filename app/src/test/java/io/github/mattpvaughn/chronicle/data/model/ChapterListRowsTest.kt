@@ -5,10 +5,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The disc-grouping decision (cu-201).
+ * The disc-grouping decision.
  *
  * Extracted from `ChapterListAdapter` so the player and the details screen cannot disagree about
- * where a header goes — the same reasoning as cu-198's `progressState()` extraction. These cases
+ * where a header goes — the same reasoning as the `progressState()` extraction. These cases
  * mirror `ChapterListAdapterTest`'s, which tested the same rules through the adapter.
  */
 class ChapterListRowsTest {

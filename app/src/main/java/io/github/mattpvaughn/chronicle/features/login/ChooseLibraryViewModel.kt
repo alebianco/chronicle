@@ -88,7 +88,7 @@ class ChooseLibraryViewModel
      * All three causes used to render as the layout's static "No libraries found", which is a
      * statement about the *server's contents* and was wrong in two of them. The owner hit the
      * worst case: a TLS hostname mismatch after a certificate rotation, reported as though the
-     * server had no audiobook libraries (cu-125).
+     * server had no audiobook libraries.
      *
      * That reads as plausible rather than broken, because account and server selection both
      * succeed first — they are answered by plex.tv, while libraries come from the server itself.
@@ -188,15 +188,15 @@ class ChooseLibraryViewModel
      * Settings' "Current library" already did this; the login picker did not, so choosing a
      * different library here left Room holding the previous library's books and tracks. Until the
      * next refresh pruned them the app showed a **union of two libraries**, and a download
-     * belonging to a book no longer in the catalogue was reclaimed later with no warning (cu-126).
+     * belonging to a book no longer in the catalogue was reclaimed later with no warning.
      *
-     * Downloaded *files* are now asked about rather than silently reclaimed (cu-130), reusing
+     * Downloaded *files* are now asked about rather than silently reclaimed, reusing
      * Settings' wording so the same decision reads identically wherever it is met.
      *
      * **`replacedDifferentLibrary` is the only gate, and it already excludes both cases that must
      * not prompt**: a first-ever choice (`previous == null`, so no download can exist yet) and a
      * failed re-authentication (the library is unchanged, so the ids match). A second "was this a
-     * re-auth?" signal would be one more thing to keep in agreement with this one — see cu-130.
+     * re-auth?" signal would be one more thing to keep in agreement with this one.
      */
     fun chooseLibrary(library: PlexLibrary) {
       val replacedDifferentLibrary = plexLoginRepo.chooseLibrary(library)
@@ -225,8 +225,8 @@ class ChooseLibraryViewModel
      *
      * The catalogue is already cleared by this point, so the files are orphans either way: keeping
      * them means they stay on disk until the user removes them, and `CachedFileManager`'s orphan
-     * pass would otherwise have deleted them silently at some later launch. That silence is what
-     * cu-130 exists to remove.
+     * pass would otherwise have deleted them silently at some later launch. This prompt exists to
+     * remove that silence.
      */
     private fun promptAboutDownloads() {
       _bottomChooserState.value =

@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /**
- * The XML theme, expressed for Compose (cu-181).
+ * The XML theme, expressed for Compose.
  *
  * The migration is screen-by-screen, so for as long as it lasts a Compose screen sits beside XML
  * ones and **must not look different**. These values are the same literals as

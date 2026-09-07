@@ -11,7 +11,7 @@ import java.io.FileFilter
  * and was marked uncached — so an unmounted SD card, a sync directory that had moved, or a volume
  * not yet mounted at launch silently wiped the cached status of a whole library while the files were
  * still on disk. That is the owner's "book reports no cache even if I'm sure I have downloaded it",
- * including the "long time after I downloaded it" variant (cu-85).
+ * including the "long time after I downloaded it" variant.
  *
  * The distinction is the fix: an [Unavailable] scan must change nothing. Only a directory that is
  * genuinely readable and genuinely empty may un-cache anything.

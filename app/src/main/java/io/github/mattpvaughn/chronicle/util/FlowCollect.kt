@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 /**
- * Collects [flow] while [owner] is at least STARTED, cancelling when it is not (cu-52).
+ * Collects [flow] while [owner] is at least STARTED, cancelling when it is not.
  *
  * The `Flow` counterpart of `liveData.observe(viewLifecycleOwner) { … }`, and the reason it is a
  * helper rather than 121 hand-written blocks: the correct form is
@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
  *   cancelling it, so an upstream `Flow` keeps producing into a buffer and the screen renders a
  *   burst of stale values on return. It is deprecated for that reason.
  * - A bare `lifecycleScope.launch { flow.collect { … } }` never stops collecting at all, so a
- *   backgrounded screen keeps doing work — the thing cu-110 measured.
+ *   backgrounded screen keeps doing work — the thing the per-tick Room invalidation fix measured.
  *
  * In a `Fragment`, pass `viewLifecycleOwner`, **never** `this`: a fragment outlives its view across
  * a detach, and a collector bound to the fragment writes into a destroyed binding.

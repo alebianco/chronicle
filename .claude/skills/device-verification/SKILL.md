@@ -22,7 +22,7 @@ Seven examples in the docs once named the unsuffixed id and had never worked as 
 
 The tablet lives at `192.168.1.95:5555`.
 
-## Mock Plex mode (cu-16)
+## Mock Plex mode
 
 A debug build can run against the fixture pack with **no account and no live server**:
 
@@ -34,24 +34,24 @@ It records the flag and restarts — it must apply before `setupNetwork()`. The 
 `app/src/debug/`, with a no-op twin in `app/src/release/`, so it is not compiled into release
 builds at all.
 
-The mock serves cover art in **both** the shapes the app asks for (cu-207) — `/photo/:/transcode`,
+The mock serves cover art in **both** the shapes the app asks for — `/photo/:/transcode`,
 which the *notification* builds, and the raw `/library/metadata/{id}/thumb/{version}` path the
 *screens* use. Only the first was routed for a long time, so notification artwork worked while every
 cover in the UI was blank; the unrouted path fell through to an **empty 200**, a bodyless success
 that reads as a served request in a log where a 404 would have been obvious. If artwork looks wrong,
 check which shape is being requested before assuming the loader is at fault.
 
-The mock also serves a generated audio tone with HTTP range support (cu-64). Audio really
+The mock also serves a generated audio tone with HTTP range support. Audio really
 flows: all three track parts are fetched and decoded. **The tone is 180 s** (8 kHz mono, 2.7 MB, a
 semitone step every 30 s so a log tells you where in the file playback is) — it was 5 s, which
 ended within a second of starting and **silently blocked every player-open verification for three
-sessions** while being misdiagnosed as a debug-hook gap (cu-115).
+sessions** while being misdiagnosed as a debug-hook gap.
 
 Seeks are still unexercised end-to-end; the 206/range path is unit-tested only.
 
 ### Getting back to a real server
 
-**`--ez mock_plex false` does not do it** (cu-73). `MockPlexMode.enable` seeds
+**`--ez mock_plex false` does not do it.** `MockPlexMode.enable` seeds
 `accountAuthToken`/`server`/`library` into prefs, and `determineLoginState` reports
 `LOGGED_IN_FULLY` whenever all three are present — so clearing the flag leaves the app "logged in"
 to a dead `127.0.0.1`, with no login screen. `MockPlexMode.disable()` would clear those prefs but
@@ -86,9 +86,9 @@ completes) before touching `shared_prefs/`.
 |---|---|
 | `--ez mock_plex true` | Enable mock mode (restarts the app) |
 | `--el play_book <id>` | Start playback via `playFromMediaId`, no tap coordinates needed |
-| `--ez show_browse true` | Open the browse screen (cu-24) |
-| `--el download_book <id>` | Trigger a download (cu-132) |
-| `--es move_sync_location <dir>` | Replay a sync-location move (cu-153) |
+| `--ez show_browse true` | Open the browse screen |
+| `--el download_book <id>` | Trigger a download |
+| `--es move_sync_location <dir>` | Replay a sync-location move |
 
 `move_sync_location` validates the path against `externalDeviceDirs()` by **exact** match, since
 `cachedMediaDir` accepts any string and a bad one fails much later as "downloads don't work".
@@ -101,7 +101,7 @@ list.
 
 ## Driving the bottom navigation with `adb shell input tap`
 
-It **can** be driven, and the geometry changed in cu-206.
+It **can** be driven, and the geometry changed with the Compose migration.
 
 It is a Compose `NavigationBar` now, whose items **spread across the full width** — so the tab
 centres are simply `screenWidth / visibleTabCount` apart. In landscape on the tablet (1920 wide,
@@ -119,13 +119,13 @@ adb shell wm size                                                # divide width 
 Take a **screenshot** for anything finer, and confirm the tap landed by comparing screens rather
 than assuming.
 
-*Historical, pre-cu-206:* `BottomNavigationView` spanned the full width while
+*Historical, pre-Compose-migration:* `BottomNavigationView` spanned the full width while
 `BottomNavigationMenuView` inside it was **centred and narrower** — on the 1200px tablet the bar was
 `0–1200` while the menu was `220–979`, so a tap at x=200 or x=1000 hit the bar and did nothing.
 That trap is gone, but the method it taught is not: read the geometry, do not guess it.
 
 **Espresso genuinely does refuse** — `click()` rejects a view the system bars overlap by more than
-10% (cu-54). That is a different mechanism and still stands, so instrumented tests need another
+10%. That is a different mechanism and still stands, so instrumented tests need another
 route; shell scripts do not.
 
 ## Screenshots and uiautomator dumps
@@ -142,15 +142,15 @@ Two dump traps:
   previous file in place**, so a stale read looks like success. Pause first, `rm` the target first,
   and assert the file exists.
 
-## Instrumented tests (cu-54)
+## Instrumented tests
 
 `./verify.sh --instrumented` adds a 7th stage; `./gradlew instrumentedCheckGroupGroupDebugAndroidTest`
 runs them directly. Two Gradle Managed Devices: **API 27** (the minSdk floor, which catches a new
 API called without a version guard) and **API 35**, both AOSP `arm64-v8a`.
 
 Opt-in, not in the default gate: two emulators take minutes where the unit gate takes seconds. The
-suite is `LoggedInLaunchTest` — three cases against the cu-16 fixture server via `MockPlexMode`, so
-no credentials and no live server. It is deliberately small; it exists to make the
+suite is `LoggedInLaunchTest` — three cases against the mock-Plex fixture server via
+`MockPlexMode`, so no credentials and no live server. It is deliberately small; it exists to make the
 Fragment/Activity/media-session layer reachable at all.
 
 Four traps it cost to learn:
@@ -166,8 +166,8 @@ Four traps it cost to learn:
 
 ## Profiling
 
-**Profile, do not read.** Four rounds of inspection produced plausible wrong answers on cu-110;
-`am profile start --sampling` named the cause at once.
+**Profile, do not read.** Four rounds of inspection produced plausible wrong answers on one
+investigation; `am profile start --sampling` named the cause at once.
 
 Playback main-thread cost is **layout/draw at 37.7%**, not data work.
 

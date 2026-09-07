@@ -135,7 +135,7 @@ class ProgressUpdaterTest {
     }
 
   /**
-   * Progress is stored **per track**, and since cu-165 the session's `PlaybackState.position` is
+   * Progress is stored **per track**, and the session's `PlaybackState.position` is
    * *chapter*-relative so Auto's scrubber matches the chapter title beside it. Reading the session
    * here would therefore save a chapter offset as a track offset — silently, and worse the further
    * into a book the listener is.
@@ -219,7 +219,7 @@ class ProgressUpdaterTest {
   )
 
   /**
-   * The cu-168 handover: when a cast session takes over, the position must keep being saved from
+   * The cast handover: when a cast session takes over, the position must keep being saved from
    * whichever player is now current.
    *
    * The service supplies `trackPosition` as `{ currentPlayer?.currentPosition }` — a *read* of the

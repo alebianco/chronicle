@@ -48,7 +48,7 @@ class RepositoryDispatcherTest {
   }
 
   /**
-   * The player layer, converted in cu-72. Scanned separately from the repositories because
+   * The player layer, converted to injected dispatchers. Scanned separately from the repositories because
    * `MediaPlayerService` keeps exactly one legitimate `Dispatchers.Main`.
    */
   @Test
@@ -83,7 +83,7 @@ class RepositoryDispatcherTest {
         .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
         .count { Regex("""Dispatchers[.]Main""").containsMatchIn(it) }
 
-    assertEquals("only the serviceScope declaration may hardcode a dispatcher; see cu-72", 1, mains)
+    assertEquals("only the serviceScope declaration may hardcode a dispatcher", 1, mains)
   }
 
   /**
@@ -98,7 +98,7 @@ class RepositoryDispatcherTest {
   }
 
   /**
-   * The cu-169 layer: ViewModels, Fragments, `application/` and `PlexConfig`.
+   * The UI and application layer: ViewModels, Fragments, `application/` and `PlexConfig`.
    *
    * `ChronicleApplication.applicationScope` is exempt and counted separately below, so this scan
    * excludes that one declaration rather than the whole file — a file-level exemption would hide
@@ -116,7 +116,7 @@ class RepositoryDispatcherTest {
       }
 
     assertEquals(
-      "dispatchers here must come from the injected provider (cu-169)",
+      "dispatchers here must come from the injected provider",
       emptyList<String>(),
       offenders,
     )
@@ -127,7 +127,7 @@ class RepositoryDispatcherTest {
    * count so it cannot become a precedent.
    *
    * `applicationScope` is a **field initialiser on the class that builds the Dagger graph**, so an
-   * injected provider does not exist yet when it runs — the same circularity cu-72 recorded for
+   * injected provider does not exist yet when it runs — the same circularity recorded for
    * `MediaPlayerService.serviceScope`.
    */
   @Test
@@ -138,7 +138,7 @@ class RepositoryDispatcherTest {
         .filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
         .count { Regex("""Dispatchers[.](IO|Main|Default)""").containsMatchIn(it) }
 
-    assertEquals("only applicationScope may hardcode a dispatcher; see cu-169", 1, hardcoded)
+    assertEquals("only applicationScope may hardcode a dispatcher", 1, hardcoded)
   }
 
   private companion object {
@@ -167,14 +167,14 @@ class RepositoryDispatcherTest {
       ).map { "src/main/java/io/github/mattpvaughn/chronicle/features/player/$it.kt" }
 
     /**
-     * The layer converted in cu-169 — ViewModels, screens, `application/` and `PlexConfig`.
+     * The layer converted to injected dispatchers — ViewModels, screens, `application/` and `PlexConfig`.
      *
      * Unscanned until then, which is how ten hardcoded dispatchers stayed green: this test named
-     * only repositories and the player, and CLAUDE.md attributed the rest to cu-72, a *closed*
-     * task. A layer nothing scans is a layer that drifts.
+     * only repositories and the player, and CLAUDE.md attributed the rest to the player-layer
+     * dispatcher conversion, an already-closed task. A layer nothing scans is a layer that drifts.
      *
-     * The two Fragments here were representative UI files rather than special ones; cu-206
-     * replaced them with the destinations below, which is where a hardcoded dispatcher would now
+     * The two Fragments here were representative UI files rather than special ones; the Compose
+     * migration replaced them with the destinations below, which is where a hardcoded dispatcher would now
      * be written.
      */
     val UI_AND_APPLICATION_SOURCES: List<String> =

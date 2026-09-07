@@ -18,7 +18,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * `BookRepository.ingest` — the repository half of the seam cu-80 opened.
+ * `BookRepository.ingest` — the repository half of the multi-source seam.
  *
  * `SourceManager.refreshBooks` was a `check` that threw, on the grounds that *"neither
  * bookRepository nor trackRepository accepts a caller-supplied list"*. This is that method, so

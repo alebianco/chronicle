@@ -9,7 +9,7 @@ import org.junit.Test
  * `getChapterAt` needs a track id *and* a timestamp inside that chapter's span, and returns
  * `EMPTY_CHAPTER` when either does not match. `CurrentlyPlayingSingleton` published that empty
  * result, so on returning to a screen without playing, the chapter was empty or stale: the timeline
- * and the chapter-list highlight disagreed until playback started (cu-87).
+ * and the chapter-list highlight disagreed until playback started.
  *
  * It is not only a display problem — `PlayerExt` drives skip-to-next-chapter and
  * skip-to-previous-chapter off the same value, so a stale chapter skips to the wrong place.
@@ -88,7 +88,7 @@ class ChapterAtBookProgressTest {
   }
 
   /**
-   * The exact case that reached the owner's device (cu-73).
+   * The exact case that reached the owner's device.
    *
    * A hand-rolled walk in two ViewModels subtracted each chapter's *duration* from a running offset
    * while comparing against the **absolute** `bookEndTimeOffset`. At 28,359,976ms in a real 40-chapter

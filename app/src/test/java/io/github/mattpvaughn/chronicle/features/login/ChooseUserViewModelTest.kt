@@ -30,8 +30,7 @@ import retrofit2.Response
  * response with no auth token is allowed to count as a successful login.
  *
  * Only three dependencies, all interfaces, all constructor-injected — the class was always
- * testable. `Dispatchers.Main` was the sole blocker, which [MainDispatcherRule] pays for once
- * (cu-15).
+ * testable. `Dispatchers.Main` was the sole blocker, which [MainDispatcherRule] pays for once.
  */
 class ChooseUserViewModelTest {
   @get:Rule
@@ -101,7 +100,7 @@ class ChooseUserViewModelTest {
    * Plex can answer 200 with a user object carrying no `authToken`. Treating that as success
    * would advance the login state with nothing to authenticate later requests with — the empty
    * token then wins the precedence chain in `PlaybackSession.authToken` and every media request
-   * goes out unauthenticated (the cu-33 defect, in a different place).
+   * goes out unauthenticated (the same defect as the empty-token auth bug, in a different place).
    */
   @Test
   fun `a response with no auth token is not a successful login`() =

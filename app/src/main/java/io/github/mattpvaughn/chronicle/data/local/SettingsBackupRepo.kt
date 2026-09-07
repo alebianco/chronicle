@@ -39,7 +39,7 @@ class SettingsBackupRepo
      *
      * `sharedPreferences.all` is passed through whole, deliberately: [exportSettings] owns the
      * allowlist, and pre-filtering here would move the security property out of the function whose
-     * tests assert it (cu-77).
+     * tests assert it.
      */
     suspend fun exportTo(destination: Uri): ExportResult =
       withContext(dispatchers.io) {
@@ -47,7 +47,7 @@ class SettingsBackupRepo
           val backup =
             exportSettings(sharedPreferences.all).copy(
               // Bookmarks are the user's own writing and the server holds no copy, so they are the
-              // part of this file that actually cannot be re-derived (cu-22, D8).
+              // part of this file that actually cannot be re-derived (D8).
               bookmarks = bookmarkRepository.getAllAsync().map { it.toBackup() },
             )
           val json = adapter.toJson(backup)
@@ -128,7 +128,7 @@ class SettingsBackupRepo
      * `commit()` rather than `apply()`: the caller reports success to the user and the settings
      * screen re-reads the preferences immediately afterwards, and `apply()`'s write is only
      * guaranteed in memory — a deferred write that the reader beats is the async-write race that
-     * cost three separate bugs in cu-73's first session.
+     * cost three separate bugs in the first session.
      */
     private fun applyParsed(parsed: Map<String, ParsedSetting>) {
       val editor = sharedPreferences.edit()
@@ -156,7 +156,7 @@ class SettingsBackupRepo
       data class Applied(
         val applied: Int,
         val skipped: Int,
-        /** How many bookmarks were restored (cu-22). Reported separately: a file can carry
+        /** How many bookmarks were restored. Reported separately: a file can carry
          *  bookmarks and no settings, and "0 settings applied" must not read as a failed import. */
         val bookmarks: Int = 0,
       ) : ImportResult

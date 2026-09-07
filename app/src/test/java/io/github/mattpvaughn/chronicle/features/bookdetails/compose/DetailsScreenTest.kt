@@ -16,13 +16,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The book-details header, asserted on what it renders (cu-200).
+ * The book-details header, asserted on what it renders.
  *
  * Replaces `BookDetailsMetadataLayoutTest`, which inflated the old XML and measured four TextViews
- * for overlap — cu-145 found the narrator and series rows overlapping the author by 17px on the
- * tablet. **A `Column` cannot overlap its children**, so that invariant is now structural rather
- * than tested: what is worth asserting instead is that each row appears only when there is
- * something to say, which is the *other* half of cu-145.
+ * for overlap — that measurement found the narrator and series rows overlapping the author by
+ * 17px on the tablet. **A `Column` cannot overlap its children**, so that invariant is now
+ * structural rather than tested: what is worth asserting instead is that each row appears only
+ * when there is something to say, which is the *other* half of that fix.
  */
 @RunWith(RobolectricTestRunner::class)
 class DetailsScreenTest {
@@ -54,11 +54,11 @@ class DetailsScreenTest {
   }
 
   /**
-   * cu-145's rule: a row appears only when there is something to say.
+   * the rule: a row appears only when there is something to say.
    *
    * An empty "Narrated by" line claims the book has no narrator, which is a wrong statement rather
-   * than a missing one — and most books are missing one or both, since cu-24 learns them only for
-   * books the user has opened.
+   * than a missing one — and most books are missing one or both, since the network/local merge
+   * learns them only for books the user has opened.
    */
   @Test
   fun `an unknown narrator renders no narrator row`() {
@@ -79,7 +79,7 @@ class DetailsScreenTest {
     compose.onNodeWithText("Middle-earth, Book 1").assertIsDisplayed()
   }
 
-  /** The series line navigates into the browse facet (cu-24); losing that is a silent loss. */
+  /** The series line navigates into the browse facet; losing that is a silent loss. */
   @Test
   fun `tapping the series line reports it`() {
     var tapped = false
@@ -94,7 +94,7 @@ class DetailsScreenTest {
   }
 
   /**
-   * The download control's spoken label follows its state (cu-149).
+   * The download control's spoken label follows its state.
    *
    * `CacheLabelPairingTest` checked this by parsing two `when` blocks out of the ViewModel's
    * *source text* and comparing their branch labels — because the icon and the label were separate
@@ -141,7 +141,7 @@ class DetailsScreenTest {
     compose.onNodeWithContentDescription("Pause/Play button").assertIsDisplayed()
   }
 
-  // ---- the chapter list, folded into the same LazyColumn (cu-201) ----
+  // ---- the chapter list, folded into the same LazyColumn ----
 
   private fun chapter(
     id: String,
@@ -201,7 +201,7 @@ class DetailsScreenTest {
     assertEquals("An Unexpected Party", jumped)
   }
 
-  /** A multi-disc book gets its headers; a single-disc one must not (cu-201's shared rule). */
+  /** A multi-disc book gets its headers; a single-disc one must not (the shared rule). */
   @Test
   fun `a multi-disc book shows disc headers`() {
     compose.setContent {

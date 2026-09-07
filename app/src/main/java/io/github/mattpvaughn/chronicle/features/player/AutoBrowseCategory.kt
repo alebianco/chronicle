@@ -5,7 +5,7 @@ import androidx.annotation.StringRes
 import io.github.mattpvaughn.chronicle.R
 
 /**
- * The top-level categories of the Android Auto browse tree (cu-99).
+ * The top-level categories of the Android Auto browse tree.
  *
  * Each carries a **stable [id]** used as the media id and matched in `onLoadChildren`, kept separate
  * from the localized [labelRes] shown to the user.

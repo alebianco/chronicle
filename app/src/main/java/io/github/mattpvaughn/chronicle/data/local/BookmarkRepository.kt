@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** The user's bookmarks (cu-22). */
+/** The user's bookmarks. */
 interface IBookmarkRepository {
   fun getBookmarksForBook(bookId: String): Flow<List<Bookmark>>
 

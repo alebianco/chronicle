@@ -5,15 +5,15 @@ import androidx.annotation.DrawableRes
 import io.github.mattpvaughn.chronicle.R
 
 /**
- * Sets a drawable resource only when it differs from the one already showing (cu-140).
+ * Sets a drawable resource only when it differs from the one already showing.
  *
  * `ImageView.setImageResource` re-resolves and re-applies the drawable unconditionally, which
  * invalidates the view *without* requesting a layout — a draw-only invalidate. That is exactly the
- * cost cu-140 exists to remove: `MediaServiceConnection.playbackState` re-emits at playback tick
+ * cost this exists to remove: `MediaServiceConnection.playbackState` re-emits at playback tick
  * rate, so the play/pause buttons were re-setting an identical icon every tick, each one costing a
  * frame that changes nothing on screen.
  *
- * Mirrors [setTextIfChanged], which solved the same problem for the text views (cu-117).
+ * Mirrors [setTextIfChanged], which solved the same problem for the text views.
  *
  * The last resource is remembered in a view tag rather than read back from the view: an
  * `ImageView` does not expose which resource id its current drawable came from, and comparing

@@ -31,7 +31,7 @@ data class PickerItem<T>(
 )
 
 /**
- * The list-picker shared by the three login steps (cu-201).
+ * The list-picker shared by the three login steps.
  *
  * `ChooseServerFragment`, `ChooseLibraryFragment` and `ChooseUserFragment` are the same screen
  * three times: a list gated on `LoadingStatus`, with a spinner and an error message. Each wrote

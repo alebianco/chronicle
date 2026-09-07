@@ -94,7 +94,7 @@ a **task** with `status: To Do`.
 
 This matters mechanically: `backlog board` and `backlog task list` show tasks, while drafts surface
 only in `backlog draft list` — so a deferred item filed as a draft and linked from a **closed**
-task is invisible in every normal view. That is exactly how cu-73 and cu-132 items got lost.
+task is invisible in every normal view. That is exactly how deferred items got lost before.
 
 When closing a task with unfinished items, promote the remainder to a task and **list in the
 closing notes where each item went**.

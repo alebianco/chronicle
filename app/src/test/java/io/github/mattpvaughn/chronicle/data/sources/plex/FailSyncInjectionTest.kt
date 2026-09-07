@@ -10,7 +10,7 @@ import retrofit2.HttpException
 import retrofit2.Response
 
 /**
- * The contract the `fail_sync` debug hook depends on (cu-73).
+ * The contract the `fail_sync` debug hook depends on.
  *
  * `--ez fail_sync true` makes the "position not synced" badge reachable by substituting a
  * [ProgressApi] that throws. Which *kind* of throw matters, and the choice is not obvious:

@@ -46,7 +46,7 @@ fun Player.seekRelative(
 /**
  * Seek to [target], the only shape `Player.seekTo(mediaItemIndex, positionMs)` actually accepts.
  *
- * Taking the typed target rather than two `Int`/`Long` arguments is the point of cu-136: the
+ * Taking the typed target rather than two `Int`/`Long` arguments avoids exactly this: the
  * index is into the *sorted* playlist and the offset is *within that track*, and both were
  * previously plain numbers that four separate bugs got the wrong way round.
  */
@@ -78,7 +78,7 @@ fun Player.skipToNext(
     Timber.d(
       "NEXT CHAPTER: index=$nextChapterIndex id=${nextChapter.id} trackId=${nextChapter.trackId} offset=${nextChapter.bookStartTimeOffset} title=${nextChapter.title}",
     )
-    // `seekTo` takes an in-track offset; the chapter's is book-absolute (cu-96).
+    // `seekTo` takes an in-track offset; the chapter's is book-absolute.
     val target = chapterSeekTarget(nextChapter, trackListStateManager.trackList)
     if (target == null) {
       Timber.e("Chapter ${nextChapter.id} names track ${nextChapter.trackId}, which is not loaded")
@@ -113,10 +113,10 @@ fun Player.skipToPrevious(
     )
   // Both operands must be book-absolute. This used to subtract a book-absolute chapter start from
   // `currentPosition`, which is *in-track* — on a multi-track book that yields a large negative,
-  // so the branch always chose "previous chapter" and never "restart this one" (cu-96).
+  // so the branch always chose "previous chapter" and never "restart this one".
   // Sorted, because `currentMediaItemIndex` addresses the player's playlist and that is built in
   // sorted order — the same `TrackIndex` distinction `chapterSeekTarget` documents. The unsorted
-  // read was safe only by its caller's grace (cu-136).
+  // read was safe only by its caller's grace.
   val bookPosition =
     BookOffset(
       trackListStateManager.trackList

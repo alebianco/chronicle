@@ -15,14 +15,14 @@ import org.robolectric.RobolectricTestRunner
 import java.util.concurrent.TimeUnit
 
 /**
- * The download client never logs response bodies (cu-109 / issue #83).
+ * The download client never logs response bodies (issue #83).
  *
- * `HttpLoggingInterceptor` at `BODY` buffers a whole response in memory so it can log it. Since
- * cu-76 routed downloads through the app's OkHttp client, that meant every download tried to hold
+ * `HttpLoggingInterceptor` at `BODY` buffers a whole response in memory so it can log it. Once
+ * downloads were routed through the app's OkHttp client, that meant every download tried to hold
  * an entire audiobook in RAM: a 293 MB m4b drove the process from 248 MB to 350 MB PSS and then
  * died with `OutOfMemoryError` on Fetch2's own thread, having written **zero** bytes to disk.
  *
- * The mechanism is why this is worth a test at all. cu-12 looked for an OOM in app code and in
+ * The mechanism is why this is worth a test at all. An earlier profiling pass looked for an OOM in app code and in
  * Fetch2 and correctly found none — the defect lived in the *seam*, in the client Fetch2 was
  * handed. Nothing about either side in isolation reveals it, and no unit test can observe the OOM
  * itself, so the property has to be pinned structurally instead.
@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit
  */
 @RunWith(RobolectricTestRunner::class)
 class DownloadLogLevelTest {
-  // `AppModule` is a Hilt `object` since cu-185, so its providers are called directly rather
+  // `AppModule` is a Hilt `object` since the Hilt migration, so its providers are called directly rather
   // than on an instance holding an `Application`.
   private val module = AppModule
 
@@ -51,7 +51,7 @@ class DownloadLogLevelTest {
     val levels = loggersOf(downloader).map { it.level }
     assertTrue(
       "a download body is a whole audiobook; logging it buffers the file in memory and OOMs " +
-        "the process (cu-109). Found levels: $levels",
+        "the process. Found levels: $levels",
       levels.none { it == HttpLoggingInterceptor.Level.BODY },
     )
   }
@@ -59,7 +59,7 @@ class DownloadLogLevelTest {
   @Test
   fun `the download client still logs headers in debug`() {
     // Not NONE: a download's status line and Content-Range are how you tell a resume from a
-    // restart, which is a live cu-73 checklist item. Diagnosability is the reason the
+    // restart, which is a live diagnosability checklist item. Diagnosability is the reason the
     // interceptor is kept at all rather than dropped.
     assertEquals(
       HttpLoggingInterceptor.Level.HEADERS,
@@ -101,8 +101,8 @@ class DownloadLogLevelTest {
 
   @Test
   fun `every non-logging interceptor survives`() {
-    // cu-76's whole gain: downloads inherit the Plex interceptor's token and base URL, and
-    // cu-10's re-auth. Dropping those to fix the OOM would trade one bug for a worse one.
+    // the whole gain: downloads inherit the Plex interceptor's token and base URL, and
+    // the re-auth. Dropping those to fix the OOM would trade one bug for a worse one.
     val plexish = Interceptor { chain -> chain.proceed(chain.request()) }
     val media =
       OkHttpClient.Builder()
@@ -132,7 +132,7 @@ class DownloadLogLevelTest {
 
     val downloader = module.downloaderOkHttpClient(media)
 
-    assertSame("cu-10's 401 re-auth must reach downloads", auth, downloader.authenticator)
+    assertSame("the 401 re-auth must reach downloads", auth, downloader.authenticator)
     assertEquals(media.connectTimeoutMillis, downloader.connectTimeoutMillis)
   }
 
@@ -150,7 +150,7 @@ class DownloadLogLevelTest {
       downloader !== media,
     )
     assertEquals(
-      "the media client must keep BODY logging; it is how cu-9's time=0 was caught",
+      "the media client must keep BODY logging; it is how the time=0 progress bug was caught",
       HttpLoggingInterceptor.Level.BODY,
       loggersOf(media).single().level,
     )

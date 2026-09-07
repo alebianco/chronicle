@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.sources
 
 /**
- * What a [MediaSource] can actually answer (D11, cu-15, cu-80).
+ * What a [MediaSource] can actually answer (D11).
  *
  * The three flags already existed on [MediaSource] itself, but nothing read them: every path
  * assumed Plex's answers to all three. Carrying them as a value lets the ingestion path be given a
@@ -22,7 +22,7 @@ data class SourceCapabilities(
    *
    * `false` does **not** mean progress is lost — it means the local value is the only one, and a
    * network copy must never overwrite it. That is already `Audiobook.merge`'s unconditional rule
-   * (decision-16, cu-90): position is owned by the tracks and `merge` never adopts
+   * (decision-16): position is owned by the tracks and `merge` never adopts
    * `network.progress`. This flag makes that a property of the source rather than a constant, so a
    * backend that genuinely has server-side progress can opt in later without the rule being
    * rewritten from memory.
@@ -30,10 +30,10 @@ data class SourceCapabilities(
   val hasServerProgress: Boolean = false,
 ) {
   companion object {
-    /** Plex answers all three (cu-24: narrator and series are detail-only, but they exist). */
+    /** Plex answers all three (narrator and series are detail-only, but they exist). */
     val PLEX = SourceCapabilities(hasNarrator = true, hasSeries = true, hasServerProgress = true)
 
-    /** A source that supplies only what is in the file — the local/WebDAV shape (cu-33.2/33.3). */
+    /** A source that supplies only what is in the file — the local/WebDAV shape. */
     val FILES_ONLY = SourceCapabilities()
   }
 }

@@ -108,7 +108,7 @@ object DebugHooks : DebugHooksContract {
    * that work on one screen state miss on another, and the media-key path needs
    * an already-active session. This goes through `playFromMediaId`, the exact
    * call the play button makes, so it exercises the real path rather than a
-   * shortcut around it (cu-64).
+   * shortcut around it.
    */
   override fun onPlayBookIntent(
     intent: Intent?,
@@ -139,7 +139,7 @@ object DebugHooks : DebugHooksContract {
    *   --ez fail_sync true
    * ```
    *
-   * Works against a **real** Plex server as well as the fixture one (cu-73). It used to only set
+   * Works against a **real** Plex server as well as the fixture one. It used to only set
    * a flag on [MockPlexMode]'s server, which is null unless mock mode is running — so on a live
    * server this was a silent no-op and the badge was unreachable without an actual outage.
    *
@@ -167,7 +167,7 @@ object DebugHooks : DebugHooksContract {
   }
 
   /**
-   * Starts a download for a book, so a sync is reachable from a script (cu-132).
+   * Starts a download for a book, so a sync is reachable from a script.
    *
    * ```
    * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.application.MainActivity \\
@@ -175,9 +175,9 @@ object DebugHooks : DebugHooksContract {
    * ```
    *
    * The book details screen — the only place with a download button — cannot be reached by
-   * `input tap`: the currently-playing sheet takes the coordinates, the obstacle cu-54 recorded
+   * `input tap`: the currently-playing sheet takes the coordinates, the same obstacle recorded
    * for the bottom navigation. `play_book` opens the player instead. So an exhausted-retry
-   * download could not be produced from a script at all, which is what left cu-132's first item
+   * download could not be produced from a script at all, which is what left the first item
    * the one never run.
    *
    * The title is looked up rather than passed: `downloadTracks` uses it for the notification, and
@@ -215,7 +215,7 @@ object DebugHooks : DebugHooksContract {
    *
    * **This is the only way to reach that path.** Rotating the token server-side does not: Plex
    * keeps honouring the superseded one, and `setupNetwork` adopts the new one on the next launch
-   * before any authenticated request, so no 401 ever happens (measured in cu-73). Editing the
+   * before any authenticated request, so no 401 ever happens (measured directly). Editing the
    * prefs file does not either — `SharedPreferences` caches in memory, so a running app never
    * re-reads it.
    *
@@ -251,8 +251,8 @@ object DebugHooks : DebugHooksContract {
    * ```
    *
    * The tab itself cannot be driven from `input tap` — a `BottomNavigationItemView` sits under the
-   * system bars, the same obstacle recorded in cu-54 — so without this the screen is unreachable
-   * from a script (cu-24).
+   * system bars, the same obstacle recorded above for the download button — so without this the
+   * screen is unreachable from a script.
    */
   override fun onShowBrowseIntent(
     intent: Intent?,
@@ -263,9 +263,9 @@ object DebugHooks : DebugHooksContract {
       return
     }
     // Posted, not called straight away: this runs from `onCreate`, before the composition has run
-    // and set the activity's NavController. The reason has changed with cu-206 — it used to be
-    // that a `commit()` from `onCreate` throws "FragmentManager has not been attached to a host" —
-    // but the fix is the same, and one pass of the main loop is still enough.
+    // and set the activity's NavController. The reason has changed with the Compose migration —
+    // it used to be that a `commit()` from `onCreate` throws "FragmentManager has not been
+    // attached to a host" — but the fix is the same, and one pass of the main loop is still enough.
     Timber.i("Opening the browse screen (show_browse)")
     activity.window.decorView.post {
       if (!activity.isFinishing && !activity.isDestroyed) {
@@ -275,7 +275,7 @@ object DebugHooks : DebugHooksContract {
   }
 
   /**
-   * Opens the settings screen (cu-33):
+   * Opens the settings screen:
    *
    * ```
    * adb shell am start -n io.github.mattpvaughn.chronicle.debug/\
@@ -283,8 +283,9 @@ object DebugHooks : DebugHooksContract {
    * ```
    *
    * Settings is reachable only from its bottom-nav tab. A tab *can* be tapped from a script once
-   * the menu's centred inset is accounted for (measured 2026-09-05, correcting the cu-54 note this
-   * comment used to cite), so what the hook buys is a route that does not depend on screen size.
+   * the menu's centred inset is accounted for (measured 2026-09-05, correcting the note this
+   * comment used to cite about the bottom-navigation coordinate obstacle), so what the hook buys
+   * is a route that does not depend on screen size.
    *
    * Posted for the same reason as `show_browse`.
    */
@@ -314,7 +315,7 @@ object DebugHooks : DebugHooksContract {
    *
    * Exists because `--el play_book` drives playback through the **media session**, which never
    * navigates the UI — so the player sheet stayed unlaid-out and the "position not synced" badge
-   * could not be screenshotted without tap coordinates (cu-73). Coordinates are exactly what
+   * could not be screenshotted without tap coordinates. Coordinates are exactly what
    * makes a device check unrepeatable across form factors, which is why this is a hook and not a
    * documented tap.
    *
@@ -396,7 +397,7 @@ object DebugHooks : DebugHooksContract {
   /**
    * Turns mock mode on before `Application.onCreate` reads it.
    *
-   * The instrumented suite (cu-54) needs the flag set from `AndroidJUnitRunner.onCreate`, which is
+   * The instrumented suite needs the flag set from `AndroidJUnitRunner.onCreate`, which is
    * the only hook that runs before the application starts. Exposed here rather than duplicating
    * the file and key names in the test, where they would drift silently — the flag not being read
    * looks exactly like mock mode being off.
@@ -421,7 +422,7 @@ object DebugHooks : DebugHooksContract {
   }
 
   /**
-   * Moves the sync location to another volume and runs the move worker (cu-153).
+   * Moves the sync location to another volume and runs the move worker.
    *
    * ```
    * adb shell am start -n io.github.mattpvaughn.chronicle.debug/\
@@ -467,7 +468,7 @@ object DebugHooks : DebugHooksContract {
   }
 
   /**
-   * The external dir matching [target], or null when it is not one of them (cu-153).
+   * The external dir matching [target], or null when it is not one of them.
    *
    * Split out as a pure function so the refusal is testable without a device. It matters more than
    * it looks: `cachedMediaDir` accepts any path, so an unmatched one would point downloads at a
@@ -482,7 +483,7 @@ object DebugHooks : DebugHooksContract {
   /**
    * A book id from an intent extra, accepting both `--el <name> 123` and `--es <name> <id>`.
    *
-   * Both forms because ids are `String` since cu-71 and need not be numeric, while every existing
+   * Both forms because ids are `String` and need not be numeric, while every existing
    * `adb` line in the docs uses `--el`. Shared by `play_book` and `download_book` so the two
    * cannot drift — the parsing was written out once per hook before.
    */

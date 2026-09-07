@@ -12,7 +12,7 @@ sealed interface CastEligibility {
   data object Eligible : CastEligibility
 
   /**
-   * The track resolves to a `file://` URI on this device (cu-83). A receiver is a separate machine
+   * The track resolves to a `file://` URI on this device. A receiver is a separate machine
    * on the network and cannot open it, so casting a downloaded book must stream from the server
    * instead of failing opaquely mid-playback.
    */

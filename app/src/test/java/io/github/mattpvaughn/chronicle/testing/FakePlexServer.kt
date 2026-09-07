@@ -15,7 +15,7 @@ import org.junit.rules.ExternalResource
  * this dispatches by request path, the way a real server does.
  *
  * No real tokens, hostnames or account identifiers appear in any fixture; the
- * data is invented. See task cu-16.
+ * data is invented.
  */
 class FakePlexServer : ExternalResource() {
   private lateinit var server: MockWebServer
@@ -75,7 +75,7 @@ class FakePlexServer : ExternalResource() {
     stub(pathPrefix, MockResponse(code = code))
   }
 
-  /** Convenience for an expired-token response — the case cu-10 has to handle. */
+  /** Convenience for an expired-token response — the case token re-auth has to handle. */
   fun stubUnauthorized(pathPrefix: String) {
     stub(pathPrefix, MockResponse(code = 401))
   }
@@ -91,12 +91,12 @@ class FakePlexServer : ExternalResource() {
   }
 
   /**
-   * The multi-id metadata response, filtered to the ids actually asked for (cu-156).
+   * The multi-id metadata response, filtered to the ids actually asked for.
    *
    * Filtering matters rather than being pedantry: a router that answers the whole captured
    * fixture whatever was requested makes Route B look like it *succeeded* for a library it knows
    * nothing about, so the Route A fallback never fires and a real fallback bug would pass every
-   * test. That is the cu-18/cu-143 mis-routing trap in a third place, and it bit here: cu-143's
+   * test. That is the same mis-routing trap in a third place, and it bit here: the
    * refresh tests went red until this filtered.
    *
    * Scanned as text rather than with `org.json`, which is an unimplemented stub in a plain JVM
@@ -157,7 +157,7 @@ class FakePlexServer : ExternalResource() {
 
   private fun routeFor(path: String): MockResponse =
     when {
-      // The tag-filter surface (cu-143). Order matters against the `/all` and bare-section rules
+      // The tag-filter surface. Order matters against the `/all` and bare-section rules
       // below: `/library/sections/1/style` contains neither "/all" nor a query, so without these
       // it would fall through to `libraries.json` and the seeder would read a library list as a
       // list of narrators.
@@ -168,17 +168,17 @@ class FakePlexServer : ExternalResource() {
       // `type=10` is a **track** fetch and `type=9` an album one, both under
       // `/library/sections/N/all` — a rule keyed only on `/all` answers albums to both, and an
       // album carries no `Media`, so `MediaItemTrack.fromPlexModel` throws on `media[0]`. Found on
-      // the tablet in cu-187, where it aborted the refresh before collections were stored. The
+      // the tablet, where it aborted the refresh before collections were stored. The
       // same defect was in `MockPlexServer`; this routing exists twice and both copies had it,
-      // exactly as cu-18 and cu-19 did.
+      // exactly as an earlier fix did.
       path.startsWith("/library/sections") && path.contains("type=10") -> json("tracks.json")
       path.startsWith("/library/sections") && path.contains("/all") -> json("albums.json")
       path.startsWith("/library/sections") -> json("libraries.json")
-      // The multi-id metadata route (cu-156). Must precede the single-id rule below: a
+      // The multi-id metadata route. Must precede the single-id rule below: a
       // comma-joined path would otherwise have its first id parsed out and answer one album, or
       // fall through to the track fixture — the same class of silent mis-routing that made a
-      // track appear as a phantom book (cu-18) and made the tag seeder read a library list as a
-      // list of narrators (cu-143). The fixture is captured from a real server.
+      // track appear as a phantom book and made the tag seeder read a library list as a
+      // list of narrators. The fixture is captured from a real server.
       path.startsWith("/library/metadata/") && path.substringAfter("/library/metadata/").contains(',') ->
         multiIdResponse(path)
       // Tracks for an album; must be checked before the bare metadata route.
@@ -187,12 +187,11 @@ class FakePlexServer : ExternalResource() {
       // `retrieveAlbum` and `retrieveChapterInfo`. Nothing in the request distinguishes them, so
       // route on the id. Answering the track fixture for both made `fetchBookAsync` receive
       // tracks for an album request, and `bookDao.update` is `@Insert(REPLACE)` — so a track was
-      // inserted into the Audiobook table as a phantom book (cu-18).
+      // inserted into the Audiobook table as a phantom book.
       // A book id gets its album; a **track** id gets that track's own chapters. Both halves matter:
-      // cu-18 fixed the album half, and the track half was still one file holding all three tracks
+      // an earlier fix addressed the album half, and the track half was still one file holding all three tracks
       // — and the app reads `metadata.firstOrNull()`, so every track received *track 2001's*
-      // chapters. The player then read "Ch 1 of 9" for a 7-chapter book, each chapter tripled
-      // (cu-19).
+      // chapters. The player then read "Ch 1 of 9" for a 7-chapter book, each chapter tripled.
       // `/library/metadata/<id>` serves **two** endpoints with identical query parameters:
       // `retrieveAlbum` (which wants the album) and `retrieveChapterInfo` (which wants the track
       // and its chapters). Nothing in the request distinguishes them, so route on the id.
@@ -200,9 +199,9 @@ class FakePlexServer : ExternalResource() {
       // Both halves of this were wrong. Answering `track-with-chapters.json` for an *album*
       // request meant `fetchBookAsync` received tracks, and `bookDao.update` is
       // `@Insert(REPLACE)`, so a track was inserted into the Audiobook table and showed on the
-      // home shelves as a phantom book (cu-18). And one chapter fixture holding all three tracks
+      // home shelves as a phantom book. And one chapter fixture holding all three tracks
       // meant every track got *track 2001's* chapters, since the app reads
-      // `metadata.firstOrNull()` — the player read "Ch 1 of 9" for a 7-chapter book (cu-19).
+      // `metadata.firstOrNull()` — the player read "Ch 1 of 9" for a 7-chapter book.
       path.startsWith("/library/metadata") -> json(metadataFixtureFor(path))
       path.startsWith("/library/collections") -> json("collections.json")
       path.contains("/resources") -> json("resources.json")
@@ -219,7 +218,7 @@ class FakePlexServer : ExternalResource() {
    *
    * ExoPlayer range-requests when it seeks and treats a server that ignores
    * `Range` as non-seekable, so the fixture server has to support it or seek
-   * behaviour cannot be tested at all (cu-64).
+   * behaviour cannot be tested at all.
    */
   fun audioResponse(rangeHeader: String? = null): MockResponse {
     val bytes = fixtureBytes("track.wav")

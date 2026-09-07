@@ -88,8 +88,8 @@ class ServerRefreshTest {
 
   @Test
   fun `the same address cached with different flags is not duplicated`() {
-    // The case that appears right after the cu-107 migration: the cached copy carries no
-    // flags, because the pre-cu-107 keys stored bare URIs, while the refresh reports the
+    // The case that appears right after the connection-flags migration: the cached copy carries no
+    // flags, because the keys stored before that migration held bare URIs, while the refresh reports the
     // real ones. Whole-object equality kept both, which put one address in two tiers and
     // made `ConnectionChooser` probe it twice per selection round.
     val flagless = Connection(LOCAL.uri)
@@ -106,7 +106,7 @@ class ServerRefreshTest {
   @Test
   fun `the fetched flags win over the cached ones`() {
     // Ordering does double duty: fetched-first plus dedupe-by-URI means the refresh is
-    // authoritative about a connection's tier, which is what makes cu-107's re-derivation work.
+    // authoritative about a connection's tier, which is what makes the re-derivation work.
     val staleFlags = Connection(LOCAL.uri, local = false, relay = true)
     val cachedStale = cached.copy(connections = listOf(staleFlags))
     val fetched = cached.copy(connections = listOf(LOCAL))

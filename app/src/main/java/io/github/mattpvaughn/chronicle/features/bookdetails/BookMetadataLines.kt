@@ -3,14 +3,14 @@ package io.github.mattpvaughn.chronicle.features.bookdetails
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 
 /**
- * What the book-details screen says about a book beyond its title (cu-145).
+ * What the book-details screen says about a book beyond its title.
  *
  * Pure over [Audiobook] so the wording and — more importantly — the *absence* rules are testable
- * without a screen. The absence rules are the substance here: cu-24 populates narrator and series
- * only for books the user has opened, and cu-146's parser leaves `seriesIndex` unknown for any
+ * without a screen. The absence rules are the substance here: narrator and series get populated
+ * only for books the user has opened, and the parser leaves `seriesIndex` unknown for any
  * title whose tagging carries no number, so **most books will have some of these missing** until
- * cu-143 seeds the index. A blank "Narrated by" line reads as "narrated by nobody", which is a
- * wrong claim rather than a missing one.
+ * the series-index parser seeds the index. A blank "Narrated by" line reads as "narrated by
+ * nobody", which is a wrong claim rather than a missing one.
  */
 object BookMetadataLines {
   /**
@@ -25,8 +25,8 @@ object BookMetadataLines {
    * The series line, or null when unknown.
    *
    * Three shapes rather than two, because the position is unknown far more often than the series
-   * name is: Plex has no numeric series field and cu-146 reads the position out of `titleSort`, so
-   * a book tagged with a series but no number is the common case, not an edge one.
+   * name is: Plex has no numeric series field and the series-index parser reads the position out
+   * of `titleSort`, so a book tagged with a series but no number is the common case, not an edge one.
    *
    * - series and position → `Mistborn, Book 2`
    * - series only         → `Mistborn`
@@ -44,7 +44,7 @@ object BookMetadataLines {
   /**
    * The book's position as a human number, or null when unknown.
    *
-   * [Audiobook.seriesIndex] is stored in hundredths (cu-146), so 200 is book 2 and 150 the novella
+   * [Audiobook.seriesIndex] is stored in hundredths, so 200 is book 2 and 150 the novella
    * between books 1 and 2. `NO_SERIES_INDEX` (0) means the tagging carried no number.
    */
   fun seriesPosition(book: Audiobook): String? {

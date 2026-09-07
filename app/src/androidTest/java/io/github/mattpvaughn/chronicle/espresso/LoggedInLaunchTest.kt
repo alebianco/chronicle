@@ -55,7 +55,7 @@ class LoggedInLaunchTest {
    * The nav bar is the discriminator: onboarding has none. Asserting on Home's content instead
    * would be asserting on the fixture data, which is a different test.
    *
-   * Read through **Compose semantics** since cu-206 — there is no `R.id.bottom_nav` any more, and
+   * Read through **Compose semantics** since the Compose migration — there is no `R.id.bottom_nav` any more, and
    * `dumpsys` reports one full-screen `AndroidComposeView` rather than a view tree. The Home tab's
    * content description is the stable handle, and it does not depend on fixture data.
    */
@@ -67,8 +67,8 @@ class LoggedInLaunchTest {
   /**
    * The activity survives a configuration change — the cheapest guard against a state-loss crash.
    *
-   * Worth more since cu-206 than it was before: the whole UI is one composition now, and the nav
-   * back stack is what has to be restored rather than a `FragmentManager`'s.
+   * Worth more since the Compose migration than it was before: the whole UI is one composition
+   * now, and the nav back stack is what has to be restored rather than a `FragmentManager`'s.
    */
   @Test
   fun survivesRecreation() {

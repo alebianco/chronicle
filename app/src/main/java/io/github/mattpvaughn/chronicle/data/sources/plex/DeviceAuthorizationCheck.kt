@@ -7,17 +7,17 @@ import javax.inject.Singleton
 /**
  * Asks plex.tv whether this install is still a registered device on the account.
  *
- * Exists because **removing a device at plex.tv invalidates no token**. Measured during the cu-73
- * live pass: after the owner deleted the device, the app made 111 requests and every one returned
+ * Exists because **removing a device at plex.tv invalidates no token**. Measured during a live
+ * pass: after the owner deleted the device, the app made 111 requests and every one returned
  * `200`. There is no rejection to react to, so the only way to honour a revocation is to ask
  * (decision-17).
  *
- * ### The rule that keeps cu-84 true
+ * ### The rule that keeps that revocation detection true
  *
  * Only a **successful, parseable** answer that omits this client counts as revocation. Every other
  * outcome — offline, timeout, 5xx, malformed body — is [AccountAuthState.State.Unknown], because
  * failing to reach plex.tv says nothing about authorization. Getting this backwards would
- * reintroduce the exact bug cu-84 fixed: nagging a user who is merely on a train.
+ * reintroduce the exact bug this fixed: nagging a user who is merely on a train.
  */
 @Singleton
 class DeviceAuthorizationCheck

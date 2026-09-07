@@ -55,7 +55,7 @@ class CacheReconciliationTest {
   }
 
   /**
-   * Ids are Strings since cu-71 and need not be numeric — a non-Plex backend may use anything
+   * Ids are Strings and need not be numeric — a non-Plex backend may use anything
    * (decision-11). Comparison must be by value, with no parsing.
    */
   @Test
@@ -81,7 +81,7 @@ class CacheReconciliationTest {
 
   /**
    * An empty disk list means the directory was read and found empty — a real answer. The caller
-   * must not reach this at all for an unreadable directory (cu-85); `scanCachedMediaDir` returns
+   * must not reach this at all for an unreadable directory; `scanCachedMediaDir` returns
    * `Unavailable` for that, and `refreshTrackDownloadedStatus` returns early.
    */
   @Test
@@ -110,7 +110,7 @@ class CacheReconciliationTest {
     )
   }
 
-  // ---- pruning abandoned partials (cu-81) ----
+  // ---- pruning abandoned partials ----
 
   /**
    * The one case that should delete: bytes nobody is coming back for.
@@ -134,7 +134,7 @@ class CacheReconciliationTest {
    * A resume candidate is never touched.
    *
    * Deleting a PAUSED or FAILED download's bytes turns a cheap HTTP Range resume into a full
-   * re-download — the exact cost cu-76 left those bytes on disk to avoid.
+   * re-download — the exact cost leaving those bytes on disk is meant to avoid.
    */
   @Test
   fun `a partial Fetch still knows about is kept`() {

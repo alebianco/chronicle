@@ -13,7 +13,7 @@ import org.junit.Test
  * durations. `CurrentlyPlayingViewModel.seekRelative`'s service-is-dead branch wrote the *book*
  * position into `MediaItemTrack.progress` — an in-track column — so seeking with no service
  * running inflated the row by that sum, and `getActiveTrack` (furthest-started) then read a
- * corrupt position. Single-track books were unaffected, which is why it survived (cu-136).
+ * corrupt position. Single-track books were unaffected, which is why it survived.
  *
  * Also pins the sorted-index rule: `getActiveTrack()` sorts internally, so the index it produces
  * must be looked up in the sorted list. It was looked up in the unsorted one and agreed only

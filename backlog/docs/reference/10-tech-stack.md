@@ -11,7 +11,7 @@ Truthful as of **2026-09-06**. Versions here are a convenience — `gradle/libs.
 | Gradle | 9.5.1 | AGP 8.x **cannot** use Gradle ≥ 9.6.0 |
 | AGP | 8.13.2 | AGP 9.x absorbs the Kotlin plugin — its own migration |
 | minSdk | 27 | The API 27 managed device exists to catch ungated new APIs |
-| target / compileSdk | 36 | cu-6 |
+| target / compileSdk | 36 | |
 
 Single module `:app`. There are **no product flavors** — the old `freeAsInBeer` flavor no longer
 exists. Release signing per `CONTRIBUTING.md`.
@@ -21,19 +21,20 @@ exists. Release signing per `CONTRIBUTING.md`.
 | Concern | Choice | Notes |
 |---|---|---|
 | Pattern | MVVM + Repository | |
-| DI | Dagger 2.57.2 | Hand-rolled components. Hilt (cu-185) follows the screen migration |
+| DI | Dagger 2.57.2 | Hand-rolled components. Hilt follows the screen migration |
 | Persistence | Room 2.8.1 | **Five separate databases**; all export schemas and have migration tests |
-| Network | Retrofit/OkHttp + Moshi | **codegen** (`@JsonClass(generateAdapter = true)`); the reflective `KotlinJsonAdapterFactory` was removed in cu-62 |
-| Media | Media3 1.11.0 | ExoPlayer + MediaSession + Cast (cu-7) |
-| State | StateFlow | LiveData removed in cu-52 |
-| UI | **Compose** only | DataBinding removed in cu-58, ViewBinding in cu-206. Adopted by decision-22 (cu-181); the migration finished with the navigation shell. One deliberate `AndroidView` island: `CastButton` |
+| Network | Retrofit/OkHttp + Moshi | **codegen** (`@JsonClass(generateAdapter = true)`); the reflective `KotlinJsonAdapterFactory` was removed |
+| Media | Media3 1.11.0 | ExoPlayer + MediaSession + Cast |
+| State | StateFlow | LiveData removed |
+| UI | **Compose** only | DataBinding removed, then ViewBinding. Adopted by decision-22; the migration finished with the navigation shell. One deliberate `AndroidView` island: `CastButton` |
 | Downloads | Fetch2 | |
-| Annotation processing | **KSP, not KAPT** | cu-8/cu-58 — `kotlin-kapt` is gone; Room and Dagger use `ksp(...)` |
+| Annotation processing | **KSP, not KAPT** | `kotlin-kapt` is gone; Room and Dagger use `ksp(...)` |
 
 **Any doc claiming KAPT is wrong.** Note incremental builds are *slower* than under KAPT (+13% on
 an ordinary edit, +97% when an annotated type changes) — this is fixed per-invocation overhead in
 KSP2, not a misconfiguration. Ruled out: Dagger/Room aggregating outputs, `ALL_FILES` poisoning,
-KSP1 fallback, larger daemon heap, newer Dagger. **See cu-8 notes before re-investigating.**
+KSP1 fallback, larger daemon heap, newer Dagger. **See the KSP migration notes before
+re-investigating.**
 
 KSP build errors in generated code usually mean an annotation problem upstream — don't loop
 blindly.
@@ -64,11 +65,11 @@ class does **not** move with the suffix, so a component name must be fully quali
 
 The debug and release source sets each provide their own `DebugHooks` object.
 `DebugHooksContract` makes the compiler check the shape, but **only for the variant being built** —
-which is why `verify.sh` compiles the release variant as its last stage (cu-70).
+which is why `verify.sh` compiles the release variant as its last stage.
 
 ## Networking policy
 
-**Cleartext HTTP is refused app-wide** (cu-42). `res/xml/network_security_config.xml` sets
+**Cleartext HTTP is refused app-wide.** `res/xml/network_security_config.xml` sets
 `cleartextTrafficPermitted="false"` with **no exceptions**; a debug-only override in
 `app/src/debug/res/xml/` adds loopback for the mock server. Plex serves LAN connections over HTTPS
 via its `*.plex.direct` wildcard cert, so no LAN exception is needed.
@@ -87,15 +88,15 @@ Plex first; Audiobookshelf and local files/WebDAV planned (backlog D11).
 `data/sources/MediaSource.kt`, `HttpMediaSource.kt`, `SourceManager.kt`,
 `data/sources/local/LocalMediaSource.kt`.
 
-**The ingestion seam is real since cu-80**: `SourceManager.refreshBooks` ingests per source through
+**The ingestion seam is real**: `SourceManager.refreshBooks` ingests per source through
 `IBookRepository.ingest`, and `planIngestion` (`data/sources/IngestionPlan.kt`) decides what a
 refresh writes and deletes.
 
-**Still not *registered*** — `sources` is empty in production, so it is a no-op until cu-33.1 adds
-one. cu-15 added the D11 capability flags (`hasNarrator`/`hasSeries`/`hasServerProgress`) and made
-`SourceManager.refreshBooks` fail loudly instead of silently discarding fetches, but the fetch
-methods on both `LocalMediaSource` and `PlexMediaSource` are still `TODO("Not yet implemented")` —
-the live Plex work is in `PlexMediaRepository`.
+**Still not *registered*** — `sources` is empty in production, so it is a no-op until the
+backend-interface carve adds one. The D11 capability flags (`hasNarrator`/`hasSeries`/
+`hasServerProgress`) were added, and `SourceManager.refreshBooks` made to fail loudly instead of
+silently discarding fetches, but the fetch methods on both `LocalMediaSource` and `PlexMediaSource`
+are still `TODO("Not yet implemented")` — the live Plex work is in `PlexMediaRepository`.
 
 ## Tests
 
@@ -114,9 +115,9 @@ workflow** (D12 rule 6).
 
 ## Known debt
 
-**29 files under `features/` import `data.sources.plex.*` directly** — task cu-80, dominated by
+**29 files under `features/` import `data.sources.plex.*` directly** — dominated by
 `PlexConfig` at 19 (a connection-state holder rather than a fetch API).
 
 That count is **not pinned by any test and has drifted** — it read 27 in the docs until the
-2026-09-06 audit measured 29. **cu-184** is to either ratchet it or stop quoting a number nothing
-maintains.
+2026-09-06 audit measured 29. A follow-up task is to either ratchet it or stop quoting a number
+nothing maintains.

@@ -16,13 +16,13 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * `setSearchActive` publishes its flag **synchronously** (cu-52).
+ * `setSearchActive` publishes its flag **synchronously**.
  *
  * `postValue` is asynchronous and *coalescing* in production: two calls in the same main-loop pass
  * collapse into one delivery, and a read taken before that pass sees the previous value.
  * `setSearchActive` does two things — sets the flag and tells the `SearchController` — so with
  * `postValue` the two could disagree about whether search is open. That is the shape of all three
- * device races cu-73 found, one of which was fixed by exactly this substitution.
+ * device races a live profiling pass found, one of which was fixed by exactly this substitution.
  *
  * **These assertions cannot fail against `postValue`, and that is worth knowing rather than
  * hiding.** `InstantTaskExecutorRule` replaces the `ArchTaskExecutor` with one that runs everything
@@ -33,7 +33,7 @@ import org.junit.Test
  *
  * What these do pin is the **contract** — that reading the flag straight after setting it returns
  * what was set — so a future change that reintroduces a deferred publish *and* removes the rule
- * fails here. The race itself is a device-level fact (cu-73), evidenced there, not here, and
+ * fails here. The race itself is a device-level fact, evidenced there, not here, and
  * `PostValueUsageTest` is what actually keeps `postValue` out of the tree.
  */
 class HomeSearchToggleTest {

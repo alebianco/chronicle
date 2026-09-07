@@ -7,7 +7,7 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 
 /**
- * A book made of **several** track files, with chapters that cross track boundaries (cu-115).
+ * A book made of **several** track files, with chapters that cross track boundaries.
  *
  * Every other fixture in this suite is a single-track book, and on a single-track book the two
  * coordinate frames coincide: an offset measured from the start of the *track* equals the same
@@ -15,8 +15,8 @@ import io.github.mattpvaughn.chronicle.data.model.TrackOffset
  * accident, and the suite cannot see the difference.
  *
  * That is not a hypothetical gap. `Chapter.bookStartTimeOffset`'s own KDoc lists four separate
- * occasions the frame was guessed wrong (cu-13, cu-49, cu-93, cu-96), and the 2026-09-02 review
- * found more still live. cu-93 and cu-96 both carry "reproduce with a multi-track book" as an
+ * occasions the frame was guessed wrong, and the 2026-09-02 review
+ * found more still live. Two open bugs both carried "reproduce with a multi-track book" as an
  * *open* acceptance criterion. This fixture is what closes them.
  *
  * ### The shape, and why these numbers
@@ -56,7 +56,7 @@ object MultiTrackBook {
    * 2m30s into track 2 — mid-track *and* mid-chapter, in both frames at once.
    *
    * Kept as raw millis alongside the typed forms below so a test can assert against a literal;
-   * [MID_BOOK_OFFSET] and [MID_TRACK_POSITION] are what the typed APIs take (cu-136).
+   * [MID_BOOK_OFFSET] and [MID_TRACK_POSITION] are what the typed APIs take.
    */
   const val MID_BOOK_POSITION = 750_000L
 
@@ -132,10 +132,10 @@ object MultiTrackBook {
   fun book(): Audiobook =
     Audiobook(
       id = BOOK_ID,
-      // The *same* source the repository under test resolves, not an arbitrary one (cu-80,
-      // cu-127). A fixture with a different source is invisible to the source-scoped removal a
+      // The *same* source the repository under test resolves, not an arbitrary one. A fixture
+      // with a different source is invisible to the source-scoped removal a
       // refresh performs, so these tests would silently stop exercising deletion at all. The
-      // cu-24 fixture trap in a new field.
+      // source-scoping fixture trap in a new field.
       source = TEST_SOURCE,
       title = "The Long Book",
       titleSort = "Long Book, The",

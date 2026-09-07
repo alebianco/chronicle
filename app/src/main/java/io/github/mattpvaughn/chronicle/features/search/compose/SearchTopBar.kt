@@ -27,7 +27,7 @@ import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 
 /**
- * A top app bar whose title collapses into a search field (cu-206).
+ * A top app bar whose title collapses into a search field.
  *
  * Replaces the `SearchView` action view that Home, Library and Collections each wired up through
  * their own `MenuProvider` — three near-identical copies of an expand listener, a collapse

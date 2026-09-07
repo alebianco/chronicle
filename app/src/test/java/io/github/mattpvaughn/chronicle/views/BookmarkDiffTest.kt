@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The bookmark list's identity and equality (cu-22).
+ * The bookmark list's identity and equality.
  *
  * `DiffUtil` decides whether a row is *the same row* and whether it needs redrawing. Getting the
  * first wrong makes an edit animate as a delete-and-insert; getting the second wrong leaves a

@@ -24,7 +24,7 @@ import org.robolectric.RobolectricTestRunner
  * Two `MainActivity.onCreate`s close together therefore killed the app, which is an ordinary
  * Activity recreation. `connectIfIdle` asks the browser's **own synchronous state** rather than a
  * flag this class publishes, because the browser's state moves *during* `connect()`, before any
- * callback runs (cu-110).
+ * callback runs.
  *
  * Robolectric supplies a real `MediaBrowserCompat`; there is no service to bind to, so the
  * connection never establishes — which is precisely the state a redundant `connect()` has to
@@ -117,7 +117,7 @@ class MediaServiceConnectionTest {
 
   /**
    * Published state is `MutableStateFlow`, deliberately public and deliberately not `postValue`
-   * (cu-52). An assignment lands immediately, which is what makes a read-after-write correct —
+   *. An assignment lands immediately, which is what makes a read-after-write correct —
    * `postValue` deferred to the next main-loop pass and was the shape of the `connectIfIdle`
    * crash.
    */

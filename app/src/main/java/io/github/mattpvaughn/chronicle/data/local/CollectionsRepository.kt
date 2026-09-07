@@ -24,7 +24,7 @@ class CollectionsRepository
     private val collectionsDao: CollectionsDao,
     private val dispatchers: DispatcherProvider,
   ) {
-    /** The Plex server these collections belong to, as a scoping key (cu-127, decision-21). */
+    /** The Plex server these collections belong to, as a scoping key (decision-21). */
     private val currentSourceId: SourceId
       get() = SourceId.forPlexServer(plexPrefsRepo.server?.serverId.orEmpty())
 
@@ -48,11 +48,11 @@ class CollectionsRepository
      * Two markers, for two different accidents:
      *
      * - [SourceId.LEGACY_PLEX] is what `COLLECTIONS_MIGRATION_2_3` stamped on rows that predate
-     *   cu-127, exactly as the book and track migrations do.
-     * - [SourceId.UNKNOWN] is what **cu-197** is fixing: `Collection.from` hardcoded it and the
-     *   repository never resolved a real one, so every row written between cu-127 and cu-197 —
-     *   including rows the migration had correctly marked `LEGACY_PLEX`, which the next refresh
-     *   then overwrote — is unreachable by every scoped read.
+     *   the source-scoping migration, exactly as the book and track migrations do.
+     * - [SourceId.UNKNOWN] is what this fix addresses: `Collection.from` hardcoded it and the
+     *   repository never resolved a real one, so every row written between the source-scoping
+     *   migration and this fix — including rows the migration had correctly marked `LEGACY_PLEX`,
+     *   which the next refresh then overwrote — is unreachable by every scoped read.
      *
      * Adopting `UNKNOWN` is safe in a way adopting an arbitrary foreign scope would not be: an
      * unscoped row belongs to no server, so there is no first server for a second one to steal it
@@ -99,12 +99,12 @@ class CollectionsRepository
 
       withContext(dispatchers.io) {
         try {
-          // Stamp the connected server's scope, exactly as `planIngestion` does for books
-          // (cu-127). `Collection.from` cannot know which server it is parsing for, so it emits
+          // Stamp the connected server's scope, exactly as `planIngestion` does for books.
+          // `Collection.from` cannot know which server it is parsing for, so it emits
           // `SourceId.UNKNOWN` and the repository — which does know — resolves it here.
           //
           // An unresolved scope writes **nothing** rather than filing rows under a key no later
-          // refresh can match. That is not a hypothetical: before cu-197 every collection was
+          // refresh can match. That is not a hypothetical: before this fix every collection was
           // stored with `UNKNOWN` while `getAllCollections` and `hasCollections` both filtered by
           // `currentSourceId`, so every row was invisible to every read of it and the Collections
           // tab was hidden for every user. `SourceId.UNKNOWN` is inert, never a wildcard.

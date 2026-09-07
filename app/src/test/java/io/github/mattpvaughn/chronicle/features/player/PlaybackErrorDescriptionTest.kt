@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.IOException
 
 /**
- * Playback-error diagnosis (cu-103).
+ * Playback-error diagnosis.
  *
  * Written from a real dead end: a book stopped mid-listen every 10-15 minutes and the log held only
  * `Exoplayer playback error: ... Source error`. That names the *category* of failure and nothing

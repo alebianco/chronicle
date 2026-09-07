@@ -81,7 +81,7 @@ coordinate does not survive a different screen size or a scrolled list.
 
 ## Both orientations, always
 
-cu-19, cu-141 and cu-142 were **all landscape-only**. A change that renders correctly in portrait
+Three past bugs were **all landscape-only**. A change that renders correctly in portrait
 is half-verified.
 
 ```bash

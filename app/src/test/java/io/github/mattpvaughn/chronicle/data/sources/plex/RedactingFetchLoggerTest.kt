@@ -11,7 +11,7 @@ import org.junit.Test
  * Fetch2 logs whole `DownloadInfo` objects, headers included, so these assert that no token value
  * survives into a log line.
  *
- * The strings below are **real shapes taken from logcat** during the cu-73 live pass, not invented
+ * The strings below are **real shapes taken from logcat** during a live pass, not invented
  * ones — the leak was found by reading exactly these lines.
  */
 class RedactingFetchLoggerTest {
@@ -35,7 +35,7 @@ class RedactingFetchLoggerTest {
   fun `keeps everything else in the line intact`() {
     val result = redact(downloadInfoLine)
 
-    // The line's diagnostic value is the point of redacting rather than silencing (cu-109 was
+    // The line's diagnostic value is the point of redacting rather than silencing (the leak was
     // found by reading these), so assert the useful fields are still there.
     assertTrue(result.contains("id=1808083103"))
     assertTrue(result.contains("status=QUEUED"))

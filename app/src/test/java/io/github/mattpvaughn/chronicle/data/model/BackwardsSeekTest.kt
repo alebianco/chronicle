@@ -8,7 +8,7 @@ import org.junit.Test
  *
  * Measured failure before the fix, on a live 107-track book: seeking back three chapters moved the
  * position from 2 296 261 to 1 564 209, and a forced refresh put it back to **1 910 473** — the
- * seek undone by 346 s (cu-131).
+ * seek undone by 346 s.
  *
  * The cause is that [getActiveTrack] takes the *furthest* started track regardless of recency, so
  * a stale `progress` left on a later track outranks the newer position the listener chose. The fix
@@ -76,9 +76,9 @@ class BackwardsSeekTest {
 
   @Test
   fun `two-device convergence is unaffected when the tail is genuinely started`() {
-    // cu-90, verified working on real devices: a device that listened further ahead must still
-    // win. The fix only clears progress *after* the track being written, so a legitimately
-    // further-on tail is untouched.
+    // Verified working on real devices: a device that listened further ahead must still win. The
+    // fix only clears progress *after* the track being written, so a legitimately further-on tail
+    // is untouched.
     val tracks =
       listOf(
         track(1, progress = 400_000L, lastViewedAt = 1788411046910L),

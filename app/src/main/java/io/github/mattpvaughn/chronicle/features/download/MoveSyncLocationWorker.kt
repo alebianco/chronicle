@@ -25,7 +25,7 @@ import kotlin.math.roundToInt
 /**
  * Moves downloaded audio when the sync location changes.
  *
- * Dependencies arrive through the constructor via [ChronicleWorkerFactory] (cu-179). They used to
+ * Dependencies arrive through the constructor via [ChronicleWorkerFactory]. They used to
  * be `Injector.get()` calls in field initialisers, which made this class unconstructable in a unit
  * test — `Injector.get()` is `ChronicleApplication.get()`, whose `INSTANCE!!` throws before the
  * constructor finishes.

@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * `Injector.get()` is a service locator, and the carve in cu-33 took it out of everything that can
+ * `Injector.get()` is a service locator, and the carve that took it out of everything that can
  * do without it. This keeps it out.
  *
  * **Why it matters, concretely.** `ChronicleApplication.get()` is `INSTANCE!!`, so a class that
@@ -38,7 +38,7 @@ class ServiceLocatorUsageTest {
     assertEquals(
       "a class started fetching its own dependencies at runtime. Take them as constructor " +
         "parameters instead — a class that calls Injector.get() cannot be built in a unit test, " +
-        "which is what kept nine ViewModels untested until cu-33.",
+        "which is what kept nine ViewModels untested.",
       emptyMap<String, Int>(),
       offenders(),
     )
@@ -74,7 +74,7 @@ class ServiceLocatorUsageTest {
    * The reason they are exempt is specific to `CoroutineWorker` — WorkManager constructs one
    * reflectively with a fixed `(Context, WorkerParameters)` signature, so a constructor cannot take
    * dependencies without a `WorkerFactory` and a `Configuration.Provider` (the same reasoning that
-   * exempted them from `DispatcherProvider` in cu-152, pinned by `WorkerDispatcherTest`). If a
+   * exempted them from `DispatcherProvider`, pinned by `WorkerDispatcherTest`). If a
    * non-worker were added to the list it would inherit a justification that does not apply to it.
    */
   @Test
@@ -103,20 +103,20 @@ class ServiceLocatorUsageTest {
     const val MAIN_SOURCE_ROOT = "src/main/java"
 
     /**
-     * Workers still reaching the locator — **none, as of cu-185.**
+     * Workers still reaching the locator — **none, as of the Hilt migration.**
      *
      * The list is kept empty rather than deleted: it is the record of a rule that took three
      * passes to land, and an emptied exemption set is the outcome, not an absence.
      *
-     * cu-152 exempted **all** workers, reasoning that WorkManager builds them reflectively through
+     * The first pass exempted **all** workers, reasoning that WorkManager builds them reflectively through
      * a fixed `(Context, WorkerParameters)` signature so they have no constructor to inject into,
      * and that a `WorkerFactory` "would buy nothing while no worker is unit-tested".
      *
-     * cu-179 re-decided that on new facts — `androidx.work:work-testing` was already in the build
+     * The second pass re-decided that on new facts — `androidx.work:work-testing` was already in the build
      * and unused, and the workers were among the largest untested bodies left — and converted two
      * of the three through a hand-written `ChronicleWorkerFactory`.
      *
-     * cu-185 finished it. `@HiltWorker` gives each worker an ordinary `@Inject` constructor and
+     * The Hilt migration finished it. `@HiltWorker` gives each worker an ordinary `@Inject` constructor and
      * `HiltWorkerFactory` builds them, so the factory we maintained is gone. The last holdout was
      * `DownloadNotificationWorker`'s **companion** `enqueue` helper, which reached the locator for
      * a `WorkManager` to schedule itself; it takes a `Context` now, passed by the one caller,
@@ -125,7 +125,7 @@ class ServiceLocatorUsageTest {
     val EXEMPT_WORKERS = emptySet<String>()
 
     /**
-     * **Empty since cu-185** — there is no `Injector` left to exempt anything from.
+     * **Empty since the Hilt migration** — there is no `Injector` left to exempt anything from.
      *
      * `ChronicleApplication` was the last entry: it *was* where the graph was built, so reaching
      * the locator there was not the thing this guard is about. `@HiltAndroidApp` builds the graph
@@ -134,7 +134,7 @@ class ServiceLocatorUsageTest {
      * loader was being built) goes through a narrow `@EntryPoint` instead.
      *
      * The guard itself stays. `Injector` is deleted, but the *pattern* — a class fetching its own
-     * dependencies at runtime instead of taking them as constructor parameters — is what cu-33
+     * dependencies at runtime instead of taking them as constructor parameters — is what this test
      * banned, and a new one could be written tomorrow.
      */
     val EXEMPT = EXEMPT_WORKERS

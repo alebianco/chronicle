@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Reading a book's series position out of `titleSort` (cu-146).
+ * Reading a book's series position out of `titleSort`.
  *
  * There is **no numeric series field in Plex** — album `index` is 1 on essentially every audiobook
  * — so this string is the only carrier, written by whichever tagger the user ran. The cases below
@@ -19,7 +19,7 @@ import org.junit.Test
  *
  * The parser this replaces was anchored to the **end** of the string and therefore read 1 of 8
  * real formats. It passed its tests because the only fixture exercising it happened to end with
- * the number — the cu-24 trap (a fixture written to match the code proves nothing) in a new field.
+ * the number — the fixture-matches-code trap (a fixture written to match the code proves nothing) in a new field.
  */
 class SeriesIndexParserTest {
   /** Reads the parser's hundredths back as a human-facing number, for legible assertions. */
@@ -184,7 +184,7 @@ class SeriesIndexParserTest {
 
   /**
    * `<Series>, Book <n>, <Subseries> - <Title>` — the number terminated by a **comma** rather than
-   * the ` - ` the plain `audnexus` shape requires (cu-155).
+   * the ` - ` the plain `audnexus` shape requires.
    *
    * Two real values on the household server carry a sub-series between the number and the title.
    * The widening is safe because the **label** is still required: `"Warhammer 40,000"` has no

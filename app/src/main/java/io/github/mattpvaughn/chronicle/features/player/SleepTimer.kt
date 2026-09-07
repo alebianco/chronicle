@@ -38,7 +38,7 @@ interface SleepTimer {
   fun extend(extensionDurationMS: Long): Boolean
 
   /**
-   * Starts a timer that pauses when the current chapter ends (cu-21).
+   * Starts a timer that pauses when the current chapter ends.
    *
    * Distinct from `start` with a duration: it carries no deadline, so it cannot be desynced by a
    * seek or a speed change. See [SleepTimerMode.EndOfChapter].
@@ -56,7 +56,7 @@ interface SleepTimer {
     const val ARG_SLEEP_TIMER_DURATION_MILLIS = "sleep_timer_duration"
 
     /**
-     * Whether a timer is counting (cu-21).
+     * Whether a timer is counting.
      *
      * Sent explicitly because the UI used to infer it from the duration being above zero — which
      * is wrong for an end-of-chapter timer, since that has no countdown and publishes 0. Inferring
@@ -69,7 +69,7 @@ interface SleepTimer {
   enum class SleepTimerAction {
     BEGIN,
 
-    /** Begin a timer that ends with the current chapter, carrying no duration (cu-21). */
+    /** Begin a timer that ends with the current chapter, carrying no duration. */
     BEGIN_END_OF_CHAPTER,
     EXTEND,
     CANCEL,
@@ -190,7 +190,7 @@ class SimpleSleepTimer
      * The user turned the timer off: forget everything, including the duration.
      *
      * The counterpart to [expire], which keeps the duration so the timer can re-arm. Conflating
-     * the two is what cu-21 fixed — expiry used to call this, so a fired timer was indistinguishable
+     * the two used to be the bug — expiry used to call this, so a fired timer was indistinguishable
      * from a dismissed one and resuming left the user with nothing.
      */
     override fun cancel() {
@@ -290,13 +290,13 @@ class SimpleSleepTimer
       }
 
       // Keep ticking while there is anything to watch for. An expired timer still ticks, because
-      // that is how it notices playback resuming — the whole point of cu-21.
+      // that is how it notices playback resuming — the whole point of this state.
       //
       // But it does not tick forever. Someone who never resumes and never cancels would otherwise
       // leave a 1 Hz handler post running for the life of the service, which is exactly the kind of
-      // per-second work cu-110 was about. After [expiredTickBudget] the timer gives up and forgets
-      // itself: an hour after falling asleep, "press play and get the same timer back" is no longer
-      // what a resume means.
+      // per-second work the per-tick Room invalidation fix was about. After [expiredTickBudget] the
+      // timer gives up and forgets itself: an hour after falling asleep, "press play and get the
+      // same timer back" is no longer what a resume means.
       when {
         state is SleepTimerState.Idle -> isTicking = false
         state is SleepTimerState.Expired && ++expiredTicks > expiredTickBudget -> {

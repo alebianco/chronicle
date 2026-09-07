@@ -4,7 +4,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.SourceId
 
 /**
- * What a refresh should write and delete, decided without touching a database (cu-80).
+ * What a refresh should write and delete, decided without touching a database.
  *
  * `BookRepository.refreshData` welded this decision to Plex fetching and to Room, so nothing about
  * it could be tested and a second source had nowhere to plug in. `SourceManager.refreshBooks` said
@@ -37,7 +37,7 @@ data class IngestionPlan(
  * either.
  *
  * [Audiobook.merge] decides field-by-field what survives — local progress is never overwritten by a
- * network copy (decision-16), and a local-only column must be named in both its arms (cu-20). This
+ * network copy (decision-16), and a local-only column must be named in both its arms. This
  * function decides only *which* books are merged at all.
  */
 fun planIngestion(
@@ -46,7 +46,7 @@ fun planIngestion(
   sourceId: SourceId,
 ): IngestionPlan {
   // An unresolved scope writes nothing rather than filing rows under a key no later refresh can
-  // match (cu-127). [SourceId.UNKNOWN] reaches here when no server is chosen — mid-login, or after
+  // match. [SourceId.UNKNOWN] reaches here when no server is chosen — mid-login, or after
   // a `clear()` — and stamping rows with it would put them beyond the reach of both the removal
   // rule below and every scoped read, leaving a catalogue nothing can prune. Silent, and it
   // accumulates.

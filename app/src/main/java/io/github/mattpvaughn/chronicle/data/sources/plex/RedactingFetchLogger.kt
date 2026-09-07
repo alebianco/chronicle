@@ -17,10 +17,10 @@ import timber.log.Timber
  * `Timber` calls, not a third-party library's internal logging, so the rule was enforced only
  * where we happen to be the caller.
  *
- * Redacting rather than silencing is deliberate. The download items still open on cu-73 (a
- * `FAILED` download retried on next launch, a token rotated mid-download) are diagnosed from
- * exactly these lines, and cu-109 — an OOM inside Fetch2's own thread — was found by reading
- * them. Turning logging off would trade one problem for a blinder one.
+ * Redacting rather than silencing is deliberate. Download issues like a `FAILED` download
+ * retried on next launch, or a token rotated mid-download, are diagnosed from exactly these
+ * lines, and an OOM inside Fetch2's own thread was found by reading them. Turning logging off
+ * would trade one problem for a blinder one.
  */
 class RedactingFetchLogger(
   private val tag: String = "Fetch2",

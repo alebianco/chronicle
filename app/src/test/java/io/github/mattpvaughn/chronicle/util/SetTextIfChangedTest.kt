@@ -8,7 +8,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * [setTextIfChanged] must not touch the view when the text is unchanged (cu-117).
+ * [setTextIfChanged] must not touch the view when the text is unchanged.
  *
  * `TextView.setText` re-lays-out even when handed an equal string, which is why the player's
  * per-second text writes showed up as measure/layout cost. The property that matters is not "the

@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Typo-tolerant, grouped search (cu-25).
+ * Typo-tolerant, grouped search.
  *
  * The cases that matter are the ones a `LIKE %q%` gets wrong: a transposed letter, a missing one,
  * a query that matches a narrator rather than a title, and a query short enough that being
@@ -243,7 +243,7 @@ class BookSearchTest {
   /**
    * An unnumbered extra belongs at the end of a series, not in front of book one.
    *
-   * `inSeriesOrder` already decides this (cu-24); the point here is that the search defers to it
+   * `inSeriesOrder` already decides this; the point here is that the search defers to it
    * rather than imposing an ordering of its own.
    */
   @Test
@@ -304,7 +304,7 @@ class BookSearchTest {
    *
    * Book 3 here matches "Mistborn" by both title and series. Listing it under both headings would
    * show the same cover twice in one result set, which reads as a duplicate library entry — the
-   * phantom-book failure mode of cu-18 all over again.
+   * phantom-book failure mode all over again.
    */
   @Test
   fun `a book matching two fields appears only once`() {

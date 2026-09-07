@@ -41,7 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlin.time.ExperimentalTime
 
 /**
- * Player-service bindings (cu-185).
+ * Player-service bindings.
  *
  * An `object` taking `Service` rather than a class holding the concrete service: Hilt builds the
  * module, so there is no constructor to pass one to. Six of these bindings genuinely need the
@@ -77,7 +77,7 @@ object ServiceModule {
     service: Service,
   ): ExoPlayer =
     // AudiobookRenderersFactory retunes silence skipping for narration: ExoPlayer's defaults
-    // collapse pauses shorter than the gaps between ordinary words (cu-88).
+    // collapse pauses shorter than the gaps between ordinary words.
     ExoPlayer.Builder(service)
       .setRenderersFactory(AudiobookRenderersFactory(service))
       .setMediaSourceFactory(DefaultMediaSourceFactory(service, artworkFreeExtractorsFactory()))
@@ -116,7 +116,7 @@ object ServiceModule {
       // All three deliberately, not just queue commands. The media-button and transport-control
       // flags are auto-enabled from API 28, but minSdk here is 27 — so on the oldest supported
       // release the session advertised neither, and a session that does not claim transport
-      // controls is a candidate cause of Android Auto showing no media card (cu-89). Setting them
+      // controls is a candidate cause of Android Auto showing no media card. Setting them
       // is a no-op on newer releases, so this rules the theory out cheaply rather than leaving it
       // as a maybe. It is *not* a confirmed fix: the remaining diagnosis needs a device.
       setFlags(
@@ -124,8 +124,8 @@ object ServiceModule {
           FLAG_HANDLES_TRANSPORT_CONTROLS or
           FLAG_HANDLES_QUEUE_COMMANDS,
       )
-      // **Not set here** since cu-185 — see `MediaPlayerService.onCreate`. `@AndroidEntryPoint`
-      // injects the service *before* `MediaBrowserServiceCompat.onCreate()` runs, and
+      // **Not set here** since the Hilt migration — see `MediaPlayerService.onCreate`.
+      // `@AndroidEntryPoint` injects the service *before* `MediaBrowserServiceCompat.onCreate()` runs, and
       // `setSessionToken` needs the impl that call creates: assigning it during provision threw
       // `NullPointerException: ... MediaBrowserServiceImpl.setSessionToken(...) on a null object`.
       setSessionActivity(launchActivityPendingIntent)

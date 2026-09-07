@@ -12,7 +12,7 @@ import org.junit.Test
  * `/api/v2/resources` reports `local` and `relay` per connection, and the app asks for
  * relay routes explicitly (`includeRelay = 1`) — but the model dropped `relay`, so relay
  * connections were raced on equal footing with LAN despite being capped around 2 Mbps
- * behind an extra hop through Plex's infrastructure (cu-11).
+ * behind an extra hop through Plex's infrastructure.
  */
 class ConnectionTierTest {
   @Test

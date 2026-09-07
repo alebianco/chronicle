@@ -18,12 +18,11 @@ import org.junit.Test
 import java.io.IOException
 
 /**
- * A library round-trips from a `MediaSource` into the repository, with **no Plex fixtures** (cu-80,
- * criterion 3).
+ * A library round-trips from a `MediaSource` into the repository, with **no Plex fixtures**.
  *
- * `SourceManager.refreshBooks` was a `check` that threw until this task, so nothing here was
- * reachable: a source could be registered but never ingested. These assertions are what the seam
- * exists to make possible.
+ * `SourceManager.refreshBooks` was a `check` that threw until the multi-backend seam was wired up,
+ * so nothing here was reachable: a source could be registered but never ingested. These assertions
+ * are what the seam exists to make possible.
  */
 class SourceManagerIngestionTest {
   /** A backend that is not Plex, declaring only what a file-based source can answer. */

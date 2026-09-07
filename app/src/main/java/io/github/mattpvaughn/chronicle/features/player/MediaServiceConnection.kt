@@ -16,7 +16,7 @@ import javax.inject.Singleton
 /**
  * The app's single connection to the media service.
  *
- * **`@Singleton`, not activity-scoped** (cu-185). There is one playback session at a time, so
+ * **`@Singleton`, not activity-scoped**. There is one playback session at a time, so
  * there is one connection; scoping it to the activity meant a *new* `MediaBrowserCompat` on every
  * recreation — a rotation, a theme change, a process the system kept — while the previous one was
  * never torn down, since `disconnect()` had no callers and `onDestroy` only nulled the component
@@ -34,7 +34,7 @@ class MediaServiceConnection
     applicationContext: Context,
     serviceComponent: ComponentName,
   ) {
-    // Publicly mutable, exactly as the `MutableLiveData` fields these replaced were (cu-52). The
+    // Publicly mutable, exactly as the `MutableLiveData` fields these replaced were. The
     // unit tests drive this class as a fake — setting `playbackState.value` to simulate the
     // service — so hiding the writer behind a private backing field would only buy a set of
     // test-only mutators. `MutableStateFlow` is thread-safe and its assignment lands
@@ -53,7 +53,7 @@ class MediaServiceConnection
      * whole handshake. Two `MainActivity.onCreate`s close together therefore crashed the app with
      * "connect() called while neither disconnecting nor disconnected", which is what an Activity
      * recreation does: a rotation, a theme change, or coming back to a process the system kept
-     * (cu-54 found it via `ActivityScenario.recreate`).
+     * (found via `ActivityScenario.recreate`).
      */
     private var isConnecting = false
 

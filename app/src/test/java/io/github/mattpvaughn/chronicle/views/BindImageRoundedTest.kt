@@ -11,10 +11,10 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The cover loader's two cu-110 guards.
+ * The cover loader's two progress-churn guards.
  *
  * These were covered only *incidentally* — by `GroupedSearchAdapterTest` inflating rows that
- * happened to call this — so deleting that adapter in cu-202 took this function's coverage from 77
+ * happened to call this — so deleting that adapter in the Compose migration of search took this function's coverage from 77
  * instructions to zero without touching it. Incidental coverage is not coverage: it disappears for
  * reasons unrelated to the code, and it never asserted the behaviour in the first place.
  */
@@ -88,7 +88,7 @@ class BindImageRoundedTest {
   }
 
   /**
-   * The cover URL is built through the passed-in builder, never a service locator (cu-33).
+   * The cover URL is built through the passed-in builder, never a service locator.
    *
    * This runs from a bind path, so resolving `PlexConfig` here would be a locator hit per row.
    */

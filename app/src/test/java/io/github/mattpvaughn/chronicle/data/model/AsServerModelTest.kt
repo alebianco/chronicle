@@ -7,8 +7,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * `PlexServer.asServer()` — the conversion at the root of the cu-33 empty-token defect, and
- * previously uncovered.
+ * `PlexServer.asServer()` — the conversion at the root of the empty-token defect, and previously
+ * uncovered.
  *
  * The line that matters is `accessToken = this.accessToken ?: ""`. It is why an absent token
  * becomes an **empty string** rather than staying null, and why two call sites that resolved the
@@ -42,7 +42,7 @@ class AsServerModelTest {
   }
 
   /**
-   * The cu-33 shape, stated as a fact rather than a hope.
+   * The empty-token shape, stated as a fact rather than a hope.
    *
    * A null token must become `""`, because `ServerModel.accessToken` is non-null and every reader
    * downstream tests emptiness rather than nullity. Anything that changed this to a nullable field
@@ -68,7 +68,7 @@ class AsServerModelTest {
   /**
    * The ordinary case for a server the user owns: Plex reports no per-server token, and the
    * account token is expected to carry the request instead. Pinned because this *is* the common
-   * path, and cu-33 showed it was the one nobody had exercised.
+   * path, and it was the one nobody had exercised.
    */
   @Test
   fun `an owned server reporting no token converts without inventing one`() {

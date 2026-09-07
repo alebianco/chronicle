@@ -9,7 +9,7 @@ import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRA
 /**
  * Keyed on `(bookId, trackId, discNumber, index)` rather than on [id].
  *
- * [id] is the value the server gave, and it is **not safe as a primary key** (cu-49). It arrives
+ * [id] is the value the server gave, and it is **not safe as a primary key**. It arrives
  * from two different namespaces: `PlexChapter.id` on the Plex path, and the *track* id on the
  * per-track fallback (`MediaItemTrack.asChapter`). Plex hands out chapter and track ratingKeys
  * from one server-wide sequence, so the two can collide, and `insertAll` uses
@@ -29,10 +29,11 @@ data class Chapter(
   val index: Long = 0L,
   val discNumber: Int = 1,
   /**
-   * Milliseconds from the start of the **book** — not the containing track (cu-96).
+   * Milliseconds from the start of the **book** — not the containing track.
    *
    * The old name, `bookStartTimeOffset`, reads as "offset from the start of *something*", and the
-   * something has now been guessed wrong four separate times: cu-13, cu-49, cu-93's display half,
+   * something has now been guessed wrong four separate times: the chapter-resolution fix, the
+   * `ChapterDatabase` migration, the display half,
    * and `PlayerExt.skipToPrevious`/`skipToNext`, which subtracted it from an in-track position and
    * handed it to `seekTo` as an in-track offset. The comment here used to say "from the start of
    * the containing track", which was simply wrong and is presumably where the confusion started.
@@ -42,7 +43,7 @@ data class Chapter(
    *
    * The **column** keeps its old name via [ColumnInfo]: renaming it would need a `ChapterDatabase`
    * migration and a change to the `Audiobook.chapters` serialization format, for no behavioural
-   * gain, while cu-82 is already scheduled to retire that dual write.
+   * gain, while that dual write is already scheduled to be retired.
    */
   @ColumnInfo(name = "startTimeOffset")
   val bookStartTimeOffset: BookOffset = BookOffset.ZERO,
@@ -82,7 +83,7 @@ val EMPTY_CHAPTER = Chapter("")
  * **[bookPosition] is a book offset, not a track one**, despite the track id alongside it: the
  * comparison is against [Chapter.bookStartTimeOffset]. The old parameter name, `timeStamp`, said
  * nothing about the frame, and `MultiTrackChapterTest` pins both halves of the ambiguity — a book
- * offset resolves, an in-track offset finds nothing. Now the type says it (cu-136).
+ * offset resolves, an in-track offset finds nothing. Now the type says it.
  */
 fun List<Chapter>.getChapterAt(
   trackId: String,
@@ -93,7 +94,7 @@ fun List<Chapter>.getChapterAt(
     // exactly on a boundary matched the **earlier** chapter — and the loop returns the first match.
     // Seeking to a chapter start lands precisely on that boundary, so pressing previous-chapter
     // seeked correctly to Chapter 20's start and then displayed "Chapter 19", which reads as the
-    // button going to the end of the previous chapter (cu-93).
+    // button going to the end of the previous chapter.
     //
     // This now agrees with [chapterAtBookProgress], which was already half-open. Two lookups over
     // the same data disagreeing at a boundary is the actual defect; the inclusive end was it.
@@ -112,7 +113,7 @@ fun List<Chapter>.getChapterAt(
  * The counterpart to [getChapterAt], which needs a track id *and* a timestamp inside that chapter's
  * span and returns [EMPTY_CHAPTER] when either does not match. This one needs only the book-level
  * position, so it answers for a book the user has not started playing in this session — where
- * `CurrentlyPlayingSingleton` has no current track to match on (cu-87).
+ * `CurrentlyPlayingSingleton` has no current track to match on.
  *
  * Offsets are absolute within the book (see [asChapterList]), so this is a plain range check.
  * Chapters are sorted first because the list arrives from the database and the network in no

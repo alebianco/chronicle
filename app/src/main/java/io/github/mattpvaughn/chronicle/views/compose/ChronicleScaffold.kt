@@ -20,7 +20,7 @@ import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 
 /**
- * The standard screen frame: a top app bar over a body (cu-206).
+ * The standard screen frame: a top app bar over a body.
  *
  * Replaces the `AppBarLayout` + `Toolbar` + `ComposeView` sandwich that eight Fragment layouts
  * each spelled out, and the `applyTopSystemBarInset()` call every one of them made — `Scaffold`

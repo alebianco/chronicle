@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * Every DAO query that returns rows without naming a single row must be scoped by source
- * (cu-127, decision-21).
+ * (decision-21).
  *
  * **Why a source-level gate rather than a behavioural test.** `SourceIsolationTest` proves the
  * queries that exist today are scoped. It cannot prove anything about the *next* one: a new
@@ -47,7 +47,7 @@ class ScopedQueryTest {
 
     assertEquals(
       "a read that returns rows without naming one must filter by source, or two servers merge " +
-        "into one list — the exact symptom cu-127 removes. Scope it with `source = :source` and " +
+        "into one list — the exact symptom source scoping removes. Scope it with `source = :source` and " +
         "pass the repository's currentSourceId, or if it genuinely is a per-row or per-book " +
         "query, say so with `id = :` / `parentKey = :` so this guard can see that.",
       emptyList<String>(),
@@ -108,7 +108,7 @@ class ScopedQueryTest {
         // uncache-everything sweep. Scoping these would leave another source's rows behind.
         Regex("""^\s*DELETE\s+FROM\s+\S+\s*$""", RegexOption.IGNORE_CASE),
         Regex("""^\s*UPDATE\s+\S+\s+SET\s+(isCached|cached)\s*=\s*:\w+\s*$""", RegexOption.IGNORE_CASE),
-        // The cu-158 chapter backfill deliberately counts the whole table: it repairs rows written
+        // The chapter backfill deliberately counts the whole table: it repairs rows written
         // before any of this existed, which by definition carry no resolved scope.
         Regex("""chapters\s+IS\s+NOT\s+NULL""", RegexOption.IGNORE_CASE),
       )

@@ -6,11 +6,11 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Every AndroidX package the app imports is **declared**, not inherited (cu-69).
+ * Every AndroidX package the app imports is **declared**, not inherited.
  *
  * A transitive dependency is a version someone else chose and can drop without warning. It has
- * happened three times here — cu-60's `androidx.lifecycle`, and `androidx.localbroadcastmanager` and
- * `androidx.media` in cu-65 — each surfacing as a compile failure after an unrelated library bump,
+ * happened three times here — the `androidx.lifecycle`, and `androidx.localbroadcastmanager` and
+ * `androidx.media` — each surfacing as a compile failure after an unrelated library bump,
  * with nothing in this repo saying the package was ever wanted.
  *
  * Declaring one does **not** mean upgrading it: each is pinned at the version it already resolved
@@ -32,7 +32,7 @@ class DeclaredDependencyTest {
 
     assertEquals(
       "these androidx packages are imported but not declared, so their version is whatever a " +
-        "transitive dependency happens to pick — the shape of three breakages (cu-60, cu-65 x2). " +
+        "transitive dependency happens to pick — the shape of three breakages. " +
         "Declare each at the version it already resolves to, which changes nothing today and " +
         "makes the choice explicit.",
       emptyList<String>(),

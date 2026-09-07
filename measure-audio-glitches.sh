@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Counts audio underruns over a fixed playback window, optionally under CPU load.
 #
-# Exists because the crackling reported in cu-104 was only ever seen by chance: it appeared when the
+# Exists because the reported crackling was only ever seen by chance: it appeared when the
 # system happened to start 51 processes at once, which is not something you can sit and wait for. To
 # compare *anything* — wired vs Bluetooth, before vs after a change — the load has to be repeatable
 # and the count has to come from the same place every time.
 #
 # The number it reports is the A2DP/audio-flinger underrun count, i.e. the thing that is audible as
-# a crack. It is deliberately NOT a measure of app CPU or allocation: those are cu-104's separate
+# a crack. It is deliberately NOT a measure of app CPU or allocation: those are separate
 # hygiene concern and are measured with `dumpsys meminfo` / GC log lines.
 #
 # Usage:
@@ -90,4 +90,4 @@ printf '  exoplayer errors      %6s\n' "$ERRORS"
 echo "=============================================="
 echo
 echo "Record alongside: device, route, duration, load. A count is only meaningful next to another"
-echo "count taken the same way — see cu-104."
+echo "count taken the same way."

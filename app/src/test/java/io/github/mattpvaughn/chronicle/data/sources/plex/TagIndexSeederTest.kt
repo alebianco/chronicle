@@ -7,13 +7,13 @@ import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
- * Seeding narrator and series onto books that have not learned them (cu-143).
+ * Seeding narrator and series onto books that have not learned them.
  *
  * The merge rule is the delicate part and the reason this is pure. It mirrors `Audiobook.merge`'s
- * third rule (cu-24): a value read from a book's own detail response is authoritative, and this
+ * third rule: a value read from a book's own detail response is authoritative, and this
  * coarser index must never overwrite it — but a book that knows nothing takes what the index has.
  * Getting that backwards would blank correct metadata on every refresh, which is exactly the
- * failure cu-24 documented for the network/local merge.
+ * failure documented for the network/local merge.
  */
 class TagIndexSeederTest {
   private fun book(
@@ -68,7 +68,7 @@ class TagIndexSeederTest {
    * A narrator read from the book's own detail response outranks the index.
    *
    * Overwriting it would replace a precise value with a coarser one on every refresh — the same
-   * shape as the refresh-blanking bug cu-24's third merge rule exists to prevent.
+   * shape as the refresh-blanking bug the third merge rule exists to prevent.
    */
   @Test
   fun `an existing narrator is never overwritten`() {

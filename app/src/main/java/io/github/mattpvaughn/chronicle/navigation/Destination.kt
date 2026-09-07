@@ -7,8 +7,7 @@ import io.github.mattpvaughn.chronicle.features.browse.FacetBooksViewModel
 import io.github.mattpvaughn.chronicle.features.collections.CollectionDetailsViewModel
 
 /**
- * Every screen the app can navigate to, and the route strings Navigation Compose addresses them by
- * (cu-206).
+ * Every screen the app can navigate to, and the route strings Navigation Compose addresses them by.
  *
  * This is deliberately a **framework-free** type: building a route and parsing one back are pure
  * string operations, and keeping them here means the encoding is unit-testable without a NavHost,
@@ -101,8 +100,9 @@ sealed interface Destination {
       /**
        * The argument name is [AudiobookDetailsViewModel.ARG_AUDIOBOOK_ID], not a fresh one.
        *
-       * cu-185 moved these three screens off mutable factory fields and onto `SavedStateHandle`,
-       * which is what makes them survive process death. Navigation Compose puts a route argument
+       * The Hilt migration moved these three screens off mutable factory fields and onto
+       * `SavedStateHandle`, which is what makes them survive process death. Navigation Compose
+       * puts a route argument
        * into that same handle, so reusing the existing name means the ViewModels need **no change
        * at all** — a new name here would compile, and the ViewModel would silently read null.
        */
@@ -180,7 +180,7 @@ fun decodeArg(encoded: String): String =
     .replace("%25", "%")
 
 /**
- * Where a login state should navigate to, or null when it should not navigate at all (cu-206).
+ * Where a login state should navigate to, or null when it should not navigate at all.
  *
  * This was the `when` inside `Navigator`'s init block, which collected `IPlexLoginRepo.loginEvent`
  * and committed a `FragmentManager` transaction per branch. Pulled out as a pure function so the

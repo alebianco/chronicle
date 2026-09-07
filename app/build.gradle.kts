@@ -68,13 +68,13 @@ android {
   }
   buildFeatures {
     buildConfig = true
-    // ViewBinding is gone as of cu-206: there are no layouts left to generate bindings for.
+    // ViewBinding is gone: there are no layouts left to generate bindings for.
     // decision-22's migration ran screen-by-screen through `ComposeView` with both enabled;
     // the navigation shell was the last thing holding XML, and Navigation Compose replaced it.
     compose = true
   }
 
-  // The debug variant serves the cu-16 Plex fixtures as assets so the app can be
+  // The debug variant serves the Plex fixtures as assets so the app can be
   // driven on a device with no account. Pointed at the same directory the unit
   // tests use, so there is exactly one copy of each fixture to keep in sync.
   sourceSets {
@@ -85,7 +85,7 @@ android {
 
   testOptions {
     // Espresso refuses to click while window/transition animations are on — the device-side
-    // setting, not a Gradle one. Managed Devices do not disable it for us (cu-54).
+    // setting, not a Gradle one. Managed Devices do not disable it for us.
     animationsDisabled = true
 
     unitTests {
@@ -94,7 +94,7 @@ android {
       isIncludeAndroidResources = true
     }
 
-    // Gradle Managed Devices (cu-54): the emulator is declared here and provisioned by Gradle, so
+    // Gradle Managed Devices: the emulator is declared here and provisioned by Gradle, so
     // `./gradlew instrumentedCheckGroupDebugAndroidTest` is the same command on a laptop and on any
     // CI — no emulator-runner action, no forge lock-in (D12 rule 6).
     managedDevices {
@@ -135,7 +135,7 @@ ksp {
 }
 
 dependencies {
-  // --- Compose (cu-181) -------------------------------------------------------------------
+  // --- Compose -------------------------------------------------------------------
   // The BOM governs every Compose artifact's version, including the test ones, so they cannot
   // drift apart. `platform(...)` on each configuration that needs it.
   implementation(platform(libs.compose.bom))
@@ -169,13 +169,13 @@ dependencies {
   implementation(libs.oss)
   implementation(libs.appcompat)
   // Declared because the app imports them directly, not because it needs a newer version — each
-  // is pinned at what it already resolved to transitively (cu-69). Three transitive-only breakages
-  // (cu-60's lifecycle, cu-65's localbroadcastmanager and androidx.media) are the pattern this
+  // is pinned at what it already resolved to transitively. Three transitive-only breakages
+  // (`androidx.lifecycle`, `androidx.localbroadcastmanager` and `androidx.media`) are the pattern this
   // closes out; `DeclaredDependencyTest` keeps it closed.
   implementation(libs.androidx.activity)
   implementation(libs.androidx.core)
   implementation(libs.androidx.fragment)
-  // FragmentScenario needs its empty host activity in the *debug* manifest (cu-178), so this is
+  // FragmentScenario needs its empty host activity in the *debug* manifest, so this is
   // debugImplementation rather than testImplementation — Robolectric runs against the debug variant.
   debugImplementation(libs.androidx.fragment.testing)
   implementation(libs.androidx.recyclerview)
@@ -190,7 +190,7 @@ dependencies {
   implementation(libs.localbroadcastmanager)
   // Declared explicitly: asLiveData/viewModelScope/ViewModel were previously
   // only reaching the classpath transitively through the Google-IAP billing
-  // library, so removing that (cu-60) took them with it.
+  // library, so removing that took them with it.
   implementation(libs.lifecycle.livedata.ktx)
   implementation(libs.lifecycle.runtime.ktx)
   implementation(libs.lifecycle.viewmodel.ktx)
@@ -205,7 +205,7 @@ dependencies {
   implementation(libs.okhttp3.logging)
 
   implementation(libs.moshi)
-  // Codegen, not reflection (cu-62). The old KAPT processor was dropped in cu-8; this is the KSP
+  // Codegen, not reflection. The old KAPT processor is gone; this is the KSP
   // one, which is what `@JsonClass(generateAdapter = true)` has been asking for ever since.
   ksp(libs.moshi.codegen)
 
@@ -229,7 +229,7 @@ dependencies {
   // (MediaSessionCompat, PlaybackStateCompat, MediaBrowserServiceCompat...), which
   // arrived only transitively via media3-session. Media3 is migrating callers off
   // that compat bridge, so the release that drops it would break playback wholesale
-  // — the same failure mode as cu-60 (lifecycle) and cu-65 (localbroadcastmanager).
+  // — the same failure mode that `androidx.lifecycle` and `androidx.localbroadcastmanager` hit.
   implementation(libs.media)
   implementation(libs.media3.exoplayer)
   implementation(libs.media3.ui)
@@ -254,14 +254,14 @@ dependencies {
 
   // Robolectric drives real SQLite in a JVM test, which lets the Room migration
   // suite run in the unit-test gate. Room's own MigrationTestHelper is
-  // instrumented-only, and instrumented tests are quarantined (cu-54).
+  // instrumented-only, and instrumented tests are quarantined.
   debugImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.retrofit)
   testImplementation(libs.retrofit.converter)
   testImplementation(libs.moshi)
   // Reflection, for tests that build adapters for types with no @JsonClass. Production is
-  // codegen-only (cu-62), so `moshi-kotlin` and the kotlin-reflect it drags in stay out of the APK.
+  // codegen-only, so `moshi-kotlin` and the kotlin-reflect it drags in stay out of the APK.
   testImplementation(libs.moshi.kotlin.reflect)
   testImplementation(libs.kotlin.reflect)
   testImplementation(libs.robolectric)
@@ -281,14 +281,14 @@ dependencies {
   // transitively. `hamcrest-all:1.3` is *not* enough on its own: it drags in hamcrest-library,
   // which Gradle resolves to 2.2 against a 1.3 core, and org.hamcrest.Matchers then lands in
   // neither merged dex — withId() dies with NoClassDefFoundError while the dependency looks
-  // present in the resolved classpath. Pin the modern coordinates instead (cu-54).
+  // present in the resolved classpath. Pin the modern coordinates instead.
   androidTestImplementation(libs.hamcrest.modern)
   androidTestImplementation(libs.espresso.core)
   androidTestImplementation(libs.espresso.contrib)
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.rules)
   androidTestImplementation(libs.androidx.test.ext.junit)
-  // The instrumented suite asserts on Compose semantics since cu-206: the app has no View ids
+  // The instrumented suite asserts on Compose semantics: the app has no View ids
   // left to match on, so `LoggedInLaunchTest` reads the bottom bar's tabs by content description.
   androidTestImplementation(platform(libs.compose.bom))
   androidTestImplementation(libs.compose.ui.test.junit4)
@@ -302,7 +302,7 @@ jacoco {
 // Robolectric runs tests through its own sandbox classloader; without these two
 // settings the JaCoCo agent cannot attribute execution to those classes and
 // anything covered only by a Robolectric test silently reports 0%, which would
-// blind the cu-3 coverage ratchet to real gains.
+// blind the coverage ratchet to real gains.
 tasks.withType<Test>().configureEach {
   extensions.configure<JacocoTaskExtension> {
     isIncludeNoLocationClasses = true
@@ -329,7 +329,7 @@ val coverageExclusions =
     "**/*Module_*Factory*.*",
     "**/*_Impl*.*",
     "**/*_Provide*Factory*.*",
-    // Hilt's generated code, on the same reasoning as the Dagger entries above (cu-185). The
+    // Hilt's generated code, on the same reasoning as the Dagger entries above. The
     // `Hilt_*` base classes it inserts under each `@AndroidEntryPoint` are 147 instructions apiece
     // of lifecycle plumbing nobody writes — 1,789 across 74 classes, all of it in the denominator.
     "**/Hilt_*.*",
@@ -337,10 +337,10 @@ val coverageExclusions =
     "**/*_HiltComponents*.*",
     "**/hilt_aggregated_deps/**",
     "**/dagger/hilt/**",
-    // Moshi codegen (cu-62 moved every model to `@JsonClass(generateAdapter = true)`). These are
+    // Moshi codegen — every model uses `@JsonClass(generateAdapter = true)`. These are
     // generated `fromJson`/`toJson` bodies nobody writes or reviews — 7,882 instructions, 9.2% of
     // the measured codebase, sitting in the denominator. The *models* they serialize stay
-    // measured, and the real-shape fixture tests (cu-24) still exercise the parsing through them;
+    // measured, and the real-shape fixture tests still exercise the parsing through them;
     // what is excluded is the generated plumbing, exactly as the Dagger and Room entries above do.
     "**/*JsonAdapter*.*",
   )
@@ -355,7 +355,7 @@ tasks.register<JacocoReport>("jacocoTestReport") {
     html.required.set(true)
   }
 
-  // The **ASM-transformed** classes, not `tmp/kotlin-classes/debug` (cu-185).
+  // The **ASM-transformed** classes, not `tmp/kotlin-classes/debug`.
   //
   // Hilt rewrites `@AndroidEntryPoint` classes through an ASM transform, and the tests execute
   // *those*. Reporting against the untransformed output makes JaCoCo unable to match its execution
@@ -380,7 +380,7 @@ tasks.register<JacocoReport>("jacocoTestReport") {
   )
 }
 
-// Mutation testing (cu-57). Deliberately **manual**: not in verify.sh, not in CI, and no score
+// Mutation testing. Deliberately **manual**: not in verify.sh, not in CI, and no score
 // threshold. It answers a different question from the coverage ratchet — "would the tests notice if
 // this code changed?" rather than "was this line executed?" — and it is far too slow for an inner
 // loop.
@@ -413,26 +413,26 @@ pitest {
   outputFormats.set(listOf("HTML", "XML"))
   targetClasses.set(
     listOf(
-      // Listening position and completion (decision-16, cu-86, cu-90)
+      // Listening position and completion (decision-16)
       "io.github.mattpvaughn.chronicle.data.model.MediaItemTrackKt",
       "io.github.mattpvaughn.chronicle.data.model.MediaItemTrack",
       "io.github.mattpvaughn.chronicle.data.model.MediaItemTrack${'$'}Companion",
       "io.github.mattpvaughn.chronicle.data.model.AudiobookKt",
       "io.github.mattpvaughn.chronicle.data.model.Audiobook${'$'}Companion",
-      // Chapters (cu-13, cu-49, cu-87)
+      // Chapters
       "io.github.mattpvaughn.chronicle.data.model.ChapterKt",
       "io.github.mattpvaughn.chronicle.data.model.ChapterAssemblyKt",
       "io.github.mattpvaughn.chronicle.data.model.ChapterListConverter",
-      // Downloads (cu-71, cu-76, cu-85)
+      // Downloads
       "io.github.mattpvaughn.chronicle.features.download.CacheScanOutcomeKt",
       "io.github.mattpvaughn.chronicle.features.download.DownloadGroupIdKt",
       "io.github.mattpvaughn.chronicle.features.download.ResumePlan",
-      // Auth (cu-10, cu-84)
+      // Auth
       "io.github.mattpvaughn.chronicle.data.sources.plex.PlexTokenAuthenticator",
       "io.github.mattpvaughn.chronicle.data.sources.plex.AccountAuthState",
-      // Progress reporting (cu-9)
+      // Progress reporting
       "io.github.mattpvaughn.chronicle.data.sources.plex.ProgressReporter",
-      // Repositories and the cache reconciliation, covered from cu-57's second pass on
+      // Repositories and the cache reconciliation, covered from the second testing pass on
       "io.github.mattpvaughn.chronicle.features.download.CacheReconciliationKt",
       "io.github.mattpvaughn.chronicle.data.local.TrackRepository",
       "io.github.mattpvaughn.chronicle.data.local.BookRepository",
@@ -457,7 +457,7 @@ pitest {
       "io.github.mattpvaughn.chronicle.views.ColorContrastTest",
       "io.github.mattpvaughn.chronicle.data.sources.plex.ReauthenticationTest*",
       "io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsPlaybackTest",
-      // Added cu-100. Forgetting it did exactly what the note above predicts: PIT refused to
+      // Forgetting this did exactly what the note above predicts: PIT refused to
       // start with "7 tests did not pass without mutation", while ./verify.sh stayed green.
       "io.github.mattpvaughn.chronicle.util.PackageValidatorTest",
       // Robolectric because MediaControllerCompat.Callback's constructor needs Binder (DRAFT-72).

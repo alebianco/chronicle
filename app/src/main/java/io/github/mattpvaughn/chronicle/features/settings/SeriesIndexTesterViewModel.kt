@@ -26,7 +26,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * State for the series-index rules tester (cu-151).
+ * State for the series-index rules tester.
  *
  * The screen exists so a user can see what a rule *does* before trusting it. tvnamer has the config
  * file and not this, and its open issue #216 is a user who could not tell whether their pattern was
@@ -34,7 +34,7 @@ import javax.inject.Inject
  * [SeriesIndexDiagnostics] and `SeriesIndexPatternSet.explain`; this is the plumbing plus two
  * choices that belong to the screen.
  *
- * Written in `LiveData` on its own branch and converted here, where cu-52's migration met it —
+ * Written in `LiveData` on its own branch and converted here, where the migration met it —
  * writing one screen in `StateFlow` while the rest of the tree was still `LiveData` would have been
  * the ad-hoc mixing convention 3 forbids.
  */
@@ -80,7 +80,7 @@ class SeriesIndexTesterViewModel
      * The rule that actually decided the position — the **first** that succeeded, not the only one.
      *
      * More than one rule routinely succeeds: `"Mistborn, Book 2 - …"` satisfies both `audnexus` and
-     * `seanap`, and first-match-wins is the whole disambiguation mechanism (cu-146). A screen that
+     * `seanap`, and first-match-wins is the whole disambiguation mechanism. A screen that
      * only marked "succeeded" would show two winners and leave the user unable to tell which reading
      * the app took — the same class of confusion the tester exists to remove.
      */
@@ -100,7 +100,7 @@ class SeriesIndexTesterViewModel
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     /**
-     * The screen's whole state (cu-202).
+     * The screen's whole state.
      *
      * Four flows combined rather than collected separately, which removes the workaround the View
      * version needed: the parse headline could not be driven off [winningRule], because a
@@ -162,7 +162,8 @@ class SeriesIndexTesterViewModel
      *
      * `getAllBooksAsync` rather than the `LiveData` query: this is a one-shot read for a summary and
      * a sample list, and a live query would re-run both on every progress tick during playback for a
-     * screen whose content cannot meaningfully change while it is open (the cu-110 shape).
+     * screen whose content cannot meaningfully change while it is open (the per-tick Room
+     * invalidation shape).
      */
     private fun loadLibrary() {
       viewModelScope.launch(exceptionHandler) {

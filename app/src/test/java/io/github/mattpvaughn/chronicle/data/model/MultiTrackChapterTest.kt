@@ -7,14 +7,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Chapter lookup on a **multi-track** book (cu-115).
+ * Chapter lookup on a **multi-track** book.
  *
  * `Chapter.bookStartTimeOffset` is absolute within the *book*. On a single-track book that is the
  * same number as the in-track offset, so passing the wrong one is invisible; here they differ by
  * up to 1,200,000 ms.
  *
  * These tests pin the frame at the boundary between the two lookups, which is where four separate
- * bugs have already lived (cu-13, cu-49, cu-93, cu-96).
+ * bugs have already lived.
  */
 class MultiTrackChapterTest {
   private val chapters = MultiTrackBook.chapters()

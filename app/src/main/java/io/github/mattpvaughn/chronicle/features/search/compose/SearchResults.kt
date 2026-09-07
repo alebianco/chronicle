@@ -27,7 +27,7 @@ import io.github.mattpvaughn.chronicle.features.search.SearchRow
 import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /**
- * Grouped search results (cu-25, migrated in cu-202).
+ * Grouped search results.
  *
  * Replaces `GroupedSearchAdapter` — two view types, a `DiffUtil` and a `setServerConnected` setter
  * — which was instantiated separately by **three** screens (library, home, collections). The
@@ -188,7 +188,7 @@ private fun BookRow(
  *
  * Under a narrator or series heading the author line would repeat what the heading already says,
  * so the *matched* value goes there instead — a book listed under "Narrators" showing only its
- * title gives no way to tell which of several narrators matched (cu-25).
+ * title gives no way to tell which of several narrators matched.
  */
 @Composable
 private fun SearchRow.Book.subtitle(): String =

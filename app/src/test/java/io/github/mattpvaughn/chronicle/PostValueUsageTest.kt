@@ -6,10 +6,10 @@ import org.junit.Test
 import java.io.File
 
 /**
- * `postValue` is banned outright, and this is the **only** mechanism that can enforce it (cu-52).
+ * `postValue` is banned outright, and this is the **only** mechanism that can enforce it.
  *
  * `postValue` is asynchronous and coalescing: a read-after-write sees a stale value, and two posts
- * in one main-loop pass collapse into one. Three of the fifteen device-only bugs in cu-73 had that
+ * in one main-loop pass collapse into one. Three of the fifteen device-only bugs found in one profiling pass had that
  * shape, and `MediaServiceConnection.connectIfIdle` documents a crash caused by exactly it — a
  * second `connect()` inside the deferral window reached `MediaBrowserCompat.connect()`, which
  * throws rather than ignoring a redundant call.
@@ -44,7 +44,7 @@ class PostValueUsageTest {
 
     assertEquals(
       "postValue is asynchronous and coalescing, so a read-after-write sees a stale value — the " +
-        "shape of three device races in cu-73 and of the connect() crash MediaServiceConnection " +
+        "shape of three device races and of the connect() crash MediaServiceConnection " +
         "documents. Use a MutableStateFlow: its assignment is thread-safe and lands immediately, " +
         "so an off-main-thread publish needs no deferral either.",
       emptyList<String>(),
@@ -69,7 +69,7 @@ class PostValueUsageTest {
      *
      * All three variants, not just `main`: the debug and release source sets each carry their own
      * `DebugHooks`, and a drifted twin there is exactly the class of thing that passes every
-     * debug-only check (the cu-70 shape).
+     * debug-only check.
      */
     val SOURCE_ROOTS = listOf("src/main/java", "src/debug/java", "src/release/java")
   }

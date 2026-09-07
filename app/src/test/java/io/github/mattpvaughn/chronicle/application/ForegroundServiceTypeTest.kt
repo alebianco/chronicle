@@ -5,7 +5,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Every declared `foregroundServiceType` must have its matching permission (cu-103).
+ * Every declared `foregroundServiceType` must have its matching permission.
  *
  * Since Android 14 a service declaring a foreground type also needs the corresponding
  * `FOREGROUND_SERVICE_*` permission. **Omitting it is silent**: the manifest merges, the build

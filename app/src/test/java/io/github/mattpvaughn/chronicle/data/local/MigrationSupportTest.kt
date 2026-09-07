@@ -12,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 
 /**
- * The table-rebuild helper the cu-71 id migrations are built on.
+ * The table-rebuild helper the id-retype migrations are built on.
  *
  * Tested on its own because four migrations over databases holding listening progress depend on
  * it, and its worst failure mode is silent: a column left out of `columns` is dropped with no

@@ -13,7 +13,7 @@ import java.io.File
  *
  * - `SharedPreferencesPrefsRepo.bookSortKey`'s setter throws for a value outside it, and
  * - `BACKUP_SETTING_VALUES` uses it to validate `KEY_BOOK_SORT_BY` on settings **import**
- *   (cu-77 — the allowlist gates keys, and for this key it gates values too).
+ *   (the allowlist gates keys, and for this key it gates values too).
  *
  * So a key listed there is, by construction, a value the app will accept and persist. The
  * comparator in `LibraryViewModel.books` ends in `throw NoWhenBranchMatchedException`, which makes

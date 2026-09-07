@@ -27,8 +27,8 @@ fun getCollectionsDatabase(context: Context): CollectionsDatabase {
 }
 
 /**
- * Retypes `source` from INTEGER to TEXT so it can hold a per-instance [SourceId] (cu-127,
- * decision-21). The [io.github.mattpvaughn.chronicle.data.local.BOOK_MIGRATION_12_13] reasoning
+ * Retypes `source` from INTEGER to TEXT so it can hold a per-instance [SourceId] (decision-21).
+ * The [io.github.mattpvaughn.chronicle.data.local.BOOK_MIGRATION_12_13] reasoning
  * applies verbatim, including why existing rows become [SourceId.LEGACY_PLEX] rather than `"0"`.
  */
 val COLLECTIONS_MIGRATION_2_3 =
@@ -77,7 +77,7 @@ interface CollectionsDao {
   @Query("SELECT Count(id) FROM Collection WHERE source = :source")
   fun countCollections(source: SourceId): Flow<Long>
 
-  /** Claims collections written before cu-127 for [newSource]. See `BookDao.adoptLegacyRows`. */
+  /** Claims collections written before the source-scoping migration for [newSource]. See `BookDao.adoptLegacyRows`. */
   @Query("UPDATE Collection SET source = :newSource WHERE source = :legacySource")
   suspend fun adoptLegacyRows(
     newSource: SourceId,
@@ -93,13 +93,13 @@ interface CollectionsDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   fun update(collection: Collection)
 
-  // Binds against `id`, TEXT since cu-71: a numeric parameter matches no row, silently.
+  // Binds against `id`, TEXT since the id-retyping migration: a numeric parameter matches no row, silently.
   @Query("DELETE FROM Collection WHERE id IN (:collectionsToRemove)")
   fun removeAll(collectionsToRemove: List<String>): Int
 }
 
 /**
- * Retypes `id` to TEXT (cu-71). `childIds` needs no change: its converter already serialized a
+ * Retypes `id` to TEXT. `childIds` needs no change: its converter already serialized a
  * JSON array of strings, and only the Kotlin type moved from List<Long> to List<String>.
  *
  * A table rebuild because SQLite cannot alter a column type or a primary key. The column list comes

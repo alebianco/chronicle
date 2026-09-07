@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * `CoroutineWorker` is the one place `Dispatchers.*` is allowed directly (cu-152).
+ * `CoroutineWorker` is the one place `Dispatchers.*` is allowed directly.
  *
  * Convention 4 says inject a `DispatcherProvider` rather than reference `Dispatchers.*`, and
  * `RepositoryDispatcherTest` enforces it for repositories. The workers are a **deliberate
@@ -97,7 +97,7 @@ class WorkerDispatcherTest {
   /**
    * `PlexSyncScrobbleWorker` names no dispatcher, and should not start.
    *
-   * Called out by name because it is on the path that protects the listener's position (cu-9), and
+   * Called out by name because it is on the path that protects the listener's position, and
    * because the task that produced this test assumed it was one of the offenders — it never was.
    */
   @Test

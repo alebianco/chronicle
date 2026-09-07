@@ -5,11 +5,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** What the cu-151 rules tester offers the user, and the numbers it reports. */
+/** What the parsing-rules tester offers the user, and the numbers it reports. */
 class SeriesIndexDiagnosticsTest {
   private fun book(titleSort: String) = EMPTY_AUDIOBOOK.copy(id = titleSort.ifEmpty { "blank" }, titleSort = titleSort)
 
-  /** The audnexus shape, which dominates real libraries (111 of 139 — cu-146/cu-150). */
+  /** The audnexus shape, which dominates real libraries (111 of 139). */
   private val parses = "The Age of Madness, Book 3 - The Wisdom of Crowds"
 
   @Test
@@ -68,7 +68,7 @@ class SeriesIndexDiagnosticsTest {
   /**
    * `unparsed` must not be presented as a defect count. A standalone novel has no series position
    * to find, so a library can be perfectly tagged and still report a large number here — 58 of 196
-   * on the owner's own library (cu-150).
+   * on the owner's own library.
    */
   @Test
   fun `a library of standalones is entirely unparsed and that is not an error`() {

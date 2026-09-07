@@ -10,7 +10,7 @@ import java.net.InetAddress
 import kotlin.concurrent.thread
 
 /**
- * Serves the cu-16 Plex fixtures over localhost so the app can be driven on a
+ * Serves the Plex fixtures over localhost so the app can be driven on a
  * device or emulator with **no Plex account and no credentials**.
  *
  * Lives in the `debug` source set only, so it cannot reach a release build. It
@@ -46,9 +46,9 @@ class MockPlexServer(private val context: Context) {
           // Log before any early return. This line used to sit below the photo
           // and audio branches, so those requests were served but never logged —
           // which made playback look like it was never fetching audio and cost a
-          // full diagnostic run to disprove (cu-64).
+          // full diagnostic run to disprove.
           Timber.i("MockPlexServer: ${request.method} $path range=${request.headers["Range"]}")
-          // Cover art, in **both** the shapes the app asks for (cu-207).
+          // Cover art, in **both** the shapes the app asks for.
           //
           // `/photo/:/transcode` is what `PlexConfig.getBitmapFromServer` builds, and it was the
           // only route here for a long time — so the notification's artwork worked while every
@@ -63,7 +63,7 @@ class MockPlexServer(private val context: Context) {
             return imageResponse()
           }
           // Audio: serve a generated tone so playback can actually be decoded and
-          // rendered, not merely wired up (cu-64).
+          // rendered, not merely wired up.
           if (path.startsWith("/library/parts/")) {
             return audioResponse(request.headers["Range"])
           }
@@ -103,7 +103,7 @@ class MockPlexServer(private val context: Context) {
           // Bind an explicit loopback address rather than the no-arg start(), which resolves the
           // hostname "localhost" — an AOSP emulator image has no DNS entry for it and the lookup
           // throws UnknownHostException. On a background thread that killed the whole process with
-          // an empty crash buffer, which is a miserable thing to debug (cu-54).
+          // an empty crash buffer, which is a miserable thing to debug.
           server.start(InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)), 0)
           port = server.port
         }.onFailure { failure = it }
@@ -216,7 +216,7 @@ class MockPlexServer(private val context: Context) {
    */
   private fun fixtureFor(path: String): String? =
     when {
-      // The tag-filter surface (cu-143), mirroring FakePlexServer. Must precede the `/all` and
+      // The tag-filter surface, mirroring FakePlexServer. Must precede the `/all` and
       // bare-section rules: `/library/sections/1/style` contains neither, so it would otherwise
       // read as a library list.
       path.contains("style=") -> "albums-style-${path.substringAfter("style=").substringBefore("&")}.json"
@@ -228,8 +228,8 @@ class MockPlexServer(private val context: Context) {
       // `Media`, so `MediaItemTrack.fromPlexModel`'s `networkTrack.media[0]` threw
       // `IndexOutOfBoundsException` and aborted the whole refresh *before collections were
       // stored*, which is why the Collections tab never appeared in mock mode (found on the
-      // tablet during cu-187). Same family as the cu-18/cu-19 routing defects: nothing in the
-      // path distinguishes the two callers except the type.
+      // tablet). Same family as the other `/library/metadata` routing defects below: nothing in
+      // the path distinguishes the two callers except the type.
       path.startsWith("/library/sections") && path.contains("type=10") -> "tracks.json"
       path.startsWith("/library/sections") && path.contains("/all") -> "albums.json"
       path.startsWith("/library/sections") -> "libraries.json"
@@ -241,12 +241,11 @@ class MockPlexServer(private val context: Context) {
       // This used to answer `track-with-chapters.json` for both, so `fetchBookAsync` received
       // tracks for an album request — and `bookDao.update` is `@Insert(REPLACE)`, so a track was
       // *inserted* into the Audiobook table and appeared on the home shelves as a phantom book
-      // (cu-18, seen on a device).
+      // (seen on a device).
       // A book id gets its album; a **track** id gets that track's own chapters. Both halves matter:
-      // cu-18 fixed the album half, and the track half was still one file holding all three tracks
+      // fixing the album half left the track half still one file holding all three tracks
       // — and the app reads `metadata.firstOrNull()`, so every track received *track 2001's*
-      // chapters. The player then read "Ch 1 of 9" for a 7-chapter book, each chapter tripled
-      // (cu-19).
+      // chapters. The player then read "Ch 1 of 9" for a 7-chapter book, each chapter tripled.
       // `/library/metadata/<id>` serves **two** endpoints with identical query parameters:
       // `retrieveAlbum` (which wants the album) and `retrieveChapterInfo` (which wants the track
       // and its chapters). Nothing in the request distinguishes them, so route on the id.
@@ -254,9 +253,9 @@ class MockPlexServer(private val context: Context) {
       // Both halves of this were wrong. Answering `track-with-chapters.json` for an *album*
       // request meant `fetchBookAsync` received tracks, and `bookDao.update` is
       // `@Insert(REPLACE)`, so a track was inserted into the Audiobook table and showed on the
-      // home shelves as a phantom book (cu-18). And one chapter fixture holding all three tracks
+      // home shelves as a phantom book. And one chapter fixture holding all three tracks
       // meant every track got *track 2001's* chapters, since the app reads
-      // `metadata.firstOrNull()` — the player read "Ch 1 of 9" for a 7-chapter book (cu-19).
+      // `metadata.firstOrNull()` — the player read "Ch 1 of 9" for a 7-chapter book.
       path.startsWith("/library/metadata") -> metadataFixtureFor(path)
       path.startsWith("/library/collections") -> "collections.json"
       path.contains("/resources") -> "resources.json"

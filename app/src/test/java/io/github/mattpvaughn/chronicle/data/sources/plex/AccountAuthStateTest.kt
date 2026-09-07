@@ -7,7 +7,7 @@ import org.junit.Test
 /**
  * The signed-out signal itself.
  *
- * Small, but it is the single piece of state the whole cu-84 fix hangs on: `PlexTokenAuthenticator`
+ * Small, but it is the single piece of state the whole offline-reported-as-signed-out fix hangs on: `PlexTokenAuthenticator`
  * writes it, `PlexLoginRepo.determineLoginState` reads it, and the settings "Sign in again" entry
  * clears it. Its transitions are worth pinning independently of the two collaborators, so a failure
  * says *which* part broke.

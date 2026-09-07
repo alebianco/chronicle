@@ -3,7 +3,7 @@ package io.github.mattpvaughn.chronicle.data.model
 import timber.log.Timber
 
 /**
- * Validation for ids that arrive from a media server (cu-111).
+ * Validation for ids that arrive from a media server.
  *
  * An id is server-controlled data that becomes a **filename**: a downloaded track is written to
  * `File(cachedMediaDir, "$id.$extension")`, and `File(parent, child)` does not normalize. So an id
@@ -11,11 +11,11 @@ import timber.log.Timber
  * directory, next to the Room databases and `ChronicleAuth.xml`.
  *
  * The threat model is narrow and worth stating: the attacker has to *be* the media server, since
- * the app refuses cleartext app-wide (cu-42) and so a network attacker cannot inject a response.
+ * the app refuses cleartext app-wide and so a network attacker cannot inject a response.
  * This is therefore server-compromise escalation rather than a remote primitive — which is why the
  * response is to reject the item and carry on, not to fail the whole sync.
  *
- * Ids are `String` since cu-71 precisely so a non-numeric backend can be represented
+ * Ids are `String` precisely so a non-numeric backend can be represented
  * (decision-11), so this cannot be "must be digits". It is a deny-list of the characters that give
  * a filename meaning it should not have.
  */

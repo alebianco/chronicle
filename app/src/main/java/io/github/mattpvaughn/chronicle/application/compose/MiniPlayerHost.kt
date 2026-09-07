@@ -10,7 +10,7 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.MiniPla
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.MiniPlayerState
 
 /**
- * Feeds [MiniPlayer] from [MainActivityViewModel] (cu-206).
+ * Feeds [MiniPlayer] from [MainActivityViewModel].
  *
  * Separate from `MiniPlayer` itself so that stays stateless and previewable — the same split every
  * other screen here uses.
@@ -18,7 +18,7 @@ import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.MiniPla
  * The four flows were four `collectWhileStarted` blocks in `MainActivity`, one of which carried
  * hand-written change detection (`boundBookTitle`/`boundBookThumb`) because `ProgressUpdater`
  * republishes the book once a second during playback and each re-bind cost a Dagger lookup, a
- * `Uri` parse and a Coil load (cu-117). Collecting into one `data class` gets that from
+ * `Uri` parse and a Coil load. Collecting into one `data class` gets that from
  * recomposition skipping instead.
  */
 @Composable

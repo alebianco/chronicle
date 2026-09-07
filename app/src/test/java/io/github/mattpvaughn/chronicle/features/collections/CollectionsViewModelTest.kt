@@ -31,7 +31,7 @@ import org.junit.Test
  *
  * Nothing about the class prevented testing: every dependency arrives through the constructor and
  * the two that matter are interfaces or open classes MockK can stand in for. The blocker was the
- * same one cu-15 identified for the other ViewModels — `Dispatchers.Main`, which
+ * same one identified for the other ViewModels — `Dispatchers.Main`, which
  * [MainDispatcherRule] pays for once.
  *
  * Scoped to the decisions this class actually owns: the sort direction, the empty-library short
@@ -232,7 +232,7 @@ class CollectionsViewModelTest {
       assertTrue(vm.searchRows.value.isEmpty())
     }
 
-  // ---- uiState: the three-way content state (cu-187) ----
+  // ---- uiState: the three-way content state ----
 
   /**
    * The bug this state exists to make impossible.

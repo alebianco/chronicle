@@ -142,7 +142,7 @@ class AudiobookMediaSessionCallback
         //
         // Explicit parameters, **not** `updateProgressWithoutParameters`: that reads the session
         // state, which the line above has not updated yet, so it would save the pre-pause position
-        // as still PLAYING — the staleness cu-93 hit on seek.
+        // as still PLAYING — the same staleness bug hit on seek.
         val pausedTrackId = mediaController.metadata?.id
         if (pausedTrackId != null) {
           progressUpdater.updateProgress(
@@ -239,9 +239,8 @@ class AudiobookMediaSessionCallback
     override fun onSeekTo(pos: Long) {
       Timber.i("Seeking to: ${DateUtils.formatElapsedTime(pos)}")
       currentPlayer.seekTo(pos)
-      // Publish the new position at once instead of waiting for the next scheduled tick, which is a
-      // second away and left the time labels showing a position the player had already left
-      // (cu-93).
+      // Publish the new position at once instead of waiting for the next scheduled tick, which is
+      // a second away and left the time labels showing a position the player had already left.
       //
       // The position comes from `currentPlayer`, **not** from the controller's playback state:
       // `updateProgressWithoutParameters` reads the session state, which the seek has not updated
@@ -322,7 +321,7 @@ class AudiobookMediaSessionCallback
      * this alone, and its condition was inverted: it tested whether the playing track belonged to
      * the book *being viewed*, which is true exactly when the user is **not** switching books. So
      * it emitted a spurious STOPPED report for the current book and stayed silent for the case it
-     * existed to handle, leaving the outgoing position unsent (cu-91).
+     * existed to handle, leaving the outgoing position unsent.
      *
      * [ProgressUpdater.updateProgressBlocking] rather than `updateProgress`: the latter launches
      * into the service scope, and the state this reads is overwritten a few lines later. The
@@ -354,7 +353,7 @@ class AudiobookMediaSessionCallback
     ) {
       // The [MediaItemTrack.id] of the track to be played, or null to resume the most recently
       // listened track in [bookId]. Absence of the key replaces the old ACTIVE_TRACK sentinel:
-      // ids are Strings now (cu-71), and "no id supplied" is what the sentinel always meant.
+      // ids are Strings now, and "no id supplied" is what the sentinel always meant.
       val startingTrackId = extras.getString(KEY_SEEK_TO_TRACK_WITH_ID)
 
       // [startTimeOffsetMillis] is an offset in milliseconds from start of the track where
@@ -461,7 +460,7 @@ class AudiobookMediaSessionCallback
           }
           // A Cast receiver fetches the audio itself, so it needs plain MediaItems with a MIME type
           // and the token in the URL rather than ExoPlayer's header-carrying media sources. It also
-          // cannot open a downloaded file:// URI, so those tracks stream instead (cu-168).
+          // cannot open a downloaded file:// URI, so those tracks stream instead.
           else -> {
             val playlist =
               buildCastPlaylist(
@@ -493,7 +492,7 @@ class AudiobookMediaSessionCallback
           book = book,
           tracks = tracks,
           track = startingTrack,
-          // Table first (cu-82). This is the playback-start path, so the book is changing and the
+          // Table first. This is the playback-start path, so the book is changing and the
           // one read is not on the per-second tick.
           chaptersFromTable = bookRepository.getChaptersForBook(book.id),
         )
@@ -519,7 +518,7 @@ class AudiobookMediaSessionCallback
       trackFetchAttempts: Int,
     ) {
       // The budget exists because this method calls [playBook] again, which comes straight back
-      // here when the fetch yields nothing — one network request per pass, unbounded (cu-97).
+      // here when the fetch yields nothing — one network request per pass, unbounded.
       if (!mayFetchTracksAgain(trackFetchAttempts)) {
         Timber.w("Book $bookId still has no tracks after a fetch; giving up rather than retrying")
         broadcastPlaybackError(appContext.getString(R.string.playback_error_no_tracks))

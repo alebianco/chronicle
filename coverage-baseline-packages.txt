@@ -11,9 +11,9 @@ io/github/mattpvaughn/chronicle/debug/compose 0.00
 io/github/mattpvaughn/chronicle/features/bookdetails 51.43
 io/github/mattpvaughn/chronicle/features/bookdetails/compose 61.59
 io/github/mattpvaughn/chronicle/features/browse 0.00
-io/github/mattpvaughn/chronicle/features/browse/compose 48.88
+io/github/mattpvaughn/chronicle/features/browse/compose 49.31
 io/github/mattpvaughn/chronicle/features/collections 75.12
-io/github/mattpvaughn/chronicle/features/collections/compose 44.98
+io/github/mattpvaughn/chronicle/features/collections/compose 45.27
 io/github/mattpvaughn/chronicle/features/currentlyplaying 39.93
 io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 55.02
 io/github/mattpvaughn/chronicle/features/download 28.83
@@ -22,13 +22,13 @@ io/github/mattpvaughn/chronicle/features/home/compose 36.15
 io/github/mattpvaughn/chronicle/features/library 54.95
 io/github/mattpvaughn/chronicle/features/library/compose 52.84
 io/github/mattpvaughn/chronicle/features/login 75.12
-io/github/mattpvaughn/chronicle/features/login/compose 6.50
+io/github/mattpvaughn/chronicle/features/login/compose 6.71
 io/github/mattpvaughn/chronicle/features/player 40.68
 io/github/mattpvaughn/chronicle/features/player/compose 0.00
 io/github/mattpvaughn/chronicle/features/search 99.21
-io/github/mattpvaughn/chronicle/features/search/compose 82.57
+io/github/mattpvaughn/chronicle/features/search/compose 82.59
 io/github/mattpvaughn/chronicle/features/settings 84.43
-io/github/mattpvaughn/chronicle/features/settings/compose 65.31
+io/github/mattpvaughn/chronicle/features/settings/compose 65.99
 io/github/mattpvaughn/chronicle/injection 0.00
 io/github/mattpvaughn/chronicle/injection/modules 5.35
 io/github/mattpvaughn/chronicle/navigation 87.46
@@ -37,4 +37,4 @@ io/github/mattpvaughn/chronicle/ui/theme 85.14
 io/github/mattpvaughn/chronicle/util 73.04
 io/github/mattpvaughn/chronicle/util/compose 0.00
 io/github/mattpvaughn/chronicle/views 65.69
-io/github/mattpvaughn/chronicle/views/compose 85.75
+io/github/mattpvaughn/chronicle/views/compose 85.77

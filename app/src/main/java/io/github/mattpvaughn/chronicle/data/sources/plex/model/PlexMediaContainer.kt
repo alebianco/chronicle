@@ -31,7 +31,7 @@ data class PlexMediaContainer(
 data class PlexGenre(val tag: String = "")
 
 /**
- * A `<Style>` or `<Mood>` tag — narrator and series by the Audnexus convention (cu-24).
+ * A `<Style>` or `<Mood>` tag — narrator and series by the Audnexus convention.
  *
  * Same single-field shape as [PlexGenre], kept as its own type because these are **not** genres:
  * naming it `PlexGenre` at three call sites is how "narrator" would eventually be read as music
@@ -42,7 +42,7 @@ data class PlexTag(val tag: String = "")
 
 /**
  * Where a server response becomes local models — and therefore the one place to reject an id that
- * is unsafe to use as a filename (cu-111).
+ * is unsafe to use as a filename.
  *
  * Every fetch funnels through these three, so validating here covers the whole surface rather than
  * relying on each call site to remember. An item with an unsafe id is **dropped**, not repaired:
@@ -66,7 +66,7 @@ fun PlexMediaContainer.asAudiobooks(): List<Audiobook> {
  * expected back, and `fetchBookAsync` hands whatever arrives to `bookDao.update` — which is
  * `@Insert(REPLACE)` and therefore *inserts* an unknown id rather than failing. A track answered
  * to an album request became a phantom book row the user could see, not play, and not remove
- * (cu-18, found on the Continue Listening shelf).
+ * (found on the Continue Listening shelf).
  *
  * A **known** non-album is refused. An absent or unrecognised `type` is *accepted*: Plex does not
  * guarantee the field, and a strict check would drop an entire library from a server that omits

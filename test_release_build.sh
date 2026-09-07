@@ -93,8 +93,8 @@ done
 # Only classes actually carrying @JsonClass count. This used to take *every* `data class` in any
 # file containing the annotation, which is a different claim: SettingsBackup.kt holds one annotated
 # DTO plus four `internal` sealed-interface members that never touch JSON, so R8 rightly inlined
-# them and the check reported four phantom failures (cu-136). Widening proguard-rules.pro to
-# silence that would have exempted correctly-optimised code from R8 — the opposite of cu-45's rule
+# them and the check reported four phantom failures. Widening proguard-rules.pro to
+# silence that would have exempted correctly-optimised code from R8 — the opposite of the rule
 # that keeps stay narrow. A nested class also has a `Parent$Child` descriptor, so the flat
 # `PKG.Child` name it looked for could not have matched even if the class had survived.
 for f in app/src/main/java/**/*.kt(N); do

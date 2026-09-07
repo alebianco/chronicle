@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Narrator and series out of `Style`/`Mood` (cu-24).
+ * Narrator and series out of `Style`/`Mood`.
  *
  * Pinned against the fixtures **captured from a real Plex 1.43.3 server**, not hand-written ones.
  * That distinction matters here more than anywhere: `plexGenres` had no `@Json(name = "Genre")` for
@@ -73,7 +73,7 @@ class AudnexusTagsTest {
         .plexMediaContainer.metadata.single()
 
     assertEquals(
-      "Plex sends `Genre`; a missing @Json name made this silently empty until cu-24",
+      "Plex sends `Genre`; a missing @Json name made this silently empty against every real server",
       listOf("Fantasy", "Adventure"),
       book.plexGenres.map { it.tag },
     )

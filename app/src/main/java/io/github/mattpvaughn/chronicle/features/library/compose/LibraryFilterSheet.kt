@@ -43,7 +43,7 @@ data class FilterOption(
 )
 
 /**
- * The library's sort/view-style/hide-played panel (cu-206).
+ * The library's sort/view-style/hide-played panel.
  *
  * Replaces the `filter_view` `ConstraintLayout` in `fragment_library.xml`, which was a persistent
  * `BottomSheetBehavior` inside the screen's `CoordinatorLayout` — two `ChipGroup`s, a switch, and a
@@ -51,7 +51,7 @@ data class FilterOption(
  * `BottomSheetCallback` in one direction and a flow collector in the other.
  *
  * `ModalBottomSheet` needs neither: visibility is a parameter, dismissal is a callback, and there
- * is no peek height to get stuck at — which is cu-142 answered structurally rather than by
+ * is no peek height to get stuck at — answered structurally here rather than by
  * `expandBottomSheetOnStart()`.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

@@ -18,11 +18,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The search bar shared by home, library and collections (cu-206).
+ * The search bar shared by home, library and collections.
  *
  * Worth testing once precisely because it is shared: the three screens each carried their own copy
  * of this wiring through a `MenuProvider`, and they had already drifted on what an empty query
- * means (cu-202). One composable cannot drift from itself.
+ * means. One composable cannot drift from itself.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w1200dp-h1920dp")

@@ -20,7 +20,7 @@ import io.github.mattpvaughn.chronicle.data.model.ChapterRow
 import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
 
 /**
- * The chapter list, shared by the player and the details screen (cu-201).
+ * The chapter list, shared by the player and the details screen.
  *
  * Replaces `ChapterListAdapter`, which both screens constructed. Emitted into a caller's
  * `LazyColumn` rather than owning its own, so the details screen can scroll its header and the
@@ -28,7 +28,7 @@ import io.github.mattpvaughn.chronicle.util.formatPrecisePosition
  * `appbar_scrolling_view_behavior` pairing was arranging by hand.
  *
  * The grouping decision lives in `chapterRows`, not here: two renderers must not disagree about
- * where a disc header goes, and a pure function is testable without a view (cu-198's precedent).
+ * where a disc header goes, and a pure function is testable without a view (the precedent).
  */
 fun LazyListScope.chapterList(
   rows: List<ChapterRow>,
@@ -47,7 +47,7 @@ fun LazyListScope.chapterList(
         }
       is ChapterRow.ChapterItem ->
         // The key carries the chapter id as well as the track/disc/index triple. A chapter that
-        // spans a track boundary legitimately appears on **both** tracks (cu-19), so the triple
+        // spans a track boundary legitimately appears on **both** tracks, so the triple
         // alone is not unique and `LazyColumn` throws on a duplicate key.
         item(key = "chapter-${row.chapter.trackId}-${row.chapter.discNumber}-${row.chapter.index}-${row.chapter.id}") {
           ChapterRowItem(row, onChapterClick)
@@ -92,7 +92,7 @@ private fun ChapterRowItem(
     )
     Text(
       // A chapter's length is a duration inside a book, so it keeps its clock form — but through
-      // the shared formatter, not `DateUtils`, which pads to `0:01:15` at the hour (cu-19).
+      // the shared formatter, not `DateUtils`, which pads to `0:01:15` at the hour.
       text =
         formatPrecisePosition(
           row.chapter.bookEndTimeOffset.millis - row.chapter.bookStartTimeOffset.millis,

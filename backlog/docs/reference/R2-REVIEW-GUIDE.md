@@ -8,8 +8,8 @@ created_date: '2026-09-05'
 # R2 review guide
 
 > **Point-in-time snapshot, 2026-09-05.** Written after the adversarial review pass against branch
-> `integration/r2-review`. Two things in it have since moved: **cu-166 has shipped** (Fetch2 is now
-> vendored at `libs/fetch2-mirror`), and **Compose was adopted** ([[decision-22]], cu-181), which
+> `integration/r2-review`. Two things in it have since moved: **the Fetch2 mirror has shipped** (Fetch2 is now
+> vendored at `libs/fetch2-mirror`), and **Compose was adopted** ([[decision-22]]), which
 > this guide predates and does not cover. The gate figures below are frozen at the moment of
 > writing — re-run `./verify.sh` for current numbers. The task list has also grown; see the roundup
 > in the m-2 milestone rather than treating the count here as current.
@@ -66,40 +66,40 @@ These work correctly; the question is whether the choice suits how your househol
 
 | Task | The choice | How to check |
 |---|---|---|
-| **cu-18** Continue Listening shelf | Which books appear, how many, and that `lastViewedAt` is the right sort key | Home screen. Is the top-left book the one you'd reach for? |
-| **cu-20** Per-book speed | That a book keeps its own speed **forever** once set, and the preset values offered | Set 1.5× on one book, play another — the second should be at your global default |
-| **cu-21** Sleep timer | The durations offered, the end-of-chapter option, and re-arming on resume | Start a 5-min timer, let it expire, press play — it should re-arm to **5 min**, not the seconds left |
-| **cu-25** Search | Fuzziness threshold (4 chars), tier weights ordering results, grouping | Search a title with a typo; search a narrator; search 3 characters (prefix-only by design) |
-| **cu-88** Skip silence | Thresholds **tuned by ear** — the task's own criterion asks for recorded reasoning | Play a narrated passage with skip-silence on. Does it clip the starts of words? |
-| **cu-143 / cu-145** Narrator & series | That a refresh seeds the index (`1 + N` requests, not one per book), and how partial coverage is worded | Browse → narrator/series facets. `unknownCount` must be honest about books not yet synced |
-| **cu-146 / cu-147 / cu-155** Series index | Eight built-in `titleSort` patterns, their **order** (most specific first), and hundredths scaling so a novella sits at 1.5 | Books in a series should sort 1, 1.5, 2 — not alphabetically |
-| **cu-148 / cu-151** Rule config + tester | The `series-index-rules.json` format, and the tester UI's layout | Settings → series index tester. Type a title, see every rule's verdict |
+| **Continue Listening shelf** | Which books appear, how many, and that `lastViewedAt` is the right sort key | Home screen. Is the top-left book the one you'd reach for? |
+| **Per-book speed** | That a book keeps its own speed **forever** once set, and the preset values offered | Set 1.5× on one book, play another — the second should be at your global default |
+| **Sleep timer** | The durations offered, the end-of-chapter option, and re-arming on resume | Start a 5-min timer, let it expire, press play — it should re-arm to **5 min**, not the seconds left |
+| **Search** | Fuzziness threshold (4 chars), tier weights ordering results, grouping | Search a title with a typo; search a narrator; search 3 characters (prefix-only by design) |
+| **Skip silence** | Thresholds **tuned by ear** — the task's own criterion asks for recorded reasoning | Play a narrated passage with skip-silence on. Does it clip the starts of words? |
+| **Narrator & series** | That a refresh seeds the index (`1 + N` requests, not one per book), and how partial coverage is worded | Browse → narrator/series facets. `unknownCount` must be honest about books not yet synced |
+| **Series index** | Eight built-in `titleSort` patterns, their **order** (most specific first), and hundredths scaling so a novella sits at 1.5 | Books in a series should sort 1, 1.5, 2 — not alphabetically |
+| **Rule config + tester** | The `series-index-rules.json` format, and the tester UI's layout | Settings → series index tester. Type a title, see every rule's verdict |
 
 ### B. Visual — a screen changed and only you can see it
 
 | Task | What changed | How to check |
 |---|---|---|
-| **cu-19** Chapter progress | Player wording: `6h 12m` for a span, `32:10` inside a chapter, never `47:12:33/52:04:11` | Open a long book. Every duration should read like a human wrote it |
-| **cu-22** Bookmarks | The add flow, note editor, and jump-back | Add a bookmark mid-chapter, add a note, leave, come back |
-| **cu-24** Library usability | List view, author browse, narrator/series facets — a large surface | Library tab, switch to list view, then browse each facet |
-| **cu-47** Accessibility | Six player controls have a **48dp tap area behind a 32dp icon** — no visible change, but the spacing *feels* different | Player controls. Also worth a TalkBack pass |
-| **cu-50** Notification | Notification updates on chapter change | Play across a chapter boundary with the shade open |
-| **cu-63** Edge-to-edge | Insets on every screen. **Portrait only, Android 15 only — landscape never checked** | Rotate every screen. This is the least-verified item here |
-| **cu-68** First-frame flashes | 34 views given XML defaults. **Screenshot comparison unchecked** | Cold-start repeatedly and watch for a flash of wrong state |
-| **cu-74** Mini player on tablet | **Four criteria unchecked, all visual** | Tablet, portrait and landscape, with a book playing |
-| **cu-95** Buffering indicator | What buffering looks like vs paused vs loading | Play over a throttled connection |
-| **cu-105** Collapsing toolbar | Scrolled content no longer draws above the toolbar | Scroll the library fast |
-| **cu-142** Speed popover in landscape | Opened at peek height showing only its title bar; now expands | **Rotate to landscape**, open the speed popover |
+| **Chapter progress** | Player wording: `6h 12m` for a span, `32:10` inside a chapter, never `47:12:33/52:04:11` | Open a long book. Every duration should read like a human wrote it |
+| **Bookmarks** | The add flow, note editor, and jump-back | Add a bookmark mid-chapter, add a note, leave, come back |
+| **Library usability** | List view, author browse, narrator/series facets — a large surface | Library tab, switch to list view, then browse each facet |
+| **Accessibility** | Six player controls have a **48dp tap area behind a 32dp icon** — no visible change, but the spacing *feels* different | Player controls. Also worth a TalkBack pass |
+| **Notification** | Notification updates on chapter change | Play across a chapter boundary with the shade open |
+| **Edge-to-edge** | Insets on every screen. **Portrait only, Android 15 only — landscape never checked** | Rotate every screen. This is the least-verified item here |
+| **First-frame flashes** | 34 views given XML defaults. **Screenshot comparison unchecked** | Cold-start repeatedly and watch for a flash of wrong state |
+| **Mini player on tablet** | **Four criteria unchecked, all visual** | Tablet, portrait and landscape, with a book playing |
+| **Buffering indicator** | What buffering looks like vs paused vs loading | Play over a throttled connection |
+| **Collapsing toolbar** | Scrolled content no longer draws above the toolbar | Scroll the library fast |
+| **Speed popover in landscape** | Opened at peek height showing only its title bar; now expands | **Rotate to landscape**, open the speed popover |
 
 ### C. Verified by measurement — confirm it matches your experience
 
 | Task | The claim | How to check |
 |---|---|---|
-| **cu-104 / cu-117 / cu-140** Playback cost | Main-thread work during playback cut; the remaining cost is layout/draw, not data | Play a **3-track, 8-chapter** book, not the easy single-track fixture, and scroll while it plays |
-| **cu-51** Large-library performance | Profiling **contradicted the task's premise** — paged loading already existed, scans were already linear, indexes made no measurable difference. A criterion was retired with evidence rather than ticked | Library of 196 books should scroll and search without stutter |
-| **cu-52** StateFlow migration | All LiveData gone; `postValue` banned by a build gate. Found three real bugs on the way | Everything should behave as before — this is the one to shout about if anything feels off |
-| **cu-33** Backend interface carve | The ingestion seam is real but **not registered** — `sources` is empty in production | No user-visible change expected |
-| **cu-99** Auto browse tree | Browse tree no longer keyed on localized strings | Android Auto browse, ideally in a non-English locale |
+| **Playback cost** | Main-thread work during playback cut; the remaining cost is layout/draw, not data | Play a **3-track, 8-chapter** book, not the easy single-track fixture, and scroll while it plays |
+| **Large-library performance** | Profiling **contradicted the task's premise** — paged loading already existed, scans were already linear, indexes made no measurable difference. A criterion was retired with evidence rather than ticked | Library of 196 books should scroll and search without stutter |
+| **StateFlow migration** | All LiveData gone; `postValue` banned by a build gate. Found three real bugs on the way | Everything should behave as before — this is the one to shout about if anything feels off |
+| **Backend interface carve** | The ingestion seam is real but **not registered** — `sources` is empty in production | No user-visible change expected |
+| **Auto browse tree** | Browse tree no longer keyed on localized strings | Android Auto browse, ideally in a non-English locale |
 
 ---
 
@@ -137,13 +137,13 @@ to different endpoints, one of them a write. CLAUDE.md now records the negative 
 
 ## Three new tasks filed from the review
 
-- **cu-165** — On Android Auto the seek bar spans the whole track while the title names the current
+- **Android Auto seek bar** — On Android Auto the seek bar spans the whole track while the title names the current
   chapter. The most-reported Auto complaint against both major competitors, and we are well placed
   to fix it since chapters and typed offsets already exist.
-- **cu-166** — Fetch2 (downloads) is unmaintained upstream and arrives via JitPack. The decision not
+- **Fetch2 mirror** — Fetch2 (downloads) is unmaintained upstream and arrives via JitPack. The decision not
   to migrate still holds; the recommendation is to mirror the artifact so an outage can't break the
   build.
-- **cu-167** — `kotlin-reflect` ships in the APK unused, pulled in by the wrong Moshi artifact.
+- **kotlin-reflect removal** — `kotlin-reflect` ships in the APK unused, pulled in by the wrong Moshi artifact.
 
 ## Two things worth your decision, not filed
 
@@ -159,7 +159,7 @@ to different endpoints, one of them a write. CLAUDE.md now records the negative 
 
 Worth knowing, because it says the expensive investments paid off:
 
-- **Typed offset frames** (cu-136) — Voice#3396 is an open bug in a 3.1k-star competitor whose
+- **Typed offset frames** — Voice#3396 is an open bug in a 3.1k-star competitor whose
   reporter is guessing "absolute vs chapter". That is exactly the bug class our value classes make
   impossible to compile.
 - **Per-book speed** — open as a feature request against Audiobookshelf since January 2024.

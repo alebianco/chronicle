@@ -19,7 +19,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * The search controller debounces and never answers a stale query (cu-25).
+ * The search controller debounces and never answers a stale query.
  *
  * These are the two properties that cannot be seen by inspection: before this, each screen ran a
  * database read per keystroke, and two racing searches could deliver out of order and leave the
@@ -161,7 +161,7 @@ class SearchControllerTest {
     }
 
   /**
-   * The query text is state here, not in the widget (cu-206).
+   * The query text is state here, not in the widget.
    *
    * Under `SearchView` the widget owned the text, so nothing in this class held it. A Compose
    * text field renders whatever it is given, so a query that is not published here shows an empty

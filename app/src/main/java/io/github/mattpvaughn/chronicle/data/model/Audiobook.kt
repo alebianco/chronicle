@@ -23,7 +23,7 @@ data class Audiobook(
    * parsed response does not know which server it arrived from, only the repository doing the
    * fetching does. [from] therefore leaves this [SourceId.UNKNOWN] and ingestion stamps it.
    *
-   * **This is a local-only column in [merge]'s sense** (cu-20): the network copy never carries a
+   * **This is a local-only column in [merge]'s sense**: the network copy never carries a
    * meaningful value, so both arms of [merge] must name it or a refresh would blank the scope of
    * every book — which is exactly the union this field exists to prevent.
    */
@@ -63,7 +63,7 @@ data class Audiobook(
    */
   val playbackSpeed: Float = NO_SPEED_OVERRIDE,
   /**
-   * The narrator(s), by the Audnexus `Style` convention (cu-24).
+   * The narrator(s), by the Audnexus `Style` convention.
    *
    * Comma-separated when a recording has several, because this is a display and grouping value
    * rather than a relation — a book with two narrators appears under both in the facet list, which
@@ -73,7 +73,7 @@ data class Audiobook(
    * a book that has never been synced has nothing here regardless of how it is tagged.
    */
   val narrator: String = "",
-  /** The series, by the `Mood` convention, with any `Series:` prefix already stripped (cu-24). */
+  /** The series, by the `Mood` convention, with any `Series:` prefix already stripped. */
   val series: String = "",
   /**
    * This book's place in [series], or 0 when unknown.
@@ -118,7 +118,7 @@ data class Audiobook(
     const val NO_SERIES_INDEX = 0
 
     /**
-     * The unit [seriesIndex] is stored in: hundredths of a book (cu-146).
+     * The unit [seriesIndex] is stored in: hundredths of a book.
      *
      * So book 2 is `200` and the novella at 1.5 is `150`. Hundredths rather than whole numbers
      * because a fractional position is real — Audnexus writes `Book 1.5` — and rather than a
@@ -138,18 +138,18 @@ data class Audiobook(
         parentId = dir.parentRatingKey.toString(),
         // joinToString on the data class itself yields "PlexGenre(tag=Fantasy)";
         // this field reaches MediaMetadataCompat, so Android Auto and the media
-        // notification would show that literal string (found via cu-16 fixtures).
+        // notification would show that literal string (found via the Plex fixtures).
         genre = dir.plexGenres.joinToString(separator = ", ") { it.tag },
         summary = dir.summary,
         year = dir.year.takeIf { it != 0 } ?: dir.parentYear,
         addedAt = dir.addedAt,
         updatedAt = dir.updatedAt,
-        // Plex reports seconds; the local DB stores millis (cu-14).
+        // Plex reports seconds; the local DB stores millis.
         lastViewedAt = plexTimestampToMillis(dir.lastViewedAt),
         viewedLeafCount = dir.viewedLeafCount,
         leafCount = dir.leafCount,
         viewCount = dir.viewCount,
-        // Audnexus tagging convention (cu-24). Both are empty on a library *listing* — Plex only
+        // Audnexus tagging convention. Both are empty on a library *listing* — Plex only
         // sends `Style`/`Mood` on the per-book detail response — so these fill in when a book is
         // synced, and `merge` below is what stops a later refresh from blanking them again.
         narrator = dir.narrators().joinToString(separator = ", "),
@@ -164,11 +164,11 @@ data class Audiobook(
      * audiobook (it is the album-ordering index), `parentIndex` is a *track's* disc number, and the
      * `Mood` tag carries the series name without a number. So this string, written by whichever
      * tagger the user ran, is the only carrier — and it is on the *listing* as well as the detail
-     * response, unlike `Style`/`Mood` (cu-24), so it costs no extra request.
+     * response, unlike `Style`/`Mood`, so it costs no extra request.
      *
      * The rules themselves live in `SeriesIndexPatterns.kt` as **data**, so a library tagged by
      * some other convention can be handled by adding a pattern rather than shipping a new build
-     * (cu-147, modelled on tvnamer). This function is the thin adapter: it asks the configured set
+     * (modelled on tvnamer). This function is the thin adapter: it asks the configured set
      * and converts the answer to the stored unit.
      *
      * Values are **hundredths** ([SERIES_INDEX_SCALE]) because a novella genuinely sits at 1.5 —
@@ -189,7 +189,7 @@ data class Audiobook(
      * A `var` with a private setter so a user-configured set can replace it at startup
      * ([installSeriesIndexPatterns]) without every caller having to thread it through.
      * `Audiobook.from` runs per book on a library refresh, so recompiling per call would rebuild
-     * several thousand expressions on a 1000-book library (the cu-51 target).
+     * several thousand expressions on a 1000-book library.
      */
     var seriesIndexPatterns: SeriesIndexPatternSet = SeriesIndexPatternSet(DEFAULT_SERIES_INDEX_PATTERNS)
       private set
@@ -228,7 +228,7 @@ data class Audiobook(
      * would silently drop the user's per-book speed on every library refresh.
      *
      * [narrator], [series] and [seriesIndex] are different again: the server *can* supply them, but
-     * only on the per-book detail response (cu-24). A library refresh merges from the **listing**,
+     * only on the per-book detail response. A library refresh merges from the **listing**,
      * where they are always absent — so they are taken from the network copy when it has a value
      * and kept from the local one when it does not. Preferring the network unconditionally would
      * blank a narrator on every refresh; preferring the local one unconditionally would make a
@@ -293,7 +293,7 @@ data class Audiobook(
      *
      * This is **not a documentation list**. It is the allowlist in two places: the
      * `bookSortKey` setter throws for a value outside it, and `BACKUP_SETTING_VALUES` validates
-     * `KEY_BOOK_SORT_BY` against it on settings *import* (cu-77). So anything listed here is a
+     * `KEY_BOOK_SORT_BY` against it on settings *import*. So anything listed here is a
      * value the app will accept and persist — and `LibraryViewModel`'s comparator ends in
      * `throw NoWhenBranchMatchedException`, which makes a listed-but-unhandled key a **crash on
      * the library screen**, reachable by importing a settings file and unrecoverable through the
@@ -352,7 +352,7 @@ val BOOK_FINISHED_END_WINDOW = 2.minutes.inWholeMilliseconds
  * The id of "no book".
  *
  * The *textual* form of the old numeric sentinel, deliberately: a `Chapter.bookId` written before
- * the cu-71 retype migrates to the string "-22321", so changing this to "" would orphan every
+ * the retype migrates to the string "-22321", so changing this to "" would orphan every
  * chapter that had no book.
  */
 const val NO_AUDIOBOOK_FOUND_ID = "-22321"

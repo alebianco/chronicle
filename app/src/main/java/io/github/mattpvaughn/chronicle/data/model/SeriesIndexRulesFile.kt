@@ -5,12 +5,12 @@ import com.squareup.moshi.Moshi
 import timber.log.Timber
 
 /**
- * A user's own series-index parsing rules, as a file they can edit (cu-148, decision-18).
+ * A user's own series-index parsing rules, as a file they can edit (decision-18).
  *
  * JSON rather than preferences, following `SettingsBackup`: a regex is not a setting with a closed
  * set of values, and the point of the format is that it opens in a text editor (D12 rule 7). The
  * file is **absent by default** and its absence is not an error — an install that never creates one
- * behaves exactly as cu-147 shipped, with the built-in rules alone.
+ * behaves exactly as it originally shipped, with the built-in rules alone.
  *
  * Example:
  *

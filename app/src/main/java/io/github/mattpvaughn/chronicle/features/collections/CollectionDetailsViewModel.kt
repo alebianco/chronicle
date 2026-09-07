@@ -22,7 +22,7 @@ class CollectionDetailsViewModel
     savedStateHandle: SavedStateHandle,
   ) : ViewModel() {
     /**
-     * Which collection, from the navigation arguments rather than a factory field (cu-185).
+     * Which collection, from the navigation arguments rather than a factory field.
      *
      * The factory held `collectionId` as a nullable `var` the Fragment set before `create` and then
      * dereferenced with `!!`. That did not survive process death — the system rebuilds the ViewModel
@@ -57,7 +57,7 @@ class CollectionDetailsViewModel
 
     @Suppress("UNCHECKED_CAST")
     companion object {
-      /** Navigation argument key, owned here because this is what reads it (cu-185). */
+      /** Navigation argument key, owned here because this is what reads it. */
       const val ARG_COLLECTION_ID = "collection_id"
     }
   }

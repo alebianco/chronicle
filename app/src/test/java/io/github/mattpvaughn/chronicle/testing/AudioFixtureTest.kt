@@ -8,7 +8,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Verifies the audio fixture is served as a real, seekable stream (cu-64).
+ * Verifies the audio fixture is served as a real, seekable stream.
  *
  * Playback is the app's core behaviour and was previously unverifiable: the mock
  * served JSON and cover art only, so a player could be constructed but never fed.

@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Human-readable durations for the player (cu-19).
+ * Human-readable durations for the player.
  *
  * The player used to print `DateUtils.formatElapsedTime`, which gives `h:mm:ss` — so a 47-hour
  * book read `47:12:33/52:04:11`. RESEARCH_FINDINGS §3.1 convergent-grammar rule 3 is explicit that

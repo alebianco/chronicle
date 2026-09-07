@@ -56,7 +56,7 @@ import java.io.IOException
  * This exists because of a crash it would have caught. `currentChapter` was written as
  * `get() = activeChapter`, resolving to a property declared *below* it — and Kotlin initialises
  * properties in declaration order, so the alias read null during construction and MainActivity
- * died on launch with "Parameter specified as non-null is null" (cu-87). The source comment at the
+ * died on launch with "Parameter specified as non-null is null". The source comment at the
  * declarations says as much: *"Nothing in the unit suite constructs this ViewModel, so only the app
  * caught it."*
  *
@@ -153,7 +153,7 @@ class CurrentlyPlayingViewModelTest {
    *
    * They used to differ — the timeline read a raw `currentlyPlaying.chapter` that only playback
    * callbacks refreshed, while the chapter list highlighted one derived from saved progress, so
-   * the two disagreed until playback started (cu-87). That is the owner's *"chapter list
+   * the two disagreed until playback started. That is the owner's *"chapter list
    * highlights the wrong chapter compared to the timeline position"*.
    */
   @Test
@@ -170,7 +170,7 @@ class CurrentlyPlayingViewModelTest {
   /** The alias must be non-null at construction, which is precisely what the crash was. */
   @Test
   fun `the current chapter is available immediately after construction`() {
-    assertNotNull("a null here is the cu-87 launch crash", viewModel().currentChapter)
+    assertNotNull("a null here is the launch crash this guards", viewModel().currentChapter)
   }
 
   /**
@@ -187,7 +187,7 @@ class CurrentlyPlayingViewModelTest {
   private fun <T> TestScope.observedValue(flow: StateFlow<T>): T = settledValue(flow)
 
   /**
-   * Chapter-relative progress, on a multi-track book (cu-115 / cu-73 fourth sweep).
+   * Chapter-relative progress, on a multi-track book.
    *
    * This was `track.progress - chapter.bookStartTimeOffset` — an in-track offset minus a
    * book-absolute one. At this position that is `150_000 - 600_000 = -450_000`. It reached
@@ -225,7 +225,7 @@ class CurrentlyPlayingViewModelTest {
     }
 
   /**
-   * The slider must catch up once the drag guard opens (cu-198).
+   * The slider must catch up once the drag guard opens.
    *
    * `isSliding` was a plain `var` read inside `.filter { !isSliding }` on the two slider flows. A
    * predicate reading a mutable field **outside** the stream is not part of that stream's state,
@@ -314,11 +314,11 @@ class CurrentlyPlayingViewModelTest {
     }
 
   /**
-   * A bookmark records the **book** offset, not the in-track one (cu-22).
+   * A bookmark records the **book** offset, not the in-track one.
    *
    * Asserted on the multi-track fixture where the two differ by a whole track: on a single-track
    * book they are the same number, so a frame mix-up here would be invisible — which is the exact
-   * shape of the six bugs cu-136 made into a type error.
+   * shape of the six bugs the offset-type split made into a type error.
    */
   @Test
   fun `adding a bookmark records the book offset`() =

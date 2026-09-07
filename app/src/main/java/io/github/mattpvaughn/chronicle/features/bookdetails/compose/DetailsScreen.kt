@@ -29,7 +29,7 @@ import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.ChapterRow
 import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
-/** What the details header can do. One object rather than seven lambdas (cu-200). */
+/** What the details header can do. One object rather than seven lambdas. */
 data class DetailsActions(
   val onPlayPause: () -> Unit = {},
   val onDownload: () -> Unit = {},
@@ -38,11 +38,11 @@ data class DetailsActions(
 )
 
 /**
- * The book-details header (cu-200).
+ * The book-details header.
  *
  * Stateless, so the whole thing is reachable from `createComposeRule()` — the View version had no
  * rendering test at all beyond a Robolectric layout check that measured four TextViews for
- * overlap (cu-145). In a `Column` that overlap is unrepresentable, which is why that test retires
+ * overlap. In a `Column` that overlap is unrepresentable, which is why that test retires
  * rather than being ported.
  */
 @Composable
@@ -57,7 +57,7 @@ fun DetailsScreen(
   // One `LazyColumn` for the header *and* the chapters, so they scroll as a single list. The View
   // version arranged that with `CollapsingToolbarLayout` plus
   // `appbar_scrolling_view_behavior` on a separate RecyclerView — two scroll containers
-  // coordinating by hand, which is the pairing cu-105's bug came out of.
+  // coordinating by hand, which is the pairing the bug came out of.
   LazyColumn(modifier = modifier.fillMaxWidth()) {
     item(key = "header") { DetailsHeader(state, actions, coverUrl) }
     chapterList(chapterRows, onChapterClick)
@@ -109,7 +109,7 @@ private fun BookText(
     color = MaterialTheme.colorScheme.onSurfaceVariant,
     modifier = Modifier.padding(top = 2.dp),
   )
-  // A `Column` cannot overlap its children, so cu-145's 17px overlap between these four rows is
+  // A `Column` cannot overlap its children, so the 17px overlap between these four rows is
   // unrepresentable rather than re-guarded — `BookDetailsMetadataLayoutTest` retires with it.
   book.narrator?.let {
     Text(
@@ -124,9 +124,9 @@ private fun BookText(
       text = it,
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.primary,
-      // Tappable: it navigates into the browse facet for the series (cu-24). `onClickLabel`
+      // Tappable: it navigates into the browse facet for the series. `onClickLabel`
       // rather than a bare `clickable`, because a screen reader must announce what the tap does —
-      // the text alone reads as a label (cu-149).
+      // the text alone reads as a label.
       modifier =
         Modifier
           .padding(top = 2.dp)
@@ -142,10 +142,10 @@ private fun seriesBrowseLabel(book: BookHeader): String = stringResource(R.strin
 /**
  * The progress line.
  *
- * Rendered from a pre-formatted string on purpose: [[cu-191]] records that this screen still shows
- * the raw `h:mm:ss/h:mm:ss` pair cu-19 removed from the player, **and that the replacement wording
- * is the owner's call**. Porting it verbatim keeps this a rendering change; rewording it here
- * would be an unreviewed product decision inside a migration.
+ * Rendered from a pre-formatted string on purpose: this screen still shows the raw
+ * `h:mm:ss/h:mm:ss` pair that was removed from the player, **and the replacement wording
+ * is the owner's call, still open**. Porting it verbatim keeps this a rendering change;
+ * rewording it here would be an unreviewed product decision inside a migration.
  */
 @Composable
 private fun ProgressRow(progress: ProgressLine) {
@@ -245,8 +245,9 @@ private fun DownloadControl(
           },
         ),
         // Was `ColorStateList.valueOf(tint)` on a **resource id** rather than a colour value, so
-        // the icon was tinted with the integer value of `R.color.icon` (cu-200 found it; the
-        // Compose rewrite forces a real `Color` and the bug cannot be expressed).
+        // the icon was tinted with the integer value of `R.color.icon` (the details screen's
+        // Compose migration found it; the Compose rewrite forces a real `Color` and the bug
+        // cannot be expressed).
         tint =
           if (download is DownloadState.Cached) {
             MaterialTheme.colorScheme.primary

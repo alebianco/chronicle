@@ -33,7 +33,7 @@ migration that dropped every track's `parentKey`, orphaning every book from its 
   `MigrationTestHelper` is instrumented-only). Add a case for any new migration.
 - Verify every migration by **deliberate sabotage** — a check that cannot fail proves nothing.
 
-**An exported schema for a released version must never change** (cu-24). Room rewrites
+**An exported schema for a released version must never change.** Room rewrites
 `<version>.json` from the current entities, and when a version bump and an entity change land in
 the same build it overwrites the **older** file — leaving `10.json` containing v11's shape. Those
 files are the authority a migration's column list is written from (`BOOK_MIGRATION_8_9` says so).
@@ -45,7 +45,7 @@ A migration that changes only *data* (not shape) still needs a case — v11→v1
 indices while the exported schemas differed only by version and shared an `identityHash`, since
 Room hashes the schema, not the version.
 
-## Entity ids are all `String` (cu-71, decision-11)
+## Entity ids are all `String` (decision-11)
 
 So a non-numeric backend can be represented. Two traps:
 
@@ -55,7 +55,7 @@ So a non-numeric backend can be represented. Two traps:
 - **A numeric-looking id must never be parsed.** `id.toLong()` throws on the very ids the retype
   exists to allow (it did, in two RecyclerView `getItemId` overrides; they hash now).
 
-## The local-column merge rule (cu-20)
+## The local-column merge rule
 
 **A local-only column must be named in *both* arms of `Audiobook.merge`.** A library refresh merges
 a network copy without loading tracks, and a field the server knows nothing about is always the
@@ -69,7 +69,7 @@ exercises both and was verified by sabotaging one arm.
 network value when it has one, the local value when it does not. Preferring the network blanks a
 narrator on every refresh; preferring the local one makes a re-tagged book uncorrectable.
 
-## Source scoping (cu-127, decision-21)
+## Source scoping (decision-21)
 
 `SourceId` (`data/model/SourceId.kt`) is a `String` value class holding `"plex:<clientIdentifier>"`.
 `Audiobook`, `Collection` and `MediaItemTrack` all carry one.
@@ -96,15 +96,15 @@ narrator on every refresh; preferring the local one makes a re-tagged book uncor
   count, every book permanently invisible.
 
 **Not fixed:** `Audiobook.id` is still the sole primary key, so two servers sharing a Plex rating
-key collide on insert. decision-21 rejected a composite key deliberately (cu-71's lesson). Scoping
-removes the *union*, which is what a user sees. Downloads stay at
+key collide on insert. decision-21 rejected a composite key deliberately (the lesson from the
+all-`String`-ids retype). Scoping removes the *union*, which is what a user sees. Downloads stay at
 `<cachedMediaDir>/<trackId>.<ext>`: a per-source path buys nothing while one id means one row means
 one filename, and it would touch four file paths whose failure mode is deleted audio.
 
 **Note:** `ScopedQueryTest` covers **reads only**. An unresolved source on a *write* looks exactly
 like "no data" and nothing catches it.
 
-## Ingestion (cu-80)
+## Ingestion
 
 **A refresh may only delete books belonging to the source doing the refreshing.** `planIngestion`
 scopes removal by `Audiobook.source`; the Plex-only path deleted every local row absent from its
@@ -116,16 +116,16 @@ an emptied library, and a *failed* fetch never reaches ingestion at all. All thr
 sabotage-verified.
 
 `refreshData` and `refreshDataPaginated` share that one path — the tail was written out twice
-before, and cu-156 had to add tag seeding to both copies.
+before, and adding tag seeding had to touch both copies.
 
-## Chapters (cu-49, cu-82, cu-159)
+## Chapters
 
 **Chapters live in `ChapterDatabase` and nowhere else.** The legacy `Audiobook.chapters` column is
 **gone** as of v14 — do not reintroduce a serialized copy on the book.
 
 - Every read goes through `resolveChapters` / `resolveChaptersFromCache`
   (`data/model/ChapterAssembly.kt`): table → `asChapterList()`.
-- The fallback is permanent (cu-13): a server reporting no chapters has nothing to fall back *to*,
+- The fallback is permanent: a server reporting no chapters has nothing to fall back *to*,
   so one chapter per track is derived instead.
 - A book with no rows repairs itself — `syncAudiobook` refetches from
   `/library/metadata/{id}?includeChapters=1` whenever the book is opened.
@@ -133,25 +133,25 @@ before, and cu-156 had to add tag seeding to both copies.
   `PlayerExt` and `CurrentlyPlayingViewModel` were resolving `indexOf` to `-1` against the empty
   column, so chapter skip silently did nothing.
 - **Rows are passed *into* `CurrentlyPlayingSingleton.update`, never read inside it**: it runs once
-  a second from `ProgressUpdater`, so a DAO there is a blocking read per tick (cu-110). A test pins
+  a second from `ProgressUpdater`, so a DAO there is a blocking read per tick. A test pins
   that a tick without rows cannot downgrade an already-resolved list.
-- The cu-158 backfill and `ChapterListConverter` went with the dropped column. Verified on the
+- The backfill and `ChapterListConverter` went with the dropped column. Verified on the
   tablet: v14, 196 books, 6 positions and 138 series indices intact, a 107-chapter book playing.
 - **A chapter spanning a track boundary appears in both *responses*, but must not appear twice in
-  the assembled list** — `assembleChapters` de-duplicates (cu-201). It used to concatenate the
+  the assembled list** — `assembleChapters` de-duplicates. It used to concatenate the
   per-track lists, so the fixture book stored ten rows for eight chapters, read "Chapter 3: A Short
   Rest" twice and said "Ch 8 of 10", because that readout's `m` is a size. The chapter is kept for
   the track it **starts** in — the rule `trackId` already follows and the frame
   `bookStartTimeOffset` is measured in — and identity is the id **plus** both book offsets, since
-  `id` alone is not unique within a book (cu-49) and dropping on it would take a real chapter with
+  `id` alone is not unique within a book and dropping on it would take a real chapter with
   it. Invisible for as long as it existed: the old adapter rendered the legacy `Audiobook.chapters`
-  column, empty since cu-49, so no duplicate could reach a screen until the list became Compose.
+  column, empty since that column was dropped, so no duplicate could reach a screen until the list became Compose.
 - **`ChapterRepository.loadChapterData` does not call `removeAllForBook` before inserting**, unlike
   `BookRepository.syncAudiobook` — so a shrinking chapter list leaves stale rows on that path.
-- Chapter offsets are **absolute within the book**, not per-track. Since cu-136 the frame is a
+- Chapter offsets are **absolute within the book**, not per-track. The frame is a
   type, so that mistake no longer compiles — see the `playback-and-player` skill.
 
-## Bookmarks are a separate database on purpose (cu-22)
+## Bookmarks are a separate database on purpose
 
 `BookmarkDatabase` is keyed by `bookId` and lives outside `BookDatabase` **so the sync path cannot
 reach it**: `refreshData` calls `bookDao.removeAll` for books the server no longer lists, so a
@@ -162,7 +162,7 @@ since no server holds a copy of a note the user wrote.
 the catalogue row; moving bookmarks into `BookDatabase` breaks it, which is the point. A library
 *switch* (`clear()`) leaves them alone too — the user may switch back.
 
-## The backup file (cu-22)
+## The backup file
 
 `SettingsBackup.settings` is a `Map<String, String>` of *preference keys*; bookmarks are a
 top-level `bookmarks` array, because forcing per-book rows through that map means JSON encoded
@@ -177,8 +177,7 @@ would delete notes made since the export.
 
 Any settings export MUST use the `BACKUP_SETTING_KEYS` allowlist and **never enumerate
 `sharedPreferences.all`**. The allowlist gates **keys, not values**: an imported string is written
-straight to prefs, so a value with a closed set of valid options needs validating on the way in
-(cu-77).
+straight to prefs, so a value with a closed set of valid options needs validating on the way in.
 
 ## Testing the data layer
 

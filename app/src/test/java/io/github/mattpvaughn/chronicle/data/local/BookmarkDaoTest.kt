@@ -17,11 +17,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The bookmark store against real SQLite (cu-22).
+ * The bookmark store against real SQLite.
  *
  * Robolectric rather than a fake, because the behaviours that matter here are SQL's: the
  * REPLACE-on-id that makes a restore idempotent, the ordering the list depends on, and the
- * `String`-bound id that would silently match nothing if it were numeric (cu-71).
+ * `String`-bound id that would silently match nothing if it were numeric.
  */
 @RunWith(RobolectricTestRunner::class)
 class BookmarkDaoTest {
@@ -164,7 +164,7 @@ class BookmarkDaoTest {
 
   /**
    * The id column is TEXT, and SQLite compares across storage classes — so a numerically-bound
-   * lookup matches no row silently, which is how two DAO methods came to be dead code in cu-71.
+   * lookup matches no row silently, which is how two DAO methods came to be dead code.
    * A numeric-looking id must work.
    */
   @Test

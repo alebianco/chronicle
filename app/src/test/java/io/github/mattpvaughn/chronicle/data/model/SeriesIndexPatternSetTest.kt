@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The pattern list *as a list* — ordering, validation, and override (cu-147).
+ * The pattern list *as a list* — ordering, validation, and override.
  *
  * These are the tests tvnamer does not have. Its 63 fixtures all check *filenames* against the
  * built-in list; `grep filename_patterns tests/` finds nothing, so nothing asserts the ordering,
@@ -48,7 +48,7 @@ class SeriesIndexPatternSetTest {
    * The ordering that disambiguation depends on.
    *
    * `audnexus` must be tried before `label_first`, or `"Book 2 of the Saga, Book 5"` reads 2 — the
-   * case cu-146's end-anchored parser existed to protect. tvnamer's default list has the same kind
+   * case the end-anchored parser existed to protect. tvnamer's default list has the same kind
    * of dependency and documents it nowhere; this test is the documentation.
    */
   @Test
@@ -254,7 +254,7 @@ class SeriesIndexPatternSetTest {
   /**
    * The tvnamer #216 failure, exactly: a rule that will not compile is dropped from `usable` with
    * only a Timber line, so `explain()` never mentioned it. The user then sees their rule having no
-   * effect with nothing anywhere telling them why — which is the whole reason cu-151's tester
+   * effect with nothing anywhere telling them why — which is the whole reason the tester
    * exists, and a tester that cannot show this would reproduce the bug it exists to prevent.
    */
   @Test

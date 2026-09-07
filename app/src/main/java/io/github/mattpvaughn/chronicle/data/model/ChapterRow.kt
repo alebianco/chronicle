@@ -1,10 +1,10 @@
 package io.github.mattpvaughn.chronicle.data.model
 
 /**
- * A chapter list, grouped into disc sections where a book has more than one disc (cu-201).
+ * A chapter list, grouped into disc sections where a book has more than one disc.
  *
  * The grouping decision, with no view attached — extracted from `ChapterListAdapter` for the same
- * reason `Audiobook.progressState()` was extracted from `bindProgressIndicators` in cu-198: two
+ * reason `Audiobook.progressState()` was extracted from `bindProgressIndicators`: two
  * screens render this and they must not disagree about where a header goes.
  */
 sealed interface ChapterRow {

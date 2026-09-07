@@ -71,7 +71,7 @@ class AudiobookDetailsViewModel
     savedStateHandle: SavedStateHandle,
   ) : ViewModel() {
     /**
-     * The book this screen is about, from the navigation arguments (cu-185).
+     * The book this screen is about, from the navigation arguments.
      *
      * Was a whole `Audiobook` held as a **mutable `lateinit` field on the factory**, set by the
      * Fragment before `create` and guarded by `check(isInitialized)`. It did not survive process
@@ -95,7 +95,7 @@ class AudiobookDetailsViewModel
      * (`audiobook.value?.isCached == false`) then evaluates false and lets an uncached book reach
      * the player with no server — the exact case `playing an undownloaded book while disconnected
      * does not reach the player` pins. The `LiveData` this replaces was a Room query, hot from the
-     * moment the screen observed it, so the distinction did not arise (cu-52).
+     * moment the screen observed it, so the distinction did not arise.
      */
     val audiobook: StateFlow<Audiobook?> =
       bookRepository
@@ -110,7 +110,7 @@ class AudiobookDetailsViewModel
     // Used to cache tracks.asChapterList when tracks changes
     private val tracksAsChaptersCache: Flow<List<Chapter>> = tracks.mapLatest { it.asChapterList() }
 
-    /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
+    /** The book's chapters from `ChapterDatabase`, the preferred source. */
     private val chaptersFromTable: Flow<List<Chapter>> =
       bookRepository.getChaptersForBookLive(bookId)
 
@@ -131,12 +131,12 @@ class AudiobookDetailsViewModel
      *
      * Null until both sources have emitted, which means **"not known yet"** rather than "not cached".
      *
-     * The nullability is load-bearing and survives the `Flow` conversion deliberately (cu-52).
+     * The nullability is load-bearing and survives the `Flow` conversion deliberately.
      * `audiobook` is Room-backed, so there is a real window at screen open where the book has not
      * arrived; seeding this `NOT_CACHED` instead would let the download button render enabled and
      * offer to download a book that is already on disk. The Fragment keeps the control disabled
      * while this is null, and `onCacheButtonClick` ignores a press — throwing there crashed a
-     * main-screen control once (cu-92).
+     * main-screen control once.
      */
     val cacheStatus: StateFlow<CacheStatus?> =
       combineDistinct(
@@ -163,7 +163,7 @@ class AudiobookDetailsViewModel
      * The combiner used to read `isBookActive ?: false && currState?.isPlaying ?: false`, which
      * Kotlin parses as `isBookActive ?: (false && …)` — so a non-null `isBookActive` short-circuited
      * and the playback state was never consulted at all. Non-null `Flow` sources make the intended
-     * expression the only one that compiles (cu-52).
+     * expression the only one that compiles.
      */
     val isBookInViewPlaying: StateFlow<Boolean> =
       combineDistinct(
@@ -251,10 +251,10 @@ class AudiobookDetailsViewModel
       ) { _chapters, _tracks ->
         // Deliberately not logged. These lines serialised the entire chapter list — 40+ objects —
         // several times a second on a real book, which is a measurable cost in a debug build and
-        // drowned the log when diagnosing the seek churn (cu-93).
+        // drowned the log when diagnosing the seek churn.
 
         // See the same fix in CurrentlyPlayingViewModel: the hand-rolled walk this replaces mixed
-        // relative and absolute chapter offsets and resolved the wrong chapter (cu-73).
+        // relative and absolute chapter offsets and resolved the wrong chapter.
         _chapters.chapterAtBookProgress(_tracks.getProgress())
       }
 
@@ -344,7 +344,7 @@ class AudiobookDetailsViewModel
           cachedFileManager.cancelGroup(bookId)
         }
         // Null until both of `cacheStatus`'s sources have emitted. That is "not known yet", not an
-        // error — throwing here crashed a main-screen control (cu-92). The Fragment also keeps the
+        // error — throwing here crashed a main-screen control. The Fragment also keeps the
         // button disabled until the status resolves, so this is the backstop rather than the only
         // guard.
         null -> Timber.i("Cache button pressed before the status resolved; ignoring")
@@ -473,7 +473,7 @@ class AudiobookDetailsViewModel
       val jumpToChapterAction = {
         audiobook.value?.let { book ->
           // The offset arrives book-absolute from the chapter list, but is applied as an in-track
-          // offset by the service (cu-96). One conversion, one home (cu-136).
+          // offset by the service. One conversion, one home.
           val inTrackOffset =
             tracks.value.let { loaded -> inTrackOffsetOf(bookStartTimeOffset, trackId, loaded) }
               ?: TrackOffset(bookStartTimeOffset.millis)
@@ -558,14 +558,14 @@ class AudiobookDetailsViewModel
     private fun setAudiobookUnwatched() {
       Timber.i("Marking audiobook as unwatched")
       viewModelScope.launch {
-        // The track half now talks to the server (cu-98), so it can fail. Reporting success before
+        // The track half now talks to the server, so it can fail. Reporting success before
         // knowing the outcome would tell the user a book was repaired when it was not — and an
         // uncaught throw here would skip `setUnwatched` entirely, leaving the two halves disagreeing,
-        // which is the cu-86 split this pairing exists to prevent.
+        // which is the split this pairing exists to prevent.
         val message =
           try {
             // Mirrors setAudiobookWatched: both halves, or the tracks keep a state the book does not
-            // and which one shows depends on the order things ran in (cu-86).
+            // and which one shows depends on the order things ran in.
             trackRepository.markTracksInBookAsUnwatched(bookId)
             bookRepository.setUnwatched(bookId)
             R.string.marked_as_unplayed
@@ -637,7 +637,7 @@ class AudiobookDetailsViewModel
       }
     }
 
-    // ---- the aggregated header state (cu-200) ----
+    // ---- the aggregated header state ----
 
     private val bookHeader: StateFlow<BookHeader> =
       combineDistinct(audiobook, plexConfig.isConnected) { book, connected ->
@@ -656,10 +656,10 @@ class AudiobookDetailsViewModel
      *
      * Replaced four flows — `cacheStatus`, `cacheIconDrawable`, `cacheContentDescription` and
      * `cacheIconTint` — each a `map` over the same source with its own `null ->` branch meaning
-     * "not resolved yet". The other three are **deleted** as of cu-201: nothing read them once the
+     * "not resolved yet". The other three are **deleted**: nothing read them once the
      * screen rendered from this, and `CacheLabelPairingTest` — which checked the icon and its
      * spoken label branched on the same states by parsing this file's *source text* — went with
-     * them. One sealed type means the compiler enforces what that scan approximated (cu-149).
+     * them. One sealed type means the compiler enforces what that scan approximated.
      */
     private val downloadState: StateFlow<DownloadState> =
       cacheStatus
@@ -703,7 +703,7 @@ class AudiobookDetailsViewModel
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProgressLine())
 
     /**
-     * Everything the header renders (cu-200).
+     * Everything the header renders.
      *
      * The Fragment collected 17 flows and made twelve independent `isVisible` decisions from them,
      * each on its own boolean or enum comparison, with nothing stopping two being true at once.
@@ -728,7 +728,7 @@ class AudiobookDetailsViewModel
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), DetailsUiState())
 
     companion object {
-      /** Navigation argument keys, owned here because this is what reads them (cu-185). */
+      /** Navigation argument keys, owned here because this is what reads them. */
       const val ARG_AUDIOBOOK_ID = "audiobook_id"
       const val ARG_AUDIOBOOK_TITLE = "ARG_AUDIOBOOK_TITLE"
       const val ARG_IS_AUDIOBOOK_CACHED = "is_audiobook_cached"

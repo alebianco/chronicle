@@ -4,14 +4,15 @@ import io.github.mattpvaughn.chronicle.data.model.LibraryParseSummary
 import io.github.mattpvaughn.chronicle.data.model.PatternAttempt
 
 /**
- * The series-index tester's whole state (cu-151, migrated in cu-202).
+ * The series-index tester's whole state.
  *
  * Was five flows driving eight independent `isVisible` decisions, plus a documented workaround:
  * the parse headline had to be driven off `attempts` rather than off `winningRule`, because
  * `winningRule` is a `StateFlow` and **conflates** — testing two different unparseable titles emits
- * `null` twice, the second is dropped, and the headline never appears. It only broke on the cu-52
- * `LiveData` merge, which is precisely the kind of coupling a single state removes: [winningRule]
- * here is a field of a value that changes whenever the input does, so there is nothing to conflate.
+ * `null` twice, the second is dropped, and the headline never appears. It only broke on the
+ * `LiveData` merge that predated the StateFlow migration, which is precisely the kind of coupling
+ * a single state removes: [winningRule] here is a field of a value that changes whenever the
+ * input does, so there is nothing to conflate.
  */
 data class SeriesIndexTesterUiState(
   val titleSort: String = "",
@@ -25,7 +26,7 @@ data class SeriesIndexTesterUiState(
    * The rule that decided the position — the **first** that succeeded, not the only one.
    *
    * More than one rule routinely succeeds: `"Mistborn, Book 2 - …"` satisfies both `audnexus` and
-   * `seanap`, and first-match-wins is the disambiguation mechanism (cu-146). Derived here so it
+   * `seanap`, and first-match-wins is the disambiguation mechanism. Derived here so it
    * cannot disagree with [attempts].
    */
   val winningRule: PatternAttempt?

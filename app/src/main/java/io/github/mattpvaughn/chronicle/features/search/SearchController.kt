@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * The search half of a screen's ViewModel, in one place (cu-25).
+ * The search half of a screen's ViewModel, in one place.
  *
  * Extracted rather than repeated because three screens (library, home, collections) each carried
  * their own copy of the same four fields and the same `search(query)` — so a fix to any of them
@@ -35,11 +35,12 @@ class SearchController(
   /**
    * The text in the search field.
    *
-   * New in cu-206, and it belongs here for the same reason the rest of this class exists. Under
-   * `SearchView` the *widget* owned the text and pushed changes out, so the ViewModel never held
-   * it — which is why nothing here needed it before. A Compose text field is stateless, so the
-   * query has to live somewhere that survives recomposition and rotation, and putting it in the
-   * one place all three screens already share means they cannot drift about it.
+   * New now that the search field is Compose, and it belongs here for the same reason the rest of
+   * this class exists. Under `SearchView` the *widget* owned the text and pushed changes out, so
+   * the ViewModel never held it — which is why nothing here needed it before. A Compose text
+   * field is stateless, so the query has to live somewhere that survives recomposition and
+   * rotation, and putting it in the one place all three screens already share means they cannot
+   * drift about it.
    *
    * It is deliberately the raw text, not the trimmed one [search] matches on: the field must show
    * exactly what the user typed, spaces included.
@@ -96,9 +97,9 @@ class SearchController(
   /**
    * Publishes the results and the rows derived from them.
    *
-   * Both were `postValue` before cu-52, which is asynchronous *and coalescing*: the two are one
-   * fact in two fields, and nothing stopped a collector observing the new results beside the
-   * previous rows for a frame. `value =` is synchronous, so they land together.
+   * Both were `postValue` before the StateFlow migration, which is asynchronous *and coalescing*:
+   * the two are one fact in two fields, and nothing stopped a collector observing the new results
+   * beside the previous rows for a frame. `value =` is synchronous, so they land together.
    */
   private fun publish(grouped: GroupedSearchResults) {
     _results.value = grouped

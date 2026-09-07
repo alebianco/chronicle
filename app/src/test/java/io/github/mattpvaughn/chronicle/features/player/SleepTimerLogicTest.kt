@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The sleep timer's semantics (cu-21).
+ * The sleep timer's semantics.
  *
  * The timer had **no tests at all** before this: it was welded to a `Service`, a
  * `MediaControllerCompat` and a real `Handler`. `SleepTimerLogic` is the decision layer pulled out
@@ -270,7 +270,7 @@ class SleepTimerLogicTest {
   }
 
   /**
-   * The bug that shipped for a second in cu-21, found on device.
+   * The bug that shipped for a second, found on device.
    *
    * `ACTION_SLEEP_TIMER_CHANGE` carries commands *into* the timer and its ticks *out* of it, and
    * the service listened to the same action it broadcast on. So the timer's own `UPDATE(0)` came

@@ -13,7 +13,7 @@ import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * That OkHttp actually *invokes* [PlexTokenAuthenticator] on a real 401 (cu-73, cu-10).
+ * That OkHttp actually *invokes* [PlexTokenAuthenticator] on a real 401.
  *
  * [PlexTokenAuthenticatorTest] is the thorough one, but every case there calls
  * `authenticator.authenticate(...)` **directly**. That covers the decision and not the wiring, and
@@ -24,9 +24,9 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * A direct call cannot verify any of that. `priorResponse` is populated by OkHttp, so a test that
  * hand-builds a response is asserting against its own fixture: the retry-once guard could be
- * removed, or the authenticator never attached at all, and those tests would still pass. cu-107 was
- * exactly this shape of blind spot — correct logic, untested seam — so these drive a real client
- * against a real (fake) server instead.
+ * removed, or the authenticator never attached at all, and those tests would still pass. The
+ * connection round-trip bug was exactly this shape of blind spot — correct logic, untested
+ * seam — so these drive a real client against a real (fake) server instead.
  */
 class ReauthWiringTest {
   @get:Rule

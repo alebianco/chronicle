@@ -11,18 +11,18 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 
 /**
- * The model layer builds and works without a DI graph (cu-79).
+ * The model layer builds and works without a DI graph.
  *
  * Three sites reached into `Injector` from a data class: a Room type converter fetching Moshi, and
  * `MediaItemTrack.getTrackSource` fetching both the cached-media directory and — worse — a
  * *Plex-specific* `PlexConfig` from inside a *domain* model, which is precisely the coupling the
- * `MediaSource` seam exists to remove (cu-15, decision-11).
+ * `MediaSource` seam exists to remove (decision-11).
  *
  * These tests do not mention `Injector` and never stand up `ChronicleApplication`, which is the
  * whole assertion: before this, none of them could have been written this way.
  *
  * Robolectric is here only for `Uri.fromFile`, which the cached path goes through deliberately: a
- * bare path gives `scheme = null` and ExoPlayer refuses it (cu-83). Nothing needs a DI graph —
+ * bare path gives `scheme = null` and ExoPlayer refuses it. Nothing needs a DI graph —
  * that is the point — but the framework's own Uri parser is not a stub.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -64,7 +64,7 @@ class ModelsWithoutDiTest {
     assertEquals(emptyList<String>(), converter.toList(converter.fromList(emptyList())))
   }
 
-  /** A non-numeric id survives, which is the point of the cu-71 retype. */
+  /** A non-numeric id survives, which is the point of the id-retype migration. */
   @Test
   fun `a non-numeric id round-trips`() {
     val converter = CollectionIdConverter()
@@ -78,7 +78,7 @@ class ModelsWithoutDiTest {
    * A cached track resolves to a local file, with its scheme.
    *
    * `file://` is load-bearing: a bare path gives `scheme = null` and ExoPlayer refuses it as an
-   * unsupported format, on downloaded books only (cu-83).
+   * unsupported format, on downloaded books only.
    */
   @Test
   fun `a cached track resolves to a local file uri`() {
@@ -141,7 +141,7 @@ class ModelsWithoutDiTest {
 
     assertEquals(
       "a model reached into Injector again — take the dependency as a parameter instead, the way " +
-        "getTrackSource and toMediaMetadata do (cu-79)",
+        "getTrackSource and toMediaMetadata do",
       emptyList<String>(),
       offenders,
     )

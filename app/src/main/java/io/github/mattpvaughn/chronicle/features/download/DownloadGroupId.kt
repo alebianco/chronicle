@@ -12,7 +12,7 @@ package io.github.mattpvaughn.chronicle.features.download
  *
  * Two ids hashing alike would share a group, so cancelling one cancels the other. Negligible at
  * household scale, and the fix — persisting an id↔group table — is a lot of machinery for a
- * subsystem cu-76 may replace.
+ * subsystem that may be replaced.
  */
 fun downloadGroupId(bookId: String): Int {
   val numeric = bookId.toIntOrNull()
@@ -42,7 +42,7 @@ fun requestCodeFor(
  * Key under which a download request carries its book id in Fetch2's `Extras`.
  *
  * [downloadGroupId] is one-way, but Fetch2's listeners hand back only the `Int` group and the app
- * needs the real id to update the database — so it travels with the request (cu-71).
+ * needs the real id to update the database — so it travels with the request.
  */
 const val EXTRA_BOOK_ID = "chronicle.bookId"
 
@@ -50,7 +50,7 @@ const val EXTRA_BOOK_ID = "chronicle.bookId"
 fun com.tonyodev.fetch2.Download.bookIdOrNull(): String? = extras.getString(EXTRA_BOOK_ID, "").ifEmpty { null }
 
 /**
- * Groups downloads by book, dropping any enqueued before cu-71 added [EXTRA_BOOK_ID].
+ * Groups downloads by book, dropping any enqueued before [EXTRA_BOOK_ID] was added.
  *
  * Not `groupBy { it.group }`: that group is a hash, so it cannot be turned back into a book id.
  * Dropped rather than guessed, because a wrong guess marks the wrong book downloaded, while a

@@ -38,7 +38,7 @@ class PlexSyncScrobbleWorker
   ) : CoroutineWorker(context, workerParameters) {
     override suspend fun doWork(): Result {
       // Nothing can be reported without a token, and waiting will not produce one.
-      // Re-auth is cu-10's job.
+      // Re-auth is the job.
       val authToken = plexPrefs.user?.authToken ?: plexPrefs.accountAuthToken
       if (authToken.isEmpty()) {
         Timber.w("Progress report skipped: not logged in")
@@ -49,7 +49,7 @@ class PlexSyncScrobbleWorker
         ProgressReporter(
           // Through DebugHooks so a debug build can inject a terminal failure with
           // `--ez fail_sync true` and make the "position not synced" badge reachable against a
-          // real server (cu-73). Release returns this unchanged.
+          // real server. Release returns this unchanged.
           api = DebugHooks.wrapProgressApi(PlexProgressApi(plexMediaService)),
           lookupTrack = { trackRepository.getTrackAsync(it) },
           lookupBookDuration = { bookId ->
@@ -114,7 +114,7 @@ class PlexSyncScrobbleWorker
     /**
      * Reads an id that [makeWorkerData] now writes as a `String`.
      *
-     * A work request enqueued by a version before cu-71 stored it as an `Int`, and WorkManager
+     * A work request enqueued by an older version stored it as an `Int`, and WorkManager
      * persists pending requests across an app upgrade. [requireString] would throw on those, and an
      * exception out of `doWork` is an uncaught crash — so the `Int` form is still accepted. Losing
      * one report would be harmless (the next playback tick re-sends the position, and the work is

@@ -33,7 +33,7 @@ interface PreferenceClick {
 }
 
 /**
- * The three kinds of settings row (cu-201).
+ * The three kinds of settings row.
  *
  * `INTEGER` and `FLOAT` are **deleted**, not renamed: no `makePreferences` row ever constructed
  * them, and both mapped to the same ViewHolder as `CLICKABLE` — a distinction the code drew and

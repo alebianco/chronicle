@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * What a bookmark row shows (cu-22).
+ * What a bookmark row shows.
  *
  * The row's two decisions — how the position reads, and whether the note line is there at all —
  * are the parts that can be wrong without anyone noticing on a screenshot of a book that happens
@@ -23,7 +23,7 @@ class BookmarkRowStateTest {
 
   /**
    * A bookmark's position is a position *inside a book*, so it is formatted the way every other
-   * such readout in the app is (cu-19, §3.1 rule 3) — never `h:mm:ss` of a duration.
+   * such readout in the app is (§3.1 rule 3) — never `h:mm:ss` of a duration.
    */
   @Test
   fun `a position under an hour reads as minutes and seconds`() {

@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The series-index tester, asserted on what it renders (cu-202).
+ * The series-index tester, asserted on what it renders.
  *
  * The View version's rendering was only reachable through two adapters and eight `isVisible`
  * decisions; the two adapters had unit tests, the screen that combined them had none.
@@ -99,7 +99,7 @@ class SeriesIndexTesterScreenTest {
    * Which rule *decided* is the distinction the screen exists for.
    *
    * More than one rule routinely matches — `"Mistborn, Book 2 - …"` satisfies both `audnexus` and
-   * `seanap` — and first-match-wins is the disambiguation mechanism (cu-146). A flat "matched"
+   * `seanap` — and first-match-wins is the disambiguation mechanism. A flat "matched"
    * list leaves the user unable to tell which reading the app took.
    */
   @Test
@@ -128,7 +128,7 @@ class SeriesIndexTesterScreenTest {
   }
 
   /**
-   * The mirror risk (cu-68): a message that means "nothing needs fixing" must not appear before
+   * The mirror risk: a message that means "nothing needs fixing" must not appear before
    * we know what is in the library, or it reassures the user about a library nobody has read.
    */
   @Test

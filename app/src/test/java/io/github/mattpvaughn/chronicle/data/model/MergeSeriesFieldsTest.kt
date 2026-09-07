@@ -13,7 +13,7 @@ import org.junit.Test
  * The two rules already documented on `merge` are "always local" (`progress`, `playbackSpeed` —
  * the server knows nothing about them) and "always network". These three are neither: they come
  * from Plex's `Style`/`Mood` convention, which the **detail** endpoint carries and the library
- * listing does not (cu-24). So a refresh merges a network copy whose narrator is empty simply
+ * listing does not. So a refresh merges a network copy whose narrator is empty simply
  * because it was never fetched.
  *
  * - Preferring the network value blanks a narrator on every library refresh.
@@ -25,7 +25,7 @@ import org.junit.Test
  * **Both arms are exercised deliberately.** `merge` branches on `lastViewedAt` and only one side
  * runs for a given pair, so a rule applied to one arm and missed in the other looks correct in any
  * test that happens to take the fixed path — the exact trap `PerBookSpeedTest` was written to
- * catch for `playbackSpeed` (cu-20). The `newer`/`older` pairs below select the arms explicitly.
+ * catch for `playbackSpeed`. The `newer`/`older` pairs below select the arms explicitly.
  */
 class MergeSeriesFieldsTest {
   private fun book(
@@ -131,7 +131,7 @@ class MergeSeriesFieldsTest {
   }
 
   /**
-   * Book 0 reads as unknown by design (cu-146), so a network `0` must not overwrite a real local
+   * Book 0 reads as unknown by design, so a network `0` must not overwrite a real local
    * index — it is indistinguishable from "not tagged".
    */
   @Test

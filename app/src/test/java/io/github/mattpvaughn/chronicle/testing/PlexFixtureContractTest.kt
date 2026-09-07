@@ -67,7 +67,7 @@ class PlexFixtureContractTest {
 
   @Test
   fun `albums fixture exercises natural sort ordering`() {
-    // "Mistborn Book 10" exists specifically so cu-4's comparator has a
+    // "Mistborn Book 10" exists specifically so the comparator has a
     // numeric-series case to work on in fixture-backed tests.
     val titles = container("albums.json").plexMediaContainer.asAudiobooks().map { it.title }
     assertTrue(titles.any { it.contains("Book 10") })
@@ -84,9 +84,9 @@ class PlexFixtureContractTest {
     assertEquals("An Unexpected Party", first.title)
     assertEquals("listening progress survives deserialization", 54_000L, first.progress)
     // 180_000 = the real length of the generated tone. The fixture durations are deliberately
-    // kept equal to the audio (cu-64), so progress percentages and chapter boundaries are
+    // kept equal to the audio, so progress percentages and chapter boundaries are
     // computed against a length the audio actually has. Extended from 5s to 3min so playback
-    // sustains long enough to measure (cu-110).
+    // sustains long enough to measure.
     assertEquals(180_000L, first.duration)
     assertTrue("media part key is present", first.media.isNotEmpty())
   }
@@ -128,7 +128,7 @@ class PlexFixtureContractTest {
   }
 
   /**
-   * The property cu-115 needs from this fixture: chapters whose spans **cross a track boundary**.
+   * The property the multi-track chapter tests need from this fixture: chapters whose spans **cross a track boundary**.
    *
    * The book is 3 x 180 s and the chapters are 75 s, which does not divide evenly — so chapter 3
    * straddles 180000 and chapter 5 straddles 360000. Plex reports such a chapter on *both* tracks
@@ -206,7 +206,7 @@ class PlexFixtureContractTest {
   }
 
   /**
-   * The leniency question cu-62 turned on: generated adapters are stricter than reflection about
+   * The leniency question the Moshi codegen switch turned on: generated adapters are stricter than reflection about
    * absent and null fields, and these models parse live Plex responses whose shape varies by server
    * version. A missing key must fall back to the Kotlin default, not throw.
    */
@@ -267,7 +267,7 @@ class PlexFixtureContractTest {
    * the fixture server used to answer `track-with-chapters.json` for both. `fetchBookAsync` then
    * received tracks for an album request and `bookDao.update` — an `@Insert(REPLACE)` — inserted
    * one into the Audiobook table, which surfaced on the home shelves as a phantom book with a
-   * track's title and its book's name in the author field (cu-18).
+   * track's title and its book's name in the author field.
    *
    * Pinned as a contract because the routing exists **twice**, in `FakePlexServer` here and in
    * `MockPlexServer` for the debug app, and both had the same defect.
@@ -307,7 +307,7 @@ class PlexFixtureContractTest {
    * `retrieveChapterInfo(trackId)` is read with `metadata.firstOrNull()`, so a fixture holding
    * every track answers the *first* one's chapters for every request — every track then got track
    * 2001's three chapters and the player read "Ch 1 of 9" for a 7-chapter book, each chapter
-   * tripled. The album half of this was cu-18; this is the track half (cu-19).
+   * tripled. An earlier fix addressed the album half of this; this is the track half.
    */
   @Test
   fun `each track chapter fixture holds only that track's chapters`() {
@@ -339,7 +339,7 @@ class PlexFixtureContractTest {
   }
 
   /**
-   * The album *detail* fixtures carry Audnexus tags (cu-24).
+   * The album *detail* fixtures carry Audnexus tags.
    *
    * They exist so narrator and series are reachable in mock mode at all — the criterion is about
    * "Audnexus-tagged libraries", and without tags in the fixtures there is nothing to browse. Pinned
@@ -367,7 +367,7 @@ class PlexFixtureContractTest {
   /**
    * And the series position, which is what orders a series list.
    *
-   * Stored in hundredths since cu-146, so book 1 is 100 — expressed through the scale here rather
+   * Stored in hundredths, so book 1 is 100 — expressed through the scale here rather
    * than as a literal, because a bare `100` reads as book one hundred.
    */
   @Test
@@ -389,7 +389,7 @@ class PlexFixtureContractTest {
   }
 
   /**
-   * A track fetch must be routed to tracks, not albums (cu-187).
+   * A track fetch must be routed to tracks, not albums.
    *
    * `type=10` (tracks) and `type=9` (albums) are both `/library/sections/N/all`, so a routing rule
    * keyed only on `/all` answers `albums.json` to both. An album carries no `Media`, so
@@ -397,7 +397,7 @@ class PlexFixtureContractTest {
    * and the **whole refresh aborts** — which on the tablet meant collections were never stored and
    * the Collections tab never appeared.
    *
-   * This is the cu-18/cu-19 defect class in a new field: the routing exists twice
+   * This is the same mis-routing defect class in a new field: the routing exists twice
    * (`FakePlexServer` here, `MockPlexServer` in `app/src/debug`) and *both* copies had it. The
    * assertion is about the failure mode — that every routed track has a playable part — rather
    * than about which filename was chosen, so it fails for anything merely album-shaped too.

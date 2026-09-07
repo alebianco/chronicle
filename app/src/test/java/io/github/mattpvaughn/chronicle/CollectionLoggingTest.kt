@@ -12,9 +12,9 @@ import java.io.File
  * is tens of kilobytes; a measured session produced **3.38 MB across 2920 lines**, all of it
  * built and written on the main thread. The interpolation happens before `Timber` is reached,
  * so a detached release tree does not save it and neither does a `BuildConfig.DEBUG` guard —
- * the string is assembled either way in a debug build (cu-134).
+ * the string is assembled either way in a debug build.
  *
- * The defect is recurrent: cu-110 fixed three instances and declared the class swept, the
+ * The defect is recurrent: an earlier fix addressed three instances and declared the class swept, the
  * 2026-09-02 review found three more, and this scan found four the review had missed. Hence a
  * build-breaking check rather than another sweep.
  *

@@ -34,7 +34,7 @@ interface IBookRepository {
   suspend fun refreshData()
 
   /**
-   * Merges a caller-supplied library into the local database, for one source (cu-80).
+   * Merges a caller-supplied library into the local database, for one source.
    *
    * The backend-neutral half of [refreshData]: a `MediaSource` fetches, this persists.
    * `SourceManager.refreshBooks` could not be written without it — the repositories owned their own
@@ -55,7 +55,7 @@ interface IBookRepository {
   suspend fun getBookCount(): Int
 
   /**
-   * Claims rows written before cu-127 for the connected server.
+   * Claims rows written before source scoping existed for the connected server.
    *
    * The v12->v13 migration cannot know which server it is running on, so it marks every existing
    * row [SourceId.LEGACY_PLEX]. Until something adopts them, an upgrading user's whole library is
@@ -129,7 +129,7 @@ interface IBookRepository {
   suspend fun searchAsync(query: String): List<Audiobook>
 
   /**
-   * Typo-tolerant search, grouped by the field each book matched (cu-25).
+   * Typo-tolerant search, grouped by the field each book matched.
    *
    * Separate from [search] rather than replacing it: that one is a plain substring filter and is
    * what Android Auto's voice search wants — a flat list of books, no headings. This one backs the
@@ -190,7 +190,7 @@ interface IBookRepository {
 
   /**
    * Sets a per-book playback-speed override, or clears it with [Audiobook.NO_SPEED_OVERRIDE]
-   * so the book follows the global preference again (cu-20).
+   * so the book follows the global preference again.
    */
   suspend fun updatePlaybackSpeed(
     bookId: String,
@@ -205,15 +205,15 @@ interface IBookRepository {
   suspend fun refreshDataPaginated()
 
   /**
-   * The book's chapters from `ChapterDatabase`, the preferred source since cu-82.
+   * The book's chapters from `ChapterDatabase`, the preferred source since the chapter move.
    *
-   * Empty for a book the cu-158 backfill has not reached yet, which is why callers resolve through
+   * Empty for a book the chapter backfill has not reached yet, which is why callers resolve through
    * `resolveChapters` rather than using this alone.
    */
   suspend fun getChaptersForBook(bookId: String): List<Chapter>
 
   /**
-   * The book's chapters from `ChapterDatabase`, observed (cu-82).
+   * The book's chapters from `ChapterDatabase`, observed.
    *
    * The reactive twin of [getChaptersForBook], for the ViewModels that combine chapters with the
    * book and its tracks. Emits an empty list for a book the backfill has not reached, so callers
@@ -246,7 +246,7 @@ class BookRepository
      *
      * One accessor rather than the expression inlined at each ingestion site, for the reason
      * `PlaybackSession.authToken` exists: the token precedence was written out twice and both
-     * copies were wrong the same way (cu-33). Read fresh each time — the user can switch servers
+     * copies were wrong the same way. Read fresh each time — the user can switch servers
      * between a refresh and the next.
      *
      * [SourceId.UNKNOWN] when no server is chosen. Ingestion refuses to run in that state rather
@@ -265,7 +265,7 @@ class BookRepository
       withContext(dispatchers.io) {
         val adopted = bookDao.adoptLegacyRows(newSource = scope, legacySource = SourceId.LEGACY_PLEX)
         if (adopted > 0) {
-          Timber.i("Adopted $adopted pre-cu-127 books into the connected server's scope")
+          Timber.i("Adopted $adopted unscoped books into the connected server's scope")
         }
       }
     }
@@ -284,7 +284,7 @@ class BookRepository
       val localBooks = withContext(dispatchers.io) { bookDao.getAudiobooks(currentSourceId) }
       // A source that reports neither field cannot answer the tag endpoints, and asking would cost
       // `1 + N` requests to learn nothing. The books keep whatever they already have — blanking a
-      // narrator because *this* source cannot supply one is the cu-24/cu-143 mistake.
+      // narrator because *this* source cannot supply one is the mistake to avoid repeating.
       val seeded =
         if (capabilities.hasNarrator || capabilities.hasSeries) {
           books.withSeededTags(readTagAssociations(books.map { it.id }))
@@ -334,10 +334,10 @@ class BookRepository
           }
         }
 
-      // Fill in narrator and series for books that have never been opened (cu-143). Seeded
+      // Fill in narrator and series for books that have never been opened. Seeded
       // *after* the merge so a value read from a book's own detail response always wins: this
       // index is the coarser source and must not overwrite the precise one, which is the same
-      // rule `Audiobook.merge` applies to the network/local pair (cu-24).
+      // rule `Audiobook.merge` applies to the network/local pair.
       //
       // Best-effort by construction — `readAssociations` swallows its own failures and returns
       // what it managed — because the endpoints are community-documented and a server that does
@@ -345,16 +345,16 @@ class BookRepository
       val seededBooks = mergedBooks.withSeededTags(readTagAssociations(mergedBooks.map { it.id }))
 
       // Persisting is `writeIngestion`'s job. This block was written out **twice**, here and in
-      // `refreshDataPaginated`, which is the cu-20 shape exactly: a rule fixed in one copy and
-      // missed in the other looks correct in every test that takes the fixed path. cu-156 already
-      // had to add tag seeding to both.
+      // `refreshDataPaginated`, which is exactly the shape that causes a rule fixed in one copy
+      // and missed in the other to look correct in every test that takes the fixed path. Tag
+      // seeding already had to be added to both for that reason.
       writeIngestion(planIngestion(seededBooks, localBooks, currentSourceId))
     }
 
     @Throws(Throwable::class)
     /**
-     * Copies chapters off `Audiobook.chapters` into `ChapterDatabase` for any book with none
-     * (cu-158), so a library synced before cu-49 gets rows without waiting to be re-synced.
+     * Copies chapters off `Audiobook.chapters` into `ChapterDatabase` for any book with none,
+     * so a library synced before the chapter move gets rows without waiting to be re-synced.
      *
      * Returns the number of books written, for logging and tests.
      *
@@ -436,7 +436,7 @@ class BookRepository
           }
         }
 
-      // Seed narrator and series here too (cu-156). cu-143 added this to `refreshData` only, but
+      // Seed narrator and series here too. An earlier fix added this to `refreshData` only, but
       // `LibrarySyncRepository` — the path an actual sync takes — calls *this* method, so the
       // index never filled in on a real device: 196 of 196 books had an empty `series` on the
       // household server. Same rules as there: after the merge, never overwriting a non-empty
@@ -444,9 +444,9 @@ class BookRepository
       val seededBooks = mergedBooks.withSeededTags(readTagAssociations(mergedBooks.map { it.id }))
 
       // Persisting is `writeIngestion`'s job. This block was written out **twice**, here and in
-      // `refreshDataPaginated`, which is the cu-20 shape exactly: a rule fixed in one copy and
-      // missed in the other looks correct in every test that takes the fixed path. cu-156 already
-      // had to add tag seeding to both.
+      // `refreshDataPaginated`, which is exactly the shape that causes a rule fixed in one copy
+      // and missed in the other to look correct in every test that takes the fixed path. Tag
+      // seeding already had to be added to both for that reason.
       writeIngestion(planIngestion(seededBooks, localBooks, currentSourceId))
     }
 
@@ -509,7 +509,7 @@ class BookRepository
     }
 
     /**
-     * Narrator and series associations for the whole library (cu-143).
+     * Narrator and series associations for the whole library.
      *
      * Built lazily rather than injected because it is only reachable from a refresh, and holding
      * one would make the repository's constructor grow for a collaborator used in one method.
@@ -523,13 +523,13 @@ class BookRepository
      *
      * Never throws: a refresh that fails because an *optional* index could not be built would be
      * a worse outcome than an index that stays partial, which is the state the app has been in
-     * since cu-24 anyway.
+     * before this seeding existed anyway.
      */
     private suspend fun readTagAssociations(bookIds: List<String>): List<TagAssociation> =
       try {
-        // Route B first (cu-156): one multi-id request answers both fields for ~280 books, where
-        // the `1 + N` walk below needs 185 for narrators alone on this library (cu-150 measured
-        // both). Falling back rather than committing to it, because the endpoint is
+        // Route B first: one multi-id request answers both fields for ~280 books, where
+        // the `1 + N` walk below needs 185 for narrators alone on this library (both measured
+        // directly). Falling back rather than committing to it, because the endpoint is
         // spec-documented but not guaranteed across Plex versions.
         val fromIds = tagIndexSeeder.readAssociationsByIds(bookIds)
         if (fromIds.isNotEmpty()) {
@@ -551,14 +551,14 @@ class BookRepository
     }
 
     /**
-     * Matches over a five-column projection, then fetches only the books that matched (cu-161).
+     * Matches over a five-column projection, then fetches only the books that matched.
      *
      * `SELECT *` over the whole table was most of a search's cost — **70 ms at 10,000 books**,
      * measured, against 13 ms for the projection plus 2 ms to fetch fifty hits by id. The matching
-     * itself is cheap and linear; the read was the expensive half (cu-51).
+     * itself is cheap and linear; the read was the expensive half.
      *
      * The matching is **unchanged**: `groupedSearch` runs over the same four fields it always did,
-     * so cu-25's fuzzy tier, 4-character floor and character-count prefilter all behave
+     * so the fuzzy tier, 4-character floor and character-count prefilter all behave
      * identically. Only where the strings come from has changed.
      *
      * `offlineMode` is applied in the projection query, so an offline search still sees only
@@ -602,7 +602,7 @@ class BookRepository
     ) {
       withContext(dispatchers.io) {
         // Only the book's own flag. This used to also stamp `downloaded` onto each of the
-        // serialized chapters, but that column is gone (cu-159) and **nothing ever read the
+        // serialized chapters, but that column is gone and **nothing ever read the
         // flag** — `Chapter.downloaded` is written by the parser and consumed nowhere. Whether a
         // book's audio is on disk is answered by `MediaItemTrack.cached`, which is what the cache
         // reconciliation and the UI actually use.
@@ -613,7 +613,7 @@ class BookRepository
     // Both of these let a failure propagate rather than logging and returning. The server call
     // comes first, so a failure leaves the local DB untouched and the two sides still agree — but
     // swallowing it told the caller the change had been made, and the caller shows a success
-    // message. Since cu-98 the caller reports the real outcome, which only works if it is told.
+    // message. The caller now reports the real outcome, which only works if it is told.
     override suspend fun updatePlaybackSpeed(
       bookId: String,
       speed: Float,
@@ -636,7 +636,7 @@ class BookRepository
         plexMediaService.unwatched(bookId)
         bookDao.setUnwatched(bookId)
         // The inverse of setWatched, which also resets progress. Without this the book kept the
-        // position it was marked played at, so "unread" showed a part-finished book (cu-86).
+        // position it was marked played at, so "unread" showed a part-finished book.
         bookDao.resetBookProgress(bookId)
       }
     }
@@ -698,7 +698,7 @@ class BookRepository
           try {
             // assembleChapters carries the running offset. This used to fall back to
             // `track.asChapter(0L)` per track — a literal zero — so a multi-file book with no
-            // server chapters had every chapter starting at 0 (cu-49).
+            // server chapters had every chapter starting at 0.
             assembleChapters(tracks) { track ->
               val networkChapters =
                 plexMediaService.retrieveChapterInfo(track.id)
@@ -729,7 +729,7 @@ class BookRepository
 
         Timber.i("Loaded chapters: ${chapters.map { "[${it.index}/${it.discNumber}]" }}")
 
-        // Chapters are written to their own table (cu-49) *and* still onto the book, so the read
+        // Chapters are written to their own table *and* still onto the book, so the read
         // sites can move over one at a time. `Audiobook.chapters` is retired once they all have.
         // Replacing rather than merging: the server's answer is authoritative, and a book whose
         // chapter count shrank must not keep the stale extras. Scoped to this book by the

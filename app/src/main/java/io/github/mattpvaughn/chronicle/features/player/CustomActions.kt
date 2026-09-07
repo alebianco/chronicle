@@ -26,7 +26,7 @@ const val SKIP_TO_PREVIOUS_CHAPTER_THRESHOLD_SECONDS = 30L
  *
  * `getChapterAt` resolves a boundary timestamp to the chapter that *starts* there, but only once
  * the player reports the position — landing exactly on the boundary leaves a window in which the
- * previous chapter is still the answer. Was an unexplained `+ 300` inline (cu-96).
+ * previous chapter is still the answer. Was an unexplained `+ 300` inline.
  */
 const val CHAPTER_SEEK_NUDGE_MILLIS = 300L
 

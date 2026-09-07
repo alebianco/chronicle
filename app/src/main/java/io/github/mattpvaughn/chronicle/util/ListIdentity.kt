@@ -5,10 +5,10 @@ package io.github.mattpvaughn.chronicle.util
  *
  * A `ListAdapter` hands back only an immutable copy of its list, so a caller wanting to know
  * "is this actually different?" has to compare. Comparing by **id** rather than by `equals` is the
- * point: the playing book's `progress` changes once a second (cu-110), so a full comparison would
+ * point: the playing book's `progress` changes once a second, so a full comparison would
  * report a new list on every tick and force a scroll-to-top.
  *
- * Extracted in cu-169 from `LibraryFragment` and `CollectionsFragment`, which held **identical**
+ * Extracted from `LibraryFragment` and `CollectionsFragment`, which held **identical**
  * copies of it — each wrapped in `withContext(Dispatchers.IO)`. That was wrong twice over: there is
  * no IO here, only two in-memory lists, and the block read `adapter.currentList` — a UI object —
  * off the main thread. It is a cheap synchronous comparison and belongs on the caller's thread.

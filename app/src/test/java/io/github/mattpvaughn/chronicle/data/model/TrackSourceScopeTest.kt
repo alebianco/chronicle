@@ -7,7 +7,7 @@ import org.hamcrest.Matchers.equalTo
 import org.junit.Test
 
 /**
- * `MediaItemTrack.source` survives a merge, in **both** arms (cu-127, cu-20's rule).
+ * `MediaItemTrack.source` survives a merge, in **both** arms.
  *
  * A parsed network track carries [SourceId.UNKNOWN] — a response does not say which server it
  * came from. So an arm of [MediaItemTrack.merge] that omits `source` blanks the scope of every
@@ -15,7 +15,7 @@ import org.junit.Test
  *
  * Both arms are exercised because only one runs for a given pair: a fix applied to one and missed
  * in the other looks correct in a test that happens to take the fixed path. That is exactly how
- * cu-20 found the `playbackSpeed` bug, and `PerBookSpeedTest` was written the same way.
+ * the `playbackSpeed` bug was found, and `PerBookSpeedTest` was written the same way.
  */
 class TrackSourceScopeTest {
   private fun local(

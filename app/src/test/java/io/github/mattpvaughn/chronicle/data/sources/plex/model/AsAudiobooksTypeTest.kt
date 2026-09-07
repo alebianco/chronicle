@@ -6,7 +6,7 @@ import org.junit.Test
 /**
  * A book row may only come from *album* metadata.
  *
- * Found by looking at the Continue Listening shelf on a device (cu-18): it showed two entries for
+ * Found by looking at the Continue Listening shelf on a device: it showed two entries for
  * one book — "The Hobbit", and "An Unexpected Party" whose author read "The Hobbit" and whose
  * `leafCount` was 0. That second row was a **track** sitting in the `Audiobook` table. It arrives
  * through `fetchBookAsync` → `retrieveAlbum(bookId)` → `asAudiobooks()` → `bookDao.update`, and
@@ -17,7 +17,7 @@ import org.junit.Test
  * expected back. The only guard available is the response's own `type`.
  *
  * A phantom book is a bad failure to leave silent: the user sees an entry they cannot explain,
- * cannot play, and cannot remove. Same rule as cu-15 — fail loudly rather than ingest quietly.
+ * cannot play, and cannot remove. Fail loudly rather than ingest quietly.
  */
 class AsAudiobooksTypeTest {
   @Test

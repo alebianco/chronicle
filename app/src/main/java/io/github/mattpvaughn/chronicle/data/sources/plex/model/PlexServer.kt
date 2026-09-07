@@ -28,7 +28,7 @@ data class Connection(
    * Reported by `/api/v2/resources` — which the app already queries with
    * `includeRelay = 1` — but previously discarded at parse time, so relay routes were
    * raced on equal footing with LAN despite being capped around 2 Mbps behind an extra
-   * hop through Plex's infrastructure (cu-11).
+   * hop through Plex's infrastructure.
    */
   val relay: Boolean = false,
   /** "http" or "https". Informational, so a tier decision can be audited from a log. */
@@ -36,18 +36,18 @@ data class Connection(
   /**
    * True when this route's address is an IPv6 literal.
    *
-   * **Parsed but deliberately not acted on** (cu-75). `/api/v2/resources` reports it beside `local`
-   * and `relay`, and cu-11 dropped it. Nothing prefers or avoids IPv6, because there is no failing
+   * **Parsed but deliberately not acted on**. `/api/v2/resources` reports it beside `local`
+   * and `relay`, and it was dropped from use. Nothing prefers or avoids IPv6, because there is no failing
    * network to justify a rule: the household's server advertises **three connections, all
    * `"IPv6": false`, none an IPv6 literal** — checked against the live server, not a fixture, since
-   * the fixture omits the key entirely (the cu-24 trap).
+   * the fixture omits the key entirely.
    *
    * Carrying it makes the flag visible in a log when a connection problem *is* reported, which is
    * what a future decision would need. Adding a tier or a filter on today's evidence would be
    * guesswork, and a wrong guess degrades the networks that already work.
    *
    * `@Json` names it explicitly: the wire key is `IPv6` and Moshi is case-sensitive, so the
-   * inferred `iPv6` would silently never match — the exact defect cu-24 found in `plexGenres`.
+   * inferred `iPv6` would silently never match — the exact defect once found in `plexGenres`.
    */
   @Json(name = "IPv6")
   val iPv6: Boolean = false,

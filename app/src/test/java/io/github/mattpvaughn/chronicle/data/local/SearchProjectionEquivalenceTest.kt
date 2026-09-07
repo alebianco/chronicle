@@ -24,14 +24,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The projection search (cu-161) must return exactly what the whole-table search returned.
+ * The projection search must return exactly what the whole-table search returned.
  *
  * The optimisation is only safe if it is invisible. So rather than asserting a handful of expected
  * results, each case runs the **old** path — `getAllBooksAsync(...).groupedSearch(query)`, which is
  * what `searchGrouped` did before — over the same real database and asserts the two agree on
  * groups, order, ids, matched values and counts.
  *
- * cu-25's rules are what would break silently here: the fuzzy tier, the 4-character floor and the
+ * the rules are what would break silently here: the fuzzy tier, the 4-character floor and the
  * character-count prefilter all run over strings that now arrive from a different query.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -97,7 +97,7 @@ class SearchProjectionEquivalenceTest {
       dispatchers = TestDispatcherProvider(),
     )
 
-  /** The path `searchGrouped` used before cu-161, run over the same database. */
+  /** The path `searchGrouped` used before the projection-search rewrite, run over the same database. */
   private fun wholeTableSearch(query: String) = db.bookDao.getAllBooksAsync(TEST_SOURCE, false).groupedSearch(query)
 
   private fun assertSameResults(query: String) =
@@ -128,7 +128,7 @@ class SearchProjectionEquivalenceTest {
 
   @Test fun `a series matches identically`() = assertSameResults("Eisenhorn")
 
-  /** cu-25's Damerau tier: a transposition is the commonest typo and must still be tolerated. */
+  /** the Damerau tier: a transposition is the commonest typo and must still be tolerated. */
   @Test fun `a transposition still matches identically`() = assertSameResults("Dnue")
 
   @Test fun `a one-character typo still matches identically`() = assertSameResults("Mistbron")
@@ -157,7 +157,7 @@ class SearchProjectionEquivalenceTest {
       assertTrue("the real row carries its source", first.source == TEST_SOURCE)
     }
 
-  /** Another source's books must stay invisible, as they were before (cu-127). */
+  /** Another source's books must stay invisible, as they were before. */
   @Test
   fun `the projection is source-scoped`() =
     runTest {

@@ -18,11 +18,11 @@ import java.net.UnknownHostException
  * The startup `/api/v2/resources` refresh used to swallow **everything** in one
  * `catch (e: Exception)` logged as "keeping cached server". A password change with "sign out
  * connected devices" produced a real `401 Unauthorized` from plex.tv and the app said nothing —
- * measured on device during the cu-73 live pass (decision-17).
+ * measured on device during a live pass (decision-17).
  *
  * The asymmetry matters in both directions, so both are pinned here: missing the 401 leaves the
- * user stranded with silently dead sync, and over-claiming it reintroduces cu-84, where being
- * offline was reported as being signed out.
+ * user stranded with silently dead sync, and over-claiming it reintroduces an earlier bug, where
+ * being offline was reported as being signed out.
  */
 class AccountRejectionClassificationTest {
   private fun httpException(code: Int) =
@@ -37,7 +37,7 @@ class AccountRejectionClassificationTest {
 
   @Test
   fun `being offline is not an account rejection`() {
-    // The cu-84 rule: no network says nothing about the credential.
+    // The rule: no network says nothing about the credential.
     assertFalse(isAccountRejection(UnknownHostException("plex.tv")))
     assertFalse(isAccountRejection(IOException("network unreachable")))
   }

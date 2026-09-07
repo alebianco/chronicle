@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Pins [ChronicleColors] against `res/values/colors.xml` (cu-181).
+ * Pins [ChronicleColors] against `res/values/colors.xml`.
  *
  * The Compose colours are Kotlin literals rather than `colorResource` lookups, because a `@Preview`
  * and a Compose UI test render with no Android theme attached — resolving a theme attribute there

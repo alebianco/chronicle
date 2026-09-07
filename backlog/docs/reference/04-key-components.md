@@ -16,7 +16,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 **What it does**:
 - Initializes the entire app when it starts
-- Is the Hilt DI root (`@HiltAndroidApp`) — since cu-185 the graph is Hilt-generated, not a
+- Is the Hilt DI root (`@HiltAndroidApp`) — the graph is Hilt-generated, not a
   hand-rolled `AppComponent`
 - Sets up image loading (Coil 3)
 - Configures logging (Timber)
@@ -34,7 +34,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 **What it does**:
 - The single Activity; calls `setContent {}` and hosts every screen as a Compose destination
-  inside a Navigation Compose `NavHost` (cu-206 — there is no Fragment layer left)
+  inside a Navigation Compose `NavHost` (there is no Fragment layer left)
 - Manages the bottom navigation bar (`ChronicleApp`'s `NavigationBar`)
 - Handles the mini player (currently playing bar at bottom)
 - Manages back button behavior, via `OnBackPressedDispatcher` (not an `onBackPressed()` override,
@@ -216,7 +216,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 **What they do**:
 - Home screen with recently added, recently listened, and downloaded books
-- Pull to refresh (`PullToRefreshBox`, since cu-206 removed the XML `SwipeRefreshLayout` host)
+- Pull to refresh (`PullToRefreshBox`, since the Compose migration removed the XML `SwipeRefreshLayout` host)
 - Quick access to search
 - Displays curated book lists
 
@@ -270,7 +270,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 ## Dependency Injection
 
-Since cu-185 the three components below are **Hilt's own** generated types
+The three components below are **Hilt's own** generated types
 (`dagger.hilt.android.components.*` / `dagger.hilt.components.SingletonComponent`), not classes
 this codebase declares. `injection/modules/*.kt` attach providers to them with
 `@Module @InstallIn(...)`; there is no `injection/components/` package anymore.
@@ -317,7 +317,7 @@ this codebase declares. `injection/modules/*.kt` attach providers to them with
 
 ## Navigation
 
-`Navigator.kt` is deleted (cu-206). Navigation Compose replaced it with two files:
+`Navigator.kt` is deleted. Navigation Compose replaced it with two files:
 
 ### Destination
 **Location**: `navigation/Destination.kt`
@@ -359,7 +359,7 @@ this codebase declares. `injection/modules/*.kt` attach providers to them with
 - Contains all audiobook metadata
 
 **Key properties**:
-- `id` — **`String`**, not `Int` (cu-71, so a non-numeric backend can be represented). A DAO
+- `id` — **`String`**, not `Int` (so a non-numeric backend can be represented). A DAO
   parameter bound against it must also be `String`: SQLite compares across storage classes, so a
   numeric bind matches **no row, silently**.
 - `title`, `author` — book metadata
@@ -368,13 +368,13 @@ this codebase declares. `injection/modules/*.kt` attach providers to them with
   ([[decision-16]]). `merge` carries the local value and never adopts `network.progress`.
 - `isCached` — whether the book is downloaded
 - `thumb` — cover art URL
-- `source` — **`SourceId`** (cu-127, [[decision-21]]): which source instance owns this row. A
+- `source` — **`SourceId`** ([[decision-21]]): which source instance owns this row. A
   local-only column, so it must be named in **both** arms of `merge` or a refresh blanks it.
 - `playbackSpeed` — per-book override, `NO_SPEED_OVERRIDE` (`0f`) when the book follows the global
   preference. Read only through `effectiveSpeed(global)`.
-- `seriesIndex` — parsed from `titleSort` in hundredths (cu-146), not from Plex's `index`.
+- `seriesIndex` — parsed from `titleSort` in hundredths, not from Plex's `index`.
 
-**There is no `chapters` property.** The column was dropped in `BookDatabase` v14 (cu-159);
+**There is no `chapters` property.** The column was dropped in `BookDatabase` v14;
 chapters live in `ChapterDatabase` and are read through `resolveChapters` /
 `resolveChaptersFromCache` (`data/model/ChapterAssembly.kt`). Do not reintroduce a serialized copy
 on the book.
@@ -387,7 +387,7 @@ on the book.
 - Room entity
 
 **Key properties**:
-- `id` — **`String`** (cu-71), same binding caveat as `Audiobook.id`
+- `id` — **`String`**, same binding caveat as `Audiobook.id`
 - `title` — track title
 - `duration` — track length
 - `progress` — the track's `viewOffset`. This is the **single source of truth** for listening

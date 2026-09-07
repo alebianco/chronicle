@@ -17,7 +17,7 @@ import java.net.SocketTimeoutException
  * The load-bearing property is **not** that revocation is detected — it is that everything else is
  * *not* mistaken for revocation. Removing a device invalidates no token (measured: 111 requests,
  * all `200`, after the owner deleted it), so the app has to ask; and asking badly would
- * reintroduce cu-84, where being offline was reported as being signed out.
+ * reintroduce the bug where being offline was reported as being signed out.
  */
 class DeviceAuthorizationCheckTest {
   private val thisDevice = "758e3323-02cc-4c46-98b9-29aa6d90f251"
@@ -74,7 +74,7 @@ class DeviceAuthorizationCheckTest {
       assertEquals(State.Revoked, authState.state.value)
     }
 
-  /** cu-84's rule. Each of these must leave the state alone, never Revoked. */
+  /** the rule. Each of these must leave the state alone, never Revoked. */
   @Test
   fun `being offline is not revocation`() =
     runTest {

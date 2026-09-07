@@ -36,7 +36,7 @@ import java.io.IOException
  * that, so the invariant rested entirely on a comment.
  *
  * `setWatched`/`setUnwatched` are the owner's *"mark as read/unread is not consistent"*: both must
- * reset the stored position, or an "unread" book still reads as part-finished (cu-86).
+ * reset the stored position, or an "unread" book still reads as part-finished.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class BookRepositorySyncTest {
@@ -199,7 +199,7 @@ class BookRepositorySyncTest {
       assertTrue("the fetched chapter must be written", inserted.captured.isNotEmpty())
     }
 
-  /** Marking read must clear the position, or the book still shows part-finished (cu-86). */
+  /** Marking read must clear the position, or the book still shows part-finished. */
   @Test
   fun `marking a book read resets its stored position`() =
     runTest {
@@ -209,7 +209,7 @@ class BookRepositorySyncTest {
       coVerify { bookDao.resetBookProgress("1001") }
     }
 
-  /** And the inverse, which is the half of cu-86 that was actually broken. */
+  /** And the inverse, which was the half that was actually broken. */
   @Test
   fun `marking a book unread resets its stored position`() =
     runTest {
@@ -224,7 +224,7 @@ class BookRepositorySyncTest {
    * permanently, which is the cross-device inconsistency the owner reported.
    *
    * It must also **reach the caller**. This used to be logged and swallowed, so the caller went on
-   * to show "Marked audiobook as played" for a change the server had refused (cu-98).
+   * to show "Marked audiobook as played" for a change the server had refused.
    */
   @Test
   fun `a rejected mark-as-read does not change local state and is reported`() =
@@ -239,7 +239,7 @@ class BookRepositorySyncTest {
       coVerify(exactly = 0) { bookDao.resetBookProgress(any()) }
     }
 
-  /** The same for the inverse, which is the one that repairs a damaged book (cu-98). */
+  /** The same for the inverse, which is the one that repairs a damaged book. */
   @Test
   fun `a rejected mark-as-unread does not change local state and is reported`() =
     runTest {

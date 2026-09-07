@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Switch a Chronicle debug install between the real Plex account and mock mode,
 # without ever needing `pm clear` (which would destroy a login nobody is around
-# to redo -- see CLAUDE.md, cu-73).
+# to redo -- see CLAUDE.md).
 #
 #   plex-session.sh backup    # capture the current real session to disk
 #   plex-session.sh real      # restore the real session, mock off

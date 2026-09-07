@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The refresh-rate mapping, both directions (cu-101).
+ * The refresh-rate mapping, both directions.
  *
  * `SettingsViewModel.makePreferences()` held this twice: one `when` turned stored minutes into a
  * label, another turned a chosen option back into minutes. Neither was reachable by a test — both

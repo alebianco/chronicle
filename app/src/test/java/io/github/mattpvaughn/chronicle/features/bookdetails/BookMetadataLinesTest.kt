@@ -9,12 +9,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * What a book's detail screen says about its narrator and series (cu-145).
+ * What a book's detail screen says about its narrator and series.
  *
- * The absence cases outnumber the present ones on purpose. cu-24 populates narrator and series only
- * for books the user has opened, and cu-146 leaves the position unknown whenever the tagging
- * carries no number — so "nothing known" and "series but no number" are the *common* states until
- * cu-143 seeds the index, not edge cases.
+ * The absence cases outnumber the present ones on purpose. The network/local merge populates
+ * narrator and series only for books the user has opened, and the series-index parser leaves the
+ * position unknown whenever the tagging carries no number — so "nothing known" and "series but no
+ * number" are the *common* states until the tag index seeder seeds the index, not edge cases.
  */
 class BookMetadataLinesTest {
   private fun book(
@@ -96,7 +96,7 @@ class BookMetadataLinesTest {
 
   // ---- fractional positions ----
 
-  /** A novella between two books genuinely sits at 1.5 — cu-146 stores it in hundredths. */
+  /** A novella between two books genuinely sits at 1.5 — the series index stores it in hundredths. */
   @Test
   fun `a novella keeps its fractional position`() {
     val b = book(series = "Mistborn", seriesIndex = 150)

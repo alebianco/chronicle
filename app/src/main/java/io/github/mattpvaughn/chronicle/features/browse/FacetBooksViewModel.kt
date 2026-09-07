@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 /**
- * The books under one facet value (cu-24).
+ * The books under one facet value.
  *
  * Filtering lives in `BookFacets` as pure functions; this is the LiveData plumbing plus the one
  * decision that belongs here: a **series** is shown in reading order, while an author's or
@@ -33,7 +33,7 @@ class FacetBooksViewModel
     savedStateHandle: SavedStateHandle,
   ) : ViewModel() {
     /**
-     * Which facet, read from the navigation arguments rather than a factory field (cu-185).
+     * Which facet, read from the navigation arguments rather than a factory field.
      *
      * The factory carried `kind` and `value` as **mutable properties** the Fragment set before
      * calling `create`, so they did not survive process death: the system recreates the ViewModel
@@ -58,7 +58,7 @@ class FacetBooksViewModel
     val books: Flow<List<Audiobook>> =
       bookRepository.getAllBooks()
         // Deduped on the facet-relevant projection: Room re-emits this table once a second during
-        // playback, and re-filtering the whole library per tick is the shape cu-110 was about.
+        // playback, and re-filtering the whole library per tick was the shape of that cost.
         .distinctUntilChangedBy { books ->
           books.map { "${'$'}{it.id}|${'$'}{it.author}|${'$'}{it.narrator}|${'$'}{it.series}|${'$'}{it.seriesIndex}" }
         }
@@ -68,7 +68,7 @@ class FacetBooksViewModel
         }
 
     companion object {
-      /** Navigation argument keys, owned here because this is what reads them (cu-185). */
+      /** Navigation argument keys, owned here because this is what reads them. */
       const val ARG_KIND = "facet_kind"
       const val ARG_VALUE = "facet_value"
     }

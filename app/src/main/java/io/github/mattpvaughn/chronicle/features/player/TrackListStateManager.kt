@@ -28,7 +28,7 @@ class TrackListStateManager {
    *
    * Sorted once on assignment rather than on each read: [currentBookPosition] and [currentTrack]
    * are read on the 1 Hz progress path, and sorting there would be exactly the per-tick work whose
-   * result cannot change that cu-110 was about.
+   * result cannot change that the per-tick Room invalidation fix was about.
    */
   private var sortedTracks: List<MediaItemTrack> = emptyList()
 
@@ -38,7 +38,7 @@ class TrackListStateManager {
    * Sorted, because this feeds `Player.seekTo`'s `mediaItemIndex`, which addresses the player's
    * playlist — and that playlist is built in sorted order. Both callers happen to assign a
    * DAO-ordered list, so the two agreed by convention rather than by construction; [TrackIndex]
-   * plus the explicit sort in [seekToActiveTrack] makes it hold by construction (cu-136).
+   * plus the explicit sort in [seekToActiveTrack] makes it hold by construction.
    */
   var currentTrackIndex: TrackIndex = TrackIndex(0)
     private set
@@ -57,7 +57,7 @@ class TrackListStateManager {
    *
    * **Has no production caller any more.** Its one reader was `seekRelative`'s service-is-dead
    * branch, which wrote it into `MediaItemTrack.progress` — a *track* column — inflating the row
-   * by every preceding track's duration (cu-136). Kept rather than deleted because the two frames
+   * by every preceding track's duration. Kept rather than deleted because the two frames
    * being available side by side is what `TrackListStateManagerFrameTest` pins, and a future
    * caller wanting a book position should find one here instead of deriving it inline for a
    * seventh time.
@@ -90,7 +90,7 @@ class TrackListStateManager {
     Timber.i("Seeking to active track")
     // `getActiveTrack()` sorts internally, so the index must come from the sorted list too. It
     // used to come from the unsorted `trackList`, which agreed only because both callers pass a
-    // DAO-ordered list — one caller away from seeking to the wrong track (cu-136).
+    // DAO-ordered list — one caller away from seeking to the wrong track.
     val ordered = sortedTracks
     val activeTrack = ordered.getActiveTrack()
     currentTrackIndex = TrackIndex(ordered.indexOf(activeTrack))

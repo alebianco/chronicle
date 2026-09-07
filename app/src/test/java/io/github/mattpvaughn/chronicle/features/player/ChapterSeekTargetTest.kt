@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Converting a book-absolute chapter offset into `seekTo` coordinates (cu-96).
+ * Converting a book-absolute chapter offset into `seekTo` coordinates.
  *
  * The multi-track fixture below is the thing that was missing when this bug was found: the owner's
  * books are single-file, so absolute and in-track offsets coincide and every wrong calculation

@@ -14,7 +14,7 @@ import org.junit.Test
  * Pins that silence skipping is retuned for narration, and that speed control survives it.
  *
  * The *values* cannot be asserted meaningfully — whether a book is listenable is a judgement about
- * audio, and belongs to the live pass (cu-73). What a test can and must pin is that the custom
+ * audio, and belongs to the live pass. What a test can and must pin is that the custom
  * processor is **installed at all**, and that the chain still carries [SonicAudioProcessor]:
  * otherwise a future refactor silently reverts to ExoPlayer's video-oriented defaults, or drops
  * playback-speed control, with nothing failing.

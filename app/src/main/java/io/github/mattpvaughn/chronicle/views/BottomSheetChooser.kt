@@ -8,9 +8,9 @@ import io.github.mattpvaughn.chronicle.R
  * The data a chooser sheet renders, and the deferred strings it renders.
  *
  * **This was a `FrameLayout`** with a hand-rolled show/hide animation, an inner `RecyclerView`
- * adapter and a `DiffUtil`; cu-203 replaced the rendering with `views/compose/BottomChooser.kt`
- * and left the *types* here, because they are not view code and are named
- * `BottomSheetChooser.FormattableString` at some 200 call sites.
+ * adapter and a `DiffUtil`; the Compose migration replaced the rendering with
+ * `views/compose/BottomChooser.kt` and left the *types* here, because they are not view code and
+ * are named `BottomSheetChooser.FormattableString` at some 200 call sites.
  *
  * **Why [FormattableString] survives Compose.** It looks like a workaround for a `View` being
  * unable to resolve a string resource without a `Context` — and Compose's `stringResource()` would

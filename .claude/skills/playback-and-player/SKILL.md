@@ -14,8 +14,8 @@ from UI**.
 per-second write: without an explicit flush the saved position is whatever the previous tick
 captured, and no `PLEX_STATE_PAUSED` ever reaches the server.
 
-Three paths flush today — `flushOutgoingBookProgress` on a book switch (cu-91), `onSeekTo` on a
-seek (cu-93), and `onPause`. **A fourth pause route added later needs its own.** Same defect class
+Three paths flush today — `flushOutgoingBookProgress` on a book switch, `onSeekTo` on a
+seek, and `onPause`. **A fourth pause route added later needs its own.** Same defect class
 as advplyr/audiobookshelf-app#1847 and PaulWoitaschek/Voice#3351.
 
 **Read the position from the player, never from the session.** `MediaSessionCompat`'s playback
@@ -24,7 +24,7 @@ state lags a frame, so `updateProgressWithoutParameters` on a pause or seek path
 position with a stale one. `PauseFlushesProgressTest` seeds a deliberately stale session position so
 the regression fails loudly instead of passing by luck.
 
-## Listening position is owned by the tracks, never the book (decision-16, cu-90)
+## Listening position is owned by the tracks, never the book (decision-16)
 
 Plex stores no album-level `viewOffset` — only per-track — so `Audiobook.progress` is a **cache of
 a derivation**.
@@ -37,13 +37,13 @@ a derivation**.
   `markTracksInBookAsWatched` stamps every track.
 - **Completion is a separate explicit fact** (`viewCount`), never inferred from position.
 
-## An offset carries its frame in its type (cu-136)
+## An offset carries its frame in its type
 
 `BookOffset`, `TrackOffset` and `TrackIndex` (`data/model/Offsets.kt`) are `@JvmInline` value
 classes, so a book-frame value passed where a track-frame one belongs **fails to compile**.
 
-Six bugs came from that mistake as plain `Long`s (cu-13, cu-49, cu-93, cu-96, and four more in
-cu-115), and prose did not stop it: `Chapter.bookStartTimeOffset` was *renamed to say the frame*
+Six bugs came from that mistake as plain `Long`s, and prose did not stop it:
+`Chapter.bookStartTimeOffset` was *renamed to say the frame*
 and carries a KDoc explaining it, and the frame was still guessed wrong twice afterwards. On a
 single-track book — most of this library — the two are the **same number**, so every one of them
 worked by accident.
@@ -61,7 +61,7 @@ worked by accident.
 - `Audiobook.progress` and `ProgressUpdater` stay `Long` on purpose — they already keep the two
   frames as separate named locals.
 
-## Per-book playback speed (cu-20)
+## Per-book playback speed
 
 `Audiobook.playbackSpeed` is `NO_SPEED_OVERRIDE` (`0f`) when the book follows the global
 preference, and `effectiveSpeed(global)` is the **only** reader. `MIN_VALID_SPEED` is pinned equal
@@ -78,7 +78,7 @@ change made **while paused** needs `CurrentlyPlaying.updateSpeedOverride` to rea
 Remember the merge rule — `playbackSpeed` is a local-only column and must be named in **both** arms
 of `Audiobook.merge` (see the `room-and-persistence` skill).
 
-## The sleep timer (cu-21)
+## The sleep timer
 
 **`ACTION_SLEEP_TIMER_CHANGE` is bidirectional, and the service must not answer itself.** Commands
 travel *into* the timer on that action and its ticks travel *out* on the same one, so a service
@@ -117,7 +117,7 @@ pass while the player was built with different ones. `EmbeddedArtworkTest` runs 
 real PNG cover through the production function, plus a second test asserting the fixture still
 carries a frame under stock flags so the first cannot pass vacuously.
 
-## Per-second work is expensive (cu-110)
+## Per-second work is expensive
 
 `ProgressUpdater` writes once a second during playback and **Room invalidates per table**, so every
 query on `Audiobook` or `MediaItemTrack` re-emits at tick rate.
@@ -132,7 +132,7 @@ had not changed, and an image reload for identical artwork.
   in `areContentsTheSame` — so a rebind must be cheap.
 - **Profile, do not read.** Four rounds of inspection produced plausible wrong answers;
   `am profile start --sampling` named it at once.
-- **A performance fix verified against the easy fixture is not verified** (cu-115). The
+- **A performance fix verified against the easy fixture is not verified.** The
   single-track, 3-chapter fixture showed 1 jiffy/6 s and looked fixed; the 3-track, 8-chapter one
   put it back to 431 jiffies/12 s and exposed the real dominant cause. Measure against the **worst
   realistic input**.
@@ -144,34 +144,34 @@ published with `postValue` while clearing `isConnecting` immediately — so both
 browser was CONNECTED, and `MediaBrowserCompat.connect()` **throws** rather than ignoring a
 redundant call.
 
-`postValue` is gone tree-wide since cu-52 and `PostValueUsageTest` fails the build on a new one, so
+`postValue` is gone tree-wide and `PostValueUsageTest` fails the build on a new one, so
 that exact shape cannot return. The general lesson survives: **ask the collaborator's own
 synchronous state**. `connectIfIdle` tests `mediaBrowser.isConnected` for that reason — the
 browser's state also moves *during* `connect()`, before any callback of ours runs.
 
 ## Downloads and caching
 
-- **A downloaded track's URI needs its `file://` scheme** (cu-83). `"/path/x.mp3".toUri()` gives
+- **A downloaded track's URI needs its `file://` scheme.** `"/path/x.mp3".toUri()` gives
   `scheme = null` and ExoPlayer will not treat it as a local file — it surfaces as an
   unsupported-format error **on downloaded books only**. Use `Uri.fromFile`, never
   `"file://" + path`, which skips percent-encoding.
-- **A cache scan that cannot read its directory must change nothing** (cu-85). `listFiles()`
+- **A cache scan that cannot read its directory must change nothing.** `listFiles()`
   returns null for a missing or unreadable directory, and coalescing that to an empty list
   un-cached whole libraries. `cachedMediaDir` also returns the *stored* path even when unmounted,
   so an absent SD card reads as unavailable rather than silently resolving to a different,
   readable directory.
-- **Changing the sync location does not strand partials** (cu-153). Fetch2 downloads **in place**
+- **Changing the sync location does not strand partials.** Fetch2 downloads **in place**
   and resumes over HTTP Range, so a partial is named `<trackId>.<ext>` exactly like a finished
   file — there is no `.part`/`.tmp` suffix. `MoveSyncLocationWorker` selects with
   `MediaItemTrack.cachedFilePattern` and moves both. Correct, but load-bearing: **give partials a
-  distinguishing suffix and they start being orphaned**, because cu-81's prune only scans the
+  distinguishing suffix and they start being orphaned**, because the prune only scans the
   *active* `cachedMediaDir`. `SyncLocationMoveTest` pins it. Verified on two real volumes in both
   directions — worth doing both, since `Files.move` may fall back to copy+delete across
   filesystems.
 
 ## Android Auto
 
-**Testable without a car, but not through Gradle Managed Devices** (cu-23, cu-89). AGP refuses:
+**Testable without a car, but not through Gradle Managed Devices.** AGP refuses:
 *"TV and Auto devices are presently not supported with Gradle Managed Devices."* The config
 resolves and the task is generated, then `<device>Setup` fails — **do not add an
 `android-automotive` `systemImageSource`.** A manual AVD works and boots in ~10s (route in the

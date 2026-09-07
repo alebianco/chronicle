@@ -8,9 +8,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Imported values must be validated, not just their keys (cu-133).
+ * Imported values must be validated, not just their keys.
  *
- * The cu-17 allowlist gates **keys**. `SettingType.STRING` then accepted any string, and
+ * The allowlist gates **keys**. `SettingType.STRING` then accepted any string, and
  * `applyParsed` wrote it straight to the editor with `putString` — bypassing the typed setters in
  * `SharedPreferencesPrefsRepo`, three of which reject unknown values by throwing.
  *
@@ -72,7 +72,7 @@ class ImportValueValidationTest {
 
   /**
    * `"Rectangle"` above is not a hypothetical: it is what the settings screen itself stored before
-   * cu-101, so a legacy export can genuinely contain it. Refusing it is right — the value matches
+   * that value was corrected, so a legacy export can genuinely contain it. Refusing it is right — the value matches
    * neither consumer constant — and the user keeps their current style rather than a broken one.
    */
   @Test

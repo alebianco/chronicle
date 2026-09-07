@@ -19,12 +19,12 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 
 /**
  * Route B — one multi-id request answering narrator **and** series — against a fixture captured
- * from a real Plex 1.43 server (cu-156).
+ * from a real Plex 1.43 server.
  *
  * The fixture is `multi-id-real-shape.json`, five books chosen to cover every tag combination:
  * both tags, narrator only, series only, neither. Captured rather than hand-written, because a
  * fixture written to match the code proves nothing — that is exactly how `plexGenres` carried the
- * wrong `@Json` name for the life of the project (cu-24).
+ * wrong `@Json` name for the life of the project.
  */
 class MultiIdTagSeedingTest {
   @get:Rule
@@ -75,7 +75,7 @@ class MultiIdTagSeedingTest {
       )
     }
 
-  /** The merge rule cu-143 established, restated for this route: never overwrite a known value. */
+  /** The merge rule established for this route: never overwrite a known value. */
   @Test
   fun `seeding never overwrites a value the book already knows`() =
     runTest {

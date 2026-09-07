@@ -6,10 +6,10 @@ import org.junit.Test
 /**
  * A second device must adopt a newer position from the server.
  *
- * Reproduces the exact numbers measured on two real devices during the cu-73 live pass: the tablet
+ * Reproduces the exact numbers measured on two real devices during a live pass: the tablet
  * played *Ender's Game* track `151445` to 244973 ms and reported it; the phone opened the book,
  * received `"viewOffset":236955,"lastViewedAt":1788384988` in `/children`, and **kept its own
- * 189 ms**. The round trip is the whole point of having a server (cu-14, decision-16).
+ * 189 ms**. The round trip is the whole point of having a server (decision-16).
  */
 class PositionAdoptionTest {
   private fun track(
@@ -35,7 +35,7 @@ class PositionAdoptionTest {
     val merged = MediaItemTrack.merge(network = network, local = local)
 
     assertEquals(
-      "device B must adopt A's position; keeping 189 ms is the cu-73 failure",
+      "device B must adopt A's position; keeping 189 ms is the failure this guards",
       236955,
       merged.progress,
     )
@@ -90,7 +90,7 @@ class PositionAdoptionTest {
   @Test
   fun `the cached flag is always kept from the local copy`() {
     // A downloaded file is a local fact the server knows nothing about; losing it would make a
-    // cached book stream again (cu-83 territory).
+    // cached book stream again.
     val network = track(progress = 236955, lastViewedAt = plexTimestampToMillis(1788384988)).copy(cached = false)
     val local = track(progress = 189, lastViewedAt = 1788384769136).copy(cached = true)
 

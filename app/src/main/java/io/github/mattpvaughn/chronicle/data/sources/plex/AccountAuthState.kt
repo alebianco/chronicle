@@ -29,7 +29,7 @@ import javax.inject.Singleton
  * negative answer moves the state to [Revoked].
  *
  * **A network failure must never land in [Revoked].** Being offline is not being signed out, and
- * treating it as such would nag every user on a train (cu-84). A timeout, a connection error, a
+ * treating it as such would nag every user on a train. A timeout, a connection error, a
  * 5xx or an unparseable body all mean [Unknown].
  */
 @Singleton

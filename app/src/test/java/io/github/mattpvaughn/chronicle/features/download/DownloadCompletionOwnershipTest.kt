@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Who owns the `cached = true` write when a download finishes (cu-138).
+ * Who owns the `cached = true` write when a download finishes.
  *
  * Two defects, one shape. `DownloadNotificationWorker.doWork` used to end with:
  *
@@ -25,7 +25,7 @@ import java.io.File
  * It presented intermittently because `CachedFileManager`'s Fetch2 group listener performs the
  * *same* write on an injected long-lived `externalScope`, which survives — so one broken owner was
  * masked by one working one. That is the "downloaded book reports as not downloaded" symptom
- * [[cu-85]] chased from the cache-scan end.
+ * the unreadable-directory cache-scan fix chased from the other end.
  *
  * **The decision: `CachedFileManager` owns it.** Its listener is a `@Singleton` with an injected
  * scope whose lifetime is not tied to any unit of work, and it is already the reconciliation
@@ -34,7 +34,7 @@ import java.io.File
  *
  * These assertions are structural, following `CachedFileManagerScopeTest`'s precedent: driving
  * Fetch2 callbacks needs a real `Fetch` and a `BroadcastReceiver`, which is instrumented territory
- * (cu-54). What is cheap and worth pinning is that the worker cannot reacquire the write, and
+ *. What is cheap and worth pinning is that the worker cannot reacquire the write, and
  * cannot reintroduce a scope tied to its own cancellation.
  */
 class DownloadCompletionOwnershipTest {
@@ -68,7 +68,7 @@ class DownloadCompletionOwnershipTest {
   fun `the worker never scopes work to its own cancellable context`() {
     assertTrue(
       "CoroutineScope(coroutineContext) inside a CoroutineWorker is cancelled the moment " +
-        "doWork returns — the work it launches races its own teardown (cu-138)",
+        "doWork returns — the work it launches races its own teardown",
       !Regex("""CoroutineScope\(\s*(coroutineContext|workerContext)\s*\)""")
         .containsMatchIn(workerSource.withoutComments()),
     )
@@ -78,7 +78,7 @@ class DownloadCompletionOwnershipTest {
   @Test
   fun `only CachedFileManager marks a book cached on download completion`() {
     assertEquals(
-      "the worker must not write cached status — CachedFileManager owns it (cu-138)",
+      "the worker must not write cached status — CachedFileManager owns it",
       0,
       Regex("""updateCachedStatus""").findAll(workerSource.withoutComments()).count(),
     )

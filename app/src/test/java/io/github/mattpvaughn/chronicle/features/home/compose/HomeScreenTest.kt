@@ -15,11 +15,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The home shelves (cu-201).
+ * The home shelves.
  *
  * Three shelves make the seed question sharper than elsewhere: `Loaded(empty, empty, empty)` is
  * indistinguishable from a genuinely empty library, so it would flash "no books found" on every
- * cold start (cu-68).
+ * cold start.
  */
 @RunWith(RobolectricTestRunner::class)
 class HomeScreenTest {
@@ -98,7 +98,7 @@ class HomeScreenTest {
   }
 
   /**
-   * Continue Listening resumes on tap rather than opening details — cu-18's whole point, and the
+   * Continue Listening resumes on tap rather than opening details — the whole point, and the
    * only shelf with distinct behaviour. Losing it would be a silent behaviour change.
    */
   @Test

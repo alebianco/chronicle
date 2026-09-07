@@ -87,11 +87,11 @@ class SettingsViewModel
       get() = _preferences
 
     /**
-     * The rows with each switch's current value resolved (cu-199).
+     * The rows with each switch's current value resolved.
      *
      * `SettingsList`'s ViewHolder read `prefsRepo` during `bind` and wrote back to it in two
      * handlers — a View reaching into a repository, which is also why the whole screen was
-     * unreachable from a unit test before cu-33. Resolving here keeps the composable stateless and
+     * unreachable from a unit test before this. Resolving here keeps the composable stateless and
      * puts the write somewhere testable.
      *
      * Derived from [preferences] rather than recomputed, so the prefs listener's rebuild is still
@@ -143,13 +143,13 @@ class SettingsViewModel
       get() = _webLink
 
     /**
-     * Asks the fragment to open the series-numbering rules tester (cu-151).
+     * Asks the fragment to open the series-numbering rules tester.
      *
      * An event rather than a navigation call, because `Navigator` is `@ActivityScoped` and this
      * ViewModel is not — the same shape as `webLink` and `exportFileRequest` above.
      *
      * Nullable, like every other event holder here: "no event yet" is a real state, and seeding one
-     * with a blank `Event` would make a fresh screen hold an event that never happened (cu-52).
+     * with a blank `Event` would make a fresh screen hold an event that never happened.
      */
     private val _showSeriesIndexTester = MutableStateFlow<Event<Unit>?>(null)
     val showSeriesIndexTester: StateFlow<Event<Unit>?>
@@ -210,7 +210,7 @@ class SettingsViewModel
      *
      * The decision lives in `RefreshRate.kt` and is unit-tested; only the string lookup is here,
      * because that is the part needing a `Context`. Keeping them apart is what took this out of the
-     * service locator's reach (cu-101).
+     * service locator's reach.
      */
     private fun formatRefreshRate(minutes: Long): String {
       val resources = appContext.resources
@@ -225,7 +225,7 @@ class SettingsViewModel
      *
      * The decision lives in `BookCoverStyle.kt` and is unit-tested; only the string lookup is here.
      * An unrecognized value falls back to the default rather than throwing — a pre-fix install can
-     * hold `"Rectangle"`, and the key is importable with no value validation (cu-133).
+     * hold `"Rectangle"`, and the key is importable with no value validation.
      */
     private fun formatBookCoverStyle(stored: String): String =
       appContext.resources
@@ -332,7 +332,7 @@ class SettingsViewModel
               stringRes = R.string.settings_book_cover_type_value,
               // The chooser's own localized label, not the persisted English literal. The
               // literal is what made a stored "Rectangle" read back as "Rectangle" under an
-              // option offered as "Rectangular" (cu-101).
+              // option offered as "Rectangular".
               placeHolderStrings =
                 listOf(
                   formatBookCoverStyle(prefsRepo.bookCoverStyle),
@@ -902,7 +902,7 @@ class SettingsViewModel
               override fun onClick() {
                 // Not a logout: keeps the chosen user, server, library *and* downloads, so the
                 // recovery for an expired token is one OAuth PIN rather than the whole setup
-                // again (cu-84). Plex has no refresh token, so a human at a browser is
+                // again. Plex has no refresh token, so a human at a browser is
                 // unavoidable — re-picking a library they already picked was not.
                 // beginReauthentication posts NOT_LOGGED_IN, which is what drives navigation to
                 // the login screen — the same mechanism clearConfig uses via determineLoginState.
@@ -1112,8 +1112,8 @@ class SettingsViewModel
      * Applies the backup in the document the user just picked.
      *
      * Every outcome says something specific. A refused file that reported nothing would look
-     * identical to a successful restore that changed nothing, which is the silent failure cu-77 set
-     * out to avoid.
+     * identical to a successful restore that changed nothing, which is the silent failure this
+     * was written to avoid.
      */
     fun onImportFileChosen(source: Uri) {
       viewModelScope.launch(exceptionHandler) {

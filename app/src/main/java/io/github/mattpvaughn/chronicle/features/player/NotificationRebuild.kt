@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.player
 
 /**
- * Everything the now-playing notification actually renders (cu-157).
+ * Everything the now-playing notification actually renders.
  *
  * Two of these being equal means a rebuild would produce a byte-identical notification, so the
  * build — five actions, a `MediaStyle`, an icon lookup and an artwork lookup — can be skipped.
@@ -9,7 +9,7 @@ package io.github.mattpvaughn.chronicle.features.player
  * **The playback state is part of the key on purpose.** A pause changes no title, but the
  * notification's action buttons and its foreground status both follow the state, so a key of
  * titles alone would leave a pause button that no longer matches what the player is doing. The
- * dead `NotificationData` that cu-50 removed carried a `playbackState` field for the same reason;
+ * dead `NotificationData` this replaced carried a `playbackState` field for the same reason;
  * this is that idea finished.
  */
 data class NotificationContentKey(
@@ -20,7 +20,7 @@ data class NotificationContentKey(
 )
 
 /**
- * Remembers the last notification content posted, so an identical one is not rebuilt (cu-157).
+ * Remembers the last notification content posted, so an identical one is not rebuilt.
  *
  * **Stateful "same as last time", never a set of seen keys.** Playback legitimately returns to a
  * previous state — pause then resume — and a set would swallow the second one, leaving a paused

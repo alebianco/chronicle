@@ -93,7 +93,7 @@ class DownloadNotificationWorker
 
         // Awaited, not fire-and-forget. This used to be
         // `fetch.getDownloads { CoroutineScope(coroutineContext).launch { … } }` followed
-        // immediately by the return below — two independent bugs (cu-138): `getDownloads` is an
+        // immediately by the return below — two independent bugs: `getDownloads` is an
         // async callback that had not necessarily fired yet, and `CoroutineWorker` cancels its
         // context the moment `doWork` returns, so the launched block raced its own teardown.
         // The cached-status write that lived here was the visible casualty; the completion
@@ -108,7 +108,7 @@ class DownloadNotificationWorker
      *
      * `Fetch.getDownloads` hands its result to a callback on its own thread. Suspending until it
      * arrives is what lets `doWork` finish its work *before* returning, rather than launching it
-     * into a context that is about to be cancelled (cu-138).
+     * into a context that is about to be cancelled.
      *
      * Cancellable: if the worker is stopped while waiting, the coroutine resumes with cancellation
      * rather than leaking a continuation. The file's own header TODO asks for exactly this
@@ -131,7 +131,7 @@ class DownloadNotificationWorker
       val bookDownloads = downloads.groupByBookId()
       Timber.i("Downloads: ${bookDownloads.mapValues { (_, forBook) -> forBook.size }}")
       // The decision — which books to report and as what — is pure and lives in
-      // `DownloadOutcomes.kt` (cu-179), so it can be tested without a worker or a
+      // `DownloadOutcomes.kt`, so it can be tested without a worker or a
       // NotificationManager. This function keeps only the rendering.
       val bookStatuses = downloads.toOutcomes()
 
@@ -487,7 +487,7 @@ class DownloadNotificationWorker
       /**
        * Start [DownloadNotificationWorker] if it is not already running.
        *
-       * Takes a [Context] since cu-185: this used to reach `Injector.get().workManager()`, and the
+       * Takes a [Context] now: this used to reach `Injector.get().workManager()`, and the
        * service locator is gone. A companion function has no injection point, so the caller — which
        * is constructor-injected — passes what it already holds.
        */

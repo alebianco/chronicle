@@ -39,7 +39,7 @@ import org.robolectric.RobolectricTestRunner
  *
  * Both are small, and both have a branch that only shows up in an unusual state: the jump icons
  * fall back when the stored interval is not one of the six offered, and `addBookmark` refuses when
- * no book is playing. A bookmark is the one piece of state **no server holds a copy of** (cu-22),
+ * no book is playing. A bookmark is the one piece of state **no server holds a copy of**,
  * so an action that silently does nothing loses something unrecoverable.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -119,7 +119,7 @@ class PlayerControlsTest {
   /**
    * The fallbacks are **asymmetric on purpose** — forward lands on 30s, backward on 10s — which
    * matches the defaults and the usual listening gesture: skip a chunk ahead, nudge a little back.
-   * Pinned because a value outside the six is reachable through settings import (cu-77 validates
+   * Pinned because a value outside the six is reachable through settings import (import validates
    * keys, and these are longs written straight through), and because the asymmetry looks like a
    * typo to anyone tidying the two `when`s into one.
    */

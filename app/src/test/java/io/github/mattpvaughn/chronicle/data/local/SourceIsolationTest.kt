@@ -27,7 +27,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * cu-127's acceptance criterion: **two sources cannot merge into one list**.
+ * the acceptance criterion: **two sources cannot merge into one list**.
  *
  * Against real databases and through the real repositories, because the claim is about what a
  * *read* returns and a mocked DAO would simply return whatever it was told to. The task file says
@@ -237,7 +237,7 @@ class SourceIsolationTest {
   /**
    * The legacy scope is a real scope, not a wildcard.
    *
-   * Rows migrated from before cu-127 carry [SourceId.LEGACY_PLEX]. A connected server must not see
+   * Rows migrated from before source scoping carry [SourceId.LEGACY_PLEX]. A connected server must not see
    * them as its own until a refresh adopts them — otherwise the migration would silently merge an
    * upgrading user's old library into whichever server they happen to connect to next.
    */
@@ -257,7 +257,7 @@ class SourceIsolationTest {
    * `Audiobook.id` remains the sole primary key, so two servers holding the same Plex rating key
    * still collide: the second insert replaces the first, whatever its source. decision-21 chose
    * this deliberately over a composite `(id, source)` key, whose cost is that every id parse and
-   * format site becomes load-bearing — cu-71's lesson.
+   * format site becomes load-bearing — the lesson.
    *
    * Scoping the reads is still worth having on its own: it removes the *union*, which is what a
    * user actually sees. Making two same-key books coexist is a separate, larger change, and this
@@ -283,7 +283,7 @@ class SourceIsolationTest {
    * `CachedFileManager.uncacheAllInLibrary` deletes only files whose names come from
    * `getCachedTracks()`, which is source-scoped — so clearing the `cached` flag for *every*
    * source would report another server's downloads as absent while they sat on disk, invisible
-   * both to the user and to cu-81's prune, which only removes files it can account for.
+   * both to the user and to the orphaned-file prune, which only removes files it can account for.
    */
   @Test
   fun `forgetting downloads leaves another source's downloads alone`() =
@@ -306,7 +306,7 @@ class SourceIsolationTest {
     }
 
   /**
-   * Why cu-127 does **not** move downloads to a per-source directory.
+   * Why source scoping does **not** move downloads to a per-source directory.
    *
    * decision-21 specified `<cachedMediaDir>/<sourceId>/<trackId>.<ext>`, on the grounds that two
    * servers can mint the same track id and so the same filename. That is true of the *ids*, but
@@ -315,10 +315,10 @@ class SourceIsolationTest {
    * only ever written for a row that exists. One row means one filename.
    *
    * So the path change would buy nothing today while touching four file paths that each carry
-   * documented data-loss history: cu-85 (an unreadable directory must change nothing), cu-81 (the
-   * prune only scans the active directory), cu-153 (a partial and a finished download are
-   * indistinguishable by name, so a move must carry both), and cu-76 (a partial must not be
-   * promoted to "downloaded"). Its failure mode is deleted audio, not a wrong list.
+   * documented data-loss history: an unreadable directory must change nothing, the
+   * prune only scans the active directory, a partial and a finished download are
+   * indistinguishable by name so a move must carry both, and a partial must not be
+   * promoted to "downloaded". Its failure mode is deleted audio, not a wrong list.
    *
    * This test is the record of that reasoning, and the tripwire: it fails the moment the primary
    * key stops being the thing that prevents the collision — which is exactly when the per-source

@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * When a book switch must flush the outgoing position (cu-91).
+ * When a book switch must flush the outgoing position.
  *
  * The old implementation in `AudiobookDetailsViewModel` tested the *opposite* of this and had no
  * tests, so both of its failure modes were invisible: a stray STOPPED report on an ordinary
@@ -63,7 +63,7 @@ class OutgoingBookFlushTest {
   }
 
   /**
-   * Ids are Strings and need not be numeric (cu-71, decision-11), so the comparison must be by
+   * Ids are Strings and need not be numeric (decision-11), so the comparison must be by
    * value with no parsing.
    */
   @Test

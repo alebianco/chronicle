@@ -102,7 +102,8 @@ ktlint gate, and a new worktree fails every Gradle task with "SDK location not f
 4. **Docs are synced in the same PR** as the behaviour they describe.
 5. **A UI change is not done until it is installed and screenshotted in *both* orientations.** Say
    which build you verified. 1301 green tests once missed "No books found" over a full library, and
-   cu-141/cu-142/cu-19 were all landscape-only bugs.
+   the landscape player hiding book-level progress, the speed popover collapsing to its title bar in
+   landscape, and chapter-aware progress display were all landscape-only bugs.
 
 ## Working in this shell
 

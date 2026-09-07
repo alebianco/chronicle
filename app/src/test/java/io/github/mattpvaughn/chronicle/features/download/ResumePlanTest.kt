@@ -11,7 +11,7 @@ import org.junit.Test
 /**
  * What resumes after an interrupted download, and — more importantly — what does not.
  *
- * Before cu-76 the retry limit was 1, so a Wi-Fi blip mid-download ended a book for good and
+ * Before this, the retry limit was 1, so a Wi-Fi blip mid-download ended a book for good and
  * nothing ever re-enqueued it. Raising the limit only helps while the app is running; a download
  * that already exhausted its retries sits at [Status.FAILED], and Fetch2 will not touch it again
  * without an explicit `retry`. `resumeAll()` does not cover those, which is the gap this closes.

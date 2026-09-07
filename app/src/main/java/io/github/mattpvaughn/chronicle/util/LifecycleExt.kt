@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /**
  * The identity of a book list *as the UI draws it*: id, cached state and progress.
  *
- * The key for `distinctUntilChangedBy` on every shelf and list query (cu-110). Room invalidates per
+ * The key for `distinctUntilChangedBy` on every shelf and list query. Room invalidates per
  * **table**, so every query on `Audiobook` re-emits whenever `ProgressUpdater` writes — once a
  * second during playback — and each emission rebuilds a list and deserializes `Audiobook.chapters`
  * for every book in it. Measured on Home: 88% janky frames and a GC every ~4s.
@@ -44,7 +44,7 @@ open class Event<out T>(private val content: T) {
  * Publishes [value] as a fresh [Event].
  *
  * Assigns rather than posts, which is the point: a `StateFlow` write lands immediately, so a reader
- * in the same main-loop pass sees it (cu-52). The receiver is nullable because "no event yet" is a
+ * in the same main-loop pass sees it. The receiver is nullable because "no event yet" is a
  * real state — seeding one of these with a blank `Event` would make a fresh screen hold an event
  * that never happened.
  */

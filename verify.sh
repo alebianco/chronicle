@@ -85,14 +85,14 @@ stage "lintDebug — Android lint"
 # The debug and release source sets each provide their own DebugHooks object, and only the
 # release variant catches a twin that has drifted — DebugHooksContract makes the compiler check
 # the shape, but it can only check the variant being built. Everything above builds debug only,
-# so without this a release-only break lands green and fails the first release build (cu-70).
+# so without this a release-only break lands green and fails the first release build.
 stage "compileReleaseKotlin — release variant compiles"
 "$GRADLE" compileReleaseKotlin
 
 # Opt-in, not part of the default gate: it provisions two emulators and takes minutes rather
 # than seconds, which would wreck the inner loop. The unit gate must stay fast enough to run on
 # every edit. Run this before a release, or when touching Activity/Fragment lifecycle, the media
-# session, or anything the unit suite structurally cannot reach (cu-54).
+# session, or anything the unit suite structurally cannot reach.
 if [ "$INSTRUMENTED" = true ]; then
   stage "instrumentedCheckGroup — Espresso on API 27 and 35"
   "$GRADLE" instrumentedCheckGroupGroupDebugAndroidTest

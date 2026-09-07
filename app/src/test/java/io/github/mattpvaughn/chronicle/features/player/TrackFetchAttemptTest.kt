@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The retry budget on the empty-track playback path (cu-97).
+ * The retry budget on the empty-track playback path.
  *
  * Found by review rather than on the device: it needs a book that resolves to zero tracks *after* a
  * successful fetch, so it never came up in ordinary use. The consequence if the budget is wrong is

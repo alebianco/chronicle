@@ -9,15 +9,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The singleton resolves its chapter list table-first (cu-82).
+ * The singleton resolves its chapter list table-first.
  *
  * This is the highest-leverage of the four read sites: `CurrentlyPlayingViewModel`'s six reads all
  * go through `currentlyPlaying.book.value.chapters` — *this* resolved field — so they move with it
  * rather than needing six separate changes.
  *
  * Rows are passed **in** rather than read from a DAO here. `update` is called once a second by
- * `ProgressUpdater` from the playback path, so giving this class a DAO would put a blocking read on
- * that tick — the exact shape cu-110 removed. All three callers already run in IO context.
+ * `ProgressUpdater` from the playback path, so giving this class a DAO would put a blocking read
+ * on that tick — the exact shape the StateFlow migration removed. All three callers already run
+ * in IO context.
  */
 class CurrentlyPlayingChapterSourceTest {
   private fun track(
@@ -44,7 +45,7 @@ class CurrentlyPlayingChapterSourceTest {
   /**
    * Real chapter rows beat the per-track derivation.
    *
-   * The legacy column was the middle level here until cu-159 dropped it; what is left is the
+   * The legacy column was the middle level here until it was dropped; what is left is the
    * distinction that still matters — a book with real chapters must not fall back to one chapter
    * per track, which is what `asChapterList()` produces.
    */
@@ -61,7 +62,7 @@ class CurrentlyPlayingChapterSourceTest {
     assertEquals("from table", s.chapter.value.title)
   }
 
-  /** cu-13's fallback, which is permanent: a server reporting no chapters has nothing to use. */
+  /** the fallback, which is permanent: a server reporting no chapters has nothing to use. */
   @Test
   fun `tracks remain the last resort`() {
     val s = CurrentlyPlayingSingleton()

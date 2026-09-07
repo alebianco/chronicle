@@ -9,7 +9,7 @@ import com.tonyodev.fetch2.Status
  * Exists so the decision is testable. [io.github.mattpvaughn.chronicle.data.sources.plex.CachedFileManager]
  * resolves `Injector.get().externalDeviceDirs()` in a field initialiser, so constructing one needs
  * a live `ChronicleApplication` and the whole Dagger graph — the same reason `ProgressReporter` was
- * split out of `PlexSyncScrobbleWorker` (cu-9). The manager keeps the Fetch2 plumbing; the
+ * split out of `PlexSyncScrobbleWorker`. The manager keeps the Fetch2 plumbing; the
  * judgement lives here.
  */
 object ResumePlan {

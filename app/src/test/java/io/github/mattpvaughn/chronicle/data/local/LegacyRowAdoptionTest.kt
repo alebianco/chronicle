@@ -33,7 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Rows migrated from before cu-127 are adopted by the first server that connects.
+ * Rows migrated from before the source-scoping change are adopted by the first server that connects.
  *
  * The migrations write [SourceId.LEGACY_PLEX] because the real server id is not knowable from
  * inside a `SupportSQLiteDatabase`. Without something to claim them, an upgrading user's whole
@@ -117,10 +117,10 @@ class LegacyRowAdoptionTest {
       dispatchers = TestDispatcherProvider(),
     )
 
-  // ---- collections (cu-197) ----
+  // ---- collections ----
 
   /**
-   * The cu-197 bug, as a test.
+   * The hardcoded-`SourceId.UNKNOWN` bug, as a test.
    *
    * `Collection.from` hardcoded `SourceId.UNKNOWN` and the repository never resolved a real one,
    * while `getAllCollections` and `hasCollections` both filter by `currentSourceId`. So every
@@ -226,7 +226,7 @@ class LegacyRowAdoptionTest {
 
   /**
    * An unresolved scope writes nothing rather than filing rows under a key no later refresh can
-   * match — the same rule `planIngestion` applies to books (cu-127). `UNKNOWN` reaches here
+   * match — the same rule `planIngestion` applies to books. `UNKNOWN` reaches here
    * mid-login or after a `clear()`.
    */
   @Test

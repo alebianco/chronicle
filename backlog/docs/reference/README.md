@@ -52,13 +52,13 @@ If you're new to the project, we recommend reading the documentation in order:
 ## Key Technologies
 
 - **Language**: Kotlin 2.2.10 (minSdk 27, target/compileSdk 36)
-- **UI**: **Compose**, all of it ([[decision-22]]; cu-181 → cu-206). No layouts, no Fragments, no ViewBinding. DataBinding was removed in cu-58 and LiveData in cu-52 — UI state is `StateFlow`.
+- **UI**: **Compose**, all of it ([[decision-22]]). No layouts, no Fragments, no ViewBinding. DataBinding was removed and LiveData too — UI state is `StateFlow`.
 - **Async**: Coroutines with an injected `DispatcherProvider` (never `Dispatchers.*` directly, never `GlobalScope`)
 - **Dependency Injection**: Dagger 2.57.2, hand-rolled components, via **KSP** (not KAPT)
 - **Database**: Room 2.8.1 — **five** databases, each with its own version and migration list
 - **Media Playback**: Media3 1.11.0 (ExoPlayer + MediaSession + Cast)
 - **Networking**: Retrofit + OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`)
-- **Image Loading**: **Coil 3** (Fresco and Glide were both removed in cu-43)
+- **Image Loading**: **Coil 3** (Fresco and Glide were both removed)
 - **Downloads**: Fetch2
 
 ## Platform notes

@@ -10,7 +10,7 @@
 # The second exists because the aggregate cannot see *where* coverage sits, and
 # in this codebase it sits backwards: `data/model` is above 80% while
 # `features/collections` and `features/home` are at 0%, and the average passes.
-# A package can therefore rot to nothing while the total rises (cu-135).
+# A package can therefore rot to nothing while the total rises.
 #
 # Both baselines are plain committed files, so the gate is forge-agnostic and
 # every movement shows up in a diff for review (decision-12 rule 6: file over

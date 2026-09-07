@@ -21,7 +21,7 @@ import org.robolectric.RobolectricTestRunner
  *
  * A Plex token can be invalidated server-side while the user's choice of server and library remains
  * perfectly good, so recovery should be one OAuth PIN — not re-picking a library they already
- * picked, and certainly not losing downloads. Before cu-84 the only path was a full logout.
+ * picked, and certainly not losing downloads. Before this, the only path was a full logout.
  *
  * These exercise the prefs layer directly rather than through `PlexLoginRepo`, which resolves
  * collaborators through Dagger; what matters here is precisely *which fields survive*.

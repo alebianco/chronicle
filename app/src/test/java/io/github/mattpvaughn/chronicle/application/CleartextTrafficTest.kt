@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Pins the cu-42 outcome: no blanket cleartext, and a network security config that is
+ * Pins the outcome: no blanket cleartext, and a network security config that is
  * actually wired to the manifest.
  *
  * `usesCleartextTraffic="true"` permitted plaintext HTTP to *any* host, so a hijacked

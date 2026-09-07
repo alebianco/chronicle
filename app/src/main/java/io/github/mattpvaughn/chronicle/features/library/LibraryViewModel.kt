@@ -110,7 +110,7 @@ class LibraryViewModel
     /**
      * The chosen sort key.
      *
-     * Public since cu-206: the filter panel is Compose now, so it renders the selected chip from
+     * Public now that the filter panel is Compose: it renders the selected chip from
      * this rather than reading `prefsRepo.bookSortKey` once. A direct property read is not
      * observable — the chip would show whatever was stored when the sheet opened and never move.
      */
@@ -121,7 +121,7 @@ class LibraryViewModel
     // Deduped at the source: this is the *whole library*, and Room re-emits it on every write to
     // the Audiobook table — once a second during playback. Without this the sort and filter below
     // ran per tick over every book, scaling with library size rather than with what changed
-    // (cu-110, and the mechanism behind cu-51).
+    // (the same per-tick Room invalidation fix, and the mechanism behind it).
     private val allBooks = bookRepository.getAllBooks().distinctUntilChangedBy { it.booksKey() }
     val books: Flow<List<Audiobook>> =
       combineDistinctAsync(
@@ -165,7 +165,7 @@ class LibraryViewModel
       }
         // Keyed on `booksKey()` — id, cached and progress — not on the list's own `equals`. Ids alone
         // made the old hand-rolled version hold the *stale* list for any change that kept the same
-        // books, so a book's progress bar in the library never moved (cu-110). This replaces the
+        // books, so a book's progress bar in the library never moved. This replaces the
         // `prevBooks` field that version compared by hand.
         .distinctUntilChangedBy { it.booksKey() }
 
@@ -174,7 +174,7 @@ class LibraryViewModel
       get() = _messageForUser
 
     /**
-     * Typo-tolerant grouped search (cu-25).
+     * Typo-tolerant grouped search.
      *
      * The four fields this used to hold by hand live in the controller now, shared with the home and
      * collections screens — they each had their own copy of the same logic.
@@ -187,7 +187,7 @@ class LibraryViewModel
     val isQueryEmpty: StateFlow<Boolean>
       get() = searchController.isQueryEmpty
 
-    /** The search field's text (cu-206) — see [SearchController.query]. */
+    /** The search field's text — see [SearchController.query]. */
     val searchQuery: StateFlow<String>
       get() = searchController.query
 
@@ -214,7 +214,7 @@ class LibraryViewModel
       searchController.setSearchActive(isSearchActive)
     }
 
-    /** Searches for books which match the provided text, typo-tolerantly and grouped (cu-25). */
+    /** Searches for books which match the provided text, typo-tolerantly and grouped. */
     fun search(query: String) {
       searchController.search(query)
     }
@@ -312,7 +312,7 @@ class LibraryViewModel
     }
 
     /**
-     * Everything the library grid renders, as one value (cu-201).
+     * Everything the library grid renders, as one value.
      *
      * The Fragment gated three views on `books.isEmpty()` and `isOffline` through two cached locals
      * — the pattern `CollectorCachesItsValueTest` guards, because discarding a collector's emission

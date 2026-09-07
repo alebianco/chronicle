@@ -32,8 +32,8 @@ passes"* and *"...and keeps the higher floor"*.
 
 The memory was written from a **real symptom** (a coverage number that would not reproduce) with
 the **wrong mechanism** attached. The real cause was a stale `UP-TO-DATE` JaCoCo report — the same
-trap as `--rerun-tasks`. The consequence was cu-204, a task filed to fix a defect that does not
-exist. And cu-135 had already been filed and closed for the same wrong reason once before.
+trap as `--rerun-tasks`. The consequence was a task filed to fix a defect that does not
+exist. And another task had already been filed and closed for the same wrong reason once before.
 
 An automatic writer would have produced that memory. It had everything such a writer keys on: a
 surprising observation, a confident diagnosis, a concrete file. Nothing in a summarisation step

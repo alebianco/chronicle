@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The bookmark list (cu-22, migrated in cu-203).
+ * The bookmark list (migrated to Compose).
  *
  * `BookmarkListAdapter` had its own test; this asserts the same behaviours plus the empty state,
  * which lived in the *host* fragment as two `isVisible` writes and so had no test at all.
@@ -56,7 +56,7 @@ class BookmarkListTest {
   }
 
   /**
-   * The position is `formatPrecisePosition`, not a raw `h:mm:ss` pair (cu-19).
+   * The position is `formatPrecisePosition`, not a raw `h:mm:ss` pair.
    *
    * 1:02:33 into the book, shown the way the player shows a position.
    */

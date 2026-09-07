@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.player
 
 /**
- * Turns a playback failure into something a log dump or a toast can actually act on (cu-103).
+ * Turns a playback failure into something a log dump or a toast can actually act on.
  *
  * `ExoPlaybackException.message` is the type name — for a streamed book it is almost always the
  * bare string `"Source error"`, which says only "something upstream failed". The fact worth having

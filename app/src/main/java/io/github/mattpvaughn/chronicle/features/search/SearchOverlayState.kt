@@ -1,12 +1,12 @@
 package io.github.mattpvaughn.chronicle.features.search
 
 /**
- * What the search overlay is showing, for the three screens that carry one (cu-202).
+ * What the search overlay is showing, for the three screens that carry one.
  *
  * Library, home and collections each wrote this out as two or three `isVisible` decisions over the
  * same three flows — and they had already drifted: library showed a "no results" message, home
- * never did. Extracting the decision is the same move as `chapterRows` and `progressState()` in
- * cu-201: two screens rendering one thing must not disagree about it.
+ * never did. Extracting the decision is the same move as `chapterRows` and `progressState()`:
+ * two screens rendering one thing must not disagree about it.
  */
 sealed interface SearchOverlayState {
   /** The search field is closed. The screen behind shows through untouched. */

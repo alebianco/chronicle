@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * What a notification actually renders, and therefore when a rebuild is redundant (cu-157).
+ * What a notification actually renders, and therefore when a rebuild is redundant.
  *
  * Measured on the tablet before writing this: starting playback of a 107-track book produced **29**
  * notification builds. Two independent causes, and the dedup the task imagined would have hidden

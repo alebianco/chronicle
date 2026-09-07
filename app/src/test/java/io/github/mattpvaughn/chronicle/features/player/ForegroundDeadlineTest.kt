@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The foreground-service deadline (cu-137).
+ * The foreground-service deadline.
  *
  * `startForeground` must be called within 5 s of the service starting or Android 12+ throws
  * `ForegroundServiceDidNotStartInTimeException` (an ANR on older releases). Every call site posted
@@ -71,7 +71,7 @@ class ForegroundDeadlineTest {
   private fun sessionToken(): MediaSessionCompat.Token =
     MediaSessionCompat(
       ApplicationProvider.getApplicationContext(),
-      "cu-137",
+      "the foreground deadline",
     ).sessionToken
 
   /**
@@ -86,7 +86,7 @@ class ForegroundDeadlineTest {
       val notification: Notification? = builder().buildNotificationWithoutArtwork(sessionToken())
 
       assertNotNull(
-        "startForeground must not wait on the cover-art fetch (cu-137)",
+        "startForeground must not wait on the cover-art fetch",
         notification,
       )
     }

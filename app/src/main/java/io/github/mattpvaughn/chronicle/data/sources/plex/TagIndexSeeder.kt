@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
- * Which tag carries which field, by the Audnexus convention (cu-24).
+ * Which tag carries which field, by the Audnexus convention.
  *
  * The filter names are Plex's own — the path segment its filter endpoints take — and are not the
  * same as the response keys (`Style`/`Mood`), which is a trap worth naming: the *request* wants
@@ -34,9 +34,9 @@ data class TagAssociation(
 )
 
 /**
- * Fills in narrator and series for the whole library, without a request per book (cu-143).
+ * Fills in narrator and series for the whole library, without a request per book.
  *
- * **Why this exists.** `Style` and `Mood` are detail-only: the library listing omits them (cu-24),
+ * **Why this exists.** `Style` and `Mood` are detail-only: the library listing omits them,
  * so before this the only way to learn a book's narrator was to open it. A fresh install therefore
  * had an almost-empty facet index, and `FacetList.unknownCount` existed to admit as much.
  *
@@ -61,11 +61,11 @@ class TagIndexSeeder(
   private val dispatchers: DispatcherProvider,
 ) {
   /**
-   * Reads narrator **and** series for [bookIds] in a handful of requests (cu-156, "Route B").
+   * Reads narrator **and** series for [bookIds] in a handful of requests ("Route B").
    *
    * The cheap path. One multi-id metadata request answers both fields for a whole batch of books,
    * where [readAssociations] needs `1 + N` per field: measured against the household server,
-   * **196 books in one request, 0.196 s** versus 185 requests for narrators alone (cu-150).
+   * **196 books in one request, 0.196 s** versus 185 requests for narrators alone.
    *
    * Returns the same [TagAssociation] shape as the `1 + N` walk, so `withSeededTags` and its
    * never-overwrite rule are untouched and the two routes are interchangeable.
@@ -91,7 +91,7 @@ class TagIndexSeeder(
             plexMediaService.retrieveAlbums(batch.joinToString(separator = ","))
               .plexMediaContainer.metadata
           } catch (t: Throwable) {
-            // Ids only: a list of directories is a collection-shaped log (cu-134), and which books
+            // Ids only: a list of directories is a collection-shaped log, and which books
             // were asked for is the whole diagnostic.
             Timber.i("Multi-id metadata failed for ${batch.size} books (first ${batch.take(3)}): $t")
             null
@@ -128,7 +128,7 @@ class TagIndexSeeder(
    * Reads every value of [filter] and the books carrying each — the `1 + N` walk ("Route A").
    *
    * Kept as the fallback for [readAssociationsByIds], since the multi-id endpoint is
-   * spec-documented rather than guaranteed across Plex versions (cu-156).
+   * spec-documented rather than guaranteed across Plex versions.
    *
    * Failures are **per value**, not fatal: a library with forty narrators should index
    * thirty-nine of them if one listing fails, rather than none. A failure to enumerate at all
@@ -185,7 +185,7 @@ class TagIndexSeeder(
  * Applies tag associations to the books that have not learned them yet.
  *
  * Pure, so the merge rule is testable without a server — and the rule is the delicate part. It
- * mirrors `Audiobook.merge`'s third rule (cu-24): a value learned from the *detail* response is
+ * mirrors `Audiobook.merge`'s third rule: a value learned from the *detail* response is
  * authoritative and must not be overwritten by this coarser source, but a book that knows nothing
  * takes what the index offers.
  *

@@ -13,7 +13,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The bookmark note editor (cu-206).
+ * The bookmark note editor.
  *
  * One of the three screens still written in Views before this task, and the only one with no
  * ViewModel at all — arguments in, a `Listener` out. That shape translates directly to parameters
@@ -72,7 +72,7 @@ class BookmarkNoteSheetTest {
     assertEquals("deleting must not also save", null, saved)
   }
 
-  /** The position is human-formatted (cu-19), never a raw `h:mm:ss/h:mm:ss` pair. */
+  /** The position is human-formatted, never a raw `h:mm:ss/h:mm:ss` pair. */
   @Test
   fun `the title carries the formatted position`() {
     setContent()

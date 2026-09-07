@@ -11,14 +11,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * What a finished batch of downloads reports (cu-179).
+ * What a finished batch of downloads reports.
  *
  * Extracted from `DownloadNotificationWorker`, which could not be constructed in a unit test at all
  * until this task — it resolved `Injector.get()` in a field initialiser, and `Injector.get()` is
  * `ChronicleApplication.get()`, whose `INSTANCE!!` throws. 1,420 instructions at 0%.
  *
  * Each rule here exists because of a way the notification was wrong, and every one of them is the
- * same family of defect as cu-81, cu-85 and cu-153: **downloads that go missing while the app
+ * same family of defect, hit three separate times: **downloads that go missing while the app
  * claims success**.
  */
 class DownloadOutcomesTest {
@@ -53,8 +53,8 @@ class DownloadOutcomesTest {
 
   /**
    * The rule that matters most. A book whose tracks partly failed is **not downloaded**, and
-   * reporting it complete is exactly the shape of cu-81/cu-85/cu-153 — the user believes they have
-   * offline audio they do not have, and finds out on a train.
+   * reporting it complete is exactly the shape hit three separate times — the user believes they
+   * have offline audio they do not have, and finds out on a train.
    */
   @Test
   fun `one failed track makes the whole book failed`() {

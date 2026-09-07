@@ -95,7 +95,7 @@ class CollectionsViewModel
      * The sorted collections.
      *
      * `combineDistinctAsync` rather than the old `QuadLiveDataAsync`: the sort is O(n log n) and ran
-     * on every Room re-emission, which is once a second during playback (cu-110). The dedup that
+     * on every Room re-emission, which is once a second during playback. The dedup that
      * `prevCollections` used to do by hand — comparing id lists and returning the previous instance —
      * is now `distinctUntilChanged` inside the combinator, so the mutable field is gone with it.
      *
@@ -123,7 +123,7 @@ class CollectionsViewModel
 
     /**
      * Everything [io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsScreen]
-     * renders, as one value (cu-187).
+     * renders, as one value.
      *
      * The Fragment used to read six flows and push each into a view independently, so three
      * `isVisible` assignments decided between "empty", "offline and empty" and "populated" — and
@@ -133,7 +133,7 @@ class CollectionsViewModel
      * [CollectionsContent] makes that state unrepresentable rather than merely unlikely.
      *
      * `WhileSubscribed` is right here: nothing reads `.value` without collecting, and dropping the
-     * Room subscription when the screen goes is the point (cu-110).
+     * Room subscription when the screen goes is the point.
      *
      * `serverConnected` is deliberately **not** part of this state: it belongs to `PlexConfig`, which
      * the Fragment already holds, and folding it in would need a five-source combinator for a field
@@ -166,7 +166,7 @@ class CollectionsViewModel
     val messageForUser: StateFlow<Event<String>?>
       get() = _messageForUser
 
-    /** Typo-tolerant grouped search, shared with the library and home screens (cu-25). */
+    /** Typo-tolerant grouped search, shared with the library and home screens. */
     private val searchController = SearchController(bookRepository, viewModelScope)
 
     val searchRows: StateFlow<List<SearchRow>>
@@ -175,7 +175,7 @@ class CollectionsViewModel
     val isQueryEmpty: StateFlow<Boolean>
       get() = searchController.isQueryEmpty
 
-    /** The search field's text (cu-206) — see [SearchController.query]. */
+    /** The search field's text — see [SearchController.query]. */
     val searchQuery: StateFlow<String>
       get() = searchController.query
 
@@ -188,7 +188,7 @@ class CollectionsViewModel
       searchController.setSearchActive(isSearchActive)
     }
 
-    /** Searches for books which match the provided text, typo-tolerantly and grouped (cu-25). */
+    /** Searches for books which match the provided text, typo-tolerantly and grouped. */
     fun search(query: String) {
       searchController.search(query)
     }

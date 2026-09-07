@@ -24,7 +24,7 @@ import org.robolectric.RobolectricTestRunner
  *
  * `toMediaItem` is what `onLoadChildren` hands the car, and `toAlbumMediaMetadata` is what the
  * session publishes — so a wrong field here is a wrong title or a missing cover on a head unit,
- * which is the hardest surface to inspect. cu-23 found a live crash in this area for exactly that
+ * which is the hardest surface to inspect. A live crash was found in this area for exactly that
  * reason (`mediaController.metadata` is platform-typed and was dereferenced unguarded).
  *
  * Robolectric rather than a plain JVM test: `MediaDescriptionCompat`, `Bundle` and

@@ -30,13 +30,13 @@ below compiles against the current codebase.
 **Entity** (`data/model/Audiobook.kt`). A flag the server knows nothing about is a **local-only
 column**, and that has a specific hazard: a library refresh merges a network copy without loading
 tracks, and the field is always the default on that copy. So it must be named in **both** arms of
-`Audiobook.merge` or every refresh wipes it (cu-20). `progress` and `playbackSpeed` document the
+`Audiobook.merge` or every refresh wipes it. `progress` and `playbackSpeed` document the
 same rule.
 
 ```kotlin
 @Entity
 data class Audiobook(
-    @PrimaryKey val id: String,   // String, not Int (cu-71)
+    @PrimaryKey val id: String,   // String, not Int
     // ...
     val favorited: Boolean = false,
 )
@@ -69,8 +69,8 @@ fail proves nothing.
 suspend fun updateFavorited(bookId: String, favorited: Boolean)
 ```
 
-A read returning *rows* must also filter by `source`, or `ScopedQueryTest` fails the build
-(cu-127). A query keyed on the primary key, as above, is exempt.
+A read returning *rows* must also filter by `source`, or `ScopedQueryTest` fails the build.
+A query keyed on the primary key, as above, is exempt.
 
 **Repository.** Take the dispatcher as an injected `DispatcherProvider` — never `Dispatchers.IO`
 directly, which `RepositoryDispatcherTest` fails the build on.
@@ -134,12 +134,12 @@ the event is consumed either way.
 **Seed a cold flow with a state that cannot be mistaken for data.** The first-frame flash of the
 ViewBinding era is gone with XML, but its cause survives in a new shape: a `stateIn` seed that is a
 *real-looking value* renders as one. `FacetList.EMPTY` showed "No narrators yet" before the first
-grouping ran. That is why screens seed a sealed `Loading` rather than an empty result (cu-201,
-cu-202) — make the pre-emission state unrepresentable, not plausible.
+grouping ran. That is why screens seed a sealed `Loading` rather than an empty result —
+make the pre-emission state unrepresentable, not plausible.
 
 **Cover art goes through `CoverImage`**, never a bare `AsyncImage`. A bare call sets no
 `placeholder`/`error`/`fallback`, so a failed load renders as *nothing* — a hole in the layout that
-no semantics assertion can see. `CoverImageTest` fails the build on one (cu-207).
+no semantics assertion can see. `CoverImageTest` fails the build on one.
 
 ### 4. Strings and tests
 
@@ -160,7 +160,7 @@ flow-shaped.
 ### Adding a New Screen
 
 Screens are **Compose** ([[decision-22]]), routed by **Navigation Compose** — there are no Fragments
-and no layouts (cu-206).
+and no layouts.
 
 The split is deliberate and worth keeping: a `*Screen` is a **pure function of its state**, which is
 what makes it testable by asserting on what it renders; a `*Destination` is the only part that knows
@@ -253,7 +253,7 @@ override var newSetting: Boolean
 3. **Decide whether it is backed up.** If the setting should survive a restore, add its key to
    `BACKUP_SETTING_KEYS`. Two rules: never enumerate `sharedPreferences.all` into an export — the
    allowlist is what keeps a credential out — and the allowlist gates **keys, not values**, so a
-   setting with a closed set of valid options must be validated on import (cu-77).
+   setting with a closed set of valid options must be validated on import.
 
 4. **Read it** through the injected `prefsRepo`. To react to changes, use `util/PreferenceFlow.kt`
    rather than reading the value once.
@@ -301,7 +301,7 @@ suspend fun fetchNewData(): List<NewItem> = withContext(Dispatchers.IO) {
 ```kotlin
 @Entity
 data class NewEntity(
-    // String, not Int: ids are backend-neutral since cu-71 so a non-numeric backend
+    // String, not Int: ids are backend-neutral so a non-numeric backend
     // (Audiobookshelf UUIDs, local file paths) can be represented. Any DAO parameter
     // bound against this column must also be String — a numeric bind silently matches
     // no row, because SQLite compares across storage classes without erroring.
@@ -355,11 +355,11 @@ val BOOK_MIGRATION_14_15 = object : Migration(14, 15) {
 1. **Follow Existing Patterns**: Look at similar features for guidance
 2. **Keep ViewModels Thin**: Heavy logic goes in Repositories
 3. **Use StateFlow for UI**: expose `StateFlow` from ViewModels and collect it with
-   `collectWhileStarted`. There is no `LiveData` in this codebase (cu-52), and `postValue` is
+   `collectWhileStarted`. There is no `LiveData` in this codebase, and `postValue` is
    banned by `PostValueUsageTest`
 4. **Handle Errors**: Try-catch in Repositories, show messages in ViewModels
 5. **Test Incrementally**: Test each layer as you build it
-6. **Write new UI in Compose** ([[decision-22]]); there is no DataBinding (cu-58)
+6. **Write new UI in Compose** ([[decision-22]]); there is no DataBinding
 7. **Keep UI Thread Free**: All heavy work in background threads
 8. **Log Important Events**: Use Timber for debugging
 9. **Handle Loading States**: Show progress indicators during async operations

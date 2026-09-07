@@ -50,7 +50,7 @@ class BookRepositoryRefreshTest {
   private val plexPrefsRepo =
     mockk<PlexPrefsRepo>(relaxed = true) {
       every { library } returns PlexLibrary(name = "Books", type = MediaType.ARTIST, id = "1")
-      // The scoping key the repository resolves (cu-127). Without it `currentSourceId` is
+      // The scoping key the repository resolves. Without it `currentSourceId` is
       // SourceId.UNKNOWN, which matches no fixture row, and every removal assertion below would
       // pass vacuously by removing nothing.
       every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)
@@ -111,10 +111,10 @@ class BookRepositoryRefreshTest {
     isCached: Boolean = false,
   ) = Audiobook(
     id = id,
-    // MEDIA_SOURCE_ID_PLEX, not an arbitrary 1L (cu-80). Every real book carries 0 — verified
+    // MEDIA_SOURCE_ID_PLEX, not an arbitrary 1L. Every real book carries 0 — verified
     // against the household server's 196 rows — and a fixture with a different source is invisible
     // to the source-scoped removal a refresh now performs, so these tests silently stopped
-    // exercising deletion at all. The cu-24 fixture trap in a new field.
+    // exercising deletion at all. The same fixture trap, in a new field.
     source = TEST_SOURCE,
     title = title,
     progress = progress,

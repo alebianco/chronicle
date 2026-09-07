@@ -69,7 +69,7 @@ class MediaPlayerService :
   SleepTimer.SleepTimerBroadcaster {
   val serviceJob: CompletableJob = SupervisorJob()
 
-  // Keeps `Dispatchers.Main` rather than an injected provider (cu-72). `ServiceModule` provides this
+  // Keeps `Dispatchers.Main` rather than an injected provider. `ServiceModule` provides this
   // very scope to the Dagger graph (`fun serviceScope() = service.serviceScope`), so it must exist
   // *before* injection runs — a field initialiser cannot read an injected dispatcher without a
   // circular dependency. Main is also correct here regardless: this scope drives MediaSession and
@@ -221,7 +221,7 @@ class MediaPlayerService :
   /**
    * Fetches the cover art and re-posts the notification with it attached.
    *
-   * The second half of the cu-137 split: [NotificationBuilder.buildNotificationWithoutArtwork]
+   * The second half of the notification-artwork split: [NotificationBuilder.buildNotificationWithoutArtwork]
    * satisfies the foreground deadline, this fills in the picture whenever the network gets round
    * to it. Re-posting through `startForeground` with the same id updates the existing notification
    * — the service is already foreground by the time this runs, so this is an update, not a second
@@ -236,9 +236,9 @@ class MediaPlayerService :
 
     // Nothing to add: the synchronous build above already attached the cached bitmap, since
     // `buildNotificationWithoutArtwork` calls `setLargeIcon(cachedArtworkFor(...))`. Rebuilding to
-    // attach art that is already there is the other half of cu-157's measured burst. The
+    // attach art that is already there is the other half of the measured burst. The
     // deadline-bearing builds themselves are never skipped — they are what `startForeground`
-    // requires within 5 s (cu-137).
+    // requires within 5 s.
     if (notificationBuilder.hasArtworkFor(currentlyPlaying.book.value)) {
       return
     }
@@ -250,7 +250,7 @@ class MediaPlayerService :
     super.onCreate()
 
     // After `super.onCreate()`, which is what creates the `MediaBrowserServiceImpl` this needs
-    // (cu-185). It used to happen inside the `mediaSession` provider, which Hilt now runs before
+    // . It used to happen inside the `mediaSession` provider, which Hilt now runs before
     // super — so the token has to be published here instead.
     sessionToken = mediaSession.sessionToken
 
@@ -276,7 +276,7 @@ class MediaPlayerService :
     // startForeground has to be called within 5 seconds of starting the service or the app
     // will ANR (on Android 9.0 and above, maybe earlier). Built and posted *synchronously* —
     // the artwork-bearing build awaits a network fetch that can outlast the deadline by 15 s
-    // (cu-137), so the cover is attached by the follow-up below instead.
+    // , so the cover is attached by the follow-up below instead.
     startForeground(
       NOW_PLAYING_NOTIFICATION,
       notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken),
@@ -292,7 +292,7 @@ class MediaPlayerService :
 
     invalidatePlaybackParams()
     observeBookSpeedOverride()
-    // The session's position is chapter-relative for the scrubber (cu-165); progress is stored per
+    // The session's position is chapter-relative for the scrubber; progress is stored per
     // track, so the updater reads the player instead.
     (progressUpdater as? SimpleProgressUpdater)?.trackPosition = { currentPlayer?.currentPosition ?: 0L }
     progressUpdater.startRegularProgressUpdates()
@@ -322,13 +322,13 @@ class MediaPlayerService :
   }
 
   /**
-   * Re-applies playback params when the book changes or its speed override does (cu-20).
+   * Re-applies playback params when the book changes or its speed override does.
    *
    * Maps to just the two fields that matter and `distinctUntilChanged`s before acting.
    * [CurrentlyPlaying.book] re-emits whenever the `Audiobook` value differs, and `ProgressUpdater`
    * writes progress **once a second** during playback — so collecting the book itself would call
    * `setPlaybackParameters` at tick rate for a value that had not changed, which is the exact
-   * shape cu-110 was about.
+   * per-second-cost shape to avoid.
    */
   private fun observeBookSpeedOverride() {
     serviceScope.launch(exceptionHandler) {
@@ -393,7 +393,7 @@ class MediaPlayerService :
           // action. Feeding it back into the timer is a loop — harmless while `update` only
           // reassigned a Long to itself, but it silently overwrote the timer's mode once the state
           // carried one, turning an end-of-chapter timer into a zero-length countdown that expired
-          // on the next tick (cu-21). The timer is told what to do by the UI; it is never told
+          // on the next tick. The timer is told what to do by the UI; it is never told
           // what it just said.
           if (action != null && action != SleepTimerAction.UPDATE) {
             sleepTimer.handleAction(action, durationMillis)
@@ -433,7 +433,7 @@ class MediaPlayerService :
         mediaSessionCallback.onPlayFromMediaId(
           trackListManager.trackList.map { it.id }.firstOrNull { true }.toString(),
           // No KEY_SEEK_TO_TRACK_WITH_ID: its absence means "resume the most recently
-          // listened track", which is what ACTIVE_TRACK used to say (cu-71).
+          // listened track", which is what ACTIVE_TRACK used to say.
           Bundle().apply {
             putLong(KEY_START_TIME_TRACK_OFFSET, USE_SAVED_TRACK_PROGRESS)
           },
@@ -443,7 +443,7 @@ class MediaPlayerService :
         mediaSessionCallback.onPrepareFromMediaId(
           trackListManager.trackList.map { it.id }.firstOrNull { true }.toString(),
           // No KEY_SEEK_TO_TRACK_WITH_ID: its absence means "resume the most recently
-          // listened track", which is what ACTIVE_TRACK used to say (cu-71).
+          // listened track", which is what ACTIVE_TRACK used to say.
           Bundle().apply {
             putLong(KEY_START_TIME_TRACK_OFFSET, USE_SAVED_TRACK_PROGRESS)
           },
@@ -459,7 +459,7 @@ class MediaPlayerService :
    * Applies speed and skip-silence to the active player.
    *
    * The single writer of [PlaybackParameters], which is why the per-book speed override is
-   * resolved here (cu-20) rather than at the load path: this already runs on service start, on a
+   * resolved here rather than at the load path: this already runs on service start, on a
    * player switch and on a pref change, so one resolution covers every case. The book comes from
    * [currentlyPlaying] because the load path publishes it *after* `player.prepare()` — reading the
    * book at load time would give the outgoing one.
@@ -491,7 +491,7 @@ class MediaPlayerService :
     val playbackSpeed = player.playbackParameters.speed
     val trackPosition = if (player.playbackState == Player.STATE_IDLE) 0L else player.currentPosition
     // Auto and the notification scrub against the *chapter*, matching the title they already show
-    // (cu-165). Falls back to the track position when the book has no usable chapter.
+    // . Falls back to the track position when the book has no usable chapter.
     val position =
       chapterScrubberWindow(currentlyPlaying.bookPosition.value, currentlyPlaying.chapter.value)
         ?.positionMillis ?: trackPosition
@@ -583,7 +583,7 @@ class MediaPlayerService :
     // unannotated compat signature as platform-typed, so `.id` on it compiled and then threw
     // `NullPointerException: getMetadata(...) must not be null`. That crashed the whole process on
     // teardown for any client that bound the service and released it without playing — which is
-    // exactly what Android Auto does when it browses (cu-23).
+    // exactly what Android Auto does when it browses.
     val trackId = mediaController.metadata?.id
     if (trackId != null && trackId != TRACK_NOT_FOUND) {
       val finalPosition = currentPlayer?.currentPosition ?: 0L
@@ -667,7 +667,7 @@ class MediaPlayerService :
     // we should launch with whatever it is we have, assuming the event isn't the notification
     // itself being removed (KEYCODE_MEDIA_STOP)
     if (ke?.keyCode != KEYCODE_MEDIA_STOP) {
-      // Synchronous for the same reason as in onCreate (cu-137).
+      // Synchronous for the same reason as in onCreate.
       startForeground(
         NOW_PLAYING_NOTIFICATION,
         notificationBuilder.buildNotificationWithoutArtwork(mediaSession.sessionToken),
@@ -697,7 +697,7 @@ class MediaPlayerService :
     result.detach()
     serviceScope.launch(exceptionHandler) {
       withContext(dispatchers.io) {
-        // Categories are matched by their stable id, never by the localized label (cu-99).
+        // Categories are matched by their stable id, never by the localized label.
         when (AutoBrowseCategory.fromId(parentId)) {
           null ->
             if (parentId == CHRONICLE_MEDIA_ROOT_ID) {
@@ -823,7 +823,7 @@ class MediaPlayerService :
       override fun onPlayerError(error: PlaybackException) {
         // `error.message` is only ever the generic "Source error"; the useful part is the cause
         // chain, which names the HTTP status or IO failure that actually stopped playback. Logging
-        // the message alone is what made a mid-listen stall undiagnosable from a log dump (cu-103).
+        // the message alone is what made a mid-listen stall undiagnosable from a log dump.
         val diagnosis = describePlaybackError(error)
         Timber.e(error, "Exoplayer playback error: $diagnosis")
         val errorIntent = Intent(ACTION_PLAYBACK_ERROR)
@@ -929,15 +929,14 @@ class MediaPlayerService :
    * is already connected works, because that path builds the cast playlist. Closing the gap means
    * rebuilding the queue here from `currentlyPlaying`, and it cannot be verified without a
    * Play-services device and a receiver — neither of which exists in this development setup, so it
-   * is left explicit rather than written blind (cu-168).
+   * is left explicit rather than written blind.
    */
   private fun observeCastSessions() {
     val provider = castPlayerProviderFor(this).also { castPlayerProvider = it }
     provider.observeSessions(
       onAvailable = { castPlayer ->
         // Flush before the swap: switchToPlayer stops the outgoing player, and the per-second tick
-        // is gated on isPlaying, so an unflushed position would be lost exactly as on a pause
-        // (cu-93).
+        // is gated on isPlaying, so an unflushed position would be lost exactly as on a pause.
         flushProgressFromCurrentPlayer()
         switchToPlayer(castPlayer)
       },
@@ -952,7 +951,7 @@ class MediaPlayerService :
    * Writes the position the *player* reports, never the session's.
    *
    * `MediaSessionCompat`'s playback state lags a frame, so reading it here would overwrite a good
-   * position with a stale one — the cu-93 trap, repeated on the cast-handover path.
+   * position with a stale one, repeated on the cast-handover path.
    */
   private fun flushProgressFromCurrentPlayer() {
     val player = currentPlayer ?: return

@@ -243,7 +243,7 @@ class TrackRepositoryMergeTest {
     }
 
   /**
-   * Mark-as-read writes three fields per track, and each one is a decision (cu-86, cu-90):
+   * Mark-as-read writes three fields per track, and each one is a decision:
    * `progress = 0` because a finished book is not part-way through, `viewCount = 1` because
    * completion is an explicit fact rather than something inferred from position (decision-16), and
    * `lastViewedAt = now` so the local state wins the next merge against the server.

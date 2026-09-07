@@ -15,7 +15,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Loading a user's rules file from disk (cu-148).
+ * Loading a user's rules file from disk.
  *
  * Against a **real file**, because the states that matter are file states: absent (the default and
  * by far the commonest), unreadable, and present-but-wrong. A mocked reader would answer whatever
@@ -29,7 +29,7 @@ class SeriesIndexRulesLoaderTest {
   @get:Rule
   val folder = TemporaryFolder()
 
-  /** Codegen adapters, matching what the app ships (cu-62) rather than the reflective factory. */
+  /** Codegen adapters, matching what the app ships rather than the reflective factory. */
   private val moshi = Moshi.Builder().build()
 
   @After

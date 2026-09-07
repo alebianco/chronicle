@@ -12,10 +12,10 @@ package io.github.mattpvaughn.chronicle.features.download
  * Two rules this encodes, both of them bugs that reached the owner:
  *
  * - A scan that could not read its directory must produce **no** changes at all, rather than
- *   reporting everything absent (cu-85). That is the caller's job — it must not call this at all
+ *   reporting everything absent. That is the caller's job — it must not call this at all
  *   for an unavailable scan — and [reconcileCachedTracks] is written so an empty disk list is a
  *   genuine "nothing on disk", not a stand-in for "could not look".
- * - A file's presence is not proof it finished downloading (cu-76); the caller filters incomplete
+ * - A file's presence is not proof it finished downloading; the caller filters incomplete
  *   files out before calling, so anything reaching [onDisk] is a verified complete download.
  */
 data class CacheReconciliation(
@@ -49,9 +49,9 @@ fun reconcileCachedTracks(
 }
 
 /**
- * Which partial files are safe to delete (cu-81).
+ * Which partial files are safe to delete.
  *
- * cu-76 stopped promoting a short file to "available offline", and deliberately **left the bytes
+ * A fix stopped promoting a short file to "available offline", and deliberately **left the bytes
  * on disk** because Fetch2 resumes over HTTP Range. Nothing ever removed the ones whose download
  * was abandoned for good, so a cancelled or exhausted download leaks its bytes into
  * `cachedMediaDir` invisibly — the UI correctly reports the book as not downloaded, so nothing
@@ -62,7 +62,7 @@ fun reconcileCachedTracks(
  * true, and each rules out a different way of destroying something valuable:
  *
  * - Fetch2 has **no record** of it. A `PAUSED` or `FAILED` download is a resume candidate
- *   (cu-76's `ResumePlan`), and deleting its bytes turns a cheap range request into a full
+ *   (the `ResumePlan`), and deleting its bytes turns a cheap range request into a full
  *   re-download.
  * - The database does **not** call it cached. A complete file belongs to a book the user
  *   downloaded on purpose.
@@ -84,7 +84,7 @@ fun partialsSafeToPrune(
 }
 
 /**
- * Deletes the files [partialsSafeToPrune] chose, and reports what was reclaimed (cu-81).
+ * Deletes the files [partialsSafeToPrune] chose, and reports what was reclaimed.
  *
  * Separated from the manager so the part that actually touches the filesystem can be exercised
  * against real temp files — the decision above is set arithmetic, but "did it delete the right

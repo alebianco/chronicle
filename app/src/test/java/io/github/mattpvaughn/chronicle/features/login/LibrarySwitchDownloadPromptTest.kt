@@ -25,9 +25,9 @@ import org.junit.Test
  *
  * Settings prompts before switching; the login picker did not, so the previous library's downloads
  * were reclaimed silently at some later launch by `CachedFileManager`'s orphan pass — a
- * multi-gigabyte deletion nobody was warned about (cu-130).
+ * multi-gigabyte deletion nobody was warned about.
  *
- * The gate is cu-126's `replacedDifferentLibrary`, deliberately reused rather than joined by a
+ * The gate is the `replacedDifferentLibrary`, deliberately reused rather than joined by a
  * second signal. It is already false for both cases that must stay silent: a first-ever choice, and
  * a failed re-authentication where the library never changed.
  */

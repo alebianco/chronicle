@@ -35,7 +35,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The playback entry points of `AudiobookDetailsViewModel` — cu-59 behaviours 1 and 2.
+ * The playback entry points of `AudiobookDetailsViewModel` — behaviours 1 and 2.
  *
  * Separate from [AudiobookDetailsViewModelTest] because these need a **real `Bundle`**: `pausePlay`
  * builds one for the transport controls, and `Bundle` is unimplemented in the unit-test android.jar.
@@ -76,7 +76,7 @@ class AudiobookDetailsPlaybackTest {
         MutableStateFlow(emptyList<MediaItemTrack>())
     }
 
-  /** cu-59 behaviour 1: play reaches the player with *this* book's id. */
+  /** Behaviour 1: play reaches the player with *this* book's id. */
   @Test
   fun `pressing play starts this book by id`() =
     runTest {
@@ -89,7 +89,7 @@ class AudiobookDetailsPlaybackTest {
     }
 
   /**
-   * cu-59 behaviour 2: a confirmed jump carries the requested offset and track to the player.
+   * Behaviour 2: a confirmed jump carries the requested offset and track to the player.
    *
    * The offset is what makes a chapter jump land in the right place; dropping it silently starts
    * the book from its saved position instead, which reads as "the jump did nothing".
@@ -138,7 +138,7 @@ class AudiobookDetailsPlaybackTest {
       appContext = mockk<Context>(relaxed = true),
       dispatchers = TestDispatcherProvider(),
       // A real handle, not a mock: it is a plain map, and this is the same path production takes
-      // — the Fragment's navigation arguments (cu-185).
+      // — the Fragment's navigation arguments.
       savedStateHandle =
         SavedStateHandle(
           mapOf(

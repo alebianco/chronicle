@@ -64,7 +64,7 @@ class PlexTokenAuthenticator(
     if (refreshed == null) {
       // Deliberately *not* a signed-out signal. The refresh can fail because the network is
       // gone, and being offline is not being signed out — claiming otherwise would nag every
-      // user on a train (cu-84).
+      // user on a train.
       Timber.w("Could not refresh the server token after a 401")
       return null
     }

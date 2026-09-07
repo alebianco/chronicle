@@ -24,11 +24,11 @@ import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 import io.github.mattpvaughn.chronicle.util.compose.ToastResEffect
 
 /**
- * The home shelves, as a navigation destination (cu-206).
+ * The home shelves, as a navigation destination.
  *
  * ### Pull-to-refresh moved to Compose here, deliberately
  *
- * cu-187 and cu-201 kept `SwipeRefreshLayout` as the `ComposeView`'s host, on the reasoning that
+ * Two earlier passes kept `SwipeRefreshLayout` as the `ComposeView`'s host, on the reasoning that
  * swapping a working widget was "an unrelated behaviour change inside a screen migration". That
  * reasoning was about changing it *while the XML host existed*. This task removes the host, so the
  * choice is no longer "keep the widget or swap it" but "keep it inside an `AndroidView` island, or
@@ -87,7 +87,7 @@ fun HomeDestination(
           state = state.copy(serverConnected = isConnected),
           coverUrl = plexConfig::toServerString,
           onBookClick = onBookClick,
-          // Continue Listening resumes rather than opening details (cu-18).
+          // Continue Listening resumes rather than opening details.
           onResumeClick = { viewModel.resume(it) },
           onDisableOfflineMode = viewModel::disableOfflineMode,
         )

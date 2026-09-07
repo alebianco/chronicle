@@ -23,7 +23,7 @@ import kotlin.math.roundToInt
   // Every per-book track query filters on `parentKey` and orders by `discNumber, index`
   // (see `TrackDao`). Unindexed that is a full table scan *plus* a sort, and `writeProgress`
   // runs it once a second during playback — so the cost was paid per tick and grew with the
-  // whole library, not with the book (cu-110). Covering the order-by columns lets SQLite
+  // whole library, not with the book. Covering the order-by columns lets SQLite
   // satisfy both the filter and the sort from the index.
   indices = [Index(value = ["parentKey", "discNumber", "index"])],
 )
@@ -74,10 +74,10 @@ data class MediaItemTrack(
      * matched and [getTrackIdFromFileName] then threw on `"".toInt()`. `.+` also accepted a
      * second dot, so `3001.mp3.part` read as a finished track. The scan runs over a
      * user-writable directory that MoveSyncLocationWorker shuffles files through, so stray
-     * names are ordinary (cu-76).
+     * names are ordinary.
      *
-     * Then `\d+` was too *narrow*: cu-71 retyped ids to `String` so a non-numeric backend can be
-     * represented (decision-11, [[cu-33.1]]), and a digits-only pattern silently made this the
+     * Then `\d+` was too *narrow*: ids were retyped to `String` so a non-numeric backend can be
+     * represented (decision-11), and a digits-only pattern silently made this the
      * arbiter of **id format** as well as of stray files. An Audiobookshelf id would download
      * fine and then be invisible to the cache scan — file present, DB says uncached, so it is
      * deleted and re-downloaded forever. The charset now matches what [MediaId] permits in an id,
@@ -103,7 +103,7 @@ data class MediaItemTrack(
       forceUseNetwork: Boolean = false,
     ) = if (forceUseNetwork || network.lastViewedAt > local.lastViewedAt) {
       Timber.i("Integrating network track: $network")
-      // `source` is named in **both** arms deliberately (cu-20's rule, cu-127's field). A parsed
+      // `source` is named in **both** arms deliberately (the rule, the field). A parsed
       // network track carries SourceId.UNKNOWN, so an arm that omits it would blank the scope of
       // every track on each refresh — and only one arm runs for a given pair, so a fix applied to
       // one and missed in the other looks correct in a test that happens to take the fixed path.
@@ -128,7 +128,7 @@ data class MediaItemTrack(
         // (the fixture's track thumb is `/library/metadata/1001/thumb/...`, the book's
         // ratingKey), which is what the player wants. Where a server does give a track its own
         // art, the player would show chapter art instead of the cover — issue #119. That case
-        // cannot be reproduced from the fixture pack, so it is a live-server check in cu-73
+        // cannot be reproduced from the fixture pack, so it is a live-server check
         // rather than a speculative `parentThumb` field here.
         thumb = networkTrack.thumb,
         index = networkTrack.index,
@@ -137,7 +137,7 @@ data class MediaItemTrack(
         progress = networkTrack.viewOffset,
         media = networkTrack.media[0].part[0].key,
         album = networkTrack.parentTitle,
-        // Plex reports seconds; the local DB stores millis (cu-14).
+        // Plex reports seconds; the local DB stores millis.
         lastViewedAt = plexTimestampToMillis(networkTrack.lastViewedAt),
         updatedAt = networkTrack.updatedAt,
         size = networkTrack.media[0].part[0].size,
@@ -152,7 +152,7 @@ data class MediaItemTrack(
      * Must carry the scheme. This used to be `File(...).absolutePath`, a bare path, and
      * `MediaMetadataCompat.mediaUri` parses whatever it is given with `toUri()` — which yields
      * `scheme = null`. ExoPlayer's `DefaultDataSource` then does not resolve it as a local file,
-     * and the user gets an unsupported-format error on **downloaded books only** (cu-83). The
+     * and the user gets an unsupported-format error on **downloaded books only**. The
      * server branch was never affected, because `toServerString` produces an `https://` URL.
      *
      * `Uri.fromFile` rather than `"file://" + path`: it percent-encodes spaces and non-ASCII
@@ -172,11 +172,11 @@ data class MediaItemTrack(
   /**
    * Where this track's audio actually is: a local file when cached, the server otherwise.
    *
-   * Both dependencies arrive as parameters (cu-79). They used to be fetched from the DI graph
+   * Both dependencies arrive as parameters. They used to be fetched from the DI graph
    * inside this data class, which made the model unconstructable in a test without standing up
    * `ChronicleApplication` — and, worse for [plexConfig], put a *Plex-specific* type inside a
    * *domain* model, which is exactly the coupling the `MediaSource` seam exists to remove
-   * (cu-15, decision-11). `toMediaMetadata` already took `plexConfig` this way; this follows it.
+   * (decision-11). `toMediaMetadata` already took `plexConfig` this way; this follows it.
    */
   fun getTrackSource(
     cachedMediaDir: File,
@@ -215,7 +215,7 @@ fun List<MediaItemTrack>.getTrackStartTime(track: MediaItemTrack): Long {
   if (isEmpty()) {
     return 0
   }
-  // Playback order, never the list's own order (cu-115). This used to sum
+  // Playback order, never the list's own order. This used to sum
   // `subList(0, indexOf(track))` over the receiver as it arrived, which is only correct if the
   // caller happens to pass an ordered list. `LibrarySyncRepository` does not: it derives every
   // book's position from `getAllTracksAsync()`, whose query is `SELECT * FROM MediaItemTrack`
@@ -255,8 +255,7 @@ fun List<MediaItemTrack>?.getTrackContainingOffset(offset: Long): MediaItemTrack
  *
  * This is the canonical track → book conversion: the active track's own progress plus the
  * durations of every track before it. Returning a [BookOffset] is what stops the result being
- * handed to something that wants an in-track value — the mistake behind cu-13/49/93/96/115
- * (cu-136).
+ * handed to something that wants an in-track value — a mistake made repeatedly before this existed.
  */
 fun List<MediaItemTrack>.getProgress(): BookOffset {
   if (isEmpty()) {
@@ -299,7 +298,7 @@ fun List<MediaItemTrack>.getActiveTrack(): MediaItemTrack {
   check(this.isNotEmpty()) { "Cannot get active track of empty list!" }
   // One pass rather than `sorted()`: finding one extreme does not need the whole ordering, and this
   // runs on the main thread once a second while playing — a profile of a 107-track book put 142
-  // samples in `compareTo` here (cu-140).
+  // samples in `compareTo` here.
   //
   // Ties are the subtle part. The key is (disc, index), neither unique by construction, so two
   // tracks can compare equal. A stable `sorted()` + `lastOrNull` answers the **last** of them,
@@ -345,7 +344,7 @@ private fun MediaItemTrack.hasProgress(): Boolean = progress > 0L
  * (`CurrentlyPlayingSingleton`, `CurrentlyPlayingViewModel`, `AudiobookDetailsViewModel`,
  * `MainActivityViewModel`). It used to build each chapter and **throw it away** — nothing was
  * ever added to the returned list — so such a book showed no chapters at all rather than one
- * per file (cu-13).
+ * per file.
  *
  * Offsets are cumulative across the whole book, because that is the coordinate space
  * [getChapterAt] and the seek bar work in.
@@ -378,7 +377,7 @@ fun MediaItemTrack.asChapter(startOffset: BookOffset): Chapter {
     downloaded = cached,
     trackId = id,
     // parentKey is this track's book. Required because chapters share one table keyed partly
-    // on bookId (cu-49); an unset one collides with every other chapter in the library.
+    // on bookId; an unset one collides with every other chapter in the library.
     bookId = parentKey,
   )
 }
@@ -392,7 +391,7 @@ val EMPTY_TRACK = MediaItemTrack(id = TRACK_NOT_FOUND)
  * `MediaItemTrack.merge` and `Audiobook.merge` decide which side is newer with
  * `network.lastViewedAt > local.lastViewedAt`, so mixing the units meant the server value was
  * ~1000x smaller and could never win — a position set on a second device was silently
- * discarded on every refresh (cu-14).
+ * discarded on every refresh.
  *
  * Values already large enough to be milliseconds are passed through unchanged: converting
  * twice would push the timestamp tens of thousands of years out and make the server always
@@ -419,7 +418,7 @@ private const val SECONDS_MILLIS_THRESHOLD = 100_000_000_000L
  * Exists because the cached-file scan marked every file matching `<id>.<ext>` as downloaded
  * with no size check, while [MediaItemTrack.size] — populated from Plex and persisted in Room
  * — was read nowhere. A Wi-Fi drop mid-download therefore left a partial file that the next
- * launch promoted to "available offline", and the book played truncated (cu-76).
+ * launch promoted to "available offline", and the book played truncated.
  *
  * A size mismatch in *either* direction is rejected: a longer file means the metadata and the
  * bytes disagree, and trusting it would hide whichever is wrong.

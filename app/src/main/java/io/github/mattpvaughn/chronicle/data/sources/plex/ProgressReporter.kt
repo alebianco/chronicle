@@ -76,7 +76,7 @@ class ProgressReporter(
       Outcome.SUCCESS
     } catch (e: IOException) {
       // No connectivity, timeout, server unreachable. This is the airplane-mode case
-      // cu-9 exists to fix: the position must survive until the network returns.
+      // this retry path exists to fix: the position must survive until the network returns.
       Timber.w(e, "Progress report failed transiently; will retry")
       Outcome.RETRY
     } catch (e: HttpException) {
@@ -85,7 +85,7 @@ class ProgressReporter(
         Outcome.RETRY
       } else {
         // A 4xx is a rejection, not a blip — most likely an expired token, which a
-        // retry cannot fix (cu-10 owns re-auth).
+        // retry cannot fix (re-auth owns that).
         Timber.e(e, "Progress report rejected with ${e.code()}; giving up")
         Outcome.PERMANENT_FAILURE
       }
@@ -116,7 +116,7 @@ class ProgressReporter(
     // frequently a *single* multi-hour file. Once playback passed the final second of that one
     // track, every later report re-fired this call: the owner's library carried `viewCount` of
     // 183, 129 and 126 on single tracks of books played at most a few times, and a book still
-    // being listened to had `viewOffset = 0` because the last scrobble wiped it (cu-73).
+    // being listened to had `viewOffset = 0` because the last scrobble wiped it.
     if (track.viewCount == 0L && request.trackProgress > track.duration - TRACK_FINISHED_WINDOW_MILLIS) {
       runCatching { api.markWatched(track.id) }
         .onFailure { Timber.e(it, "Failed to mark track ${track.id} watched") }
@@ -132,7 +132,7 @@ class ProgressReporter(
     val bookDuration = lookupBookDuration(bookId)
     // A book whose duration is not loaded yet has duration 0, which makes the window check
     // trivially true for any progress — so a book at 3% gets scrobbled as finished, its
-    // `viewCount` incremented and its `viewOffset` cleared server-side (the cu-73/cu-98 damage).
+    // `viewCount` incremented and its `viewOffset` cleared server-side (the premature-finish damage).
     // It is reachable: `lookupBookDuration` derives from `getTracksForAudiobookAsync`, which
     // filters on `cached >= offlineMode`, so an uncached book in offline mode has no tracks and
     // therefore no duration. `Audiobook.isCompleted()` has carried this guard all along.

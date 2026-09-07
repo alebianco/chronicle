@@ -27,7 +27,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Resuming from the Continue Listening shelf (cu-18).
+ * Resuming from the Continue Listening shelf.
  *
  * The shelf's whole premise is "carry on where you left off", and it used to navigate to the
  * details screen — so carrying on took a second screen and a second tap. These pin that a tap now
@@ -59,8 +59,9 @@ class HomeResumeTest {
    * The saved-position sentinel, not an offset computed here.
    *
    * The service owns resolving where a book resumes from, out of its tracks. Computing it in the
-   * ViewModel would duplicate that resolution — the mistake cu-136 was about — and a wrong answer
-   * reads as "resume jumped me somewhere else", which is worse than not resuming at all.
+   * ViewModel would duplicate that resolution — the mistake the offset-type split was about — and
+   * a wrong answer reads as "resume jumped me somewhere else", which is worse than not resuming at
+   * all.
    */
   @Test
   fun `resume asks for the saved position rather than computing one`() {

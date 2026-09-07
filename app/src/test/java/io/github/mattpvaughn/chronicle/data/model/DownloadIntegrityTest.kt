@@ -14,7 +14,7 @@ import org.junit.rules.TemporaryFolder
  * from Plex's `media[0].part[0].size` and persisted in Room — was read nowhere in the app.
  *
  * So a Wi-Fi drop at 40% left a partial file that the next launch promoted to "downloaded",
- * and the book played truncated while the UI insisted it was available offline (cu-76).
+ * and the book played truncated while the UI insisted it was available offline.
  */
 class DownloadIntegrityTest {
   @get:Rule

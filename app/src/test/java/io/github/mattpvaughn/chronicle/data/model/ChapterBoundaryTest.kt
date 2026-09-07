@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The two chapter lookups must agree, especially on a boundary (cu-93).
+ * The two chapter lookups must agree, especially on a boundary.
  *
  * `getChapterAt` used an inclusive range (`start..end`) while `chapterAtBookProgress` was half-open.
  * A position exactly on a boundary therefore resolved to the **earlier** chapter through one and

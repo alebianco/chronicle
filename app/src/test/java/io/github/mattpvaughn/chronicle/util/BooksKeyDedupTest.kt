@@ -10,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The cu-110 gate: which emissions reach the UI, and which are dropped.
+ * The progress-churn dedup gate: which emissions reach the UI, and which are dropped.
  *
  * `ProgressUpdater` writes to the `Audiobook` table once a second during playback, and Room
  * invalidates per **table** — so every `LiveData` query on it re-emits at tick rate. On Home that
@@ -19,7 +19,7 @@ import org.junit.Test
  * core, a GC every ~4s freeing ~165,000 objects.
  *
  * The mechanism is `distinctUntilChangedBy { booksKey() }` (it was a hand-rolled `distinctBy` on
- * `LiveData` before cu-52; the operator is stock, the key is ours, and the contract is unchanged).
+ * `LiveData` before the StateFlow migration; the operator is stock, the key is ours, and the contract is unchanged).
  *
  * Both halves need pinning, because the obvious fix breaks the second one. Keying on ids alone
  * suppresses the churn *and* silently swallows real progress changes — which is exactly what

@@ -56,7 +56,7 @@ interface ITrackRepository {
 
   /**
    * Clears stale progress on tracks *after* [track] in [bookId], so a backwards seek across a
-   * track boundary is not undone by the next re-derivation of the book position (cu-131).
+   * track boundary is not undone by the next re-derivation of the book position.
    *
    * Returns the number of rows cleared, so a caller can tell whether anything was stale.
    */
@@ -86,7 +86,7 @@ interface ITrackRepository {
    */
   suspend fun getBookIdForTrack(trackId: String): String
 
-  /** Claims tracks written before cu-127 for the connected server. See `IBookRepository`. */
+  /** Claims tracks written before the source-scoping migration for the connected server. See `IBookRepository`. */
   suspend fun adoptLegacyRows()
 
   /** Remove all [MediaItemTrack] from the [TrackDatabase] */
@@ -151,7 +151,7 @@ interface ITrackRepository {
    *
    * Added because the pair was asymmetrical. `setWatched` marked the book *and* its tracks, while
    * `setUnwatched` touched only the book — so the tracks kept `viewCount` and their timestamps, and
-   * the book's state depended on which of the two had run last (cu-86).
+   * the book's state depended on which of the two had run last.
    */
   suspend fun markTracksInBookAsUnwatched(bookId: String)
 
@@ -159,8 +159,8 @@ interface ITrackRepository {
     /**
      * The [MediaItemTrack.id] for any track which does not exist in the [TrackDatabase].
      *
-     * The textual form of the old numeric sentinel, so rows written before the cu-71 retype still
-     * compare equal after it.
+     * The textual form of the old numeric sentinel, so rows written before the id-retyping
+     * migration still compare equal after it.
      */
     const val TRACK_NOT_FOUND: String = "-23"
   }
@@ -179,7 +179,7 @@ class TrackRepository
     private val dispatchers: DispatcherProvider,
   ) : ITrackRepository {
     /**
-     * The Plex server these tracks belong to, as a scoping key (cu-127, decision-21).
+     * The Plex server these tracks belong to, as a scoping key (decision-21).
      *
      * The same accessor `BookRepository` has, and for the same reason: read fresh, because the
      * user can switch servers between a refresh and the next.
@@ -193,7 +193,7 @@ class TrackRepository
       withContext(dispatchers.io) {
         val adopted = trackDao.adoptLegacyRows(newSource = scope, legacySource = SourceId.LEGACY_PLEX)
         if (adopted > 0) {
-          Timber.i("Adopted $adopted pre-cu-127 tracks into the connected server's scope")
+          Timber.i("Adopted $adopted unscoped tracks into the connected server's scope")
         }
       }
     }
@@ -295,7 +295,7 @@ class TrackRepository
           }
         trackDao.insertAll(updatedTracks)
 
-        // Clear the server's per-track viewCount too (cu-98). This was local-only, so the album
+        // Clear the server's per-track viewCount too. This was local-only, so the album
         // was unscrobbled by `BookRepository.setUnwatched` while every track kept the count it
         // had — and completion is owned by the *tracks* (decision-16), so the next sync could
         // read the book back as finished. It also matters as a repair: the per-tick scrobble bug

@@ -26,7 +26,7 @@ import java.io.File
  * BroadcastReceiver, which is instrumented territory" — true of the download callbacks, but not of
  * this method, which only needs the directory list. That list came from
  * `Injector.get().externalDeviceDirs()` **in a field initialiser**, so constructing the class on
- * the JVM threw before it could run any of it (cu-33). It is a constructor parameter now.
+ * the JVM threw before it could run any of it. It is a constructor parameter now.
  *
  * Worth testing precisely because the failure mode is silent and destructive: the filter decides
  * which files on the user's storage get deleted.
@@ -129,7 +129,7 @@ class CachedFileManagerUncacheTest {
     }
 
   /**
-   * A directory that cannot be listed changes nothing (cu-85).
+   * A directory that cannot be listed changes nothing.
    *
    * `listFiles` answers null for a missing or unreadable directory, and coalescing that to an empty
    * list is what un-cached whole libraries. A second, readable directory must still be processed

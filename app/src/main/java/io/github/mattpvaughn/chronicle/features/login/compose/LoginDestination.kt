@@ -39,11 +39,12 @@ import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 import timber.log.Timber
 
 /**
- * The sign-in screen, as a navigation destination (cu-206).
+ * The sign-in screen, as a navigation destination.
  *
- * One of the three screens cu-188/cu-203 never reached — it was still pure Views, so this is a real
- * migration rather than a shell swap. Three `View.visibility` writes and a `setOnCheckedChangeListener`
- * become state; the Custom Tabs launch stays exactly as it was, because it is an `Intent` and has
+ * One of the three screens the earlier Compose migrations never reached — it was still pure Views,
+ * so this is a real migration rather than a shell swap. Three `View.visibility` writes and a
+ * `setOnCheckedChangeListener` become state; the Custom Tabs launch stays exactly as it was,
+ * because it is an `Intent` and has
  * nothing to do with the view layer.
  *
  * `checkForAccess()` on resume is what completes the login: the user leaves for a browser, approves

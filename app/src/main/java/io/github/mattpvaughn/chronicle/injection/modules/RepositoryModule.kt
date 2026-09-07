@@ -20,7 +20,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import javax.inject.Singleton
 
 /**
- * The repositories, split out of `AppModule` so a test can replace them (cu-185).
+ * The repositories, split out of `AppModule` so a test can replace them.
  *
  * These are the bindings a screen test wants to fake — a screen test needs a book
  * repository returning a known list, not one backed by a real database. `@BindValue` alone cannot

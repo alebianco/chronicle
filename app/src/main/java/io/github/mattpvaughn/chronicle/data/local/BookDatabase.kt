@@ -81,7 +81,7 @@ val BOOK_MIGRATION_7_8 =
 
 /**
  * Retypes `id` and `parentId` to TEXT so a non-numeric backend can be represented
- * (cu-71, decision-11).
+ * (decision-11).
  *
  * A table rebuild because SQLite cannot alter a column type or a primary key. The column list comes
  * from the exported v8 schema, which is the authority — a column omitted here is dropped with
@@ -106,7 +106,7 @@ val BOOK_MIGRATION_8_9 =
   }
 
 /**
- * Adds the per-book playback-speed override (cu-20).
+ * Adds the per-book playback-speed override.
  *
  * `DEFAULT 0` is [Audiobook.NO_SPEED_OVERRIDE] — an existing row keeps following the global
  * preference, which is the behaviour before this column existed.
@@ -119,7 +119,7 @@ val BOOK_MIGRATION_9_10 =
   }
 
 /**
- * Adds narrator and series, from the Audnexus `Style`/`Mood` tags (cu-24).
+ * Adds narrator and series, from the Audnexus `Style`/`Mood` tags.
  *
  * Empty and 0 defaults mean **not known yet**, which is the truthful state for every existing row:
  * these come from the per-book detail response, so they populate as books are synced rather than
@@ -135,7 +135,7 @@ val BOOK_MIGRATION_10_11 =
   }
 
 /**
- * Rescales `seriesIndex` from whole books to hundredths (cu-146).
+ * Rescales `seriesIndex` from whole books to hundredths.
  *
  * The column stays `INTEGER` — this is a *unit* change, not a type change — so no column is added
  * or altered and the exported schema is identical apart from its version. The migration exists
@@ -158,8 +158,8 @@ val BOOK_MIGRATION_11_12 =
   }
 
 /**
- * Retypes `source` from INTEGER to TEXT so it can hold a per-instance [SourceId] (cu-127,
- * decision-21).
+ * Retypes `source` from INTEGER to TEXT so it can hold a per-instance [SourceId]
+ * (decision-21).
  *
  * A table rebuild, because SQLite cannot alter a column's type. The column list comes from the
  * exported v12 schema, which is the authority — a column omitted here is dropped with no error at
@@ -193,16 +193,17 @@ val BOOK_MIGRATION_12_13 =
   }
 
 /**
- * Drops the legacy `chapters` column (cu-159, the last step of cu-49's chapter move).
+ * Drops the legacy `chapters` column, the last step of the chapter move.
  *
- * `ChapterDatabase` has been the source of truth since cu-82; this column was kept only as the
+ * `ChapterDatabase` has been the source of truth since that move; this column was kept only as the
  * middle level of `resolveChapters`'s table → column → `asChapterList()` fallback, so the read
  * sites could migrate one at a time. They all have.
  *
  * **Verified empty before dropping** (2026-09-05): both household installs report 0 of 196 books
- * with a non-empty column, because nothing has written it since cu-49 and both libraries were
- * synced after that. So this drops no data. The permanent fallback also still covers every book —
- * 1379 tracks across 197 books, and `asChapterList()` derives chapters from tracks — and any book
+ * with a non-empty column, because nothing has written it since the chapter move landed and both
+ * libraries were synced after that. So this drops no data. The permanent fallback also still
+ * covers every book — 1379 tracks across 197 books, and `asChapterList()` derives chapters from
+ * tracks — and any book
  * whose chapters are genuinely missing is repaired by `syncAudiobook`, which refetches them from
  * `/library/metadata/{id}?includeChapters=1` and writes the table directly.
  *
@@ -396,7 +397,7 @@ interface BookDao {
   ): List<Audiobook>
 
   /**
-   * Claims rows written before cu-127 for [newSource].
+   * Claims rows written before source scoping existed for [newSource].
    *
    * Scoped to the legacy marker on purpose: adopting anything else would let a second server take
    * over the first's library, which is what the scoping exists to prevent.
@@ -428,7 +429,7 @@ interface BookDao {
     isCached: Boolean = true,
   ): List<Audiobook>
 
-  /** Clears the cached flag for one source's books. See `TrackDao.uncacheAll` (cu-127). */
+  /** Clears the cached flag for one source's books. See `TrackDao.uncacheAll`. */
   @Query("UPDATE Audiobook SET isCached = :isCached WHERE source = :source")
   suspend fun uncacheAll(
     source: SourceId,
@@ -444,11 +445,10 @@ interface BookDao {
   ): List<Audiobook>
 
   /**
-   * The five fields [io.github.mattpvaughn.chronicle.data.model.groupedSearch] actually reads
-   * (cu-161).
+   * The five fields [io.github.mattpvaughn.chronicle.data.model.groupedSearch] actually reads.
    *
    * `SELECT *` materialises every column of every row — summary, thumb, and twenty more that the
-   * matching never touches. cu-51 measured that read as most of a search's cost at 10,000 books.
+   * matching never touches. Profiling measured that read as most of a search's cost at 10,000 books.
    */
   @Query(
     "SELECT id, title, author, narrator, series FROM Audiobook " +
@@ -459,7 +459,7 @@ interface BookDao {
     offlineModeActive: Boolean,
   ): List<BookSearchRow>
 
-  /** The books a search actually matched, fetched in full once the matching is done (cu-161). */
+  /** The books a search actually matched, fetched in full once the matching is done. */
   @Query("SELECT * FROM Audiobook WHERE source = :source AND id IN (:ids)")
   suspend fun getAudiobooksByIds(
     source: SourceId,
@@ -470,10 +470,10 @@ interface BookDao {
   suspend fun getBookCount(source: SourceId): Int
 
   /**
-   * Sets this book's speed override, or clears it with [Audiobook.NO_SPEED_OVERRIDE] (cu-20).
+   * Sets this book's speed override, or clears it with [Audiobook.NO_SPEED_OVERRIDE].
    *
    * `bookId` is `String` deliberately: SQLite compares across storage classes, so a numeric bind
-   * against a TEXT id column matches no row, silently and with no error (cu-71).
+   * against a TEXT id column matches no row, silently and with no error.
    */
   @Query("UPDATE Audiobook SET playbackSpeed = :speed WHERE id = :bookId")
   suspend fun updatePlaybackSpeed(

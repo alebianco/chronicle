@@ -27,7 +27,7 @@ fun getTrackDatabase(context: Context): TrackDatabase {
 }
 
 /**
- * Retypes `id` and `parentKey` to TEXT. `parentKey` is a book id, so it converts in step with Audiobook (cu-71).
+ * Retypes `id` and `parentKey` to TEXT. `parentKey` is a book id, so it converts in step with Audiobook.
  *
  * A table rebuild because SQLite cannot alter a column type or a primary key. The column list comes
  * from the exported v4 schema, which is the authority — a column omitted here is dropped with
@@ -52,7 +52,7 @@ val MIGRATION_4_5 =
   }
 
 /**
- * Adds the per-instance scoping key to tracks (cu-127, decision-21).
+ * Adds the per-instance scoping key to tracks (decision-21).
  *
  * An `ADD COLUMN` rather than a rebuild, because the column is new — nothing is being retyped, so
  * there is no old value that would mean the wrong thing.
@@ -110,7 +110,7 @@ interface TrackDao {
   fun getAllTracks(source: SourceId): Flow<List<MediaItemTrack>>
 
   // Ordered, because callers derive book position from the result and `getTrackStartTime` sums
-  // the tracks *before* the active one. It sorts defensively now (cu-115), but an unordered
+  // the tracks *before* the active one. It sorts defensively now, but an unordered
   // whole-library read is a trap for anything else that groups or slices this list, and the
   // `parentKey, discNumber, index` index makes the ordering free.
   @Query("SELECT * FROM MediaItemTrack WHERE source = :source ORDER BY `parentKey`, `discNumber` ASC, `index` ASC")
@@ -160,7 +160,7 @@ interface TrackDao {
    * A backwards seek across a track boundary otherwise does not stick: `getActiveTrack` returns
    * the *furthest* started track regardless of recency, so a stale `progress` left on a later
    * track wins over the newer position the user just chose, and the next re-derivation of the
-   * book position undoes the seek (cu-131).
+   * book position undoes the seek.
    *
    * Ordering is `(discNumber, index)`, matching `MediaItemTrack.compareTo` — never the list's own
    * order, which arrives from the database and the network in no guaranteed sequence.
@@ -179,7 +179,7 @@ interface TrackDao {
     index: Int,
   ): Int
 
-  /** Claims tracks written before cu-127 for [newSource]. See `BookDao.adoptLegacyRows`. */
+  /** Claims tracks written before the source-scoping migration for [newSource]. See `BookDao.adoptLegacyRows`. */
   @Query("UPDATE MediaItemTrack SET source = :newSource WHERE source = :legacySource")
   suspend fun adoptLegacyRows(
     newSource: SourceId,
@@ -210,10 +210,11 @@ interface TrackDao {
   /**
    * Clears the cached flag for one source's tracks.
    *
-   * Scoped since cu-127, to stay consistent with `CachedFileManager.uncacheAllInLibrary`, which
-   * deletes only the connected server's *files*. Unscoped, it would report another server's
-   * downloads as absent while they sat on disk — invisible to the user and to cu-81's prune,
-   * which only ever scans for files it can account for.
+   * Scoped since the source-scoping migration, to stay consistent with
+   * `CachedFileManager.uncacheAllInLibrary`, which deletes only the connected server's *files*.
+   * Unscoped, it would report another server's downloads as absent while they sat on disk —
+   * invisible to the user and to the orphaned-file prune, which only ever scans for files it can
+   * account for.
    */
   @Query("UPDATE MediaItemTrack SET cached = :isCached WHERE source = :source")
   suspend fun uncacheAll(
@@ -229,7 +230,7 @@ interface TrackDao {
 }
 
 /**
- * Adds the `parentKey, discNumber, index` index (cu-110).
+ * Adds the `parentKey, discNumber, index` index.
  *
  * Pure addition — no data moves, so a `CREATE INDEX` is enough and there is no rebuild to get
  * wrong. The name must match what Room generates for the entity's `@Index`

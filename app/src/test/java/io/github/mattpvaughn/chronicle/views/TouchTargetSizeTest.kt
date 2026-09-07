@@ -5,7 +5,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Every clickable control is at least [MIN_TOUCH_TARGET_DP] on both axes (cu-47).
+ * Every clickable control is at least [MIN_TOUCH_TARGET_DP] on both axes.
  *
  * Android's accessibility guidance puts the minimum at 48dp — roughly a fingertip. Below that a
  * control is hard to hit for anyone and disproportionately so with a motor impairment or a moving

@@ -4,16 +4,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * `getActiveTrack` must pick the same track as a full sort would, without paying for one (cu-140).
+ * `getActiveTrack` must pick the same track as a full sort would, without paying for one.
  *
  * The profile that motivated this: 15 s of sampled playback on a 107-track book put **142 samples
  * in `MediaItemTrack.compareTo`** on the main thread, because `getActiveTrack()` called `sorted()`
  * on every invocation and `ProgressUpdater` publishes once a second. It is also why the cost scales
  * with track count — the same measurement on a 28-track book understated the main-thread total by
- * 5.6× (cu-117).
+ * 5.6×.
  *
  * The *ordering* is load-bearing and is not being dropped: `TrackIndex` means "index into the
- * sorted list" (cu-136), and `getProgress` documents a real bug that came from trusting the list's
+ * sorted list", and `getProgress` documents a real bug that came from trusting the list's
  * own order. What changes is that finding one extreme of an ordering is a scan, not a sort.
  *
  * Assertions compare against the explicitly-sorted answer rather than hand-picked expectations, so

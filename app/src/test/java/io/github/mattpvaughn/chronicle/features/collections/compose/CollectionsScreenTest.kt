@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The collections screen, tested by asserting **what is on screen** (cu-181).
+ * The collections screen, tested by asserting **what is on screen**.
  *
  * Contrast `CollectionsFragmentScenarioTest`, which needs `launchFragmentInContainer`, a mocked
  * `ActivityComponent`, a real `ViewModelProvider.Factory` over four mocks and a hand-written

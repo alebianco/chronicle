@@ -173,9 +173,9 @@ class AudiobookDetailsViewModelTest {
   }
 
   /**
-   * cu-59 behaviour 5: pressing cache *while caching* cancels the download rather than starting a
-   * second one. `cacheStatus` is driven through its real input (`activeBookDownloads`) as the task
-   * requires, not stubbed directly — the derivation is part of what is under test.
+   * Pressing cache *while caching* cancels the download rather than starting a second one.
+   * `cacheStatus` is driven through its real input (`activeBookDownloads`), not stubbed directly —
+   * the derivation is part of what is under test.
    */
   @Test
   fun `pressing cache while a download is running cancels it`() =
@@ -211,9 +211,8 @@ class AudiobookDetailsViewModelTest {
     }
 
   /**
-   * cu-59 behaviour 4: pressing cache on an already-downloaded book starts no download and asks
-   * before deleting. Deleting a download without confirmation would be a data-loss action on a
-   * single tap.
+   * Pressing cache on an already-downloaded book starts no download and asks before deleting.
+   * Deleting a download without confirmation would be a data-loss action on a single tap.
    */
   @Test
   fun `pressing cache on a downloaded book prompts instead of downloading`() =
@@ -235,7 +234,7 @@ class AudiobookDetailsViewModelTest {
     }
 
   /**
-   * cu-59 behaviour 2: jump-to-chapter warns before clearing progress. Without confirmation it must
+   * Behaviour 2: jump-to-chapter warns before clearing progress. Without confirmation it must
    * show the prompt and reach neither the player nor the connection.
    */
   @Test
@@ -264,7 +263,7 @@ class AudiobookDetailsViewModelTest {
   }
 
   /**
-   * cu-92: a press before `cacheStatus` resolves must do nothing, not crash.
+   * A press before `cacheStatus` resolves must do nothing, not crash.
    *
    * `cacheStatus` is a MediatorLiveData with no value until it has an active observer *and* both
    * sources have emitted — so this test deliberately does **not** observe it. It previously threw
@@ -297,7 +296,7 @@ class AudiobookDetailsViewModelTest {
       appContext = mockk<Context>(relaxed = true),
       dispatchers = TestDispatcherProvider(),
       // A real handle, not a mock: it is a plain map, and this is the same path production takes
-      // — the Fragment's navigation arguments (cu-185).
+      // — the Fragment's navigation arguments.
       savedStateHandle =
         SavedStateHandle(
           mapOf(

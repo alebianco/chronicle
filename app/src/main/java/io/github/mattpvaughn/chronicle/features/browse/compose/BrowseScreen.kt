@@ -27,7 +27,7 @@ import io.github.mattpvaughn.chronicle.data.model.FacetList
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 
 /**
- * Browse the library by author, narrator or series (cu-24, migrated in cu-202).
+ * Browse the library by author, narrator or series, migrated to Compose here.
  *
  * Replaces a `TabLayout` with an `addOnTabSelectedListener`, a `FacetListAdapter` and three
  * `isVisible` decisions written across two `render` passes. The tab order still *is* the enum
@@ -42,7 +42,7 @@ fun BrowseScreen(
   modifier: Modifier = Modifier,
 ) {
   // `MaterialTheme` defines `colorScheme.background` but paints nothing — a bare `Column` would
-  // let the window colour through and render near-invisible text (cu-181).
+  // let the window colour through and render near-invisible text.
   Surface(modifier = modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
       TabRow(selectedTabIndex = FacetKind.entries.indexOf(state.selected)) {
@@ -85,7 +85,7 @@ private fun FacetRows(
 ) {
   LazyColumn(modifier = Modifier.fillMaxSize()) {
     // Only when something is actually missing — a complete index carrying a caveat teaches the
-    // user to ignore the caveat (cu-24).
+    // user to ignore the caveat.
     if (facets.isPartial) {
       item(key = "coverage") {
         Text(

@@ -48,7 +48,7 @@ import org.robolectric.RobolectricTestRunner
  * `IMediaControllerCallback.Stub`, which calls `android.os.Binder.attachInterface` — unmocked in the
  * unit-test android.jar. Nothing about the state machine needs a device; it is the superclass
  * constructor that does. That also means this class must be listed in `excludedTestClasses` for
- * PIT, which reports false SURVIVED for Robolectric tests (cu-57).
+ * PIT, which reports false SURVIVED for Robolectric tests.
  *
  * These are deliberately *behavioural* assertions, not a transcription of the `when`. The subtle
  * ones are the pairs: PAUSED both notifies **and** calls `stopForegroundService(false)`, which is
@@ -71,7 +71,7 @@ class NotificationStateMachineTest {
 
   @Before
   fun stubNotificationBuilder() {
-    // Both halves of the cu-137 split return the same instance, so these assertions stay about
+    // Both halves of the notification-build split return the same instance, so these assertions stay about
     // the state machine rather than about which build ran. The deadline property itself —
     // that the foreground path never awaits the artwork — is pinned in ForegroundDeadlineTest.
     every { notificationBuilder.buildNotificationWithoutArtwork(any()) } returns notification
@@ -130,7 +130,7 @@ class NotificationStateMachineTest {
   }
 
   /**
-   * The cu-137 second phase: the artwork build runs *after* the state machine, and re-posts
+   * The notification-build split's second phase: the artwork build runs *after* the state machine, and re-posts
    * through `notify` only.
    *
    * It must not call `startForeground` again — PAUSED deliberately releases the foreground state
@@ -245,7 +245,7 @@ class NotificationStateMachineTest {
         // `onChapterChange` reads `chapter`, `book` and `track` off this, and a relaxed mock hands
         // back a bare Object for a generic StateFlow, which fails to cast. Stub each with a real
         // one. `book` is EMPTY_AUDIOBOOK on purpose: these tests are about the state machine, and
-        // an empty book makes `publishChapterAsSessionMetadata` return early (cu-50), so nothing
+        // an empty book makes `publishChapterAsSessionMetadata` return early, so nothing
         // here depends on session metadata being published.
         currentlyPlaying =
           mockk(relaxed = true) {

@@ -5,13 +5,13 @@ import android.content.SharedPreferences
 /**
  * A `SharedPreferences` with a **working listener list**.
  *
- * Promoted out of two suites in cu-185, where the same class was written twice privately, so the
+ * Promoted out of two suites during the Hilt migration, where the same class was written twice privately, so the
  * Hilt test module can bind it.
  *
  * A relaxed `SharedPreferences` mock is the wrong tool and silently so: it returns `false`/`null`
  * from the getters and **drops the listener registration**, so a `preferenceFlow` built on it
  * never emits, the `combine` downstream never fires, and every assertion about the result passes
- * against a flow that produced nothing (cu-187).
+ * against a flow that produced nothing.
  */
 class FakePrefs : SharedPreferences {
   private val booleans = mutableMapOf<String, Boolean>()

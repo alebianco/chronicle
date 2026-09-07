@@ -22,13 +22,13 @@ import org.robolectric.RobolectricTestRunner
  *
  * `ProgressUpdater`'s per-second tick is gated on `isPlaying`, so pausing stops it: without an
  * explicit flush the saved position is whatever the previous tick happened to capture, and no
- * PAUSED state ever reaches Plex. The book-switch path has `flushOutgoingBookProgress` (cu-91) and
- * a seek publishes its own position (cu-93), but an ordinary pause — from the lock screen, the
+ * PAUSED state ever reaches Plex. The book-switch path has `flushOutgoingBookProgress` and
+ * a seek publishes its own position, but an ordinary pause — from the lock screen, the
  * notification or a headset button — had nothing. It is the defect behind
  * advplyr/audiobookshelf-app#1847 ("an hour of listening lost") and PaulWoitaschek/Voice#3351.
  *
  * The **state and position must come from the player, not the session**: `MediaSessionCompat`'s
- * playback state lags a frame behind, which is precisely why cu-93 stopped using
+ * playback state lags a frame behind, which is precisely why the seek path stopped using
  * `updateProgressWithoutParameters` on the seek path. A flush that read the session would report
  * the pre-pause position as still PLAYING — worse than not flushing, because it would overwrite a
  * good position with a stale one and tell the server playback continues.

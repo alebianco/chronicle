@@ -13,7 +13,7 @@ import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater
 import io.github.mattpvaughn.chronicle.features.player.SimpleProgressUpdater
 
 /**
- * Activity-scoped bindings (cu-185).
+ * Activity-scoped bindings.
  *
  * An `object` taking `@ActivityContext` rather than a class holding the activity: Hilt builds the
  * module, so there is no constructor to pass one to. The cast to [AppCompatActivity] is safe and

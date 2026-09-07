@@ -7,12 +7,12 @@ import org.junit.Test
 import kotlin.math.roundToInt
 
 /**
- * The percentage readout's arithmetic, which now shares a source with the timeline (cu-94).
+ * The percentage readout's arithmetic, which now shares a source with the timeline.
  *
  * The percentage used to read the track list straight from Room — written every second by the
  * progress loop — while the timeline read `currentlyPlaying.track`, refreshed only by playback
  * callbacks. The DB write landed first, so the percentage visibly moved before the timeline did.
- * Two readouts of one fact, disagreeing; the same split cu-87 fixed for the chapter list.
+ * Two readouts of one fact, disagreeing; the same split that was fixed for the chapter list.
  *
  * The derivation is reproduced here rather than exercised through the ViewModel: the ViewModel
  * needs a LiveData harness, and what broke was the *arithmetic of combining* a playing track with

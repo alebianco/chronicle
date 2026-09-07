@@ -14,7 +14,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The library's sort/view-style panel (cu-206).
+ * The library's sort/view-style panel.
  *
  * Replaces a persistent `BottomSheetBehavior` whose state was kept in step with the ViewModel by a
  * `BottomSheetCallback` pushing one way and a flow collector pushing back. The interesting

@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The collapsed mini player (cu-206).
+ * The collapsed mini player.
  *
  * The View version's fields were bound one at a time from `MainActivity`, so nothing could assert
  * what the row showed without inflating `activity_main.xml` and reaching into it. As a function of
@@ -86,7 +86,7 @@ class MiniPlayerTest {
   }
 
   /**
-   * A buffering mini player shows a spinner *instead of* the button (cu-95).
+   * A buffering mini player shows a spinner *instead of* the button.
    *
    * Both live in a fixed-size box, so the row does not reflow — which is what the View version's
    * `INVISIBLE` (rather than `GONE`) achieved by hand.

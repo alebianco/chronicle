@@ -10,15 +10,15 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * `setImageResourceIfChanged` skips a redundant `setImageResource` (cu-140).
+ * `setImageResourceIfChanged` skips a redundant `setImageResource`.
  *
  * `MediaServiceConnection.playbackState` re-emits at playback tick rate, so the play/pause buttons
  * re-set an identical icon every second. `setImageResource` re-applies unconditionally, which
  * invalidates the view *without* a layout — a draw-only invalidate, which is the class of cost
- * cu-140 is about.
+ * this guard is about.
  *
  * Measured effect on its own: player sheet 57–60 → 54–55 frames / 15 s. Real but small; the
- * dominant cost on that screen is elsewhere (see the task's notes).
+ * dominant cost on that screen is elsewhere.
  */
 @RunWith(RobolectricTestRunner::class)
 class SetImageResourceIfChangedTest {

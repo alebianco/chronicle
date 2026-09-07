@@ -7,7 +7,7 @@ import androidx.room.TypeConverter
  *
  * Six bugs came from the same mistake before these existed: a value measured from the start of a
  * **track** used where one measured from the start of the **book** belongs, or the reverse
- * (cu-13, cu-49, cu-93, cu-96, and four more found in the 2026-09-02 review). Both are `Long`, so
+ * (four separate fixes, and four more found in the 2026-09-02 review). Both are `Long`, so
  * the compiler could not help — and on a single-track book, which is most of this library, the
  * two are the *same number*, so every one of them worked by accident until a multi-track book
  * appeared.
@@ -23,7 +23,7 @@ import androidx.room.TypeConverter
  *
  * Never by hand. `chapterSeekTarget` is the one home for book → track, because the conversion
  * needs the *sorted* track list and a track's own start; the two places that inlined
- * `offset - trackStart` instead are precisely where cu-115 found bugs.
+ * `offset - trackStart` instead are precisely where bugs were found.
  */
 @JvmInline
 value class BookOffset(val millis: Long) : Comparable<BookOffset> {
@@ -67,8 +67,8 @@ value class TrackOffset(val millis: Long) : Comparable<TrackOffset> {
  * "Index into what" is the untyped distinction that makes `TrackListStateManager` safe only by
  * its callers' grace: `getActiveTrack()` sorts internally, and the result was then looked up in
  * the *unsorted* list. Both callers happen to pass a DAO-ordered list, so the indices agree by
- * convention rather than by construction — the same shape as the bug cu-115 fixed, one caller
- * away from biting.
+ * convention rather than by construction — the same shape as the book/track offset mix-up, one
+ * caller away from biting.
  */
 @JvmInline
 value class TrackIndex(val value: Int) {

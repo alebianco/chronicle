@@ -1,16 +1,16 @@
 package io.github.mattpvaughn.chronicle.data.model
 
-// Typo-tolerant, grouped search over a book list (cu-25).
+// Typo-tolerant, grouped search over a book list.
 //
 // Pure over Audiobook, like FacetKind and friends, so the matching, the ranking and the grouping
 // are all testable without a database or a screen.
 //
 // Why this is local and not /hubs/search. Plex's search endpoint cannot answer the queries this app
-// most needs: narrator and series live in Style/Mood tags that are *detail-only* (cu-24), so the
+// most needs: narrator and series live in Style/Mood tags that are *detail-only*, so the
 // server has no index of them for a book this install has not synced yet, and a server-side search
 // is unavailable in offline mode — which every other read path here honours. A local scan over the
 // already-synced library answers all four fields, works offline, and is cheap enough to run per
-// keystroke (see searchFuzzy). Seeding narrator/series for the whole library up front is cu-143.
+// keystroke (see searchFuzzy). Seeding narrator/series for the whole library up front is separate work.
 
 /** Which field a query matched — both a ranking input and the grouping key. */
 enum class SearchField {
@@ -96,7 +96,7 @@ private fun charCountsOf(value: String): Map<Char, Int> = value.groupingBy { it 
  *
  * Scans the four searchable fields locally. Cost is the reason this is viable per keystroke: an
  * edit distance is computed only for a field that survives a **length and character-count
- * prefilter**, which on a 1000-book library (the cu-51 target) leaves a few dozen of several
+ * prefilter**, which on a 1000-book library (the scale target) leaves a few dozen of several
  * thousand fields — so the common keystroke costs a character tally per field, not a distance
  * matrix.
  */
@@ -130,7 +130,7 @@ fun List<Audiobook>.groupedSearch(query: String): GroupedSearchResults {
 }
 
 /**
- * Replaces each result's projection stub with the real book (cu-161).
+ * Replaces each result's projection stub with the real book.
  *
  * The matching runs over a five-column projection, so every [SearchResult.book] is a stub carrying
  * only the matched fields — enough to decide *whether* a book matched, not enough to render it.
@@ -161,7 +161,7 @@ fun GroupedSearchResults.withRealBooks(booksById: Map<String, Audiobook>): Group
  * "closest match first" is what a title or narrator query means.
  *
  * Delegates to [inSeriesOrder] rather than sorting here, so the reading order the browse screen
- * uses (cu-24, including its rule that an unnumbered extra sorts *after* the numbered books) is
+ * uses (including its rule that an unnumbered extra sorts *after* the numbered books) is
  * the one the search shows. A second copy would drift.
  */
 private fun List<SearchResult>.orderedFor(field: SearchField): List<SearchResult> {
@@ -209,7 +209,7 @@ private const val FIELD_BONUS_STEP = 1000
 /**
  * The fields a query is matched against, strongest first.
  *
- * Narrator is split because a full-cast recording stores several comma-separated (cu-24), and a
+ * Narrator is split because a full-cast recording stores several comma-separated, and a
  * query for one narrator must not have to match the whole joined string.
  */
 private fun Audiobook.searchableFields(): List<Pair<SearchField, String>> =

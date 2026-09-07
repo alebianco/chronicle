@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * A `SharedPreferences` value as a `Flow` (cu-52), replacing the
+ * A `SharedPreferences` value as a `Flow`, replacing the
  * `Boolean`/`String`/`Float`PreferenceLiveData trio.
  *
  * `callbackFlow` is the direct analogue of `LiveData.onActive`/`onInactive`: it registers the
@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  *
  * - The **current value is emitted first**, before any change arrives. The LiveData versions did
  *   this in `onActive`, and a screen that only learned the value on the next *edit* would render
- *   its default indefinitely — the `FirstFrameFlashTest` failure mode (cu-68).
+ *   its default indefinitely — the `FirstFrameFlashTest` failure mode.
  * - `SharedPreferences` fires its listener on whichever thread called `apply()`, which is why the
  *   LiveData versions could not use `value =` safely. A `Flow` has no such constraint: `trySend`
  *   is thread-safe, and the collector resumes on its own dispatcher.

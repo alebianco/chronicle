@@ -9,7 +9,7 @@ import org.junit.Test
  *
  * It decides whether to force a scroll-to-top, so a false "different" is visible as the list
  * jumping under the reader's finger — and comparing by **id** rather than by equality is what
- * prevents that, since the playing book's `progress` changes once a second (cu-110).
+ * prevents that, since the playing book's `progress` changes once a second.
  */
 class ListIdentityTest {
   private data class Row(val id: String, val progress: Long = 0L)
@@ -26,7 +26,7 @@ class ListIdentityTest {
     assertThat(different(listOf(Row("1"), Row("2"), Row("3")), current), equalTo(false))
   }
 
-  /** The cu-110 case: a field changed every second, but the list is the same list. */
+  /** The progress-churn case: a field changed every second, but the list is the same list. */
   @Test
   fun `a changed field on the same ids is not a new list`() {
     val current = listOf(Row("1", progress = 0L), Row("2"))

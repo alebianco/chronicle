@@ -66,7 +66,7 @@ class MainActivityViewModel
      * The back handler needs this. Backing out of a picker used to fall through to "switch to the
      * Home tab", which showed a Home rendered from the *previous* session's Room data — so the app
      * looked fully configured while its own state said otherwise and the prefs held no library
-     * (cu-124). The emptier the cache, the more obviously broken it would have looked; with a full
+     *. The emptier the cache, the more obviously broken it would have looked; with a full
      * one it was invisible.
      */
     val isOnboarding: StateFlow<Boolean> =
@@ -85,9 +85,9 @@ class MainActivityViewModel
      * [maximizeCurrentlyPlaying], [onCurrentlyPlayingHandleDragged]) and so does the activity's back
      * handler. As a `MutableLiveData` written with `postValue` the write deferred to the next
      * main-loop pass, so the next reader saw the *previous* state — back then decided the sheet was
-     * not expanded and fell through to leaving the app (cu-73) — and several posts in one loop
+     * not expanded and fell through to leaving the app — and several posts in one loop
      * coalesced, losing a collapse-then-expand pair entirely. A `MutableStateFlow` assignment lands
-     * immediately and cannot have either shape (cu-52).
+     * immediately and cannot have either shape.
      */
     private val _currentlyPlayingLayoutState = MutableStateFlow(HIDDEN)
     val currentlyPlayingLayoutState: StateFlow<BottomSheetState>
@@ -96,7 +96,7 @@ class MainActivityViewModel
     /**
      * The sheet's state.
      *
-     * Was `CurrentlyPlayingInterface`'s read side (cu-198) — an interface the activity implemented
+     * Was `CurrentlyPlayingInterface`'s read side — an interface the activity implemented
      * so `CurrentlyPlayingFragment` could ask "am I on screen?" without inferring it from view
      * geometry. With the player composed directly by the activity there is no host to ask, so the
      * interface is gone and this is simply a property. It is kept distinct from
@@ -133,7 +133,7 @@ class MainActivityViewModel
     // Used to cache tracks.asChapterList when tracks changes
     private val tracksAsChaptersCache: Flow<List<Chapter>> = tracks.mapLatest { it.asChapterList() }
 
-    /** The book's chapters from `ChapterDatabase`, the preferred source (cu-82). */
+    /** The book's chapters from `ChapterDatabase`, the preferred source. */
     private val chaptersFromTable: Flow<List<Chapter>> =
       audiobookId.flatMapLatest { id ->
         if (id != NO_AUDIOBOOK_FOUND_ID) {
@@ -156,7 +156,7 @@ class MainActivityViewModel
         if (_chapters.isEmpty() || _tracks.isEmpty()) {
           return@combineDistinct "No track playing"
         }
-        // Book-absolute, because `Chapter.bookStartTimeOffset` is (cu-115). This used to pass
+        // Book-absolute, because `Chapter.bookStartTimeOffset` is. This used to pass
         // `activeTrack.progress` — an **in-track** offset — into a lookup that compares against
         // book offsets, and to filter the chapters to the active track first. On a single-track
         // book the two frames are the same number, so it worked; on any later track the offset is
@@ -182,7 +182,7 @@ class MainActivityViewModel
      *
      * The same derivation as the player and details screens. The mini player is often the only
      * playback control on screen, so without this a stalled start there looks identical to a paused
-     * book (cu-95).
+     * book.
      */
     val isAudioLoading: StateFlow<Boolean> =
       mediaServiceConnection.playbackState
@@ -224,7 +224,7 @@ class MainActivityViewModel
         // HIDDEN need either a later non-stopped state (there is none; playback has ended) or
         // `setAudiobook` seeing a *different* book id, which re-selecting the same book fails.
         // Since the collapsed player is the only handle that expands the sheet, the player became
-        // unreachable, and for an already-finished book it was never reachable at all (cu-119).
+        // unreachable, and for an already-finished book it was never reachable at all.
         STATE_NONE -> setBottomSheetState(HIDDEN)
         else -> {
           if (currentlyPlayingLayoutState.value == HIDDEN) {
@@ -264,7 +264,7 @@ class MainActivityViewModel
       }
       // Revealing the sheet is *not* conditional on the book having changed. It used to be, which
       // stranded the player: re-selecting the same book after it had been hidden was rejected by
-      // the guard above, so nothing could bring the collapsed handle back (cu-119). Whether there
+      // the guard above, so nothing could bring the collapsed handle back. Whether there
       // is something playing and whether it is a *new* something are different questions.
       if (_currentlyPlayingLayoutState.value == HIDDEN) {
         // Both writes are plain assignments now. This runs in a coroutine after a suspending DB
@@ -280,7 +280,7 @@ class MainActivityViewModel
      * Separate from [onCurrentlyPlayingClicked] because that one *toggles* and throws on
      * [BottomSheetState.HIDDEN]. This is idempotent and a no-op when hidden, which is what a
      * caller that just wants the player on screen needs — used by the `show_player` debug hook
-     * so the "position not synced" badge can be screenshotted without tap coordinates (cu-73).
+     * so the "position not synced" badge can be screenshotted without tap coordinates.
      */
     fun expandCurrentlyPlaying() {
       if (currentlyPlayingLayoutState.value == COLLAPSED) {

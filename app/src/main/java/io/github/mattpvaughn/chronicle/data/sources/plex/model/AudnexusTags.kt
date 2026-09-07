@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
 //
-// Narrator and series, read out of Plex's `Style` and `Mood` tags (cu-24).
+// Narrator and series, read out of Plex's `Style` and `Mood` tags.
 //
 // Plex's music schema carries no narrator or series field. The Audnexus tagging convention borrows
 // two music fields for them, so **these are not music semantics** — a "style" here is a person, and
@@ -42,7 +42,7 @@ fun PlexDirectory.narrators(): List<String> = plexStyles.map { it.tag.trim() }.f
  * preference — verified in `Contents/Code/update_tools.py`). Plex returns moods alphabetically, so
  * simply taking the first non-empty tag filed any book whose author sorts before its series under a
  * series named after the author — silently, and only on servers with that preference enabled, which
- * is why fixtures written to match this code never showed it (the cu-24 trap).
+ * is why fixtures written to match this code never showed it (the author-sorts-before-series trap).
  *
  * Among equals the **first** still wins: a book belongs to one series in this convention, and
  * picking arbitrarily from a set would make the facet list unstable between syncs. Audnexus can emit

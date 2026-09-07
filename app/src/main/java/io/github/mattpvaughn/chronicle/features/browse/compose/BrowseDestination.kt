@@ -14,7 +14,7 @@ import io.github.mattpvaughn.chronicle.features.browse.BrowseViewModel
 import io.github.mattpvaughn.chronicle.views.compose.ChronicleScaffold
 
 /**
- * Browse the library by author, narrator or series, as a navigation destination (cu-206).
+ * Browse the library by author, narrator or series, as a navigation destination.
  *
  * Replaces `BrowseFragment` + `fragment_browse.xml`. That layout was the odd one out — a bare
  * `Toolbar` in a `ConstraintLayout` with no `AppBarLayout` and no inset call, so it was the only

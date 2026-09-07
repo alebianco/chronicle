@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The settings screen, asserted on what it renders (cu-199).
+ * The settings screen, asserted on what it renders.
  *
  * The View version had no rendering test at all — `SettingsList` was a `FrameLayout` wrapping a
  * programmatic `RecyclerView`, so reading a row's contents needed Espresso on a device. These run
@@ -111,7 +111,7 @@ class SettingsScreenTest {
    * The whole row toggles, not just the switch.
    *
    * The View version wired `preferenceSwitchContent` for exactly this; losing it would shrink a
-   * full-width target to a 48dp one, which is the cu-47 touch-target concern in a new place.
+   * full-width target to a 48dp one, which is the touch-target concern in a new place.
    */
   @Test
   fun `tapping anywhere on a switch row toggles it`() {

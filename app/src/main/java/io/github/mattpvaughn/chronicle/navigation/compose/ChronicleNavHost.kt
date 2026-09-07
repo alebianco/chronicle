@@ -29,7 +29,7 @@ import io.github.mattpvaughn.chronicle.navigation.Destination
 import io.github.mattpvaughn.chronicle.navigation.decodeArg
 
 /**
- * The app's navigation graph (cu-206).
+ * The app's navigation graph.
  *
  * Replaces `Navigator`, which committed `FragmentManager` transactions against a
  * `FragmentContainerView`. Three things it did by hand are now the framework's job:
@@ -39,7 +39,7 @@ import io.github.mattpvaughn.chronicle.navigation.decodeArg
  * - **`isFragmentWithTagVisible(TAG)`**, which drove both back handling and the "don't re-add home
  *   if it's already showing" guard, is `currentBackStackEntry`. The tags themselves go with it.
  * - **Arguments in a `Bundle`** become route arguments, landing in the same `SavedStateHandle` the
- *   ViewModels already read (cu-185).
+ *   ViewModels already read.
  *
  * The **login destinations are ordinary entries here**, not a separate flow. `Navigator` drove them
  * from `IPlexLoginRepo.loginEvent`, and that collector moves to `MainActivity`, which is the one

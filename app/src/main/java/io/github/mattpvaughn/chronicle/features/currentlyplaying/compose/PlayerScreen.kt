@@ -63,7 +63,7 @@ data class PlayerActions(
 )
 
 /**
- * The player's body (cu-198).
+ * The player's body.
  *
  * Stateless: it takes a [PlayerUiState] and emits events, so the whole screen is reachable from
  * `createComposeRule()` with no Robolectric, no `FragmentScenario` and no mocked Dagger component
@@ -71,7 +71,7 @@ data class PlayerActions(
  *
  * **Every visibility guard is gone, not ported.** The Fragment established "am I on screen?" with
  * `!seekbar.isShown || root.height == 0`, because a collapsed sheet is zero height with every
- * child still `VISIBLE`. That inference caused cu-141 and cu-19 (the landscape probe anchored on a
+ * child still `VISIBLE`. That inference caused two landscape bugs (the landscape probe anchored on a
  * view `values-land` hides). Here the Fragment simply does not compose this at all when the sheet
  * is collapsed, which it now knows from `bottomSheetState` rather than from geometry.
  */
@@ -129,7 +129,7 @@ private fun PlayerArtwork(
 /**
  * The two-level readout.
  *
- * Both lines come from [PlayerText], the pure formatters cu-173 extracted — so the wording rule
+ * Both lines come from [PlayerText], the pure formatters extracted from the screen — so the wording rule
  * (§3.1 rule 3: `6h 12m left in book`, never `47:12:33/52:04:11`) is stated once and shared with
  * the View screen while both exist.
  */
@@ -186,7 +186,8 @@ private fun PlayerReadout(text: TextState) {
  *
  * The drag position is held in `remember` and only reported on release, so playback's own ticks
  * cannot fight the thumb mid-gesture. `state.isSliding` is what makes that expressible at all —
- * it was a plain `var` until cu-198, and Compose has no "write time" at which to consult a field.
+ * it was a plain `var` until the Compose migration, and Compose has no "write time" at which to
+ * consult a field.
  */
 @Composable
 private fun PlayerSlider(
@@ -250,8 +251,9 @@ private fun TransportRow(
         IconButton(onClick = actions.onPlayPause) {
           // `Image`, not `Icon`: these are **two-colour** drawables — an accent circle with a
           // white glyph — and `Icon` flattens both to a single `tint`, rendering the play button
-          // as a bare filled circle with no triangle. Found on a device during cu-200; every
-          // Compose test passed, since the semantics tree was right and only the pixels wrong.
+          // as a bare filled circle with no triangle. Found on a device during the details
+          // screen's Compose migration; every Compose test passed, since the semantics tree was
+          // right and only the pixels wrong.
           Image(
             painterResource(
               if (transport.isPlaying) {
@@ -323,10 +325,10 @@ private fun UtilityRow(
 
     // Tap marks this moment, long-press lists them. A tap is the frequent action and gets the
     // plain press; browsing is rarer, so it takes the long one — §3.1 rule 2, one tray icon per
-    // job (cu-22).
+    // job.
     // A `Box` with `combinedClickable` rather than an `IconButton`: `IconButton` takes only
     // `onClick`, and the long-press is not optional here — it is the only route to the bookmark
-    // list. The 48dp size keeps the touch target, which `IconButton` would have supplied (cu-47).
+    // list. The 48dp size keeps the touch target, which `IconButton` would have supplied.
     Box(
       modifier =
         Modifier

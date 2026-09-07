@@ -82,12 +82,12 @@ interface PlexMediaService {
   ): PlexMediaContainerWrapper
 
   /**
-   * Several books' metadata in **one** request (cu-156).
+   * Several books' metadata in **one** request.
    *
    * The spec's "Get one or more metadata items" form. Verified against a real Plex 1.43 server:
    * 196 ids in a 1371-character path answered 200 in 0.196 s with 449 KB, carrying `Style` and
    * `Mood` for every book — the same facts Route A's `1 + N` walk derives, at one request instead
-   * of 185 (cu-150 measured it, this captured the fixture).
+   * of 185 (measured, and this captured the fixture).
    *
    * **`@Path(encoded = true)` is load-bearing**: Retrofit percent-encodes a path segment by
    * default, which would turn the separating commas into `%2C` and address a single book whose id
@@ -179,7 +179,7 @@ interface PlexMediaService {
   ): PlexMediaContainerWrapper
 
   /**
-   * The distinct values of one tag filter for a library — every narrator, or every series (cu-143).
+   * The distinct values of one tag filter for a library — every narrator, or every series.
    *
    * `filterName` is `style` (narrator) or `mood` (series) by the Audnexus convention, and
    * `type=$MEDIA_TYPE_ALBUM` scopes the answer to books rather than tracks or artists. The response
@@ -187,7 +187,7 @@ interface PlexMediaService {
    * text) — so `plexDirectories` reads it with no new model.
    *
    * This exists because `Style`/`Mood` are **detail-only** on an item: the library listing omits
-   * them entirely (cu-24), so the only alternative is one `/library/metadata/{id}` per book. Here
+   * them entirely, so the only alternative is one `/library/metadata/{id}` per book. Here
    * the cost is one request per *distinct value* instead, which for a household library is a small
    * multiple rather than a per-book sweep.
    *
@@ -201,7 +201,7 @@ interface PlexMediaService {
   ): PlexMediaContainerWrapper
 
   /**
-   * The books carrying one tag value (cu-143).
+   * The books carrying one tag value.
    *
    * `filterName` is `style` or `mood` as above and `tagKey` is the `key` from
    * [retrieveFilterChoices] — a tag **id**, never the display text. Returns listing-shaped albums,

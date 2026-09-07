@@ -21,12 +21,12 @@ import org.junit.Test
  *
  * The pair was asymmetrical: `setWatched` marked the book *and* its tracks, `setUnwatched` only the
  * book — so the tracks kept `viewCount` and their timestamps, and which state the UI showed depended
- * on what had run last. `markTracksInBookAsUnwatched` was added as the inverse in cu-86 and had **no
+ * on what had run last. `markTracksInBookAsUnwatched` was added as the inverse and had **no
  * test**, which is what this closes.
  *
  * The property that matters most is the last one: the values these write must not make
  * `getActiveTrack` believe the listener is part way through the book. That is the exact regression
- * cu-90's furthest-started rule introduced and cu-86 fixed, and it is only visible when the two are
+ * the furthest-started rule introduced and that inverse fixed, and it is only visible when the two are
  * tested *together*.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -121,7 +121,7 @@ class WatchedRoundTripTest {
     }
 
   /**
-   * The regression that connects cu-86 to cu-90. Every track marked watched carries
+   * The regression that connects the unwatched inverse to the furthest-started rule. Every track marked watched carries
    * `lastViewedAt = now`; if that counted as "started", `getActiveTrack` would return the **last**
    * track and the book would report itself part way through — 3000ms of 6000 for these tracks —
    * instead of at the start.
@@ -141,7 +141,7 @@ class WatchedRoundTripTest {
     }
 
   /**
-   * The server half of the repair (cu-98).
+   * The server half of the repair.
    *
    * `markTracksInBookAsUnwatched` was local-only: the *album* was unscrobbled by
    * `BookRepository.setUnwatched`, but every track kept the `viewCount` it had on the server. Since

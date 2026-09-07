@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The jump-interval mapping (cu-101).
+ * The jump-interval mapping.
  *
  * The third and fourth `stringRes`-as-identity `when` blocks in `makePreferences()`: the jump
  * forward and jump backward choosers offered the same six options and each carried its **own copy**

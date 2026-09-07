@@ -13,7 +13,7 @@ import org.junit.Test
  * `SharedPreferences` file as settings, so the obvious implementation — enumerate
  * `sharedPreferences.all` — would serialize the Plex token into a plaintext JSON file the user
  * then puts in Dropbox. The R0-close review also flagged that `key_is_premium` and
- * `key_premium_token` survive on installs predating cu-60, so a blanket dump would export a
+ * `key_premium_token` survive on installs predating the premium-feature removal, so a blanket dump would export a
  * Play **purchase token** too.
  *
  * So the exporter only ever emits keys it was told about, and these tests assert the negative:
@@ -30,7 +30,7 @@ class BackupSchemaTest {
         "auth_token" to "plex-account-token",
         "server_token" to "plex-server-token",
         "user" to """{"authToken":"nested-token"}""",
-        // Must not appear: orphaned by cu-60, still present on older installs.
+        // Must not appear: orphaned by the premium-feature removal, still present on older installs.
         "key_is_premium" to true,
         "key_premium_token" to "play-purchase-token",
       )

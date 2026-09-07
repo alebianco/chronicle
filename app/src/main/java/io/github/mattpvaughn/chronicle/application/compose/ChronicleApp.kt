@@ -67,7 +67,7 @@ private val TABS =
   )
 
 /**
- * The whole app shell (cu-206): bottom navigation, the nav host, and the currently-playing sheet
+ * The whole app shell: bottom navigation, the nav host, and the currently-playing sheet
  * stacked on top of both.
  *
  * This replaces `activity_main.xml`, whose player sheet was moved between three hand-written
@@ -77,15 +77,15 @@ private val TABS =
  *
  * The three states live in [BottomSheetState] on `MainActivityViewModel`, and four things read
  * them back — the back handler, the notification intent path, the media-session callbacks and the
- * player itself (cu-198). The XML version was never a `BottomSheetBehavior`: it was three
+ * player itself. The XML version was never a `BottomSheetBehavior`: it was three
  * constraint sets plus a `GestureDetector` that only ever *toggled*. So this renders the state it
  * is given and keeps the ViewModel as the single source of truth, rather than adopting
  * `AnchoredDraggable`, whose internal state would be a second copy of it — and keeping one source
- * of truth is what preserves cu-73's back-handling fix.
+ * of truth is what preserves the back-handling fix.
  *
  * Insets are handled here rather than in `applyWindowInsets`: the nav bar grows by the bottom inset
  * and pads by the same amount, so its content keeps a full [BottomNavHeight] while the extra sits
- * under the system bar (cu-73, found on the owner's phone in 3-button navigation mode).
+ * under the system bar (found on the owner's phone in 3-button navigation mode).
  */
 @Composable
 fun ChronicleApp(
@@ -134,8 +134,8 @@ fun ChronicleApp(
       // A plain `if`, **not** an `AnimatedVisibility`, and that is load-bearing rather than a
       // simplification. `AnimatedVisibility` keeps its content composed while hidden, so the
       // player would recompose at tick rate behind a collapsed sheet — `ProgressUpdater` publishes
-      // once a second during playback, and the whole point of cu-198's gate is that a collapsed
-      // player does *no* work (cu-110, cu-117, cu-141). Not composing it at all is a stronger
+      // once a second during playback, and the whole point of the gate is that a collapsed
+      // player does *no* work. Not composing it at all is a stronger
       // guarantee than any guard, which is what `CollapsedSheetGuardTest` pins.
       //
       // The cost is that the expanded player appears without a slide. The collapsed handle above

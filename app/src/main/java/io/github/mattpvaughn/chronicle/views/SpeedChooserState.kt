@@ -56,7 +56,7 @@ data class SpeedChooserState(
      * `Slider.setValue` **throws** for a value that is not a multiple of `stepSize` away from
      * `valueFrom`. Every speed this popover writes is already on a step, but the global preference
      * is also reachable through a settings import, where the allowlist gates the key and not the
-     * value (cu-77).
+     * value.
      */
     fun snapToStep(speed: Float): Float {
       val steps = Math.round((speed - SPEED_MIN) / SPEED_STEP)

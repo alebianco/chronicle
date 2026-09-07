@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The search overlay, shared by library, home and collections (cu-202).
+ * The search overlay, shared by library, home and collections.
  *
  * `GroupedSearchAdapter` had a unit test that drove its ViewHolders directly; this asserts what a
  * reader actually sees, which is what the adapter test could not.
@@ -91,7 +91,7 @@ class SearchOverlayTest {
    * Under a narrator heading the *matched narrator* is shown, not the author.
    *
    * A book listed under "Narrators" showing only its title gives the user no way to tell which of
-   * several narrators matched (cu-25).
+   * several narrators matched.
    */
   @Test
   fun `a narrator match says who narrated it rather than repeating the author`() {

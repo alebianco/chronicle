@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Moving the credentials into their own preferences file (cu-108).
+ * Moving the credentials into their own preferences file.
  *
  * The migration's whole risk is **signing a user out**. `PlexLoginRepo.determineLoginState` reads
  * `NOT_LOGGED_IN` from an empty account token, and `server` reads as null when its token is
@@ -51,7 +51,7 @@ class AuthPrefsMigrationTest {
 
   private fun newRepo() = SharedPreferencesPlexPrefsRepo(settings, auth, moshi)
 
-  /** Writes credentials the pre-cu-108 way: into the settings file. */
+  /** Writes credentials the legacy way: into the settings file. */
   private fun writeLegacyCredentials() {
     settings.edit()
       .putString("auth_token", "account-token")

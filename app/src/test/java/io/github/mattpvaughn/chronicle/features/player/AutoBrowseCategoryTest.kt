@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The Android Auto browse tree's identifiers (cu-99).
+ * The Android Auto browse tree's identifiers.
  *
  * The tree used to be keyed on `getString(R.string.auto_category_*)` — the localized label was the
  * media id *and* the value matched in `onLoadChildren`. Browsing therefore worked only in the locale

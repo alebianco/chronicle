@@ -18,10 +18,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The `SharedPreferences` round trip for a chosen server (cu-107).
+ * The `SharedPreferences` round trip for a chosen server.
  *
  * The real implementation had **no test at all** — every other test injects the in-memory
- * `FakePlexPrefsRepo` — which is why cu-11's tiering could be silently inert from the second
+ * `FakePlexPrefsRepo` — which is why the tiering could be silently inert from the second
  * launch onwards while all of its own unit tests passed. Those tests construct [Connection]
  * objects directly and assert the chooser's decisions; nothing crossed the persistence boundary
  * where the `local` and `relay` flags were being dropped.
@@ -36,7 +36,7 @@ class PlexPrefsConnectionRoundTripTest {
   private lateinit var authPrefs: SharedPreferences
   private lateinit var repo: SharedPreferencesPlexPrefsRepo
 
-  /** Modelled on a real `/api/v2/resources` response, captured in cu-107. */
+  /** Modelled on a real `/api/v2/resources` response, captured from a live sync. */
   private val lan =
     Connection(
       uri = "https://192-168-1-54.hash.plex.direct:32400",
@@ -85,7 +85,7 @@ class PlexPrefsConnectionRoundTripTest {
     val restored = repo.server
     assertNotNull(restored)
 
-    // The failure cu-107 records: every connection came back DIRECT, because it was rebuilt
+    // The failure this records: every connection came back DIRECT, because it was rebuilt
     // from a bare URI string with local and relay at their false defaults.
     assertEquals(
       listOf(ConnectionTier.LAN, ConnectionTier.DIRECT, ConnectionTier.RELAY),
@@ -102,7 +102,7 @@ class PlexPrefsConnectionRoundTripTest {
 
   @Test
   fun `a relay connection is still a relay after a round trip`() {
-    // The one that matters most for cu-11: relay must keep its penalty, or it is raced on equal
+    // The property that matters most: relay must keep its penalty, or it is raced on equal
     // footing with LAN despite the extra hop and the bandwidth cap.
     repo.server = serverWith(listOf(relay))
 
@@ -157,13 +157,13 @@ class PlexPrefsConnectionRoundTripTest {
     assertEquals(listOf(wan), repo.server!!.connections)
   }
 
-  // --- Migration from the pre-cu-107 keys -------------------------------------------------
+  // --- Migration from the legacy keys -------------------------------------------------
   //
   // The upgrade path matters more than it looks: an empty connection list makes `server` read
   // back as null, which presents to the user as "no server chosen" and sends them through the
   // chooser again. A fix that logged everyone out on upgrade would be worse than the bug.
 
-  /** Writes the server the way the pre-cu-107 code did: bare URIs in two identical string sets. */
+  /** Writes the server the way the legacy code did: bare URIs in two identical string sets. */
   private fun writeLegacyServer(connections: List<Connection>) {
     val uris = connections.map { it.uri }.toSet()
     prefs.edit()

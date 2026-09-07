@@ -20,7 +20,7 @@ import java.io.IOException
  * address answering in 120ms.
  *
  * `probe` is injected, so these cases never touch Retrofit — the trade-off is that the real
- * `checkServer` wiring is not covered here (see cu-73).
+ * `checkServer` wiring is not covered here.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectionChooserTest {

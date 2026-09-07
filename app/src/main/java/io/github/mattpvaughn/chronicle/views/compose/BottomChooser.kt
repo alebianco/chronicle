@@ -21,7 +21,7 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.BottomChooserSta
 import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableString
 
 /**
- * A list of choices in a modal sheet (cu-203).
+ * A list of choices in a modal sheet.
  *
  * Replaces `BottomSheetChooser`, a `FrameLayout` with a hand-rolled show/hide animation, an inner
  * `RecyclerView` adapter and a `DiffUtil` — used by five screens through a binding-adapter-style
@@ -33,7 +33,7 @@ import io.github.mattpvaughn.chronicle.views.BottomSheetChooser.FormattableStrin
  * string were made in the composable, and it is not — `SettingsViewModel` alone builds 123 of them.
  * Deferring the `Resources` lookup to render time is the right shape, and this resolves it here.
  *
- * `ModalBottomSheet` needs no `expandBottomSheetOnStart()` (cu-142): Material's
+ * `ModalBottomSheet` needs no `expandBottomSheetOnStart()`: Material's
  * `BottomSheetDialog` opened at a peek height shorter than its own title bar in landscape, and the
  * Compose sheet has no peek state to get stuck in. That helper does **not** retire yet — the three
  * `BottomSheetDialogFragment`s (bookmarks, the note editor, the speed chooser) still need it.

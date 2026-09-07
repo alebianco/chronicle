@@ -24,14 +24,14 @@ import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 
 /**
- * The frame shared by the three onboarding pickers (cu-206).
+ * The frame shared by the three onboarding pickers.
  *
  * `onboarding_plex_choose_{server,library,user}.xml` were the same layout three times: a title, a
  * refresh icon and the list. Only the server picker actually wired its refresh icon up — the
  * library picker's had no click listener at all, so it was a button that did nothing. Making
  * [onRefresh] a required parameter is what stops that being expressible.
  *
- * These screens have no toolbar, so the frame takes the status-bar inset itself (cu-63).
+ * These screens have no toolbar, so the frame takes the status-bar inset itself.
  */
 @Composable
 fun OnboardingScaffold(

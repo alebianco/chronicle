@@ -30,7 +30,7 @@ class PlexMediaSource
      * Read from prefs on each access rather than captured once: the user can switch servers
      * without this object being rebuilt, and a stale id would scope writes to the previous
      * server — filing the new server's books where the next refresh of the old one would delete
-     * them (cu-80's removal rule).
+     * them (the removal rule).
      */
     override val id: SourceId
       get() = SourceId.forPlexServer(plexPrefsRepo.server?.serverId.orEmpty())

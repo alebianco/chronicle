@@ -9,14 +9,14 @@ import java.io.File
  * What Android's Auto Backup is allowed to take.
  *
  * The app keeps its Plex auth token, server access token and user record in
- * `ChronicleAuth.xml`, separate from the settings in `Chronicle.xml` since cu-108. With
+ * `ChronicleAuth.xml`, separate from the settings in `Chronicle.xml`. With
  * `allowBackup="true"` and no rules, Auto Backup's default is to include all shared preferences,
  * so working credentials would go to the user's Drive. D8 is explicit that tokens stay on the
  * device.
  *
  * The separation is the point of these tests, and it cuts both ways: the credentials file must be
- * excluded, and the settings file must **not** be — otherwise cu-108 moved the tokens for nothing
- * and the user still loses their preferences on a device transfer.
+ * excluded, and the settings file must **not** be — otherwise this split moved the tokens for
+ * nothing and the user still loses their preferences on a device transfer.
  *
  * Two files are needed because `dataExtractionRules` is honoured only on API 31+ while minSdk
  * is 27. A rule present in one and missing from the other applies on some devices and not
@@ -42,7 +42,7 @@ class BackupRulesTest {
 
   @Test
   fun `the settings file is not excluded`() {
-    // The reason cu-108 split the files. Asserted on the parsed `path` attributes rather than
+    // The reason the files were split. Asserted on the parsed `path` attributes rather than
     // with `contains`, because "ChronicleAuth.xml" contains neither more nor less than itself —
     // a substring check here would be answering a different question than it appears to.
     val excludedPaths =
@@ -50,7 +50,7 @@ class BackupRulesTest {
         .mapNotNull { Regex("""path="([^"]+)"""").find(it)?.groupValues?.get(1) }
 
     assertTrue(
-      "settings must survive a restore; only credentials are withheld (cu-108)",
+      "settings must survive a restore; only credentials are withheld",
       SETTINGS_PREFS_FILE !in excludedPaths,
     )
     assertTrue(
@@ -139,7 +139,7 @@ class BackupRulesTest {
     /** `APP_NAME` is "Chronicle", so the settings file on disk is Chronicle.xml. */
     const val SETTINGS_PREFS_FILE = "Chronicle.xml"
 
-    /** `AUTH_PREFS_NAME` is "ChronicleAuth" (cu-108). */
+    /** `AUTH_PREFS_NAME` is "ChronicleAuth". */
     const val AUTH_PREFS_FILE = "ChronicleAuth.xml"
   }
 }

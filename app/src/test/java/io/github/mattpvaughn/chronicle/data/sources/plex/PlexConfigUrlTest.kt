@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * `PlexConfig.toServerString`, the join every Plex URL in the app is built from.
  *
- * Untested until cu-33 because the class fetched its `Context` from the service locator in two
+ * Untested because the class fetched its `Context` from the service locator in two
  * methods, so constructing one on the JVM threw. It now takes the context as a constructor
  * parameter, and the join — which is pure and has four cases, two of which are the ones that
  * produce a doubled or missing slash — is finally reachable.
@@ -31,7 +31,7 @@ class PlexConfigUrlTest {
   }
 
   /**
-   * The case the function exists for, and the one it used to get wrong (cu-160).
+   * The case the function exists for, and the one it used to get wrong.
    *
    * It stripped the path's leading slash and then added one back, so `//` came out — not cosmetic
    * to Plex, which matches a path rather than normalising it. Unreachable from live data (every

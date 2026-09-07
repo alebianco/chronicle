@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * A collapsed player does no rendering work — now enforced by structure, not by a guard (cu-198).
+ * A collapsed player does no rendering work — now enforced by structure, not by a guard.
  *
  * ## What this used to be, and why it changed
  *
@@ -16,7 +16,7 @@ import java.io.File
  * 1. `renderPlayerText` passed its guard while collapsed and wrote text into a hierarchy with no
  *    room, so `wrap_content` readouts measured to zero width. The book-progress line was blank in
  *    landscape depending only on which tick landed after an expand — six attempts at the
- *    *constraints* found nothing, because the constraints were never wrong (cu-141).
+ *    *constraints* found nothing, because the constraints were never wrong.
  * 2. The re-render listener keyed on an `isShown` transition that never fired, so the stale text
  *    written while collapsed was never corrected.
  *
@@ -24,11 +24,11 @@ import java.io.File
  * lines of a `height` check — because a Robolectric view is laid out at its measured size with no
  * `BottomSheetBehavior` driving it, so the collapsed state was unreachable from a unit test.
  *
- * cu-198 removed the mechanism rather than re-guarding it. The body is `PlayerScreen`, composed
- * only when the sheet reports `EXPANDED`. cu-206 moved *where* that gate lives: the fragment and
- * its `CurrentlyPlayingInterface` are gone, and `ChronicleApp` composes the player under a plain
- * `if (sheetState == EXPANDED)`. So "is the player on screen?" is a fact the shell already knows
- * instead of something inferred from view geometry, and the
+ * The Compose migration removed the mechanism rather than re-guarding it. The body is
+ * `PlayerScreen`, composed only when the sheet reports `EXPANDED`. That migration moved *where*
+ * that gate lives: the fragment and its `CurrentlyPlayingInterface` are gone, and `ChronicleApp`
+ * composes the player under a plain `if (sheetState == EXPANDED)`. So "is the player on screen?"
+ * is a fact the shell already knows instead of something inferred from view geometry, and the
  * failure mode is **unrepresentable**: there is no write site left at which a guard could be
  * forgotten.
  *
@@ -38,8 +38,9 @@ import java.io.File
  *
  * **The `if` in `ChronicleApp` is load-bearing and this test is why it is not an
  * `AnimatedVisibility`.** That composable keeps its content composed while hidden, so the player
- * would recompose once a second behind a collapsed sheet — the exact cost cu-110 and cu-117
- * measured. The first cu-206 draft used one, and repointing this guard is what caught it.
+ * would recompose once a second behind a collapsed sheet — the exact cost an earlier profiling
+ * pass measured. The first Compose migration draft used one, and repointing this guard is what
+ * caught it.
  */
 class CollapsedSheetGuardTest {
   private val player =
@@ -71,7 +72,7 @@ class CollapsedSheetGuardTest {
    * `isShown` cannot answer the question this screen asks. It reports the visibility *flags* up
    * the ancestor chain, and a collapsed sheet's children are all `VISIBLE` — so it reads true
    * while nothing is on screen. Any reappearance means someone has started inferring
-   * on-screen-ness from the view tree again, which is cu-141.
+   * on-screen-ness from the view tree again.
    */
   @Test
   fun `the player does not infer visibility from view geometry`() {
@@ -86,11 +87,11 @@ class CollapsedSheetGuardTest {
     assertFalse(
       "`isShown` reads true for a collapsed sheet, because it only checks visibility flags and " +
         "the sheet collapses to zero height with its children VISIBLE. Gate composition on the " +
-        "sheet's own state instead — that is what cu-198 replaced this guard with.",
+        "sheet's own state instead — that is what replaced this guard.",
       source.contains(".isShown"),
     )
     assertFalse(
-      "`root.height == 0` is the other half of the same inference (cu-141). The sheet's state is " +
+      "`root.height == 0` is the other half of the same inference. The sheet's state is " +
         "available directly; do not re-derive it from measurement.",
       Regex("""\broot\.height\b""").containsMatchIn(source),
     )
@@ -122,7 +123,7 @@ class CollapsedSheetGuardTest {
 
     assertFalse(
       "the expanded player must not sit inside an AnimatedVisibility: it keeps content composed " +
-        "while hidden, which is the per-second work cu-110 and cu-117 measured and removed.",
+        "while hidden, which is the per-second work an earlier profiling pass measured and removed.",
       expandedBranch.contains("AnimatedVisibility"),
     )
   }

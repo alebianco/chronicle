@@ -12,10 +12,10 @@ import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import timber.log.Timber
 
 /**
- * Renders a Compose screen on a real device with no server and no login (cu-181).
+ * Renders a Compose screen on a real device with no server and no login.
  *
  * A POC that only ever runs under `createComposeRule()` proves the logic and nothing about how it
- * *looks* — and every UI bug this migration is meant to prevent (cu-141, cu-142, cu-19, cu-68) was
+ * *looks* — and every UI bug this migration is meant to prevent was
  * a bug about appearance on a real screen in a real orientation. So the screen has to be seen.
  *
  * **Debug-only, and deliberately not wired into `CollectionsFragment`.** That Fragment also owns
@@ -24,7 +24,7 @@ import timber.log.Timber
  * production Collections screen is untouched until the migration is a whole task.
  *
  * It lives in `src/debug` rather than behind a `DebugHooks` method on purpose: the contract has a
- * release twin that must be kept in step (cu-70), and a standalone activity needs neither.
+ * release twin that must be kept in step, and a standalone activity needs neither.
  *
  * ```
  * adb shell am start -n io.github.mattpvaughn.chronicle.debug/io.github.mattpvaughn.chronicle.debug.compose.ComposePreviewActivity

@@ -13,7 +13,7 @@ import org.junit.Test
 import java.io.IOException
 
 /**
- * `PlaybackSession` — the Plex session handshake and the token that authorizes it (cu-33).
+ * `PlaybackSession` — the Plex session handshake and the token that authorizes it.
  *
  * Both used to sit inside `AudiobookMediaSessionCallback`, which reached the network through
  * `Injector.get().plexMediaService()`, so neither could be tested at all. The token precedence in

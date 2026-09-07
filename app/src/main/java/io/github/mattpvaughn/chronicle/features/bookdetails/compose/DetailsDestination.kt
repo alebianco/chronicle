@@ -40,7 +40,7 @@ import io.github.mattpvaughn.chronicle.views.compose.ChronicleScaffold
 private const val SYNC_SPIN_MILLIS = 1000
 
 /**
- * One book, as a navigation destination (cu-206).
+ * One book, as a navigation destination.
  *
  * ### The collapsing toolbar is not carried over
  *
@@ -133,8 +133,8 @@ fun DetailsDestination(
             onPlayPause = viewModel::pausePlayButtonClicked,
             onDownload = viewModel::onCacheButtonClick,
             onToggleSummary = viewModel::onToggleSummaryView,
-            // The series line navigates into the browse facet cu-24 built. Losing it would be a
-            // silent feature loss of the kind cu-198 shipped and had to recover.
+            // The series line navigates into the browse-by-facet screen. Losing it would be a
+            // silent feature loss of the kind the player's Compose migration shipped and had to recover.
             onSeriesClick = { viewModel.audiobook.value?.let { onSeriesClick(it.series) } },
           ),
         coverUrl = plexConfig::toServerString,

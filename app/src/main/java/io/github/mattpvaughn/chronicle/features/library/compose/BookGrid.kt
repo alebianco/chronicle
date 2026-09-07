@@ -22,7 +22,7 @@ import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 
 /**
- * A plain grid of books with an empty message (cu-201).
+ * A plain grid of books with an empty message.
  *
  * Shared by the browse-facet and collection-detail screens, which are both thin
  * `AudiobookAdapter` users: a grid, an empty message, and a tap. They have no offline branch and
@@ -31,7 +31,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
  *
  * [books] being `null` means "not read yet" and renders nothing, which is the same distinction
  * `LibraryContent.Loading` draws: an empty list and an unread one must not look alike, or the
- * empty message flashes before the first emission (cu-68).
+ * empty message flashes before the first emission.
  */
 @Composable
 internal fun BookGrid(
@@ -62,7 +62,7 @@ internal fun BookGrid(
       else ->
         LazyVerticalGrid(
           // Adaptive, never Fixed: a fixed count divides the available width, which on a 1920px
-          // tablet gives one cover per screen (cu-187).
+          // tablet gives one cover per screen.
           columns = GridCells.Adaptive(minSize = 180.dp),
           contentPadding = PaddingValues(8.dp),
           horizontalArrangement = Arrangement.spacedBy(8.dp),

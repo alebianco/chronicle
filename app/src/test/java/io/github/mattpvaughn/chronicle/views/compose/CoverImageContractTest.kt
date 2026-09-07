@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * What [CoverImage] asks the network for (cu-207).
+ * What [CoverImage] asks the network for.
  *
  * The decision is a pure function so it can be asserted directly: `AsyncImage` is asynchronous and
  * Robolectric has no network, so a rendering assertion cannot tell "requested the right url" from

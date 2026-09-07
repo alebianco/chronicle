@@ -16,12 +16,12 @@ import org.robolectric.RobolectricTestRunner
 import kotlin.system.measureNanoTime
 
 /**
- * Measures what `searchGrouped`'s whole-table read actually costs (cu-161, cu-51's finding).
+ * Measures what `searchGrouped`'s whole-table read actually costs.
  *
  * A **measurement harness**, not a gate: it prints and asserts nothing tight, because a wall-clock
  * number under Robolectric on a laptop is not a device number and must not fail a build on a busy
  * machine. It exists so the "is this worth fixing" question is answered with numbers rather than
- * by reading the query — cu-110 and cu-51 both recorded that reading produced confident wrong
+ * by reading the query — two separate past attempts at reading it each recorded confident wrong
  * answers here.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -81,7 +81,7 @@ class SearchReadCostTest {
         }
       val median = timings.sorted()[runs / 2]
 
-      println("cu-161 whole-table read, 10k books: median ${"%.1f".format(median)} ms, all=$timings")
+      println("search-read-cost: whole-table read, 10k books: median ${"%.1f".format(median)} ms, all=$timings")
     }
 
   /** The 196-book library the household actually has, for scale. */
@@ -93,11 +93,11 @@ class SearchReadCostTest {
 
       val timings =
         (1..5).map { measureNanoTime { db.bookDao.getAllBooksAsync(TEST_SOURCE, false) } / 1_000_000.0 }
-      println("cu-161 whole-table read, 196 books: median ${"%.2f".format(timings.sorted()[2])} ms, all=$timings")
+      println("search-read-cost: whole-table read, 196 books: median ${"%.2f".format(timings.sorted()[2])} ms, all=$timings")
     }
 
   /**
-   * The hypothesis cu-161 proposes: match on a projection, then fetch only the hits in full.
+   * The hypothesis this proposes: match on a projection, then fetch only the hits in full.
    *
    * Measured rather than assumed. If the projection read plus a second keyed read is not
    * materially cheaper than one whole-table read, the change is not worth its complexity — and a
@@ -112,7 +112,7 @@ class SearchReadCostTest {
 
       val timings =
         (1..5).map { measureNanoTime { db.bookDao.searchProjection(TEST_SOURCE, false) } / 1_000_000.0 }
-      println("cu-161 projection read, 10k books: median ${"%.1f".format(timings.sorted()[2])} ms, all=$timings")
+      println("search-read-cost: projection read, 10k books: median ${"%.1f".format(timings.sorted()[2])} ms, all=$timings")
     }
 
   /** The second half of the hypothesis: fetching a realistic number of hits by id. */
@@ -125,11 +125,11 @@ class SearchReadCostTest {
 
       val timings =
         (1..5).map { measureNanoTime { db.bookDao.getAudiobooksByIds(TEST_SOURCE, ids) } / 1_000_000.0 }
-      println("cu-161 fetch 50 by id, 10k books: median ${"%.2f".format(timings.sorted()[2])} ms, all=$timings")
+      println("search-read-cost: fetch 50 by id, 10k books: median ${"%.2f".format(timings.sorted()[2])} ms, all=$timings")
     }
 
   /**
-   * The number cu-161's acceptance criterion asks for: a whole `searchGrouped` at 10,000 books,
+   * The number the acceptance criterion asks for: a whole `searchGrouped` at 10,000 books,
    * old path against new, on the same data in the same run.
    */
   @Test
@@ -170,7 +170,7 @@ class SearchReadCostTest {
 
       val hits = repo.searchGrouped(QUERY).groups.sumOf { it.count }
       println(
-        "cu-161 searchGrouped 10k books: before ${"%.1f".format(before)} ms, " +
+        "search-read-cost: searchGrouped 10k books: before ${"%.1f".format(before)} ms, " +
           "after ${"%.1f".format(after)} ms (${"%.0f".format((1 - after / before) * 100)}% less), " +
           "hits=$hits",
       )

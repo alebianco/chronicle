@@ -6,12 +6,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 
 /*
- * The `Flow` replacements for `DoubleLiveData` and friends (cu-52).
+ * The `Flow` replacements for `DoubleLiveData` and friends.
  *
  * Those were hand-rolled `MediatorLiveData` subclasses whose whole job — combine N sources, publish
  * only when the result changed — is what `combine` plus `distinctUntilChanged` does natively. Kept
  * as named helpers rather than inlined at 23 call sites so the **dedup stays mandatory**: that is
- * not an optimisation, it is the cu-110 fix.
+ * not an optimisation, it is the per-tick Room invalidation fix.
  *
  * `Flow`'s `combine` also improves on the originals in one way that matters here: it waits for
  * *every* source to emit before producing anything, where `DoubleLiveData` published immediately
@@ -70,7 +70,7 @@ fun <T, K, S, Q, R> combineDistinct(
  * whichever dispatcher it was collected from — no `postValue` and no scope to inject.
  *
  * The dispatcher is a parameter rather than `Dispatchers.IO` so it obeys convention 4 (inject a
- * `DispatcherProvider`, cu-15) and a test can control it.
+ * `DispatcherProvider`) and a test can control it.
  */
 fun <T, K, S, Q, R> combineDistinctAsync(
   source1: Flow<T>,

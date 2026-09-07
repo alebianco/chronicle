@@ -13,12 +13,12 @@ This glossary explains common Android, Kotlin, and architecture terms used throu
 
 ### Activity
 A single screen in an Android app with a user interface. Chronicle has one Activity
-(`MainActivity`); it calls `setContent` and hosts a Compose `NavHost` (cu-206).
+(`MainActivity`); it calls `setContent` and hosts a Compose `NavHost`.
 
 ### Fragment
 A reusable portion of UI representing a screen or part of one. **Chronicle has none** — every
-screen was a Fragment until cu-206, which replaced them with Compose destinations. The term appears
-throughout the task history, which is why it is still defined here.
+screen was a Fragment until the Compose migration replaced them with Compose destinations. The term
+appears throughout the task history, which is why it is still defined here.
 
 ### Service
 A component that runs in the background without a user interface. `MediaPlayerService` plays audio in the background.
@@ -30,7 +30,7 @@ A message that requests an action from another app component. Used for navigatio
 Provides access to application resources and system services. Activities and Services are Contexts.
 
 ### Layout
-XML files defining UI structure, in `res/layout/`. **Chronicle has none** as of cu-206; a screen is
+XML files defining UI structure, in `res/layout/`. **Chronicle has none**; a screen is
 a `*Screen` composable.
 
 ### RecyclerView
@@ -93,8 +93,9 @@ A singleton object associated with a class, similar to static members in Java.
 ## Android Jetpack Terms
 
 ### LiveData
-Android's lifecycle-aware observable holder. **Removed from this codebase in cu-52** — the entry is
-kept only so the term is recognisable in older commits and comments. Use `StateFlow`.
+Android's lifecycle-aware observable holder. **Removed from this codebase in the StateFlow
+migration** — the entry is kept only so the term is recognisable in older commits and comments. Use
+`StateFlow`.
 
 ### ViewModel
 A class that holds UI-related data and survives configuration changes (like screen rotation).
@@ -106,22 +107,22 @@ SQLite database library that provides an abstraction layer over SQLite for easie
 API for scheduling background tasks that need guaranteed execution.
 
 ### Data Binding
-**Removed in cu-58.** Kept here only so the term is recognisable in older commits. Layouts have no
+**Removed.** Kept here only so the term is recognisable in older commits. Layouts have no
 `<layout>` wrapper and no `@{...}` expressions; view state is set from Kotlin. See **ViewBinding**
 and **Compose**.
 
 ### ViewBinding
 Generated type-safe accessors for a layout's views (`FragmentHomeBinding.inflate(...)`).
-**Removed in cu-206** along with the last layout; `buildFeatures.viewBinding` is off. DataBinding
-went earlier, in cu-58.
+**Removed** along with the last layout; `buildFeatures.viewBinding` is off. DataBinding
+went earlier.
 
 ### Compose
-Declarative UI toolkit, and **the whole UI** ([[decision-22]]; cu-181 → cu-206). A screen is a
+Declarative UI toolkit, and **the whole UI** ([[decision-22]]). A screen is a
 `*Screen` composable — a pure function of its state — behind a `*Destination` that wires a ViewModel
 to it with `hiltViewModel()`.
 
 ### Navigation Compose
-The navigation library that replaced `Navigator`'s `FragmentManager` transactions (cu-206). Routes
+The navigation library that replaced `Navigator`'s `FragmentManager` transactions. Routes
 are declared in `navigation/Destination.kt` and registered in
 `navigation/compose/ChronicleNavHost.kt`; an argument travels in the route string and arrives in the
 ViewModel's `SavedStateHandle`.
@@ -253,7 +254,7 @@ Tools that shrink, optimize, and obfuscate code for release builds.
 External library or module that the project uses.
 
 ### KSP (Kotlin Symbol Processing)
-Annotation processing tool for Kotlin, used by Room and Dagger. **KAPT is gone** (cu-8/cu-58) —
+Annotation processing tool for Kotlin, used by Room and Dagger. **KAPT is gone** —
 `kotlin-kapt` is not applied, and any doc claiming otherwise is wrong.
 
 ## Testing Terms
@@ -292,7 +293,7 @@ series — `seriesName()` prefers a prefixed tag for that reason. The position w
 parsed from `titleSort` by `SeriesIndexPatterns.kt`, in hundredths, **not** from Plex's `index`.
 
 ### SourceId
-`"plex:<clientIdentifier>"` — which source instance owns a stored row (cu-127, [[decision-21]]).
+`"plex:<clientIdentifier>"` — which source instance owns a stored row ([[decision-21]]).
 Carried by `Audiobook`, `Collection` and `MediaItemTrack`; a read returning rows must filter by it
 or `ScopedQueryTest` fails the build.
 

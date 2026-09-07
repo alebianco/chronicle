@@ -16,7 +16,7 @@ import org.junit.Test
  * Switching libraries invalidates every cached book and track. Settings already handled that — it
  * clears the databases and asks about downloads — but the login picker did not, so choosing a
  * different library there left Room holding the previous library's catalogue and the app showed a
- * **union of two libraries** until the next refresh pruned it (cu-126).
+ * **union of two libraries** until the next refresh pruned it.
  *
  * The distinction that matters is *changed*, not *chosen*: a first-ever selection has nothing to
  * invalidate, and treating it as a change would clear a database that is already empty and, in the

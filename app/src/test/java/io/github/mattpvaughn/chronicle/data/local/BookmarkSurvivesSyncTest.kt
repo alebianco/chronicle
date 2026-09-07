@@ -32,7 +32,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Bookmarks survive a library re-sync (cu-22, criterion 2).
+ * Bookmarks survive a library re-sync.
  *
  * Against **real databases**, both of them, and driving the real `refreshData` — because the claim
  * is about what the sync path does to another table, and a mocked DAO cannot answer that. The
@@ -64,7 +64,7 @@ class BookmarkSurvivesSyncTest {
       every { library } returns PlexLibrary(name = "Books", type = MediaType.ARTIST, id = "1")
       // Without this the repository's scoping key is SourceId.UNKNOWN, no fixture row matches it,
       // and the refresh deletes nothing — which would make this test pass while proving nothing
-      // (cu-127). The assertion it would defeat is the one that says the book *was* deleted.
+      // . The assertion it would defeat is the one that says the book *was* deleted.
       every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)
     }
 

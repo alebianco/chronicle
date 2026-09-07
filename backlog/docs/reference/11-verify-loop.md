@@ -27,9 +27,9 @@ laptop and on any forge.
 Nothing less. The last stage exists because the debug and release source sets each provide their own
 `DebugHooks` object: `DebugHooksContract` makes the compiler check the shape, but only for the
 variant being built — so a drifted release twin used to pass every debug-only check and break the
-first release build (cu-70).
+first release build.
 
-## The coverage ratchet (cu-135)
+## The coverage ratchet
 
 `coverage-ratchet.sh` checks JaCoCo instruction coverage **twice from one report**, and both
 baselines are plain committed files so every movement is reviewable in a diff (D12 rule 6).
@@ -39,7 +39,7 @@ tolerance absorbs codegen jitter, and it *is* a high-water mark: the no-regressi
 deliberately does not rewrite the file, so a second consecutive dip is measured against the same
 high number and fails. **Drops cannot accumulate.**
 
-> An earlier doc claimed the opposite and cu-135 was filed to "fix" it. The walk does not exist —
+> An earlier doc claimed the opposite and a task was filed to "fix" it. The walk does not exist —
 > the comment in the script was simply describing a 0.01% tolerance the code never had.
 
 **Per package**, against `coverage-baseline-packages.txt` — fails when any single package drops
@@ -63,10 +63,10 @@ entities), or dependencies.
 It asserts **against the dex** that Room/Retrofit/Dagger/Moshi classes survived R8 — these fail at
 runtime, not build time.
 
-Keep rules are deliberately narrow (cu-45): **prefer adding one precise rule over widening a
+Keep rules are deliberately narrow: **prefer adding one precise rule over widening a
 blanket `-keep`**, which silently exempts code from R8.
 
-## Instrumented tests (cu-54)
+## Instrumented tests
 
 `./verify.sh --instrumented` adds them as a 7th stage; `./gradlew
 instrumentedCheckGroupGroupDebugAndroidTest` runs them directly.
@@ -76,7 +76,7 @@ version guard) and **API 35**, both AOSP `arm64-v8a`.
 
 **Opt-in, not in the default gate** — two emulators take minutes where the unit gate takes seconds.
 
-The suite is `LoggedInLaunchTest`: three cases against the cu-16 fixture server via `MockPlexMode`,
+The suite is `LoggedInLaunchTest`: three cases against the fixture server via `MockPlexMode`,
 so **no credentials and no live server**. It is deliberately small; it exists to make the
 Fragment/Activity/media-session layer reachable at all, not to cover it.
 

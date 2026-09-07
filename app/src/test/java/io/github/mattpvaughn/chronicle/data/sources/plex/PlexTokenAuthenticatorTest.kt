@@ -97,7 +97,7 @@ class PlexTokenAuthenticatorTest {
 
   /**
    * plex.tv answered and still refused: the account token itself is dead. Recorded so the UI can
-   * say so and offer re-authentication, instead of the app presenting stale data in silence (cu-84).
+   * say so and offer re-authentication, instead of the app presenting stale data in silence.
    */
   @Test
   fun `an unchanged token records the account as signed out`() {

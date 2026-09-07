@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Bookmarks in the backup file (cu-22, criterion 3).
+ * Bookmarks in the backup file.
  *
  * The file is the durable artifact — a user may keep it for years and open it in an editor — so
  * what matters is that a round trip is lossless, that a restore is idempotent, and that a

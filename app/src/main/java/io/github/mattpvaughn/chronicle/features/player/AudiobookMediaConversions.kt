@@ -19,7 +19,7 @@ import java.io.File
  * browse tree Android Auto renders.
  *
  * These lived on `Audiobook` itself and were its only reason to import `MediaBrowserCompat`,
- * `MediaDescriptionCompat`, `Bundle` and `MediaMetadataCompat` (cu-176). Two reasons they moved:
+ * `MediaDescriptionCompat`, `Bundle` and `MediaMetadataCompat`. Two reasons they moved:
  *
  *  1. **They are a presentation concern of this package, not a property of a book.** `toMediaItem`
  *     exists so `MediaPlayerService.onLoadChildren` has something to hand the car; nothing about a

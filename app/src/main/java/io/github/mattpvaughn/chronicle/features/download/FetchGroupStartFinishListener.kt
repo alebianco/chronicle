@@ -14,8 +14,8 @@ abstract class FetchGroupStartFinishListener : AbstractFetchGroupListener() {
    *
    * "Finished" here means "no longer in flight", not "succeeded". An implementation must inspect
    * [FetchGroup.downloads] before treating the group as downloaded; `fetchGroup.downloads.all
-   * { it.error == Error.NONE }` is the check. A sibling class conflated the two and was deleted
-   * in cu-76: it routed `onError` straight to `onFinished`, leaving callers no way to tell a
+   * { it.error == Error.NONE }` is the check. A sibling class conflated the two and was deleted:
+   * it routed `onError` straight to `onFinished`, leaving callers no way to tell a
    * failed download from a complete one, which is how a truncated book gets marked available
    * offline.
    */

@@ -18,7 +18,7 @@ import javax.inject.Inject
  * Replaces a loop that launched every attempt simultaneously and then polled them every
  * 500ms. That was not tiered despite appearing to be — sorting a list whose elements all
  * start at once only changes the order in which completions are *noticed*, so a relay
- * answering in 80ms beat a LAN address answering in 120ms (cu-11, #103/#98).
+ * answering in 80ms beat a LAN address answering in 120ms (#103/#98).
  *
  * Tiers are tried best-first with a **budget** rather than strictly in sequence. Waiting out
  * a full LAN timeout before trying anything else would just relocate the old stall: instead

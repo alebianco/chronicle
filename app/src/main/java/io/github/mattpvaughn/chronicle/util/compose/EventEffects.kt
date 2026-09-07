@@ -13,7 +13,7 @@ import io.github.mattpvaughn.chronicle.util.Event
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Runs [onEvent] for each unhandled [Event], while the screen is at least STARTED (cu-206).
+ * Runs [onEvent] for each unhandled [Event], while the screen is at least STARTED.
  *
  * The Compose equivalent of `collectEventsWhileStarted`, which took a `LifecycleOwner` a
  * composable does not have. The STARTED gate is the same and matters for the same reason: a
@@ -74,7 +74,7 @@ fun ToastResEffect(events: Flow<Event<Int>?>) {
 }
 
 /**
- * Runs [onResume] each time the screen becomes RESUMED (cu-206).
+ * Runs [onResume] each time the screen becomes RESUMED.
  *
  * The equivalent of a Fragment's `onResume` override. `LoginDestination` is the reason it exists:
  * the user leaves for a browser to approve an OAuth PIN and comes back, and only a resume tells the

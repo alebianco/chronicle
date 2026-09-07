@@ -57,7 +57,7 @@ interface PlexPrefsRepo {
    * The difference between re-authenticating and logging out. A Plex token can be invalidated
    * server-side (a password change with "sign out connected devices", a server re-claim) while the
    * user's choice of server and library remains perfectly good — so the recovery is a fresh OAuth
-   * PIN, not re-picking a library they already picked (cu-84).
+   * PIN, not re-picking a library they already picked.
    *
    * The per-user token on [user] goes too: it is derived from the account token, so keeping it
    * would leave a dead credential that outlives the re-auth.
@@ -105,7 +105,7 @@ class SharedPreferencesPlexPrefsRepo
        *
        * Replaces the two keys below, which stored **bare URI strings** and so lost `local`,
        * `relay` and `protocol` — every connection read back as [ConnectionTier.DIRECT] and
-       * cu-11's tiering did nothing from the second launch onwards (cu-107).
+       * the tiering did nothing from the second launch onwards.
        */
       const val PREFS_SERVER_CONNECTIONS_KEY = "server_connections_v2"
 
@@ -124,7 +124,7 @@ class SharedPreferencesPlexPrefsRepo
       const val NO_TEMP_ID_FOUND = -1L
 
       /**
-       * The keys that live in the credentials file (cu-108).
+       * The keys that live in the credentials file.
        *
        * `uuid` and `id` are deliberately **not** here: a client identifier and an OAuth temp id
        * are not credentials, and `uuid` is a stable device identity that should survive a
@@ -142,9 +142,9 @@ class SharedPreferencesPlexPrefsRepo
       const val PREFS_AUTH_MIGRATED = "credentials_migrated"
 
       /**
-       * Inert since cu-60, but still on disk for anyone who installed before it.
+       * Inert since the premium-key removal, but still on disk for anyone who installed before it.
        *
-       * `key_premium_token` held a **Play purchase token**. cu-77's allowlist keeps it out of
+       * `key_premium_token` held a **Play purchase token**. The allowlist keeps it out of
        * exports, but deleting it outright is strictly better than merely not copying it.
        */
       val ORPHANED_PREMIUM_KEYS = listOf("key_is_premium", "key_premium_token")
@@ -288,7 +288,7 @@ class SharedPreferencesPlexPrefsRepo
     }
 
     /**
-     * Connections from the pre-cu-107 keys, as bare URIs.
+     * Connections from the pre-migration keys, as bare URIs.
      *
      * The flags are unrecoverable here — both keys were written the same full list, so the
      * union below is a formality kept only in case a hand-edited install has them differing.
@@ -305,7 +305,7 @@ class SharedPreferencesPlexPrefsRepo
       if (uris.isNotEmpty() && !hasLoggedLegacyConnections) {
         hasLoggedLegacyConnections = true
         Timber.i(
-          "Loaded ${uris.size} connection(s) from the pre-cu-107 keys; tiers will be " +
+          "Loaded ${uris.size} connection(s) from the legacy untiered keys; tiers will be " +
             "re-derived on the next /resources refresh",
         )
       }
@@ -339,7 +339,7 @@ class SharedPreferencesPlexPrefsRepo
      *
      * Was two `putStringSet` calls holding bare URIs — and, both times, the *same* complete list
      * despite the keys being named local and remote, so the partition they implied never
-     * happened (cu-107). The legacy keys are removed here rather than left behind, so a
+     * happened. The legacy keys are removed here rather than left behind, so a
      * downgrade-then-upgrade cannot read a stale flagless copy.
      */
     @SuppressLint("ApplySharedPref")
@@ -428,7 +428,7 @@ class SharedPreferencesPlexPrefsRepo
     }
 
     /**
-     * Deletes the premium keys orphaned by cu-60, once.
+     * Deletes the premium keys orphaned by the earlier premium-token removal, once.
      *
      * Separate from the credential migration despite running beside it: this one removes data
      * outright, and conflating "moved the tokens" with "deleted the premium keys" in a single
@@ -444,7 +444,7 @@ class SharedPreferencesPlexPrefsRepo
         val editor = prefs.edit()
         present.forEach { editor.remove(it) }
         editor.commit()
-        Timber.i("Removed ${present.size} orphaned premium key(s) left by cu-60")
+        Timber.i("Removed ${present.size} orphaned premium key(s) left by the dropped product flavors")
       }
       authPrefs.edit().putBoolean(PREFS_PREMIUM_KEYS_REMOVED, true).commit()
     }

@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The search overlay's decision, which three screens share (cu-202).
+ * The search overlay's decision, which three screens share.
  *
  * Framework-free, so it fails for the right reason: the interesting case is a *combination* of
  * three booleans, and a rendering test could only reach it through a whole screen.

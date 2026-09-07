@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Reading a user's own parsing rules from a file (cu-148, decision-18).
+ * Reading a user's own parsing rules from a file (decision-18).
  *
  * Almost every case here is a **degradation** case, and that is the point. The rules are a regex in
  * a hand-edited file: typos are the normal state, not the exception, and decision-18's contract is
@@ -18,7 +18,7 @@ class SeriesIndexRulesFileTest {
   /**
    * The **codegen** adapters, not the reflective ones.
    *
-   * The app removed `KotlinJsonAdapterFactory` in cu-62 and parses with `@JsonClass`-generated
+   * The app removed `KotlinJsonAdapterFactory` and parses with `@JsonClass`-generated
    * adapters, so a test using the reflective factory would exercise a different parser than the
    * one that ships — and would leave the generated code with no coverage at all, which is what the
    * per-package gate caught.
@@ -92,7 +92,7 @@ class SeriesIndexRulesFileTest {
   /**
    * A newer file is refused rather than guessed at.
    *
-   * The same reasoning as `importSettingsOrNull` (cu-22): a later version may mean something
+   * The same reasoning as `importSettingsOrNull`: a later version may mean something
    * different by the same keys, and silently misreading a user's rules is worse than ignoring them.
    */
   @Test

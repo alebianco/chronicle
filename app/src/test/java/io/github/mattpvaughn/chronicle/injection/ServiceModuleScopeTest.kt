@@ -23,7 +23,7 @@ class ServiceModuleScopeTest {
       .readText()
 
   /**
-   * A **source** scan, not reflection (cu-185).
+   * A **source** scan, not reflection.
    *
    * The old custom `@ServiceScope` was `RUNTIME`-retained, so `isAnnotationPresent` could see it.
    * Hilt's `@ServiceScoped` is `CLASS`-retained and therefore invisible to reflection — a

@@ -8,7 +8,7 @@ import javax.inject.Inject
 class SourceManager
   @Inject
   constructor(
-    // The **interfaces**, not the concrete repositories (cu-80). Depending on `BookRepository`
+    // The **interfaces**, not the concrete repositories. Depending on `BookRepository`
     // meant depending on its Plex constructor — `PlexMediaService`, `PlexPrefsRepo` — so the one
     // class whose whole purpose is to be backend-neutral could not be constructed in a test
     // without a Plex stack behind it.
@@ -38,7 +38,7 @@ class SourceManager
     /**
      * Fetches from every registered [MediaSource] and merges the results into the repositories.
      *
-     * Until cu-80 this was a `check` that threw, because *"neither bookRepository nor
+     * This was a `check` that threw, because *"neither bookRepository nor
      * trackRepository accepts a caller-supplied list"* — each owned its own Plex sync. They accept
      * one now ([io.github.mattpvaughn.chronicle.data.local.IBookRepository.ingest]), so this can do
      * what its name says.
@@ -50,7 +50,7 @@ class SourceManager
      *
      * A source whose fetch fails is **logged and skipped**, not fatal: one unreachable backend must
      * not stop the others from refreshing, which is the rule the Plex path already applies to the
-     * optional tag index (cu-143).
+     * optional tag index.
      */
     suspend fun refreshBooks() {
       for (source in sources) {

@@ -44,13 +44,13 @@ private val PRESETS =
   )
 
 /**
- * The playback-speed popover (cu-206).
+ * The playback-speed popover.
  *
  * Replaces `ModalBottomSheetSpeedChooser`, one of the three screens still written in Views. All the
  * decisions already lived in [SpeedChooserState]; what is gone is the plumbing around them —
  * an `isRendering` re-entrancy flag guarding every programmatic write so a listener would not
  * fire back, a `SharedPreferences.OnSharedPreferenceChangeListener` re-reading the state, and a
- * `NestedScrollView` needed because the sheet clipped its last control when expanded (cu-142).
+ * `NestedScrollView` needed because the sheet clipped its last control when expanded.
  *
  * The re-entrancy guard has nothing to guard: state flows one way, so setting a value cannot call
  * back into the setter. The scroll view survives as `verticalScroll` for the same reason it existed
@@ -110,7 +110,7 @@ fun SpeedChooserSheet(
 
       // `steps` is the count *between* the ends, hence the -1. A Compose `Slider` clamps rather
       // than throwing, so the `snapToStep` guard that existed because `Slider.setValue` **throws**
-      // off-grid (cu-77) is no longer load-bearing here — it stays in `SpeedChooserState` because
+      // off-grid is no longer load-bearing here — it stays in `SpeedChooserState` because
       // the value it protects also reaches the player.
       Slider(
         value = state.speed,

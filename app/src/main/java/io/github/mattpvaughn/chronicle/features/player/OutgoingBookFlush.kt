@@ -14,7 +14,7 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
  * was inverted — it asked whether the playing track belonged to the book *being viewed*, which is
  * true exactly when the user is **not** switching books. It therefore emitted a spurious STOPPED
  * report for the book already playing and stayed silent for the case it existed to serve, so the
- * outgoing position was never sent (cu-91). That is one candidate cause of positions diverging
+ * outgoing position was never sent. That is one candidate cause of positions diverging
  * across devices: the device you left a book on never told the server where you stopped.
  *
  * @param outgoingTrack what is playing now, or [MediaItemTrack.EMPTY_TRACK] when nothing is.

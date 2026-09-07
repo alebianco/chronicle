@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The book-cover-style mapping, both directions (cu-101).
+ * The book-cover-style mapping, both directions.
  *
  * This is the second of the two-way mappings buried in `makePreferences()`, and unlike the refresh
  * rate it was **actively broken**. The chooser wrote raw literals:
@@ -72,7 +72,7 @@ class BookCoverStyleTest {
   /**
    * A value from an older install — or a hand-edited settings export — must not throw. The
    * original `when` ended in `throw NoWhenBranchMatchedException`, and this key is allowlisted for
-   * import as a bare `STRING` with no value validation (cu-133).
+   * import as a bare `STRING` with no value validation.
    */
   @Test
   fun `an unknown stored value falls back to the default rather than throwing`() {

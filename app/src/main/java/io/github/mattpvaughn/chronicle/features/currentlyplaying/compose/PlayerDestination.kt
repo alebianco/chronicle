@@ -38,7 +38,7 @@ import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 import io.github.mattpvaughn.chronicle.views.compose.SpeedChooserSheet
 
 /**
- * The expanded player (cu-206).
+ * The expanded player.
  *
  * Not a `NavHost` destination: it lives *above* the nav host in `ChronicleApp`, because the player
  * sheet covers whatever screen the user is on and must survive navigating between them. That is the
@@ -54,7 +54,7 @@ import io.github.mattpvaughn.chronicle.views.compose.SpeedChooserSheet
  *
  * The sleep-timer receiver keeps its STARTED-scoped registration in a `DisposableEffect`, which is
  * what `onStart`/`onStop` did. It matters: `ACTION_SLEEP_TIMER_CHANGE` is bidirectional, and a
- * receiver left registered would keep hearing the timer's own ticks (cu-21).
+ * receiver left registered would keep hearing the timer's own ticks.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +83,7 @@ fun PlayerDestination(
   ToastEffect(viewModel.showUserMessage)
 
   // A new bookmark opens its note sheet straight away, so writing one is part of the same gesture
-  // rather than something to go and find afterwards (cu-22). The note is optional — dismissing
+  // rather than something to go and find afterwards. The note is optional — dismissing
   // leaves a perfectly good positional bookmark.
   EventEffect(viewModel.bookmarkAdded) { bookmark -> editingBookmark = bookmark }
   EventEffect(viewModel.showModalBottomSheetSpeedChooser) { showSpeedChooser = true }

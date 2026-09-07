@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * A `collectWhileStarted` that discards its emission does not leave a stale local behind (cu-52).
+ * A `collectWhileStarted` that discards its emission does not leave a stale local behind.
  *
  * The bug this exists for, found on the device and by nothing else: `LibraryFragment` combined
  * several sources into one `refreshEmptyStates()`, kept the latest of each in a local, and

@@ -15,7 +15,7 @@ buildscript {
 
     // The OSS-licences plugin drags in a JavaPoet old enough that Hilt's Gradle plugin fails in
     // `hiltAggregateDepsDebug` with `NoSuchMethodError: ClassName.canonicalName()`. Both are on
-    // the same buildscript classpath, so the newer one has to win explicitly (cu-185).
+    // the same buildscript classpath, so the newer one has to win explicitly.
     classpath(libs.javapoet)
   }
 }

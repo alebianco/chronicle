@@ -5,14 +5,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * How the multi-id metadata route is split into requests (cu-156).
+ * How the multi-id metadata route is split into requests.
  *
- * cu-150 measured the route against the household server: 196 books in **one** request, 0.2 s,
+ * Measured the route against the household server: 196 books in **one** request, 0.2 s,
  * 449 KB, carrying both `Style` and `Mood` — versus Route A's 185 requests for narrators alone.
  * Re-verified here while capturing the fixture: 196 returned, 1371-character id string, 0.196 s.
  *
- * **Batch by URL length, not by count.** Plex itself tolerated a 22 KB URL in cu-150's probe, but
- * the relay is one of the three connection tiers (cu-11) and a reverse proxy in front of a server
+ * **Batch by URL length, not by count.** Plex itself tolerated a 22 KB URL in the probe, but
+ * the relay is one of the three connection tiers and a reverse proxy in front of a server
  * commonly caps a request line at 8 KB. So the cap is deliberately conservative and expressed in
  * characters of ids, which is the part that actually grows.
  */

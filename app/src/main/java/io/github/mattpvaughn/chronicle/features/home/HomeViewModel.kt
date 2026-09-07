@@ -50,7 +50,7 @@ class HomeViewModel
       get() = _offlineMode
 
     /**
-     * The shelves are deduped at the source (cu-110).
+     * The shelves are deduped at the source.
      *
      * Each of these is a Room `LiveData` on the `Audiobook` table, and Room invalidates per table —
      * so `ProgressUpdater`'s once-a-second write during playback re-emitted all three, and each
@@ -110,7 +110,7 @@ class HomeViewModel
     val isSearchActive: StateFlow<Boolean>
       get() = _isSearchActive
 
-    /** Typo-tolerant grouped search, shared with the library and collections screens (cu-25). */
+    /** Typo-tolerant grouped search, shared with the library and collections screens. */
     private val searchController = SearchController(bookRepository, viewModelScope)
 
     val searchRows: StateFlow<List<SearchRow>>
@@ -119,7 +119,7 @@ class HomeViewModel
     val isQueryEmpty: StateFlow<Boolean>
       get() = searchController.isQueryEmpty
 
-    /** The search field's text (cu-206) — see [SearchController.query]. */
+    /** The search field's text — see [SearchController.query]. */
     val searchQuery: StateFlow<String>
       get() = searchController.query
 
@@ -176,12 +176,12 @@ class HomeViewModel
      * Resume [audiobook] from its saved position, without going through the details screen.
      *
      * This is what makes the Continue Listening shelf worth having: a shelf whose whole premise is
-     * "carry on where you left off" should not need a second screen and a second tap to do it
-     * (cu-18). Details is still reachable by long-pressing the same cover.
+     * "carry on where you left off" should not need a second screen and a second tap to do it.
+     * Details is still reachable by long-pressing the same cover.
      *
      * `USE_SAVED_TRACK_PROGRESS` rather than an offset we compute here — the service owns resolving
-     * the saved position from the tracks, and duplicating that resolution is the mistake cu-136 was
-     * about.
+     * the saved position from the tracks, and duplicating that resolution is the mistake the
+     * retype was about.
      */
     fun resume(audiobook: Audiobook) {
       if (!plexConfig.isConnected.value && !audiobook.isCached) {
@@ -205,10 +205,10 @@ class HomeViewModel
     }
 
     fun setSearchActive(isSearchActive: Boolean) {
-      // `value =`, not `postValue` (cu-52). Called from a click listener, so this is already the main
+      // `value =`, not `postValue`. Called from a click listener, so this is already the main
       // thread — and `postValue` coalesces, so two toggles in one frame collapse to one while the
       // `searchController` call below runs twice. The flag and the controller would then disagree
-      // about whether search is open, which is the shape of the three device races in cu-73.
+      // about whether search is open, which is the shape of three device races found earlier.
       _isSearchActive.value = isSearchActive
       searchController.setSearchActive(isSearchActive)
     }
@@ -217,7 +217,7 @@ class HomeViewModel
       prefsRepo.offlineMode = false
     }
 
-    /** Searches for books which match the provided text, typo-tolerantly and grouped (cu-25). */
+    /** Searches for books which match the provided text, typo-tolerantly and grouped. */
     fun search(query: String) {
       searchController.search(query)
     }
@@ -236,15 +236,15 @@ class HomeViewModel
     }
 
     /**
-     * Everything the home screen renders, as one value (cu-201).
+     * Everything the home screen renders, as one value.
      *
      * The Fragment read these four by `.value` inside one `refreshShelves()` and made eight
      * independent `isVisible` decisions from them. The seed is `Loading`, never
      * `Loaded(empty, empty, empty)` — with three shelves that would render "no books found" on every
-     * cold start before Room's first emission, which is cu-68's flash.
+     * cold start before Room's first emission, which is the flash.
      *
      * The `distinctUntilChangedBy { it.booksKey() }` on each shelf source stays where it is: it is
-     * cu-110's load-bearing fix (88% janky frames, GC every ~4s) and lives upstream of this.
+     * the load-bearing fix (88% janky frames, GC every ~4s) and lives upstream of this.
      */
     val uiState: StateFlow<HomeUiState> =
       combineDistinct(

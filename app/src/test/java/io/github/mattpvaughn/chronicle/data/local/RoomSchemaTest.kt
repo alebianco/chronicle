@@ -93,7 +93,7 @@ class RoomSchemaTest {
     db.close()
   }
 
-  /** The fifth database (cu-22). Same shape as the four above; there is no reason to omit it. */
+  /** The fifth database. Same shape as the four above; there is no reason to omit it. */
   @Test
   fun `the bookmark database opens and validates`() {
     val db =
@@ -192,7 +192,7 @@ class RoomSchemaTest {
   }
 
   /**
-   * The v9 -> v10 migration adds the per-book speed override (cu-20).
+   * The v9 -> v10 migration adds the per-book speed override.
    *
    * Two things must hold: the pre-existing row survives, and its new column reads
    * [Audiobook.NO_SPEED_OVERRIDE] — an upgrade that defaulted it to a *speed* would silently make
@@ -242,7 +242,7 @@ class RoomSchemaTest {
   }
 
   /**
-   * The v10 -> v11 migration adds narrator and series (cu-24).
+   * The v10 -> v11 migration adds narrator and series.
    *
    * Existing rows must read **empty**, meaning "not known yet" — an upgrade that invented a value
    * would put a phantom narrator in the facet list for every book in the library.
@@ -293,7 +293,7 @@ class RoomSchemaTest {
   }
 
   /**
-   * The v11 -> v12 migration rescales `seriesIndex` to hundredths (cu-146).
+   * The v11 -> v12 migration rescales `seriesIndex` to hundredths.
    *
    * No column changes — the exported v11 and v12 schemas have identical columns and even the same
    * `identityHash`, since Room hashes the schema rather than the version. So this migration is
@@ -360,12 +360,12 @@ class RoomSchemaTest {
   }
 
   /**
-   * The v12 -> v13 migration retypes `source` from INTEGER to TEXT (cu-127, decision-21).
+   * The v12 -> v13 migration retypes `source` from INTEGER to TEXT (decision-21).
    *
    * The load-bearing assertion is the **value**, not the type. Every existing row holds the old
    * per-type constant `0`, and a plain `CAST(source AS TEXT)` would yield the string `"0"` — a
    * scope that no `SourceId` the app can construct will ever equal, leaving every book invisible
-   * to the scoped reads and un-prunable by cu-80's removal rule. Nothing else can catch that: the
+   * to the scoped reads and un-prunable by the removal rule. Nothing else can catch that: the
    * column would be correctly typed, the row count right, and the schema would validate.
    *
    * Progress is asserted alongside because this is a full table rebuild, and a column omitted from
@@ -419,7 +419,7 @@ class RoomSchemaTest {
 
   /**
    * The v2 -> v3 collections migration, the same retype as the book one above and for the same
-   * reason (cu-127).
+   * reason.
    */
   @Test
   fun `the collections database retypes source when migrating from v2`() {
@@ -451,7 +451,7 @@ class RoomSchemaTest {
   }
 
   /**
-   * The v6 -> v7 migration adds the track scoping key (cu-127, decision-21).
+   * The v6 -> v7 migration adds the track scoping key (decision-21).
    *
    * The assertion that matters is the **default**, not the column's existence — Room's own
    * validation on open already covers that. An existing track must land on
@@ -505,7 +505,7 @@ class RoomSchemaTest {
   }
 
   /**
-   * The v13 -> v14 migration drops the legacy `chapters` column (cu-159).
+   * The v13 -> v14 migration drops the legacy `chapters` column.
    *
    * A full table rebuild, so the risk is not the dropped column — it is every *other* column
    * silently going with it. `BOOK_MIGRATION_8_9` recorded that a column omitted from the copy list
@@ -514,7 +514,7 @@ class RoomSchemaTest {
    * back.
    *
    * The column itself carried nothing to lose: it was verified empty on both household installs
-   * (0 of 196 books) before the drop, because nothing has written it since cu-49.
+   * (0 of 196 books) before the drop, because nothing has written it since `ChapterDatabase` was wired into Dagger.
    */
   @Test
   fun `the book database drops the chapters column when migrating from v13`() {
@@ -686,7 +686,7 @@ class RoomSchemaTest {
       assertEquals("an upgrade that loses progress loses the user's place", 4_242L, cursor.getLong(2))
     }
 
-    // The cu-110 index must exist on an *upgraded* database, not just a freshly created one.
+    // The parentKey index must exist on an *upgraded* database, not just a freshly created one.
     // Room validates that the schema matches the entity on open, so a missing index would throw
     // above — but only if the entity declares it, and a silently-dropped `@Index` would then make
     // both sides agree on the wrong thing. Asserting against `sqlite_master` is independent of
@@ -810,8 +810,8 @@ class RoomSchemaTest {
    * Migrating a v2 chapter database must produce a table the entity validates against.
    *
    * The v2→v3 migration drops the table rather than copying it, which is safe *only* here: nothing
-   * ever wrote to it (no Dagger module provided `ChapterDatabase` before cu-49), and pre-cu-49 rows
-   * all carry `bookId = NO_AUDIOBOOK_FOUND_ID`, so copying them would collide on the new key.
+   * ever wrote to it (no Dagger module provided `ChapterDatabase` before it was wired in), and rows
+   * from before that wiring all carry `bookId = NO_AUDIOBOOK_FOUND_ID`, so copying them would collide on the new key.
    * What this test proves is that Room opens the result and accepts the schema — the failure mode
    * that shipped a crashing migration once already.
    */
@@ -909,7 +909,7 @@ class RoomSchemaTest {
     }
 
   /**
-   * An exported schema's file must declare the version its **name** says (cu-24).
+   * An exported schema's file must declare the version its **name** says.
    *
    * Room rewrites `<version>.json` from the current entities, and if the version bump and the
    * entity change land in the same build it overwrites the **old** file — leaving `10.json`

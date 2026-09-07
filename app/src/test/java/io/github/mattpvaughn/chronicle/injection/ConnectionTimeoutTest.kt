@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The timing budget behind cu-11's "recover in under 5 seconds".
+ * The timing budget behind the "recover in under 5 seconds".
  *
  * These are constants rather than an inspected `OkHttpClient` because `AppModule` needs a
  * real `Application` to construct. The weaker guarantee is deliberate and worth stating: the

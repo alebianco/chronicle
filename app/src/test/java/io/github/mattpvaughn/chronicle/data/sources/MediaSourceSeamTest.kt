@@ -11,7 +11,7 @@ import org.junit.Test
  * Pins the seam contract from decision-11: the interface carries capability flags so
  * the UI can degrade per backend instead of rendering empty narrator/series fields.
  *
- * [LocalMediaSource] is deliberately kept rather than deleted — it is the cu-33.2
+ * [LocalMediaSource] is deliberately kept rather than deleted — it is the local/WebDAV backend's
  * target. The older C6 analysis recommended removing it, but decision-11 supersedes
  * that. What matters is that it cannot masquerade as working.
  */

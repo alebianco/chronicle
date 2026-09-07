@@ -60,10 +60,10 @@ interface ChapterDao {
   /**
    * The number of books that have any chapter rows.
    *
-   * Exists so the cu-158 backfill can decide whether to run **without** reading the book table:
+   * Exists so the chapter backfill can decide whether to run **without** reading the book table:
    * `BookDao.getAudiobooks()` is a `SELECT *` that deserializes every book's `chapters` column, and
-   * on a real library that is megabytes (cu-134 measured 3.38 MB from one such list). Doing that on
-   * every launch to discover there is nothing to do is the cu-110 mistake — work whose result
+   * on a real library that is megabytes (measured 3.38 MB from one such list). Doing that on
+   * every launch to discover there is nothing to do is the mistake to avoid — work whose result
    * cannot change.
    */
   @Query("SELECT COUNT(DISTINCT bookId) FROM Chapter")
@@ -75,7 +75,7 @@ interface ChapterDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   fun update(chapter: Chapter)
 
-  // These bind against `id`, which is TEXT since cu-71. A numeric parameter would compare
+  // These bind against `id`, which is TEXT. A numeric parameter would compare
   // across storage classes in SQLite and match no row — no error, just silently nothing.
   @Query("UPDATE Chapter SET downloaded = :cached WHERE id = :chapterId")
   fun updateCachedStatus(
@@ -99,7 +99,7 @@ interface ChapterDao {
 }
 
 /**
- * Retypes `id`, `trackId` and `bookId` to TEXT. These were Long while books and tracks were Int, so this also removes that inconsistency (cu-71).
+ * Retypes `id`, `trackId` and `bookId` to TEXT. These were Long while books and tracks were Int, so this also removes that inconsistency.
  *
  * A table rebuild because SQLite cannot alter a column type or a primary key. The column list comes
  * from the exported v1 schema, which is the authority — a column omitted here is dropped with
@@ -123,15 +123,15 @@ val CHAPTER_MIGRATION_1_2 =
   }
 
 /**
- * Moves the primary key from `id` alone to `(bookId, trackId, discNumber, index)` (cu-49).
+ * Moves the primary key from `id` alone to `(bookId, trackId, discNumber, index)`.
  *
  * `id` is not unique across books — see [io.github.mattpvaughn.chronicle.data.model.Chapter].
  * SQLite cannot alter a primary key, so this is another table rebuild; no column changes type.
  *
  * **Existing rows are discarded rather than copied**, which is safe here and only here: no code
- * ever wrote to this table (nothing provided `ChapterDatabase` in Dagger until cu-49), so it is
- * empty on every real device. Copying would also be *wrong* — pre-cu-49 rows carry
- * `bookId = NO_AUDIOBOOK_FOUND_ID` because neither chapter path set it, so every row would
+ * ever wrote to this table (nothing provided `ChapterDatabase` in Dagger before the chapter move),
+ * so it is empty on every real device. Copying would also be *wrong* — rows from before that move
+ * carry `bookId = NO_AUDIOBOOK_FOUND_ID` because neither chapter path set it, so every row would
  * collide on the new key and the insert would fail or silently keep one. Chapters are derived
  * data, refetched from the server per book, so there is nothing here to lose. This is the one
  * table where that argument holds; never reason this way about books or tracks, which hold

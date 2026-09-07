@@ -21,7 +21,7 @@ import java.net.HttpURLConnection
  * The contract tests prove the fixtures parse; this proves the *server* answers
  * the endpoints [PlexMediaService] actually calls, with bodies those calls can
  * deserialize. Together they mean a test can ask for a library and get a
- * coherent answer without a live Plex server or any credentials (D10, cu-16).
+ * coherent answer without a live Plex server or any credentials (D10).
  */
 class FakePlexServerTest {
   @get:Rule
@@ -90,7 +90,7 @@ class FakePlexServerTest {
   @Test
   fun `an unauthorized response is distinguishable`() =
     runBlocking {
-      // cu-10 has to tell "token expired" apart from "server down"; this is the
+      // Token re-auth has to tell "token expired" apart from "server down"; this is the
       // hook that lets it be tested without an expired real token.
       plex.stubUnauthorized("/library/sections")
 

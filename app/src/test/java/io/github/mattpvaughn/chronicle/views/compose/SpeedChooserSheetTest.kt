@@ -14,7 +14,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The playback-speed popover (cu-206).
+ * The playback-speed popover.
  *
  * The View version needed an `isRendering` flag around every programmatic write so its own
  * listeners would not fire back, and a `SharedPreferences` change listener to re-read what it had

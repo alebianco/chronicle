@@ -45,7 +45,7 @@ import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
- * Application-wide bindings (cu-185).
+ * Application-wide bindings.
  *
  * An `object` with `@ApplicationContext` parameters rather than a class holding an `Application`:
  * Hilt builds the module itself, so a constructor argument has nowhere to come from. Each provider
@@ -61,7 +61,7 @@ object AppModule {
    * Qualifier for the client Fetch2 downloads through; see [downloaderOkHttpClient].
    *
    * Deliberately *not* the media client, even though it is derived from it: a media body is a
-   * whole audiobook, and body-level logging buffers it in memory (cu-109).
+   * whole audiobook, and body-level logging buffers it in memory.
    */
   const val OKHTTP_CLIENT_DOWNLOADER = "Downloader"
 
@@ -71,7 +71,7 @@ object AppModule {
   /**
    * Handshake budget. A reachability probe that takes 15s has already failed as far as
    * the listener is concerned, and the old value let a dead LAN address consume the whole
-   * connection attempt before relay was tried (cu-11).
+   * connection attempt before relay was tried.
    */
   const val CONNECT_TIMEOUT_SECONDS = 5L
 
@@ -86,7 +86,7 @@ object AppModule {
    * How many times Fetch2 retries a failed download before giving up.
    *
    * Retries resume via HTTP Range rather than restarting, so this is cheap; the previous
-   * value of 1 meant a single network blip ended a download permanently (cu-76).
+   * value of 1 meant a single network blip ended a download permanently.
    */
   const val DOWNLOAD_RETRY_ATTEMPTS = 5
 
@@ -97,7 +97,7 @@ object AppModule {
   ): Context = context
 
   /**
-   * The credentials file, separate from settings (cu-108).
+   * The credentials file, separate from settings.
    *
    * Qualified rather than replacing the unqualified binding: settings, the sync path and the
    * backup export all legitimately want `Chronicle.xml`, and only the three credential accessors
@@ -184,7 +184,7 @@ object AppModule {
    * `getExternalFilesDirs` returns a `File[]` that **may contain null entries** for volumes that
    * are currently unavailable — an ejected SD card, or one not yet mounted. `.toList()` kept those,
    * so the declared `List<File>` really held nulls at runtime and `first()` could hand back null in
-   * defiance of its type, or a `NullPointerException` at the first use (cu-85).
+   * defiance of its type, or a `NullPointerException` at the first use.
    *
    * The order is also not a stable identity: entries come and go with the volumes, so the *index*
    * of a directory must never be treated as a durable reference to it. See
@@ -221,17 +221,17 @@ object AppModule {
       .createDownloadFileOnEnqueue(false)
       .enableAutoStart(false)
       // Was 1: a single retry meant a Wi-Fi blip mid-download ended it for good, and
-      // nothing re-enqueued it (cu-76). Fetch2 resumes via HTTP Range, so a retry picks up
+      // nothing re-enqueued it. Fetch2 resumes via HTTP Range, so a retry picks up
       // where it stopped rather than restarting a 2GB file.
       .setAutoRetryMaxAttempts(DOWNLOAD_RETRY_ATTEMPTS)
       // Download through the app's own OkHttp client, so downloads inherit the Plex
-      // interceptor's headers, cu-10's 401 re-auth and cu-11's connection tiering. This was
+      // interceptor's headers, the 401 re-auth and the connection tiering. This was
       // commented out with a "broken when I set up Fetch" TODO; the cause was simply that
       // the fetch2okhttp artifact was never declared, so OkHttpDownloader did not exist.
       //
       // Note this is the *downloader* client, not the media one: same interceptors and
       // authenticator, but never body-level logging, which would buffer a whole audiobook in
-      // memory and OOM the process (cu-109).
+      // memory and OOM the process.
       .setHttpDownloader(OkHttpDownloader(okHttpClient))
       // Fetch2 logs whole `DownloadInfo` objects, and that `toString()` includes the headers
       // map — so plain logging wrote the Plex token to logcat three times before a single byte
@@ -240,7 +240,7 @@ object AppModule {
       // internal logging.
       //
       // Redacted rather than switched off. These lines are how the download path is diagnosed —
-      // cu-109's OOM inside Fetch2's own thread was found by reading them, and cu-73's remaining
+      // the OOM inside Fetch2's own thread was found by reading them, and the remaining
       // download items still need them.
       .enableLogging(true)
       .setLogger(RedactingFetchLogger())
@@ -254,7 +254,7 @@ object AppModule {
    * The logging level for **download** traffic.
    *
    * Capped at [HttpLoggingInterceptor.Level.HEADERS] even in debug: `BODY` would buffer a whole
-   * audiobook in memory (cu-109 / #83). Headers are the useful part for a download anyway — the
+   * audiobook in memory (issue #83). Headers are the useful part for a download anyway — the
    * `206`, the `Content-Range`, and whether a retry resumed or restarted.
    *
    * Named rather than inlined so [io.github.mattpvaughn.chronicle.injection.DownloadLogLevelTest]
@@ -297,7 +297,7 @@ object AppModule {
       .protocols(listOf(Protocol.HTTP_1_1, Protocol.QUIC))
       .addInterceptor(plexConfig.plexMediaInterceptor)
       .addInterceptor(loggingInterceptor)
-      // Recovers a rotated server token on a 401 and retries once (cu-10). Media client
+      // Recovers a rotated server token on a 401 and retries once. Media client
       // only: a 401 from the *login* client means the account token is dead, and
       // re-fetching resources with that same dead token cannot help.
       .authenticator(
@@ -318,22 +318,22 @@ object AppModule {
    * The client Fetch2 downloads through: the media client with body logging turned down.
    *
    * Downloads must keep everything the media client provides — [PlexConfig.plexMediaInterceptor]
-   * for the token and base URL, cu-10's [PlexTokenAuthenticator] for a rotated server token,
-   * and cu-11's chosen connection — which is why this is [OkHttpClient.newBuilder] off that
+   * for the token and base URL, the [PlexTokenAuthenticator] for a rotated server token,
+   * and the chosen connection — which is why this is [OkHttpClient.newBuilder] off that
    * client rather than a second builder. A parallel builder would be a copy to keep in sync, and
-   * the whole point of cu-76 was that downloads share playback's HTTP stack.
+   * downloads are meant to share playback's HTTP stack.
    *
    * The one thing it must **not** share is [HttpLoggingInterceptor.Level.BODY]. That level
    * buffers an entire response body in memory in order to log it, and a download's body is the
    * whole audiobook: a 293 MB m4b took the process from 248 MB to 350 MB PSS and then killed it
    * with `OutOfMemoryError` on Fetch2's own thread, with zero bytes written to disk. That is
-   * issue #83, which cu-12 could not locate by reading app code or Fetch2 — the defect was in
-   * neither, but in the client Fetch2 was handed (cu-109).
+   * issue #83, which could not be located by reading app code or Fetch2 — the defect was in
+   * neither, but in the client Fetch2 was handed.
    *
    * `HEADERS` rather than `NONE` on purpose: a download's status line and `Content-Range` are
    * exactly what you need to tell a resume from a restart, and they cost nothing to log. Body
    * logging stays on the media client, where it is genuinely useful and where bodies are small —
-   * it is how cu-9's `time=0` and the `/:/scrobble` storm were both caught.
+   * it is how the `time=0` and the `/:/scrobble` storm were both caught.
    */
   @Provides
   @Singleton
@@ -398,7 +398,7 @@ object AppModule {
   @Provides
   @Singleton
   fun moshi(): Moshi =
-    // No `KotlinJsonAdapterFactory` (cu-62): every model carries
+    // No `KotlinJsonAdapterFactory`: every model carries
     // `@JsonClass(generateAdapter = true)` and the KSP processor now generates a real adapter for
     // each, so the reflective fallback is dead weight — and worse, it would mask a model that
     // *lost* its annotation by silently handling it reflectively.
@@ -430,7 +430,7 @@ object AppModule {
   /**
    * The app's one connection to the media service, reconnecting to a session already running.
    *
-   * Moved here from `ActivityModule` in cu-185: see [MediaServiceConnection] for why it is a
+   * Moved here from `ActivityModule`: see [MediaServiceConnection] for why it is a
    * singleton. It takes the application context, so nothing about it was activity-shaped.
    */
   @Provides
@@ -458,7 +458,7 @@ object AppModule {
   /**
    * The in-process broadcast bus.
    *
-   * Moved out of `ActivityModule` in cu-185: it is `getInstance`-backed and process-wide, so
+   * Moved out of `ActivityModule`: it is `getInstance`-backed and process-wide, so
    * activity scope was never meaningful — and the player service and a `@HiltViewModel` both need
    * it, which an activity-scoped binding cannot serve.
    */

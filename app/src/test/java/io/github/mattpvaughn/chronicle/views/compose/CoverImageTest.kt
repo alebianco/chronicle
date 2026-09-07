@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Artwork goes through [CoverImage], never a bare `AsyncImage` (cu-207).
+ * Artwork goes through [CoverImage], never a bare `AsyncImage`.
  *
  * ## Why a source scan
  *
@@ -58,7 +58,7 @@ class CoverImageTest {
       "artwork must go through CoverImage, which carries the placeholder for the offline, " +
         "no-artwork and failed-load cases. A bare AsyncImage renders *nothing* when the load " +
         "fails — a hole in the layout that no semantics assertion can see, which is how six " +
-        "screens shipped without one (cu-207).",
+        "screens shipped without one.",
       emptyList<String>(),
       offenders,
     )
@@ -82,7 +82,7 @@ class CoverImageTest {
     assertTrue(
       "CoverImage must draw its placeholder as a background colour. `painterResource` throws for " +
         "a <shape> drawable, which is what the app's placeholder is — a crash on the first frame " +
-        "showing a coverless book, not a fallback (cu-207).",
+        "showing a coverless book, not a fallback.",
       source.contains(".background(PlaceholderColor)"),
     )
     assertTrue(

@@ -6,11 +6,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Rebuilds [table] via create-copy-drop-rename, optionally retyping [textColumns] to TEXT.
  *
  * SQLite cannot change a column's type *or* a table's primary key, so both kinds of change need a
- * full rebuild. Pass an empty [textColumns] for a pure primary-key change (cu-49's composite key);
- * name the id columns for a retype (cu-71). Every migration this codebase had before cu-71 was a
- * simple `ADD COLUMN`, so there was no precedent to copy — hence one tested helper rather than the
- * same five statements written out repeatedly, where a mistyped column list drops a column's data
- * with no error at all.
+ * full rebuild. Pass an empty [textColumns] for a pure primary-key change (the composite key);
+ * name the id columns for a retype. Every migration this codebase had before the id-retyping
+ * migration was a simple `ADD COLUMN`, so there was no precedent to copy — hence one tested
+ * helper rather than the same five statements written out repeatedly, where a mistyped column
+ * list drops a column's data with no error at all.
  *
  * `CAST(x AS TEXT)` is belt-and-braces rather than load-bearing: SQLite applies TEXT affinity on
  * insert, so a copied INTEGER already lands as text (verified — `typeof()` reports `text` with or
@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * @param textColumns columns to wrap in `CAST(... AS TEXT)`; empty for a rebuild that keeps every
  *   column's type, such as a primary-key change.
  * @param columnExpressions replaces a column's value with a SQL expression instead of copying it.
- *   For a retype whose old values do not *mean* the same thing in the new type — cu-127's `source`,
+ *   For a retype whose old values do not *mean* the same thing in the new type — the `source`,
  *   where every existing row holds the per-type constant `0` and copying it would yield a scope no
  *   [io.github.mattpvaughn.chronicle.data.model.SourceId] can ever equal. A literal must be quoted
  *   by the caller; this is migration code with no user input reaching it.

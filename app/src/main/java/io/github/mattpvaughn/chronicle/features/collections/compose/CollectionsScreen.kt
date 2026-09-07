@@ -31,11 +31,11 @@ import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /**
- * Everything the collections screen renders, as one value (cu-181).
+ * Everything the collections screen renders, as one value.
  *
  * The Fragment reads six separate flows and pushes each into views independently, so three
  * `isVisible` assignments decide between "empty", "offline and empty" and "populated" — and nothing
- * stops two of them being true at once. That is cu-68's failure class, and `FirstFrameFlashTest`
+ * stops two of them being true at once. That is the failure class, and `FirstFrameFlashTest`
  * exists to guard a symptom of it.
  *
  * One state means the screen cannot describe a contradiction: [content] is a sealed type, so
@@ -56,7 +56,7 @@ sealed interface CollectionsContent {
   /**
    * Nothing has been read yet — the `stateIn` seed.
    *
-   * A distinct state rather than `Loaded(emptyList())` (cu-187): that seed renders an empty grid
+   * A distinct state rather than `Loaded(emptyList())`: that seed renders an empty grid
    * before the first Room emission, and worse, it is indistinguishable from a genuinely empty
    * library, so a test asserting "empty" passes against a flow that has produced nothing. That is
    * the vacuous-pass shape CLAUDE.md warns about for `WhileSubscribed` flows.
@@ -150,7 +150,7 @@ private fun CollectionsGrid(
   ) {
     // `key` is the identity the diff runs on. The Fragment reaches the same conclusion by hand —
     // `isDifferentListById`, then `submitList(null) { submitList(real) }` to force scroll-to-top —
-    // because a full equals() comparison re-scrolls once a second while a book is playing (cu-110).
+    // because a full equals() comparison re-scrolls once a second while a book is playing.
     // Here it is one parameter, and stable ids also preserve scroll position for free.
     items(collections, key = { it.id }) { collection ->
       CollectionCard(

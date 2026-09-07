@@ -13,7 +13,7 @@ Every one of those is mechanically checkable. Run this before declaring any task
 
 ```bash
 # Run from the repo root. Substitute the task id.
-ID=cu-187
+ID=cu-NN
 F=$(command ls backlog/tasks/ | command grep "^task-${ID#cu-} \|^task-$ID ")
 ```
 
@@ -69,7 +69,7 @@ The plan is replaced or condensed into notes: what actually changed, decisions t
 scoped and postponed is a **task** with `status: To Do`.
 
 A deferred item filed as a draft and linked from a **closed** task is invisible in `backlog board`
-and `backlog task list` — which is exactly how cu-73 and cu-132 items got lost.
+and `backlog task list` — which is exactly how deferred items got lost before.
 
 **List in the closing notes where each item went.**
 

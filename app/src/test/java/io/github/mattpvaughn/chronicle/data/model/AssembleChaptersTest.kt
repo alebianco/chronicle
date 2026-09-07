@@ -112,12 +112,12 @@ class AssembleChaptersTest {
   }
 
   /**
-   * A chapter spanning a track boundary is reported by **both** tracks (cu-18), and concatenating
+   * A chapter spanning a track boundary is reported by **both** tracks, and concatenating
    * the per-track lists therefore listed it twice.
    *
    * On the fixture book, chapter 4003 arrives from track 2001 *and* from track 2002. The list read
    * "Chapter 3: A Short Rest" twice and the header counted ten chapters for an eight-chapter book,
-   * because `Ch n of m` is a size. It went unseen until cu-201: the old adapter was rendering the
+   * because `Ch n of m` is a size. It went unseen until the switch away from the old adapter: the old adapter was rendering the
    * empty legacy `Audiobook.chapters` column, so no duplicate could reach it.
    *
    * The chapter belongs to the track it **starts** in — which is the rule the `MultiTrackBook`
@@ -176,7 +176,7 @@ class AssembleChaptersTest {
    * Two genuinely different chapters that happen to share an id must both survive.
    *
    * `Chapter.id` is not unique across a book — the per-track fallback uses the *track* id, and
-   * Plex hands chapter and track ratingKeys from one sequence (cu-49). De-duplicating on id alone
+   * Plex hands chapter and track ratingKeys from one sequence. De-duplicating on id alone
    * would silently drop a real chapter.
    */
   @Test

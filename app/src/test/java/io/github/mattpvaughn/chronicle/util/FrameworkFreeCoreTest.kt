@@ -5,7 +5,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * The framework-free core, and a fence around it (cu-177).
+ * The framework-free core, and a fence around it.
  *
  * **87 files carry no `android.*` or `androidx.*` import** beyond Room annotations. They are not a
  * curiosity — they are the decision logic: `SleepTimerState`, `ChapterSeekTarget`,
@@ -20,7 +20,7 @@ import java.io.File
  * | everything else | 35.7% |
  *
  * A file that can be tested without a framework *gets* tested. That purity was not designed in one
- * go — it is what cu-19, cu-21, cu-101, cu-136 and cu-176 each produced by pulling a decision out
+ * go — it is what a series of small refactors each produced by pulling a decision out
  * of a framework class — and nothing but review currently stops someone adding
  * `import android.os.Bundle` to `SleepTimerState` tomorrow. The 2026-09-05 review found that
  * review misses things.
@@ -55,7 +55,7 @@ class FrameworkFreeCoreTest {
 
     assertTrue(
       "These files are on the framework-free list but now import the Android framework.\n" +
-        "Either move the framework-facing part out (as cu-176 did for the media conversions), or " +
+        "Either move the framework-facing part out (as was done for the media conversions), or " +
         "remove the file from the list with a comment saying why:\n" +
         offenders.joinToString("\n"),
       offenders.isEmpty(),
@@ -153,13 +153,13 @@ class FrameworkFreeCoreTest {
         "features/player/TrackListStateManager.kt",
         "features/search/SearchController.kt",
         "features/search/SearchRow.kt",
-        // `features/settings/PreferenceBindingAdapters.kt` was here until cu-199. It is deleted,
+        // `features/settings/PreferenceBindingAdapters.kt` was here until the Compose migration. It is deleted,
         // not moved: it was a one-function bridge to `SettingsList.setPreferences`, called from
         // nowhere, and both went with the Compose migration of the settings screen. Removed from
         // the list rather than left to fail as "missing", which is what this guard reports for a
         // deleted entry.
         "features/settings/PreferenceModel.kt",
-        // Route strings and their argument encoding (cu-206). Framework-free on purpose: building
+        // Route strings and their argument encoding. Framework-free on purpose: building
         // a route and parsing one back are pure string work, and a mis-encoded argument matches no
         // pattern and navigates *nowhere, silently* — exactly the failure a test without a NavHost
         // can catch cheaply.

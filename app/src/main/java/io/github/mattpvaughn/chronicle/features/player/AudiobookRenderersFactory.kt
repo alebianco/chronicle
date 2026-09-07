@@ -21,7 +21,7 @@ import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
  * | `PADDING_SILENCE_US` | 20 ms | Too little breathing room, so words run together |
  *
  * The result is the owner's report that the setting *"makes most tracks un-listenable"*. The setting
- * was never mis-wired; the defaults are simply wrong for speech (cu-88).
+ * was never mis-wired; the defaults are simply wrong for speech.
  *
  * There is precedent for overriding ExoPlayer's video-oriented defaults in this codebase:
  * `ServiceModule.exoPlayer()` already enlarges the load-control buffers for the same reason.
@@ -58,7 +58,7 @@ class AudiobookRenderersFactory(context: Context) : DefaultRenderersFactory(cont
      *
      * These are **starting points chosen against the defaults' known failure modes**, not measured
      * values — "listenable" is a judgement about audio that cannot be made from a unit test. They
-     * are expected to be revised after the live pass ([[cu-73]]), including against a quiet-voiced
+     * are expected to be revised after a live pass, including against a quiet-voiced
      * narrator.
      */
     const val MINIMUM_SILENCE_DURATION_US = 800_000L

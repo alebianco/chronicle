@@ -44,7 +44,7 @@ import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 private const val PIN_LENGTH = 4
 
 /**
- * The user picker and its PIN entry screen, as a navigation destination (cu-206).
+ * The user picker and its PIN entry screen, as a navigation destination.
  *
  * ### Back handling moves here, and stops being the Activity's business
  *

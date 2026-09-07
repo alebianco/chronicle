@@ -27,7 +27,7 @@ import java.io.File
  *
  * These tests exercise the URI construction directly rather than through `getTrackSource()`, which
  * reaches the Dagger graph via `Injector.get()` for `cachedMediaDir` and `plexConfig` and so cannot
- * be constructed in a unit test (the same coupling cu-79 is about). What is pinned here is the
+ * be constructed in a unit test (the same coupling the DI-reachability fix is about). What is pinned here is the
  * property that was wrong: the string handed to the player must parse to a URI with a scheme.
  */
 @RunWith(RobolectricTestRunner::class)

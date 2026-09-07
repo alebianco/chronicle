@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * What survives of the ViewModel-factory guards after cu-185.
+ * What survives of the ViewModel-factory guards after the Hilt migration.
  *
  * **The factory/ViewModel agreement test is retired, not deleted by accident.** It existed because
  * a ViewModel and its hand-written `Factory` declared the same dependency list *twice* and only

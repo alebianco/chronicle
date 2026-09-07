@@ -14,7 +14,7 @@ import java.io.IOException
 /**
  * The retry contract for progress reporting.
  *
- * This is cu-9's first acceptance criterion — a position lost to airplane mode must be
+ * This is the first acceptance criterion — a position lost to airplane mode must be
  * recovered — and it was not met: the worker never returned `retry`, so the backoff
  * configured at the enqueue site did nothing and a failed report was dropped for good.
  *

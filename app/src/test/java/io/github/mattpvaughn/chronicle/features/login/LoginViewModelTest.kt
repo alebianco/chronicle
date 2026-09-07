@@ -23,7 +23,7 @@ import org.junit.Test
 import java.io.IOException
 
 /**
- * `LoginViewModel`, which had no test at all before cu-33.
+ * `LoginViewModel`, which had no test at all before this.
  *
  * Not because it was hard to test but because it was *impossible*: every one of its coroutine
  * launches read `Injector.get().unhandledExceptionHandler()`, and `ChronicleApplication.get()` is

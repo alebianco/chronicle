@@ -7,7 +7,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 /**
  * Whether book covers render square or rectangular, as the settings screen presents it.
  *
- * Extracted from `SettingsViewModel.makePreferences()` (cu-101), the same two-way-mapping shape as
+ * Extracted from `SettingsViewModel.makePreferences()`, the same two-way-mapping shape as
  * [RefreshRate] — but this one was **broken**, not merely untestable.
  *
  * The chooser's listener wrote raw literals, `"Rectangle"` and `"Square"`, while all four consumers
@@ -64,7 +64,7 @@ enum class BookCoverStyle(
      *
      * Three ways an unrecognized value reaches this: an install that stored `"Rectangle"` before
      * the fix, a hand-edited settings export (the key is allowlisted as a bare `STRING` with no
-     * value validation — cu-133), and any future rename. The original `when` ended in
+     * value validation), and any future rename. The original `when` ended in
      * `throw NoWhenBranchMatchedException`, which is the wrong answer for a cosmetic preference.
      */
     fun ofStoredOrDefault(stored: String): BookCoverStyle = ofStored(stored) ?: default

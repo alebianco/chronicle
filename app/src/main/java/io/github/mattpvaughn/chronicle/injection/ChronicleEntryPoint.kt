@@ -17,7 +17,7 @@ import javax.inject.Named
 /**
  * Graph access for code the framework constructs, where constructor injection is impossible.
  *
- * **This is not a service locator, and the distinction is the point** (cu-33, cu-185). `Injector`
+ * **This is not a service locator, and the distinction is the point**. `Injector`
  * was: a global `Injector.get()` reachable from anywhere, which made any class that used it
  * unconstructable in a unit test — `ChronicleApplication.get()` is `INSTANCE!!`, so the first line
  * touching it threw NPE. `ServiceLocatorUsageTest` was written to keep it from spreading.

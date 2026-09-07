@@ -16,10 +16,10 @@ import io.github.mattpvaughn.chronicle.features.library.compose.BookGrid
 import io.github.mattpvaughn.chronicle.views.compose.ChronicleScaffold
 
 /**
- * The books under one facet value, as a navigation destination (cu-206).
+ * The books under one facet value, as a navigation destination.
  *
  * The facet name is the toolbar title, so it is read from the ViewModel rather than the route: the
- * ViewModel already resolves both arguments out of `SavedStateHandle` (cu-185), and reading the
+ * ViewModel already resolves both arguments out of `SavedStateHandle`, and reading the
  * route here as well would be the same fact in two places.
  */
 @Composable

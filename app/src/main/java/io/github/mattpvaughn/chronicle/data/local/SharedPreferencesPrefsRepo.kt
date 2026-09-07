@@ -61,7 +61,7 @@ interface PrefsRepo {
   var shakeToSnooze: Boolean
 
   /**
-   * Whether an expired sleep timer re-arms itself when playback resumes (cu-21).
+   * Whether an expired sleep timer re-arms itself when playback resumes.
    *
    * Defaults **on**: the timer firing means "I fell asleep", and the usual next action is to resume
    * and want the same timer again. A preference exists because silently re-arming a timer the user
@@ -170,7 +170,7 @@ interface PrefsRepo {
      * The values [PrefsRepo.libraryMediaType] accepts.
      *
      * Published beside [VIEW_STYLES] because settings *import* has to agree with the setter about
-     * what is valid (cu-133). These lived as a private `viewTypes` list in the implementation, so
+     * what is valid. These lived as a private `viewTypes` list in the implementation, so
      * the importer could not see them and wrote unvalidated strings straight to prefs.
      */
     val LIBRARY_MEDIA_TYPES =
@@ -204,9 +204,9 @@ class SharedPreferencesPrefsRepo
      *
      * Returns the **stored** path whenever one is set, even if that volume is not currently
      * mounted. It used to fall back to `externalDeviceDirs().first()` when the stored path was not
-     * in the current list, which is the subtler half of cu-85: with an SD card removed, this
-     * returned a *different, readable* directory, the cache scan found none of the expected files
-     * there, and it un-cached the whole library. Returning the real (absent) path lets
+     * in the current list, which is the subtler half of the SD-card-removed bug: with an SD card
+     * removed, this returned a *different, readable* directory, the cache scan found none of the
+     * expected files there, and it un-cached the whole library. Returning the real (absent) path lets
      * `scanCachedMediaDir` report `Unavailable` and change nothing — which is the correct outcome
      * for "the card is out", and is recoverable when it is put back.
      *

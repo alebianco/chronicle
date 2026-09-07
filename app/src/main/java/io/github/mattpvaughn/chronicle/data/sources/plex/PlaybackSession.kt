@@ -10,7 +10,7 @@ import javax.inject.Singleton
  * Both used to live inside `AudiobookMediaSessionCallback`, which reached the network through
  * `Injector.get().plexMediaService()` and assembled its own `X-Plex-Token` header — credential
  * plumbing inside a MediaSession command callback, and the thing that made the callback
- * untestable (cu-33).
+ * untestable.
  *
  * The token precedence was **written out twice**, here and in `ServiceModule.plexDataSourceFactory`.
  * Two copies of a credential rule that must agree is a bug waiting to happen, so [authToken] is now

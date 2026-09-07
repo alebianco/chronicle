@@ -30,7 +30,7 @@ graph TD
 ```
 
 ### View (UI Layer)
-- **Compose screens**: every screen is a composable function of state — `features/<x>/compose/<X>Screen.kt` — paired with a `<X>Destination.kt` that wires a `hiltViewModel()` into it and passes callbacks. The Fragment-per-screen structure ([[decision-22]]) is gone entirely as of cu-206; there is no ViewBinding and no XML layout left
+- **Compose screens**: every screen is a composable function of state — `features/<x>/compose/<X>Screen.kt` — paired with a `<X>Destination.kt` that wires a `hiltViewModel()` into it and passes callbacks. The Fragment-per-screen structure ([[decision-22]]) is gone entirely; there is no ViewBinding and no XML layout left
 - **Activities**: single `MainActivity` calls `setContent {}` once and hosts a Navigation Compose `NavHost` — see the Navigation section below
 - **One deliberate exception**: `features/player/compose/CastButton.kt` wraps the Cast SDK's `MediaRouteButton` in an `AndroidView`, because the SDK has no Compose surface (decision-19)
 - **Responsibilities**: Display data, handle user input, navigation
@@ -51,7 +51,7 @@ graph TD
 
 ### 1. Dependency Injection (Dagger 2 via Hilt)
 
-Dagger 2 still handles all object creation, but since cu-185 it is Hilt's generated components,
+Dagger 2 still handles all object creation, but it is now Hilt's generated components,
 not hand-rolled ones: `@HiltAndroidApp` on `ChronicleApplication`, `@AndroidEntryPoint` on
 `MainActivity` and `MediaPlayerService`, `hiltViewModel()` in every `<X>Destination.kt`.
 `injection/modules/*.kt` are `@Module @InstallIn(SingletonComponent::class | ActivityComponent::class
@@ -103,7 +103,7 @@ graph LR
 
 ### 3. Reactive Programming (StateFlow + Coroutines)
 
-**StateFlow**: Observable state holder (cu-52 — there is **no `LiveData` left in this codebase**)
+**StateFlow**: Observable state holder (there is **no `LiveData` left in this codebase**)
 - Always has a current value, replayed to every new collector
 - **Not** lifecycle-aware by itself: collect via `collectWhileStarted` /
   `collectEventsWhileStarted` (`util/FlowCollect.kt`), which wrap `repeatOnLifecycle(STARTED)`.
@@ -162,20 +162,20 @@ listening progress.
 - **BookDatabase** (v14): audiobook metadata
 - **TrackDatabase** (v7): tracks. `viewOffset` here is the source of truth for position
   ([[decision-16]])
-- **ChapterDatabase** (v3): chapters — and **nowhere else** since cu-159 dropped
+- **ChapterDatabase** (v3): chapters — and **nowhere else** since the migration dropped
   `Audiobook.chapters`
 - **CollectionsDatabase** (v3): Plex collections
 - **BookmarkDatabase** (v1): bookmarks, kept **outside `BookDatabase` on purpose** so the sync path
-  cannot delete a note the user wrote (cu-22)
+  cannot delete a note the user wrote
 
 ### 3. File System (Local Cache)
 - **CachedFileManager**: Manages downloaded audio files
-- **Fetch2**: download library, **vendored** at `libs/fetch2-mirror` (cu-166 — upstream is
+- **Fetch2**: download library, **vendored** at `libs/fetch2-mirror` (upstream is
   abandoned and was arriving via JitPack)
 
 ## Navigation
 
-Navigation Compose replaced `Navigator` in cu-206 (`Navigator.kt` is deleted). Three pieces:
+Navigation Compose replaced `Navigator` (`Navigator.kt` is deleted). Three pieces:
 
 - **`navigation/Destination.kt`**: a framework-free sealed interface — one `data object`/`data
   class` per screen, each holding its own route string. `encodeArg`/`decodeArg` percent-encode
@@ -192,7 +192,7 @@ Navigation Compose replaced `Navigator` in cu-206 (`Navigator.kt` is deleted). T
 `plexLoginRepo.loginEvent` itself and navigates on it — the one thing that has to live above any
 single screen — and registers the back handler via `OnBackPressedDispatcher` (not an
 `onBackPressed()` override, which the platform's mandatory predictive-back gesture at targetSdk 36
-never calls, cu-73). Backstack clearing (`Navigator`'s
+never calls). Backstack clearing (`Navigator`'s
 `while (backStackEntryCount > 0) popBackStackImmediate()`) is `popUpTo(startDestination)`; the tab
 tags that drove "is this fragment already showing" checks are gone with the tags themselves —
 Navigation Compose exposes `currentBackStackEntry` instead.

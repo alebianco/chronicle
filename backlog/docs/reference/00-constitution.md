@@ -37,7 +37,7 @@ then fix this file in the same PR.
    `verify.sh`/Gradle so any CI system is a thin wrapper. Plain git + markdown must be enough to
    move the whole project to another forge without loss.
 7. **Open formats, DRM-free, no data extraction** (decision-19). Open file formats for state
-   (JSON/zip exports per D8/cu-17, markdown for docs); DRM-free audio only (DRM stores are a
+   (JSON/zip exports per D8, markdown for docs); DRM-free audio only (DRM stores are a
    permanent won't-do, decision-14); OFL fonts; prefer open/keyless APIs.
 
 ### The dependency rule (principle 7, in full)
@@ -56,7 +56,7 @@ all four hold:
 3. it is **confined behind a seam**, so an open replacement would be a swap;
 4. there is **genuinely no open alternative** reaching the same hardware.
 
-Each one admitted is recorded as an ADR. Google Cast (cu-168) is the first — every SDK reference
+Each one admitted is recorded as an ADR. Google Cast is the first — every SDK reference
 sits inside `CastPlayerProvider`, and no open protocol reaches a Chromecast.
 `play-services-oss-licenses` qualifies retroactively.
 
@@ -78,7 +78,7 @@ Two features qualify:
 - **Settings cloud sync** to the user's own Google Drive `appDataFolder`.
 
 **Sync carries no auth token.** decision-8's "auth tokens excluded (re-login on restore)" stands,
-enforced by both backup-rules files, `BACKUP_SETTING_KEYS` and the cu-108 `ChronicleAuth.xml`
+enforced by both backup-rules files, `BACKUP_SETTING_KEYS` and the `ChronicleAuth.xml`
 split — Plex has *no per-device revocation and no refresh token*, so a leaked account token can
 only be killed by logging out every device the household owns. Migration is still one tap because
 sync carries server id, library id, connections, settings, bookmarks and per-book speed — all
@@ -93,31 +93,31 @@ today**; extending it is the implementing task's first job.
    `@ServiceScope`); never instantiate singletons manually.
 2. **UI in Compose — a `*Screen` composable is a pure function of its state, a `*Destination` wires a ViewModel to it; business logic in ViewModels/Repositories; the DB is never
    accessed from UI.**
-3. **`StateFlow` for UI state, never `LiveData`** (cu-52) — private `MutableStateFlow`, public
+3. **`StateFlow` for UI state, never `LiveData`** — private `MutableStateFlow`, public
    immutable `StateFlow`. See the `android-ui` skill for collection rules and `stateIn` policy.
-4. **Inject `DispatcherProvider`** (cu-15); never reference `Dispatchers.*` directly. `GlobalScope`
+4. **Inject `DispatcherProvider`**; never reference `Dispatchers.*` directly. `GlobalScope`
    is gone and stays gone. Exactly two hardcoded dispatchers remain, both field initialisers that
    cannot read an injected one (`MediaPlayerService.serviceScope`,
    `ChronicleApplication.applicationScope` — the latter runs *before* the Dagger graph exists), and
    each is pinned at an exact count by its own test. The five repositories, the player layer
-   (cu-72) and the ViewModel/Fragment/`application/` layer (cu-169) are all converted.
-   `CoroutineWorker`s are a deliberate exemption (cu-152): WorkManager builds them reflectively with
+   and the ViewModel/Fragment/`application/` layer are all converted.
+   `CoroutineWorker`s are a deliberate exemption: WorkManager builds them reflectively with
    a fixed signature.
-5. **Never call `Injector.get()`** (cu-33). Take dependencies as constructor parameters — a class
+5. **Never call `Injector.get()`.** Take dependencies as constructor parameters — a class
    that fetches its own at runtime **cannot be constructed in a unit test at all**. That, and
    `Dispatchers.Main`, are the two reasons nine of the twelve ViewModels had no test. Two
    exemptions: `CoroutineWorker`s and `ChronicleApplication` itself (which *is* the DI root). A
    framework-inflated `View`, a binding adapter or an extension function has no constructor either
    — pass what it needs at the call site.
-6. **The framework-free core is a fence, not an accident** (cu-177). 87 files carry no
+6. **The framework-free core is a fence, not an accident.** 87 files carry no
    `android.*`/`androidx.*` import beyond Room annotations — the decision logic. They sit at
    **80.8% coverage against 35.7% for everything else**, because a file testable without a
    framework gets tested. When a listed file needs the framework, **move the framework-facing part
-   out** — cu-176 did exactly that for `toMediaItem`/`toAlbumMediaMetadata`/`toMediaMetadata`,
+   out** — an earlier cleanup did exactly that for `toMediaItem`/`toAlbumMediaMetadata`/`toMediaMetadata`,
    which are a presentation concern of `features/player`, not properties of a book.
 7. **User-facing text in `res/values/strings.xml`**, always.
 8. **Room schema change ⇒ bump the DB version + write a migration in the same PR.**
-9. **Navigation through `ChronicleNavHost`; a destination is a `Destination` with a route, and an argument travels in the route into the ViewModel's `SavedStateHandle` — **reuse the ViewModel's own argument-name constant**, since a fresh one compiles and reads null (cu-206)**; data via Bundles/args.
+9. **Navigation through `ChronicleNavHost`; a destination is a `Destination` with a route, and an argument travels in the route into the ViewModel's `SavedStateHandle` — **reuse the ViewModel's own argument-name constant**, since a fresh one compiles and reads null**; data via Bundles/args.
 10. **Playback via `MediaServiceConnection`/`MediaPlayerService`** — never touch ExoPlayer from UI.
 11. **Network endpoints in `PlexService.kt`**; errors handled in repositories; log with Timber
     (`Timber.e(e, "context")`).
@@ -132,7 +132,7 @@ Rules 3–6 and several others are **enforced by build gates** — see
 ## Testing
 
 Every change to repositories/ViewModels/sync/download logic must add or extend tests (D6/D10).
-Fixture-backed where network is involved (the cu-16 fixture pattern).
+Fixture-backed where network is involved (the fixture pattern).
 
 ### Mock a collaborator you only call; fake a collaborator that calls *you* back
 

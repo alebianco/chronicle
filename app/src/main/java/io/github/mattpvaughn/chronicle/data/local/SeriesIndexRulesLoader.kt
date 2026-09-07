@@ -13,11 +13,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Installs the user's own series-index parsing rules at startup, if they wrote any (cu-148).
+ * Installs the user's own series-index parsing rules at startup, if they wrote any.
  *
  * The file is **absent by default** and its absence is not an error: an install that never creates
- * one keeps the built-in rules and behaves exactly as cu-147 shipped. That is the reason nothing
- * here reports a failure to the user — there is no failure, only a file that is not there.
+ * one keeps the built-in rules and behaves exactly as the series-index rules feature originally
+ * shipped. That is the reason nothing here reports a failure to the user — there is no failure,
+ * only a file that is not there.
  *
  * Reads off the main thread. The app enables StrictMode's disk-read penalties in debug, and this
  * runs from `Application.onCreate`, so a synchronous read here would be a crash in a debug build

@@ -27,7 +27,7 @@ import org.robolectric.RobolectricTestRunner
  * The settings screen's **click handlers**, exercised through the list `makePreferences` builds.
  *
  * These are the 231 uncovered lines inside that 737-line function, and they are worth reaching for
- * a reason cu-175's original plan missed: extracting a pure `SettingsPreferencesBuilder` would move
+ * a reason the original plan missed: extracting a pure `SettingsPreferencesBuilder` would move
  * the *labels* out and leave every one of these handlers behind in the ViewModel. The refactor and
  * the coverage are separate problems.
  *
@@ -137,8 +137,8 @@ class SettingsClickHandlerTest {
 
   /**
    * The destructive one. Emptying the cache deletes audio the user chose to keep for offline
-   * listening, so a tap must open a confirmation — never act. cu-85 and cu-81 are both about
-   * downloads disappearing; this is the path where the user asks for it, and even then it asks
+   * listening, so a tap must open a confirmation — never act. Downloads disappearing unexpectedly
+   * was a recurring complaint; this is the path where the user asks for it, and even then it asks
    * first.
    */
   @Test
@@ -206,7 +206,7 @@ class SettingsClickHandlerTest {
 
   /**
    * The list is rebuilt from `prefsRepo` on every prefs change, so a row's label must reflect the
-   * stored value rather than a value captured once at construction (cu-101 — a stored
+   * stored value rather than a value captured once at construction (a stored
    * `"Rectangle"` read back under an option offered as `"Rectangular"`).
    */
   @Test

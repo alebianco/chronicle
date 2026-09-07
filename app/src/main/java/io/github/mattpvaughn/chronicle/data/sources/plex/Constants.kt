@@ -5,7 +5,7 @@ const val MEDIA_TYPE_TRACK = 10
 const val APP_NAME = "Chronicle"
 
 /**
- * The `SharedPreferences` file holding credentials, kept apart from settings (cu-108).
+ * The `SharedPreferences` file holding credentials, kept apart from settings.
  *
  * Auto Backup can exclude a preferences **file** but not individual keys, so while tokens shared
  * `Chronicle.xml` with the settings the only correct rule was to exclude the whole thing — and any

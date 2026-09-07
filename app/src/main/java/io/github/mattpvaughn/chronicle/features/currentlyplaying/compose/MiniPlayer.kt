@@ -42,7 +42,7 @@ data class MiniPlayerState(
 val MiniPlayerHeight = 72.dp
 
 /**
- * The collapsed currently-playing handle (cu-206).
+ * The collapsed currently-playing handle.
  *
  * Replaces `currently_playing_handle` in `activity_main.xml`, which was a `ConstraintLayout` bound
  * field-by-field from `MainActivity`.
@@ -52,7 +52,7 @@ val MiniPlayerHeight = 72.dp
  * `ProgressUpdater` republishes the playing book **once a second**, so this content re-emits at
  * tick rate with an identical title and artwork. The View version needed two hand-maintained
  * guards for that — `setTextIfChanged`, and a pair of `boundBookTitle`/`boundBookThumb` fields
- * compared before every bind (cu-117, where the measured cost was 285 jiffies/10s against 1 while
+ * compared before every bind (the measured cost was 285 jiffies/10s against 1 while
  * paused). Compose skips a recomposition whose inputs are `equals`, so passing a
  * [MiniPlayerState] `data class` gets the same result from the framework: an unchanged tick
  * recomposes nothing, and there is no mirror state to drift.
@@ -112,7 +112,7 @@ fun MiniPlayer(
       contentAlignment = Alignment.Center,
     ) {
       if (state.isLoading) {
-        // Spinner *instead of* the icon, same as the expanded player (cu-95). In the View version
+        // Spinner *instead of* the icon, same as the expanded player. In the View version
         // the button went INVISIBLE rather than GONE so the row would not reflow; here both sit in
         // a fixed-size Box, so the layout is stable either way.
         val buffering = stringResource(R.string.buffering)
@@ -129,7 +129,7 @@ fun MiniPlayer(
             painterResource(
               // A button shows the action a tap performs, not the current state: while playing it
               // must offer pause. The drawables are *state*-named, which is how this got inverted
-              // once during the cu-58 conversion.
+              // once during the drawable conversion.
               if (state.isPlaying) {
                 R.drawable.ic_notification_icon_paused
               } else {

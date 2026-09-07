@@ -12,7 +12,7 @@ import org.junit.Test
 /**
  * When a track or book is marked watched — the arithmetic, at its boundaries.
  *
- * **Written because mutation testing asked for it (cu-57).** `ProgressReporter` had 96% *line*
+ * **Written because mutation testing asked for it.** `ProgressReporter` had 96% *line*
  * coverage and killed 3 of 45 mutants: the existing tests execute this method but assert almost
  * nothing about it. PIT reported `changed conditional boundary` and
  * `Replaced long subtraction with addition` surviving in `markFinishedIfNeeded`, meaning the two
@@ -20,7 +20,7 @@ import org.junit.Test
  *
  * The consequence of getting them wrong is not cosmetic: marking a book watched resets its
  * position, so an off-by-one here throws away the listener's place — the same family of bug as
- * cu-9's mid-playback `setWatched`.
+ * the mid-playback `setWatched`.
  */
 class MarkFinishedBoundaryTest {
   private val track =
@@ -33,7 +33,7 @@ class MarkFinishedBoundaryTest {
     )
 
   /**
-   * The scrobble must fire **once**, not on every progress report (cu-73).
+   * The scrobble must fire **once**, not on every progress report.
    *
    * Plex's `/:/scrobble` increments `viewCount` rather than setting a flag, and it clears
    * `viewOffset` as a side effect. Progress is reported every ten ticks during playback, and these
@@ -154,7 +154,7 @@ class MarkFinishedBoundaryTest {
 
   /**
    * The book is marked only when playback has *ended*. Playing through the last two minutes must
-   * not mark it — that is cu-9's bug, where marking watched reset the position mid-listen.
+   * not mark it — that is the bug, where marking watched reset the position mid-listen.
    */
   @Test
   fun `a book near its end is not marked while still playing`() =
@@ -249,7 +249,7 @@ class MarkFinishedBoundaryTest {
    *
    * Without a guard the window check is trivially true — `0 - 3000 < 120000` — so a book barely
    * started gets scrobbled finished on the server: `viewCount` incremented and `viewOffset`
-   * cleared, which is precisely the damage cu-73 observed and cu-98 had to repair.
+   * cleared, which is precisely the damage that was observed and had to be repaired.
    *
    * It is reachable, not hypothetical. `lookupBookDuration` derives from
    * `getTracksForAudiobookAsync`, whose query filters `cached >= :offlineMode` — so an *uncached*

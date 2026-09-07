@@ -8,12 +8,11 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Whether changing the sync location leaves partial downloads behind in the **source** directory
- * (cu-153).
+ * Whether changing the sync location leaves partial downloads behind in the **source** directory.
  *
- * The question cu-81 raised and could not answer: its prune only ever looks at the *current*
- * `cachedMediaDir`, so anything the move fails to bring across is orphaned on a volume nothing
- * scans again.
+ * The question the downloads-going-missing investigation raised and could not answer: its prune
+ * only ever looks at the *current* `cachedMediaDir`, so anything the move fails to bring across
+ * is orphaned on a volume nothing scans again.
  *
  * The answer is decided entirely by naming. Fetch2 downloads **in place** and resumes over HTTP
  * Range — there is no `.part`/`.tmp` suffix — so a partial file is named `<trackId>.<ext>` exactly

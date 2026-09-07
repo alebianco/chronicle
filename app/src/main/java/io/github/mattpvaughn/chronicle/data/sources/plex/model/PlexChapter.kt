@@ -12,7 +12,7 @@ data class PlexChapter(
   val index: Long = 0L,
   val discNumber: Int = 0,
   // These are Plex's JSON key names and Moshi maps by field name — they must NOT be renamed to
-  // match `Chapter.bookStartTimeOffset` (cu-96). Renaming them silently stops chapters parsing:
+  // match `Chapter.bookStartTimeOffset`. Renaming them silently stops chapters parsing:
   // every offset defaults to 0 and no test that mocks the API notices.
   val startTimeOffset: Long = 0L,
   val endTimeOffset: Long = 0L,
@@ -22,7 +22,7 @@ data class PlexChapter(
  * Maps a Plex chapter onto the neutral [Chapter] entity.
  *
  * [bookId] is required rather than defaulted: chapters live in a shared table keyed partly on it
- * (cu-49), so an unset book id would collide with every other chapter in the library. It was
+ *, so an unset book id would collide with every other chapter in the library. It was
  * genuinely absent while chapters were serialized inside `Audiobook.chapters`, where the
  * containing book was implicit.
  */

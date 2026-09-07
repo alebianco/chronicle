@@ -56,7 +56,7 @@ interface IPlexLoginRepo {
    * The recovery for a token invalidated server-side. Plex has no refresh token — a new account
    * token needs a human approving an OAuth PIN in a browser — but that is the *only* thing needed,
    * so making the user re-pick a library they already picked was gratuitous. Before this the sole
-   * path was a full logout (cu-84).
+   * path was a full logout.
    */
   fun beginReauthentication()
 
@@ -100,7 +100,7 @@ class PlexLoginRepo
      * `postEvent`, so `loginEvent.value` was null for anything reading in the same main-loop pass
      * as construction — `MediaPlayerService` and `MainActivity` both do `.value?.let`, which
      * silently did nothing in that window. A `StateFlow` cannot be empty and its assignment lands
-     * immediately, so the window does not exist (cu-52). The seed is the safe direction: it is
+     * immediately, so the window does not exist. The seed is the safe direction: it is
      * what `determineLoginState` itself returns for an absent token.
      */
     private val _loginState = MutableStateFlow(Event(NOT_LOGGED_IN))
@@ -194,7 +194,7 @@ class PlexLoginRepo
      * handles this — it clears the databases and asks whether to keep downloaded files — but this
      * path did not, so choosing a different library here left the app showing a *union* of two
      * libraries until the next refresh pruned it, and a multi-gigabyte download could be reclaimed
-     * later as a silent side effect of a choice nobody was warned about (cu-126).
+     * later as a silent side effect of a choice nobody was warned about.
      *
      * Returning the fact rather than acting on it keeps this repository free of database and
      * download dependencies; the decision about *what* to clear belongs with the code that already
@@ -221,7 +221,7 @@ class PlexLoginRepo
       val server: ServerModel? = plexPrefsRepo.server
       val library: PlexLibrary? = plexPrefsRepo.library
       // Presence, never the values: this line used to log three working credentials
-      // into logcat, which persists and ends up in bug reports (cu-10).
+      // into logcat, which persists and ends up in bug reports.
       Timber.i(
         """Login state: hasAccountToken = ${token.isNotEmpty()},
                     |hasUserToken = ${!user?.authToken.isNullOrEmpty()},
@@ -235,11 +235,11 @@ class PlexLoginRepo
             token.isEmpty() -> NOT_LOGGED_IN
             // A stored token is not a valid one. Plex tokens are invalidated by an event, never on a
             // timer, so presence proves nothing — and reporting LOGGED_IN_FULLY here is what made the
-            // app show stale data with no way back (cu-84). Only a request that actually came back
+            // app show stale data with no way back. Only a request that actually came back
             // 401 sets this, so being offline does not land here.
             // Deliberately *not* NOT_LOGGED_IN: that routes through `Navigator.showLogin()`, which
             // calls `plexConfig.clear()` and wipes server, library and connections — so an expired
-            // token cost the user their whole configuration (decision-17, cu-73). A revoked account
+            // token cost the user their whole configuration (decision-17). A revoked account
             // keeps its config and its downloads; the UI surfaces `account_signed_out` and points at
             // Settings -> ACCOUNT -> "Sign in again", which already restores sync in place.
             accountAuthState.isRevoked -> {

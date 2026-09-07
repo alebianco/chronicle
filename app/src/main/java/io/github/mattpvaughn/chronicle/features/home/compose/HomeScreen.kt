@@ -26,13 +26,13 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.features.library.compose.BookCard
 
 /**
- * Everything the home screen renders, as one value (cu-201).
+ * Everything the home screen renders, as one value.
  *
  * The Fragment read four flows by `.value` inside one `refreshShelves()` and made **eight**
  * independent `isVisible` decisions from them. Grouped into a sealed [HomeContent] so "no emission
  * yet" is its own branch rather than three empty lists — with three shelves, a
  * `Loaded(empty, empty, empty)` seed would render "no books found" on every cold start, which is
- * cu-68's flash.
+ * the flash.
  */
 data class HomeUiState(
   val content: HomeContent = HomeContent.Loading,
@@ -59,7 +59,7 @@ sealed interface HomeContent {
  *
  * Each shelf takes its own `List<Audiobook>` rather than the whole state, so a progress tick that
  * changes one book in "recently listened" does not recompose the other two shelves — the Compose
- * equivalent of cu-110's `distinctUntilChangedBy { it.booksKey() }`, which stays in the ViewModel.
+ * equivalent of the `distinctUntilChangedBy { it.booksKey() }`, which stays in the ViewModel.
  */
 @Composable
 fun HomeScreen(
@@ -88,7 +88,7 @@ fun HomeScreen(
             coverUrl = coverUrl,
             onClick = onBookClick,
           )
-          // Continue Listening resumes on tap rather than opening details — cu-18's whole point,
+          // Continue Listening resumes on tap rather than opening details — the whole point,
           // and the only shelf with distinct behaviour.
           shelf(
             titleRes = R.string.recently_listened,

@@ -13,7 +13,7 @@ import org.junit.Test
  * The trap it exists to avoid: `ProgressUpdater` writes the playing track's progress to Room every
  * tick, so the track list re-read on the next tick is a *genuinely different value*. Comparing the
  * lists therefore reports "changed" every tick and guards nothing — the comparison has to ignore
- * the one field that is meant to change (cu-117).
+ * the one field that is meant to change.
  */
 class PerTickRepublishTest {
   private fun track(
@@ -50,7 +50,7 @@ class PerTickRepublishTest {
 
   @Test
   fun `a progress-only tick does not re-notify the chapter listener`() {
-    // The listener drives skip-to-next/previous-chapter (cu-87). Firing it every second is both
+    // The listener drives skip-to-next/previous-chapter. Firing it every second is both
     // wasted work and a signal that the chapter list was rebuilt behind it.
     val s = singleton()
     var notifications = 0

@@ -86,7 +86,7 @@ sequenceDiagram
 
 ## Dependency Injection Hierarchy
 
-Since cu-185 these three components are Hilt's own generated types, not hand-written classes —
+These three components are Hilt's own generated types, not hand-written classes —
 `ActivityModule.kt`/`ServiceModule.kt`/`AppModule.kt` attach providers to them with
 `@InstallIn(...)`:
 

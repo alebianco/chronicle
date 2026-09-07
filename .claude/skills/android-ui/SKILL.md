@@ -5,7 +5,7 @@ description: Use when writing or changing any screen - a Compose destination, th
 
 # Android UI
 
-**The UI is Compose, all of it** (decision-22; cu-181 → cu-206). **Zero layouts, zero Fragments,
+**The UI is Compose, all of it** (decision-22). **Zero layouts, zero Fragments,
 zero `RecyclerView.Adapter`s, no ViewBinding.** A screen is a `*Screen` composable — a pure
 function of its state — behind a `*Destination` that wires a ViewModel to it. `Navigator` and its
 `FragmentManager` transactions are gone; `ChronicleNavHost` is the graph.
@@ -15,17 +15,18 @@ function of its state — behind a `*Destination` that wires a ViewModel to it. 
 and its `@UnstableApi` marker propagates to every caller up to `MainActivity.onCreate` — lint's
 `UnsafeOptInUsageError` recognises only that annotation, never `@OptIn`.
 
-New UI is written in Compose, **device-verified in both orientations** — cu-141, cu-142 and cu-19
-were all landscape-only bugs, and a Compose test measures whatever width it is told.
+New UI is written in Compose, **device-verified in both orientations** — three past bugs
+were all landscape-only, and a Compose test measures whatever width it is told.
 
-**Two things only a device run catches**, both found after a green suite in cu-206/cu-207:
+**Two things only a device run catches**, both found after a green suite during the Compose
+migration:
 
 - **`painterResource` throws for a `<shape>` drawable** — *"Only VectorDrawables and rasterized
   asset types are supported"*. It killed the app on the first frame rendering a coverless book.
   Draw a placeholder as a `Box` background instead.
 - **`AnimatedVisibility` keeps its content composed while hidden.** The expanded player is gated on
   a plain `if (sheetState == EXPANDED)` for that reason — an `AnimatedVisibility` there put every
-  per-tick recomposition back behind a collapsed sheet, cu-110/cu-117's measured cost.
+  per-tick recomposition back behind a collapsed sheet, a measured cost.
   `CollapsedSheetGuardTest` pins it.
 
 ## Compose rules
@@ -44,13 +45,13 @@ were all landscape-only bugs, and a Compose test measures whatever width it is t
   versions demand compileSdk 37 (we are on 36) and AGP 9.1. Raise them only with compileSdk.
 
 **Navigation Component for Fragments must not be adopted** — Navigation Compose is the target, and
-the Fragment variant would be migrated twice. Same reason Hilt (cu-185) follows the screens.
+the Fragment variant would be migrated twice. Same reason the Hilt migration follows the screens.
 
 **Notifications and Android Auto stay outside Compose permanently**: a notification is rendered by
 the system process from `NotificationCompat`/`RemoteViews`, and the car host draws Auto from
 `MediaBrowser` items.
 
-### Five things a green Compose suite will not tell you (cu-198–cu-201, all found on a device)
+### Five things a green Compose suite will not tell you (all found on a device)
 
 - A **`_white` drawable can carry a black fill** — the name describes the intended tint, not the
   asset. It needs an explicit `tint`, or it renders invisible on a dark surface.
@@ -69,20 +70,20 @@ the system process from `NotificationCompat`/`RemoteViews`, and the car host dra
   perfectly correct while the pixels are not.
 
 **Extract the shared decision as a pure function before forking a renderer.**
-`Audiobook.progressState()` (cu-198) and `chapterRows(chapters, activeChapter)` (cu-201) exist
+`Audiobook.progressState()` and `chapterRows(chapters, activeChapter)` exist
 because two screens render the same thing and must not drift. Doing it first also gives the
 behaviour a framework-free test, which is the only kind that can fail for the right reason.
 
 **A `ModalBottomSheet` needs no `expandBottomSheetOnStart()`** — it has no peek state to get stuck
-in, which is cu-142 answered structurally. That helper stays until the last
+in, which answered the landscape peek-height bug structurally. That helper stays until the last
 `BottomSheetDialogFragment` goes.
 
-**`FormattableString` survives Compose** (cu-203). It looks like a workaround for a `View` being
+**`FormattableString` survives Compose.** It looks like a workaround for a `View` being
 unable to resolve a string without a `Context`, but the strings are chosen in **ViewModels**, which
 still cannot hold one — `SettingsViewModel` alone builds 123. Deferring the `Resources` lookup to
 render time is right; `BottomChooser` performs it there.
 
-## The first-frame flash class of bug is structurally gone (cu-68 → cu-206)
+## The first-frame flash class of bug is structurally gone
 
 It was a Kotlin-driven view with no XML default, holding that default long enough to read "No
 libraries found" over onboarding — several sources are cold (a `stateIn(WhileSubscribed)` before
@@ -95,15 +96,15 @@ A composable renders its state or nothing, so there is no default to flash and n
 
 **The lesson that survives is the seed.** A `stateIn` seed that is a *real-looking value* still
 renders as one — `FacetList.EMPTY` showed "No narrators yet" before the first grouping ran. That is
-why the sealed `Loading` states exist (cu-201, cu-202): make the pre-first-emission state
+why the sealed `Loading` states exist: make the pre-first-emission state
 unrepresentable rather than plausible.
 
-**`FormattableString` survives Compose** (cu-203). It looks like a workaround for a `View` being
+**`FormattableString` survives Compose.** It looks like a workaround for a `View` being
 unable to resolve a string without a `Context`, but the strings are chosen in **ViewModels**, which
 still cannot hold one — `SettingsViewModel` alone builds 123. `BottomChooser` performs the
 `Resources` lookup at render time.
 
-## Cover art goes through `CoverImage` (cu-207)
+## Cover art goes through `CoverImage`
 
 Never a bare `AsyncImage`. `CoverImageTest` fails the build on one, and the reason is that a bare
 call sets no `placeholder`/`error`/`fallback`, so a cover that fails to load renders as **nothing**
@@ -140,18 +141,18 @@ readers, and under `WhileSubscribed` its offline guard read the `null` seed and 
 book reach the player with no server. A test pins that choice.
 
 **Combine with `combineDistinct`** (`util/FlowCombinators.kt`), not a bare `combine` — the
-`distinctUntilChanged` is the cu-110 fix, not an optimisation. For a list, key it with
-`distinctUntilChangedBy { it.booksKey() }`.
+`distinctUntilChanged` is the fix for the recomposition-cost bug, not an optimisation. For a list,
+key it with `distinctUntilChangedBy { it.booksKey() }`.
 
 ## Orientation and visibility traps
 
-**An `isShown` guard must probe a view that exists in every orientation** (cu-19). `renderPlayerText`
+**An `isShown` guard must probe a view that exists in every orientation.** `renderPlayerText`
 guarded on `binding.progress`, which carries
 `android:visibility="@integer/currently_playing_artwork_visibility"` — GONE in `values-land`. So on
 a landscape tablet the guard returned early *every* time and the whole text block stayed blank:
 chapter position, duration, percentage and title. It probes `chapterProgressSeekbar` now.
 
-**A modal bottom sheet opens at its peek height in landscape, hiding everything** (cu-142). The
+**A modal bottom sheet opens at its peek height in landscape, hiding everything.** The
 speed popover rendered *only* its title bar — Material's `BottomSheetDialog` opens collapsed and
 expects a drag, and for a `wrap_content` sheet that peek settled at 96px, shorter than the sheet's
 own 108px title bar, with nothing suggesting anything was draggable. **Every modal sheet calls
@@ -170,12 +171,12 @@ player layout bug.
 
 - **A `Slider` throws for a value off its step grid.** `setValue` requires an exact multiple of
   `stepSize` above `valueFrom`, so any value coming from outside the UI — a settings import
-  validates keys, not values (cu-77) — must be snapped first (`SpeedChooserState.snapToStep`).
+  validates keys, not values — must be snapped first (`SpeedChooserState.snapToStep`).
 - **A `Chip`'s `android:tag` must not be a string resource** when parsed as data: the speed presets
   keyed on `@string/playback_speed_1_0x`, so a locale rendering it "1,0x" matched no branch and
   every preset silently became 1.0x.
 
-## The progress readout is human-formatted (cu-19)
+## The progress readout is human-formatted
 
 Never `h:mm:ss/h:mm:ss`. `formatCoarseDuration` (`6h 12m`, `<1m`) for a span,
 `formatPrecisePosition` (`32:10`) for a position inside a chapter — both in
@@ -188,7 +189,7 @@ countdown genuinely *is* `h:mm:ss`.
 
 ## Logging from the UI layer
 
-**Never log a whole collection** (cu-134). `CollectionLoggingTest` fails the build on a `Timber`
+**Never log a whole collection.** `CollectionLoggingTest` fails the build on a `Timber`
 call interpolating a bare collection-shaped name; log a projection (`${books.map { it.id }}`,
 `${books.size}`).
 

@@ -11,7 +11,7 @@ import org.junit.Test
  *
  * While chapters were serialized inside `Audiobook.chapters` the containing book was implicit, so
  * neither construction path set [Chapter.bookId] and every chapter carried
- * [NO_AUDIOBOOK_FOUND_ID]. Moving chapters into a shared table (cu-49) makes that fatal: `bookId`
+ * [NO_AUDIOBOOK_FOUND_ID]. Moving chapters into a shared table makes that fatal: `bookId`
  * is part of the composite primary key, so unset means every chapter in the library collides on
  * the same key and `insertAll` keeps only the last one written.
  */

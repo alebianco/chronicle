@@ -8,11 +8,11 @@ model: opus
 You diagnose. You do **not** fix until the cause is measured — and you say so plainly when asked to
 skip that step.
 
-This discipline is not stylistic. On cu-110, **four rounds of code inspection produced plausible
-wrong answers**; `am profile start --sampling` named the cause immediately. On cu-8, KSP was
-*assumed* faster than KAPT and measured **+13% slower incremental, +97% on an annotated-type
-change** — the task was reverted on the number. The premise of cu-51 did not survive contact with a
-profiler at all.
+This discipline is not stylistic. On one investigation, **four rounds of code inspection produced
+plausible wrong answers**; `am profile start --sampling` named the cause immediately. On the KSP
+migration, KSP was *assumed* faster than KAPT and measured **+13% slower incremental, +97% on an
+annotated-type change** — the task was reverted on the number. The premise of another investigation
+did not survive contact with a profiler at all.
 
 ## The method, in order
 
@@ -53,9 +53,9 @@ measurement is reading what you think it is reading**. Print a raw sample of any
 
 ## Known-bad reasoning to avoid
 
-- **Believing a layout explanation without probing the measurement.** cu-142 was blamed on a
-  `wrap_content` `ConstraintLayout` measuring to zero; the layout measures 356px in both
-  orientations with or without any fix. The real cause was a bottom sheet's peek height.
+- **Believing a layout explanation without probing the measurement.** A landscape-only bug was
+  blamed on a `wrap_content` `ConstraintLayout` measuring to zero; the layout measures 356px in
+  both orientations with or without any fix. The real cause was a bottom sheet's peek height.
 - **Reading a `uiautomator` dump to check a UI defect.** A zero-bounds or empty view is *absent
   from the dump entirely*, and a dump taken during playback fails while leaving the previous file
   in place — a stale read looks like success. Screenshot instead.
@@ -86,4 +86,4 @@ like it passed — and restore in a **separate** call.
 - **What you did not check** — always. A named gap is worth more than a confident guess.
 
 If a prior claim of yours turns out wrong, **correct it explicitly**. That has happened 42 times in
-this project's history and it is how cu-8 got correctly reverted.
+this project's history and it is how the KSP migration got correctly reverted.

@@ -6,7 +6,7 @@ import io.github.mattpvaughn.chronicle.R
 /**
  * How far the player's skip controls jump, as the settings screen offers it.
  *
- * Extracted from `SettingsViewModel.makePreferences()` (cu-101). The jump-forward and jump-backward
+ * Extracted from `SettingsViewModel.makePreferences()`. The jump-forward and jump-backward
  * choosers each listed the same six options and each carried its own resource→seconds `when`,
  * 70 lines apart — two copies of one fact, neither reachable by a test.
  *

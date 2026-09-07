@@ -18,13 +18,13 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 
 /**
- * The SAF half of the settings backup (cu-77).
+ * The SAF half of the settings backup.
  *
  * `BackupSchemaTest` covers the allowlist and the parsing in isolation; what needs an Android
  * runtime is the part that actually moves bytes — a `ContentResolver` writing to a `Uri`, and the
  * typed writes landing back in `SharedPreferences`. Robolectric gives both without a device.
  *
- * The headline case is [a wipe and restore round trip restores every setting], which is cu-77's
+ * The headline case is [a wipe and restore round trip restores every setting], which is the
  * acceptance criterion stated as a test: settings are changed away from their defaults, exported,
  * wiped, and restored, then compared **key by key** rather than eyeballed.
  */
@@ -270,7 +270,7 @@ class SettingsBackupRepoTest {
     }
 
   /**
-   * The cu-133 payload, end to end: a *well-formed* string that is not a permitted value.
+   * The well-formed-but-invalid payload, end to end: a *well-formed* string that is not a permitted value.
    *
    * Distinct from the malformed case above — `"x"` parses fine as a string, so only a per-key
    * value allowlist can refuse it. Before that existed it was written straight to preferences and

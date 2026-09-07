@@ -51,7 +51,7 @@ class CollectionSortAndConverterTest {
   }
 
   /**
-   * The stored form is a JSON array of strings and always has been (cu-71 changed the Kotlin type,
+   * The stored form is a JSON array of strings and always has been (the id-retype migration changed the Kotlin type,
    * not the encoding). Pinned literally, because this converter builds its **own** `Moshi` rather
    * than the app's — so if the app's ever gains an adapter that writes a string list differently,
    * nothing else would notice the divergence.
@@ -78,7 +78,7 @@ class CollectionSortAndConverterTest {
   }
 
   /**
-   * Non-numeric ids are the whole point of the cu-71 retype: `toLong()` would have thrown on
+   * Non-numeric ids are the whole point of the id-retype migration: `toLong()` would have thrown on
    * exactly the ids a non-Plex backend is expected to use (decision-11).
    */
   @Test

@@ -17,7 +17,7 @@ data class ServerModel(
  *
  * A pure function because the launch path that used to do this inline discarded the
  * refreshed access token — it kept only `connections` — so a rotated server token was
- * fetched and thrown away on every launch (cu-10). Keeping the decision here makes it
+ * fetched and thrown away on every launch. Keeping the decision here makes it
  * testable without standing up an `Application`.
  *
  * @param fetched null when the refresh failed or timed out. The cached server is then
@@ -35,7 +35,7 @@ fun mergeServerRefresh(
     // can still reach.
     //
     // `distinctBy { uri }` rather than `distinct()`: the same address can be cached with
-    // different flags from the one just fetched — most obviously right after the cu-107
+    // different flags from the one just fetched — most obviously right after the connection-flags
     // migration, where cached entries carry no `local`/`relay` at all — and whole-object
     // equality then keeps both. That put one address in two tiers and probed it twice per
     // selection round. Keeping the *fetched* copy is what makes the flags authoritative,

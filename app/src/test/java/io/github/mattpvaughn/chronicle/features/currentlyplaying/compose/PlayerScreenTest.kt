@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The player screen, asserted on what it renders (cu-198).
+ * The player screen, asserted on what it renders.
  *
  * `createComposeRule` with no `FragmentScenario`, no mocked `ActivityComponent` and no hand-written
  * `SharedPreferences` fake — the Fragment equivalent needed all three and could still only assert
@@ -60,7 +60,7 @@ class PlayerScreenTest {
 
   /**
    * The wording rule, at the screen rather than only in `PlayerText`'s own tests: a duration reads
-   * `6h 12m`, never `47:12:33/52:04:11` (§3.1 rule 3, cu-19).
+   * `6h 12m`, never `47:12:33/52:04:11` (§3.1 rule 3).
    */
   @Test
   fun `durations read as human text, never a raw pair`() {
@@ -72,7 +72,7 @@ class PlayerScreenTest {
   }
 
   /**
-   * cu-141 and cu-19 were both landscape-only: a text block that rendered in portrait and vanished
+   * Two earlier bugs were both landscape-only: a text block that rendered in portrait and vanished
    * in landscape, because the guard probed a view `values-land` hides. Landscape here differs by
    * exactly one thing — no cover — and everything else must still be on screen.
    */

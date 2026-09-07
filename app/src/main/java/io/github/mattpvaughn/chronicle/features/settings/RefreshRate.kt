@@ -6,7 +6,7 @@ import io.github.mattpvaughn.chronicle.R
 /**
  * How often the library re-syncs, as the settings screen presents it.
  *
- * Extracted from `SettingsViewModel.makePreferences()` (cu-101), where the same fact lived twice and
+ * Extracted from `SettingsViewModel.makePreferences()`, where the same fact lived twice and
  * neither copy was reachable by a test:
  *
  * - a `when` chain turned a stored minute count into a label, reaching through

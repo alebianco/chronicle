@@ -14,18 +14,18 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Ids that would escape the cache directory (cu-111).
+ * Ids that would escape the cache directory.
  *
  * An id is server-controlled data that becomes a **filename**: a downloaded track is written to
  * `File(cachedMediaDir, "$id.$extension")`, and `File(parent, child)` does not normalize. So an id
  * of `../../../../databases/BookDatabase` writes attacker-controlled bytes into app-private
  * storage, next to the Room databases and `ChronicleAuth.xml`.
  *
- * Reaching this requires the *server* to be hostile — the app refuses cleartext app-wide (cu-42),
+ * Reaching this requires the *server* to be hostile — the app refuses cleartext app-wide,
  * so a network attacker cannot inject a response. That is why the response is to drop the item and
  * keep going rather than fail the sync.
  *
- * Ids are `String` since cu-71 so a non-numeric backend can be represented (decision-11), so the
+ * Ids are `String` since the id-retype migration so a non-numeric backend can be represented (decision-11), so the
  * rule cannot be "digits only". These tests pin both directions: the traversal shapes are refused,
  * and the legitimate non-numeric shapes are not.
  */

@@ -29,7 +29,7 @@ Hard rules, each of which has bitten:
   They genuinely differ; a mismatch makes it invisible with no error.
 - **Deferred work is a task with `status: To Do`, never a draft.** A draft is an idea nobody has
   committed to. Work that was scoped and postponed and then filed as a draft is invisible in
-  `backlog board` and `backlog task list` — that is how cu-73 and cu-132 items were lost.
+  `backlog board` and `backlog task list` — that is how deferred items were lost before.
 
 ## Writing acceptance criteria
 

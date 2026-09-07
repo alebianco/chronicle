@@ -89,7 +89,7 @@ class CastPlaylistTest {
 
   @Test
   fun `an empty token is omitted rather than sent as an empty parameter`() {
-    // cu-33: an empty token is *absent*, and Plex reads `X-Plex-Token=` as malformed rather than
+    // An empty token is *absent*, and Plex reads `X-Plex-Token=` as malformed rather than
     // anonymous — so sending it would turn "no token" into a hard failure.
     val playlist = buildCastPlaylist(listOf(candidate(SERVER_URI)), "")
 

@@ -23,21 +23,21 @@ around a gate.
 | `ViewModelFactoryTest` | **(no KDoc summary — add one)** |
 | `CollectionLoggingTest` | A `Timber` call must not interpolate a whole collection. |
 | `ScopedQueryTest` | Every DAO query that returns rows without naming a single row must be scoped by source |
-| `ViewStyleTest` | An unrecognised view style must degrade, never throw (cu-133). |
+| `ViewStyleTest` | An unrecognised view style must degrade, never throw. |
 | `ModelsWithoutDiTest` | **(no KDoc summary — add one)** |
 | `TokenLoggingTest` | Auth tokens must never reach logcat. |
-| `DeclaredDependencyTest` | Every AndroidX package the app imports is **declared**, not inherited (cu-69). |
-| `RawDurationFormatTest` | The player must not print a raw duration (cu-19). |
-| `WorkerDispatcherTest` | `CoroutineWorker` is the one place `Dispatchers.*` is allowed directly (cu-152). |
-| ~~`OrphanedAdapterTest`~~ | *Retired in cu-206* — zero `RecyclerView.Adapter`s remain. |
-| ~~`UnguardedMenuAccessTest`~~ | *Retired in cu-206* — no Fragments, and no toolbar menus to dereference. |
+| `DeclaredDependencyTest` | Every AndroidX package the app imports is **declared**, not inherited. |
+| `RawDurationFormatTest` | The player must not print a raw duration. |
+| `WorkerDispatcherTest` | `CoroutineWorker` is the one place `Dispatchers.*` is allowed directly. |
+| ~~`OrphanedAdapterTest`~~ | *Retired* — zero `RecyclerView.Adapter`s remain. |
+| ~~`UnguardedMenuAccessTest`~~ | *Retired* — no Fragments, and no toolbar menus to dereference. |
 | `InternalApiUsageTest` | `@InternalCoroutinesApi` is not a stability opt-in like `@ExperimentalCoroutinesApi`. |
-| `PostValueUsageTest` | `postValue` is banned outright, and this is the **only** mechanism that can enforce it (cu-52). |
-| `ServiceLocatorUsageTest` | `Injector.get()` is a service locator, and the carve in cu-33 took it out of everything that can |
-| `CollectorCachesItsValueTest` | A `collectWhileStarted` that discards its emission does not leave a stale local behind (cu-52). |
-| `ContentDescriptionTest` | Every image is either labelled for a screen reader or explicitly marked decorative (cu-47). |
-| ~~`FirstFrameFlashTest`~~ | *Retired in cu-206* — a composable renders its state or nothing, so there is no XML default to flash. |
-| `TouchTargetSizeTest` | Every clickable control is at least [MIN_TOUCH_TARGET_DP] on both axes (cu-47). |
+| `PostValueUsageTest` | `postValue` is banned outright, and this is the **only** mechanism that can enforce it. |
+| `ServiceLocatorUsageTest` | `Injector.get()` is a service locator, and the backend-interface carve took it out of everything that can |
+| `CollectorCachesItsValueTest` | A `collectWhileStarted` that discards its emission does not leave a stale local behind. |
+| `ContentDescriptionTest` | Every image is either labelled for a screen reader or explicitly marked decorative. |
+| ~~`FirstFrameFlashTest`~~ | *Retired* — a composable renders its state or nothing, so there is no XML default to flash. |
+| `TouchTargetSizeTest` | Every clickable control is at least [MIN_TOUCH_TARGET_DP] on both axes. |
 
 ## Non-structural gates
 

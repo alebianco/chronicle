@@ -7,7 +7,7 @@ import io.github.mattpvaughn.chronicle.data.model.TrackIndex
 import io.github.mattpvaughn.chronicle.data.model.TrackOffset
 
 /**
- * Where to seek for a chapter, in the coordinates `Player.seekTo` actually takes (cu-96).
+ * Where to seek for a chapter, in the coordinates `Player.seekTo` actually takes.
  *
  * `seekTo(mediaItemIndex, positionMs)` wants a **track index** and a position **within that track**.
  * `Chapter.bookStartTimeOffset` is absolute within the *book*. The two coincide on a single-file
@@ -40,7 +40,7 @@ fun chapterSeekTarget(
   tracks: List<MediaItemTrack>,
 ): ChapterSeekTarget? {
   // The index must come from the **sorted** list, because that is the order the player's playlist
-  // is built in and `seekTo`'s `mediaItemIndex` addresses. [TrackIndex] says which list (cu-136).
+  // is built in and `seekTo`'s `mediaItemIndex` addresses. [TrackIndex] says which list.
   val ordered = tracks.sorted()
   val trackIndex = ordered.indexOfFirst { it.id == chapter.trackId }
   if (trackIndex == -1) return null
@@ -61,7 +61,7 @@ fun chapterSeekTarget(
  * `AudiobookDetailsViewModel.jumpToChapter` — all three written as
  * `tracks.takeWhile { it.id != trackId }.sumOf { it.duration }`, which **sums every track when
  * the id is absent** rather than reporting that it could not resolve one. Two of the six bugs in
- * this family were exactly that shape, so the duplication is the defect (cu-136).
+ * this family were exactly that shape, so the duplication is the defect.
  *
  * @param tracks the book's tracks, in any order — sorted internally, because the order that
  *   matters is the player's playlist order and not the caller's.

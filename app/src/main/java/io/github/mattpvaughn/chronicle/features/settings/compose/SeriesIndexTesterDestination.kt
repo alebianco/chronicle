@@ -12,7 +12,7 @@ import io.github.mattpvaughn.chronicle.features.settings.SeriesIndexTesterViewMo
 import io.github.mattpvaughn.chronicle.views.compose.ChronicleScaffold
 
 /**
- * The series-numbering rules tester as a navigation destination (cu-206).
+ * The series-numbering rules tester as a navigation destination.
  *
  * Replaces `SeriesIndexTesterFragment` + `fragment_series_index_tester.xml`. The toolbar, its back
  * arrow and the `applyTopSystemBarInset()` call all collapse into [ChronicleScaffold].

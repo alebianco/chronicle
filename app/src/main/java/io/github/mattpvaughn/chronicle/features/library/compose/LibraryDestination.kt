@@ -60,7 +60,7 @@ private fun viewStyleOptions(): List<FilterOption> =
   )
 
 /**
- * The library grid, as a navigation destination (cu-206).
+ * The library grid, as a navigation destination.
  *
  * The heaviest of the twelve: it carried a `SearchView`, a `SwipeRefreshLayout`, a persistent
  * `BottomSheetBehavior` filter panel with two `ChipGroup`s, and a four-item menu whose
@@ -114,7 +114,6 @@ fun LibraryDestination(
           // Its handler is live though — `promptDownloadAll()` works — so this is a feature that
           // was built and then hidden, not dead code. Restoring it is a product decision (it
           // would download an entire library on one tap), so it is filed rather than taken here.
-          // See the cu-206 notes.
           IconButton(onClick = onBrowseClick) {
             Icon(
               painter = painterResource(R.drawable.ic_browse),

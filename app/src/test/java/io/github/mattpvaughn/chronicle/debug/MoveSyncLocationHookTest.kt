@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * The `move_sync_location` hook's refusal to accept a path that is not one of the app's own
- * external dirs (cu-153).
+ * external dirs.
  *
  * Worth a test rather than a glance: `PrefsRepo.cachedMediaDir` accepts **any** path, so an
  * unmatched one would silently point downloads at a directory the app cannot write, and that

@@ -6,7 +6,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.VIEW_STYLE
 import timber.log.Timber
 
 /**
- * How a stored library view style maps onto layout decisions, in one place (cu-133).
+ * How a stored library view style maps onto layout decisions, in one place.
  *
  * This mapping was written **seven times** across `LibraryFragment`, `CollectionsFragment`,
  * `CollectionDetailsFragment`, `AudiobookAdapter` and `CollectionsAdapter`, and every copy ended in

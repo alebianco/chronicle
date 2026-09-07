@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Route encoding (cu-206).
+ * Route encoding.
  *
  * These matter because a route that fails to match its pattern navigates **nowhere, silently** —
  * there is no crash and no error, the user simply taps and nothing happens. Book titles and facet
@@ -108,7 +108,7 @@ class DestinationTest {
   }
 
   /**
-   * Login routing (cu-206), which was the `when` inside `Navigator`'s init block.
+   * Login routing, which was the `when` inside `Navigator`'s init block.
    *
    * The two null branches are the interesting half: staying put is a decision, and a reader
    * skimming the `when` could easily "fix" them into navigation. The login screen reports both

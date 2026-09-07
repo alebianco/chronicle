@@ -67,7 +67,7 @@ interface ICachedFileManager {
    *
    * Nothing did this before: `setAutoRetryMaxAttempts(1)` gave a download one retry and then
    * abandoned it, so a Wi-Fi blip ended it permanently and the book stayed partially
-   * downloaded with no way back except re-requesting it by hand (cu-76).
+   * downloaded with no way back except re-requesting it by hand.
    *
    * Safe to call repeatedly — Fetch2 ignores downloads that are already running or complete.
    */
@@ -134,7 +134,7 @@ class CachedFileManager
     }
 
     /**
-     * Deletes incomplete files that no longer belong to anything (cu-81).
+     * Deletes incomplete files that no longer belong to anything.
      *
      * Fetch2's own records are the authority on what is resumable, and they can only be read
      * through a callback — so this asks, decides on the answer, and deletes there. A failure to
@@ -225,7 +225,7 @@ class CachedFileManager
           // this means that it has failed to fully download
           val destFile = File(cachedFilesDir, track.getCachedFileName())
 
-          // Defence in depth (cu-111). Ids are validated where a server response becomes a model
+          // Defence in depth. Ids are validated where a server response becomes a model
           // (`asTrackList`), so nothing should reach here unsafe — but this is the line that
           // actually writes to the filesystem, and `File(parent, child)` does not normalize. A
           // path that escapes the cache directory is refused here rather than trusted to have
@@ -414,15 +414,15 @@ class CachedFileManager
             val downloadSuccess =
               downloads.all { it.error == Error.NONE } && downloads.isNotEmpty()
             // Fetch2 reports an Int groupId, which is a hash of the book id and cannot be
-            // reversed — so the id is read back from the extras it was enqueued with (cu-71).
+            // reversed — so the id is read back from the extras it was enqueued with.
             // A download from an older version has none; skipping is right, because guessing
             // would mark the wrong book as downloaded.
             val bookId = downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
             if (downloadSuccess && bookId != null) {
-              // The *only* owner of this write (cu-138). DownloadNotificationWorker used to
+              // The *only* owner of this write. DownloadNotificationWorker used to
               // perform it too, from a scope tied to its own cancellation, so the fact had two
               // owners and one of them usually lost the race — which is how a downloaded book
-              // could report itself uncached until the next cache scan repaired it (cu-85).
+              // could report itself uncached until the next cache scan repaired it.
               // This site is the right owner: a @Singleton on an injected scope outliving any
               // single unit of work, and already the reconciliation authority for cache state.
               externalScope.launch {
@@ -450,8 +450,8 @@ class CachedFileManager
 
       // "Cannot read the directory" is not "the directory is empty". This used to be
       // `listFiles(...) ?: emptyList()`, so an unmounted SD card or a moved sync directory made
-      // every track look absent and un-cached a whole library while the files were still there
-      // (cu-85). A scan that cannot see the directory must change nothing at all.
+      // every track look absent and un-cached a whole library while the files were still there.
+      // A scan that cannot see the directory must change nothing at all.
       val filesOnDisk =
         when (
           val outcome =
@@ -469,8 +469,8 @@ class CachedFileManager
       // A file's presence is not proof it finished downloading. This scan used to mark any
       // matching file as cached, so a Wi-Fi drop mid-download left a partial file that the
       // next launch promoted to "available offline" — and the book played truncated. The
-      // expected size has always been in the database; it was simply never read (cu-76).
-      // The incomplete ones are remembered rather than merely skipped (cu-81): a partial whose
+      // expected size has always been in the database; it was simply never read.
+      // The incomplete ones are remembered rather than merely skipped: a partial whose
       // download was abandoned is invisible — the UI correctly says the book is not downloaded —
       // so nothing ever pointed at the space it occupies.
       val incompleteOnDisk = mutableListOf<String>()
@@ -497,7 +497,7 @@ class CachedFileManager
       val reconciliation =
         reconcileCachedTracks(onDisk = trackIdsFoundOnDisk, reportedCached = reportedCachedKeys)
 
-      // Delete partials nobody is coming back for (cu-81). After the reconciliation, so the
+      // Delete partials nobody is coming back for. After the reconciliation, so the
       // database's view is the settled one; `partialsSafeToPrune` decides, and it keeps anything
       // Fetch could still resume or the database still claims.
       pruneAbandonedPartials(incompleteOnDisk, reportedCachedKeys, idToFileMap)
@@ -515,8 +515,8 @@ class CachedFileManager
       reconciliation.toMarkCached.forEach {
         val rowsUpdated = trackRepository.updateCachedStatus(it, true)
         if (rowsUpdated == 0) {
-          // A complete file whose track has no row is left alone — deliberately, and this is the
-          // TODO cu-81 resolves rather than removes. Downloads are retained across libraries, so
+          // A complete file whose track has no row is left alone — deliberately, and this is a
+          // known gap to resolve rather than remove. Downloads are retained across libraries, so
           // "no row here" does not mean "nobody wants this"; deleting it would take a good
           // download to fix a bookkeeping gap. Only *incomplete* files are ever deleted, below,
           // and only when nothing is coming back for them.
@@ -540,7 +540,7 @@ class CachedFileManager
         val isBookCached = isBookFullyCached(bookTrackCacheCount, bookTrackCount)
         val book = bookRepository.getAudiobookAsync(bookId)
         if (book != null) {
-          // The chapter-level `downloaded` stamp went with the legacy column (cu-159); it was
+          // The chapter-level `downloaded` stamp went with the legacy column; it was
           // never read. The book's own flag is the one the UI and cache reconciliation use.
           bookRepository.update(book.copy(isCached = isBookCached))
         }

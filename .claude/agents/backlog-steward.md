@@ -71,8 +71,9 @@ A draft is an idea nobody committed to. Work that was **scoped and postponed** i
 `status: To Do`.
 
 This matters mechanically: drafts appear only in `backlog draft list`, so a deferred item filed as
-a draft and linked from a **closed** task is invisible in every normal view. That is how the cu-73
-and cu-132 items were lost, and the owner flagged the risk himself: *"i'm almost sure we'll loose
+a draft and linked from a **closed** task is invisible in every normal view. That is how deferred
+items were lost before, and the owner flagged the risk himself — quoted verbatim, task id and
+all, because a quotation is a record rather than prose to tidy: *"i'm almost sure we'll loose
 track of the deferred items in cu-73 if we leave it like that."*
 
 Check open drafts for anything that is really postponed work, and propose promotion

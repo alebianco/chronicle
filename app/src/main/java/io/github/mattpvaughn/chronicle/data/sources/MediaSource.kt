@@ -11,8 +11,9 @@ interface MediaSource {
    * The specific backend **installation** this source represents — one Plex server, not "Plex"
    * as a category (decision-21).
    *
-   * Was a per-type constant (`0L` for Plex) until cu-127, which is why `Audiobook.source` could
-   * exist for years without scoping anything: every row carried the same value.
+   * Was a per-type constant (`0L` for Plex) until the source-scoping change, which is why
+   * `Audiobook.source` could exist for years without scoping anything: every row carried the
+   * same value.
    */
   val id: SourceId
 
@@ -40,7 +41,7 @@ interface MediaSource {
    * Backends differ in what they know about a book, so the UI reads these flags to
    * degrade gracefully rather than rendering a blank field that looks like missing
    * data (decision-11). Plex encodes narrator in `Style` tags by convention; a bare
-   * folder of MP3s knows nothing until tags are read (cu-33.2).
+   * folder of MP3s knows nothing until tags are read.
    */
   val hasNarrator: Boolean
 

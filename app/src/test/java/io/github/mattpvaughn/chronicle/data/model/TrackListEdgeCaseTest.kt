@@ -114,7 +114,7 @@ class TrackListEdgeCaseTest {
    * A track that is not in the list returns 0 rather than summing the whole list. That distinction
    * is load-bearing: `inTrackOffsetOf` was written because three call sites used
    * `takeWhile { it.id != trackId }.sumOf { … }`, which sums **every** track when the id is absent
-   * and silently reports a position at the end of the book (cu-136).
+   * and silently reports a position at the end of the book.
    */
   @Test
   fun `start time is zero for a track absent from the list`() {
@@ -130,7 +130,7 @@ class TrackListEdgeCaseTest {
     assertEquals(3_000L, tracks.getTrackStartTime(tracks[2]))
   }
 
-  /** Unsorted input must not change the answer — the function sorts internally (cu-115). */
+  /** Unsorted input must not change the answer — the function sorts internally. */
   @Test
   fun `start time ignores the order the list arrives in`() {
     val shuffled = listOf(tracks[2], tracks[0], tracks[1])

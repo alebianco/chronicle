@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The frame shared by the three onboarding pickers (cu-206).
+ * The frame shared by the three onboarding pickers.
  *
  * The refresh test is the point of this file. `onboarding_plex_choose_library.xml` carried a
  * refresh icon with **no click listener in Kotlin** — a button that did nothing, beside a server

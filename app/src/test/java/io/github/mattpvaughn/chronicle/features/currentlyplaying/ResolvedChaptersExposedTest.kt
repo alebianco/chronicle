@@ -9,10 +9,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The resolved chapter list must be readable, not just used internally (cu-82).
+ * The resolved chapter list must be readable, not just used internally.
  *
  * Ten call sites — five in `PlayerExt` (chapter skip) and five in `CurrentlyPlayingViewModel` —
- * read `currentlyPlaying.book.value.chapters`, the **legacy column**. Since cu-49 writes chapters
+ * read `currentlyPlaying.book.value.chapters`, the **legacy column**. Since chapters are written
  * to `ChapterDatabase`, that column is empty for any freshly synced book, so `indexOf` returns -1
  * and chapter skip silently does nothing. They must read the resolved list instead.
  */
@@ -37,8 +37,9 @@ class ResolvedChaptersExposedTest {
    * The resolved list must be exposed, not recomputed by each caller.
    *
    * Ten call sites in `PlayerExt` and `CurrentlyPlayingViewModel` used to read the book's legacy
-   * column, which was empty for any book synced since cu-49 — so `indexOf` returned -1 and chapter
-   * skip silently did nothing. The column is gone (cu-159); the exposure it forced stays.
+   * column, which was empty for any book synced since chapters moved to the table — so
+   * `indexOf` returned -1 and chapter skip silently did nothing. The column is gone; the exposure
+   * it forced stays.
    */
   @Test
   fun `the resolved list is exposed for a book whose chapters live only in the table`() {

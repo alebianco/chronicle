@@ -11,7 +11,7 @@ import io.github.mattpvaughn.chronicle.data.sources.MediaSource
 class LocalMediaSource : MediaSource {
   /**
    * The device's own storage is a single installation, so unlike a Plex server there is nothing
-   * to key on — one device has one local source (decision-21, cu-33.2).
+   * to key on — one device has one local source (decision-21).
    */
   override val id: SourceId = MEDIA_SOURCE_ID_LOCAL
 
@@ -35,7 +35,7 @@ class LocalMediaSource : MediaSource {
   override val isDownloadable: Boolean = false
 
   // Files on disk carry no narrator or series metadata until a tag reader lands, and
-  // there is no server to hold progress (cu-33.2).
+  // there is no server to hold progress.
   override val hasNarrator: Boolean = false
   override val hasSeries: Boolean = false
   override val hasServerProgress: Boolean = false

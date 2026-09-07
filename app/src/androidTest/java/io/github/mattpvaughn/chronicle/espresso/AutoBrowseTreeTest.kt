@@ -18,17 +18,17 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * The Android Auto browse tree, driven through a real [MediaBrowserCompat] (cu-23, cu-99).
+ * The Android Auto browse tree, driven through a real [MediaBrowserCompat].
  *
  * This is the only way to exercise `onGetRoot`/`onLoadChildren` as Auto actually calls them.
  * A unit test cannot: both are `MediaBrowserServiceCompat` overrides that need a bound service, a
- * real `Result` to detach and send on, and a caller package to validate. cu-99's two bugs — the
+ * real `Result` to detach and send on, and a caller package to validate. the two bugs — the
  * localized title used as the media id, and a `when` with no fallback branch that hung the request
  * by never calling `sendResult` — were both invisible to everything except a real browse.
  *
  * `ChronicleTestRunner` enables mock-Plex mode before the application starts, so this needs no
  * credentials and no live server. It runs on the Automotive emulator (`chronicle_auto`) as well as
- * on the two managed devices, which is what cu-23's "app reliably appears in Auto" asks about.
+ * on the two managed devices, which is what the "app reliably appears in Auto" asks about.
  */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
@@ -103,7 +103,7 @@ class AutoBrowseTreeTest {
   }
 
   /**
-   * cu-23 criterion 1, the machine-checkable half: the app offers a browse root at all.
+   * The machine-checkable half of the browse-root criterion: the app offers a browse root at all.
    *
    * A logged-out or Auto-disabled install returns `"empty root"`, so asserting the root is *not*
    * that is what distinguishes "Auto works" from "Auto is politely refusing".
@@ -116,7 +116,7 @@ class AutoBrowseTreeTest {
     )
   }
 
-  /** The four categories, by their stable wire ids — not their localized titles (cu-99). */
+  /** The four categories, by their stable wire ids — not their localized titles. */
   @Test
   fun theRootOffersEveryCategoryByItsStableId() {
     val children = loadChildren(onMain { browser.root })
@@ -141,7 +141,7 @@ class AutoBrowseTreeTest {
   }
 
   /**
-   * cu-23 criterion 2: a book served to Auto carries the metadata a head unit renders.
+   * The metadata criterion: a book served to Auto carries the metadata a head unit renders.
    *
    * **Conditional on the library having synced**, and deliberately so. Mock mode seeds the login
    * but does not run a refresh, so on a freshly-provisioned emulator the catalogue is empty — the
@@ -180,10 +180,10 @@ class AutoBrowseTreeTest {
   }
 
   /**
-   * The fallback branch cu-99 added. An id Auto no longer recognises must return an empty list,
-   * **not hang**: before that fix an unmatched `parentId` fell through with no `sendResult` on an
-   * already-detached `Result`, so the browse request never completed and Auto showed a spinner
-   * forever. The timeout in [loadChildren] is what would catch a regression.
+   * The fallback branch added for unrecognised ids. An id Auto no longer recognises must return
+   * an empty list, **not hang**: before that fix an unmatched `parentId` fell through with no
+   * `sendResult` on an already-detached `Result`, so the browse request never completed and Auto
+   * showed a spinner forever. The timeout in [loadChildren] is what would catch a regression.
    */
   @Test
   fun anUnknownCategoryReturnsEmptyRatherThanHanging() {

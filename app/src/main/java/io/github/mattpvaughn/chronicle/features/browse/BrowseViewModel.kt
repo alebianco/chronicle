@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 /**
- * Browsing the library by author, narrator or series (cu-24).
+ * Browsing the library by author, narrator or series.
  *
  * The grouping itself lives in `BookFacets` as pure functions; this only chooses which facet is
  * showing and hands the result to the view.
@@ -50,7 +50,7 @@ class BrowseViewModel
      *
      * Room re-emits the `Audiobook` table on every write — once a second during playback — and this
      * screen's grouping is O(library). Without the dedupe it would regroup 196 books per tick, which
-     * is the shape cu-110 was about.
+     * is the churn this dedupe exists to avoid.
      */
     private val allBooks =
       bookRepository.getAllBooks().onEach {
@@ -108,7 +108,7 @@ class BrowseViewModel
 
     fun showFacet(kind: FacetKind) {
       // MutableStateFlow already conflates an identical value, so the guard the LiveData version
-      // needed is redundant — but assignment is still synchronous, which is the cu-52 point.
+      // needed is redundant — but assignment is still synchronous, which is the point.
       _kind.value = kind
     }
   }

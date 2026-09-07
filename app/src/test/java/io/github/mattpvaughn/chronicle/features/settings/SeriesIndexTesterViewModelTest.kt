@@ -23,7 +23,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * The tester reports what a rule did, including when it did nothing (cu-151).
+ * The tester reports what a rule did, including when it did nothing.
  *
  * The screen exists to prevent tvnamer's #216 — a user unable to tell whether their pattern was
  * wrong or the tool was broken — so the cases that matter most here are the *negative* ones: a rule
@@ -69,7 +69,7 @@ class SeriesIndexTesterViewModelTest {
    * More than one rule routinely succeeds, and only the first counts.
    *
    * `"Mistborn, Book 2 - …"` satisfies both `audnexus` and `seanap`. First-match-wins is the
-   * disambiguation mechanism (cu-146), so the screen has to name the rule that *decided* rather
+   * disambiguation mechanism, so the screen has to name the rule that *decided* rather
    * than every rule that could have — a user reading two green rows cannot tell which applied.
    */
   @Test
@@ -228,7 +228,7 @@ class SeriesIndexTesterViewModelTest {
   /**
    * Two different unparseable titles both report a verdict.
    *
-   * The regression this pins appeared only when cu-151 met cu-52's migration: `winningRule` became
+   * The regression this pins appeared only when the StateFlow migration happened: `winningRule` became
    * a `StateFlow`, which **conflates**, so a second title that also fails emits `null` after a
    * `null` and the collector never fires — the headline stayed hidden while the rule list beneath
    * it updated. As a `LiveData` transformation it re-emitted regardless. The screen drives that

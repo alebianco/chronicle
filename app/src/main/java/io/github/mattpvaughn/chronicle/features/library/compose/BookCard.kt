@@ -27,13 +27,13 @@ import io.github.mattpvaughn.chronicle.data.model.progressState
 import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /**
- * One book, in whichever of the three view styles is chosen (cu-201).
+ * One book, in whichever of the three view styles is chosen.
  *
  * Written *alongside* `AudiobookAdapter` rather than replacing it: that adapter is shared by
  * Library, Home, FacetBooks and CollectionDetails, and the last two are still Views. Forking the
  * rendering is the cost of migrating screens one at a time — what must **not** fork is the
- * *decision*, which is why the progress indicator reads `Audiobook.progressState()` (cu-198's
- * extraction) rather than re-implementing cu-86's three-state rule.
+ * *decision*, which is why the progress indicator reads `Audiobook.progressState()` (the
+ * extraction) rather than re-implementing the three-state rule.
  *
  * Three styles, not a two-way `isGrid` boolean: `VIEW_STYLE_DETAILS_LIST` exists and collapsing to
  * a boolean would silently drop it.
@@ -123,7 +123,7 @@ private fun Cover(
   modifier: Modifier,
 ) {
   // `CoverImage`, not a bare `AsyncImage`: it carries the placeholder for the offline, no-artwork
-  // and failed-decode cases, which this call site used to leave as a hole in the layout (cu-207).
+  // and failed-decode cases, which this call site used to leave as a hole in the layout.
   CoverImage(
     thumb = book.thumb,
     serverConnected = serverConnected,
@@ -135,8 +135,8 @@ private fun Cover(
 /**
  * The progress bar and the unstarted marker.
  *
- * Reads `progressState()` — the shared decision extracted in cu-198 — so this and
- * cu-86's rule is stated once in `progressState()`, so no renderer can drift from it.
+ * Reads `progressState()` — the shared decision extracted out — so this and
+ * the rule is stated once in `progressState()`, so no renderer can drift from it.
  */
 @Composable
 private fun ProgressOverlay(

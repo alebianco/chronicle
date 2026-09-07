@@ -13,9 +13,9 @@ import org.junit.Test
  * scan runs over a user-writable directory (`MoveSyncLocationWorker` moves files between SD
  * card and internal storage), so a stray file is not hypothetical.
  *
- * It was then `\d+`, which was too *narrow*: cu-71 made ids `String` so a non-numeric backend can
+ * It was then `\d+`, which was too *narrow*: the id-retype migration made ids `String` so a non-numeric backend can
  * be represented, and a digits-only pattern made this the de facto arbiter of id format — an
- * Audiobookshelf id would download and then be invisible to the scan (cu-111).
+ * Audiobookshelf id would download and then be invisible to the scan.
  *
  * The pattern's one job is **"is this filename one of ours?"**. It cannot distinguish `cover.jpg`
  * from a track whose id happens to be `cover`, and it does not need to: every consumer is safe
@@ -44,7 +44,7 @@ class CachedFilePatternTest {
   }
 
   /**
-   * A non-numeric id must match — this is the cu-111 case. Ids are `String` so an Audiobookshelf
+   * A non-numeric id must match. Ids are `String` so an Audiobookshelf
    * or WebDAV backend can be represented (decision-11); a digits-only pattern meant such a track
    * downloaded fine and was then invisible to the cache scan, so it was deleted and re-downloaded
    * forever.

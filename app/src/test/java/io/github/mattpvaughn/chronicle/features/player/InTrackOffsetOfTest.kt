@@ -15,7 +15,7 @@ import org.junit.Test
  * `tracks.takeWhile { it.id != trackId }.sumOf { it.duration }`. `takeWhile` stops at the first
  * element that fails the predicate — so when the id *is* present it is right, and when the id is
  * **absent it sums every track**, silently returning a huge offset instead of admitting it could
- * not resolve one. Two of this family's six bugs were that shape (cu-136).
+ * not resolve one. Two of this family's six bugs were that shape.
  */
 class InTrackOffsetOfTest {
   private val tracks = MultiTrackBook.tracks()

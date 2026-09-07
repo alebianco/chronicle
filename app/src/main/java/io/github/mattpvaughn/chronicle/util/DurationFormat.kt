@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
  * The player used to print `DateUtils.formatElapsedTime` everywhere, so a 47-hour book — the
  * owner's real library has several — read `47:12:33/52:04:11`. RESEARCH_FINDINGS §3.1's
  * convergent-grammar rule 3 is that every well-liked audio app avoids exactly that: *"two-level,
- * human-formatted progress … never raw `h:mm:ss/h:mm:ss`"* (cu-19).
+ * human-formatted progress … never raw `h:mm:ss/h:mm:ss`"*.
  *
  * Two formats here, because the two levels want different precision: this one for a **span** —
  * how much book is left, where nobody tracks 47 hours to the second — and [formatPrecisePosition]

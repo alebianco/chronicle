@@ -16,7 +16,7 @@ import io.github.mattpvaughn.chronicle.features.library.compose.BookGrid
 import io.github.mattpvaughn.chronicle.views.compose.ChronicleScaffold
 
 /**
- * The books in one collection, as a navigation destination (cu-206).
+ * The books in one collection, as a navigation destination.
  *
  * The title is collected rather than passed in the route: it comes from the collection row, which
  * the ViewModel is already reading. The Fragment set it with a `collectWhileStarted` for the same

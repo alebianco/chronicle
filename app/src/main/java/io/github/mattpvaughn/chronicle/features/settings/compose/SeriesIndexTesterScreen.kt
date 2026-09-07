@@ -29,9 +29,9 @@ import io.github.mattpvaughn.chronicle.data.model.PatternAttempt
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 
 /**
- * Shows how the series-numbering rules read a title (cu-151, migrated in cu-202).
+ * Shows how the series-numbering rules read a title.
  *
- * The half of cu-147/cu-148 that lets a user see what a rule *does* before trusting it. tvnamer has
+ * The half of this feature that lets a user see what a rule *does* before trusting it. tvnamer has
  * the config file and not this, and its open issue #216 is a user who could not tell whether their
  * pattern was wrong or the tool was broken.
  *
@@ -46,7 +46,7 @@ fun SeriesIndexTesterScreen(
   onSampleChosen: (String) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  // `MaterialTheme` defines `colorScheme.background` but paints nothing (cu-181).
+  // `MaterialTheme` defines `colorScheme.background` but paints nothing.
   Surface(modifier = modifier.fillMaxSize()) {
     val padding = dimensionResource(R.dimen.screen_horizontal_padding)
 
@@ -140,7 +140,7 @@ fun SeriesIndexTesterScreen(
       }
 
       // Nothing is said until the library has actually been read — an empty list means "nothing
-      // needs fixing" only once we know what is in the library (cu-68's mirror risk).
+      // needs fixing" only once we know what is in the library (the mirror risk).
       if (state.libraryLoaded) {
         if (state.samples.isEmpty()) {
           item(key = "samples-empty") {
@@ -186,7 +186,7 @@ private fun SectionHeading(text: String) {
  *
  * "Matched and decided" versus "also matched, but too late" is the distinction the screen exists
  * for: more than one rule routinely matches, and a flat "matched" list leaves the user unable to
- * tell which reading the app actually took (cu-146).
+ * tell which reading the app actually took.
  */
 @Composable
 private fun RuleVerdictRow(

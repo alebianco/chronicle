@@ -13,7 +13,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 
 /**
- * [PackageValidator.isKnownCaller] — the real decision, not a copy of it (cu-100).
+ * [PackageValidator.isKnownCaller] — the real decision, not a copy of it.
  *
  * This replaces `PackageValidatorSignatureTest`, which asserted against private helpers
  * *re-implemented inside the test file*. Those 8 tests passed while `PackageValidator` sat at 0%
@@ -22,7 +22,7 @@ import org.robolectric.Shadows.shadowOf
  * a parsed XML resource — is answered by Robolectric, already used in nine other test classes.
  *
  * Both rules covered here are security-relevant in the **fail-open** direction, and each
- * historically admitted or crashed on a caller it should not have (cu-61):
+ * historically admitted or crashed on a caller it should not have:
  *
  * - the platform-signature branch admitted an *unsigned* caller whenever the platform signature was
  *   also null, which is the case on an emulator image with no platform signature;

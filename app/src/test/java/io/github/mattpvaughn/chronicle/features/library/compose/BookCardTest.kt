@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The shared book card (cu-201).
+ * The shared book card.
  *
  * Written alongside `AudiobookAdapter`, which four screens still use — so what matters most here
  * is that the *three* view styles all survive. Collapsing them to a two-way `isGrid` boolean would
@@ -118,8 +118,8 @@ class BookCardTest {
     ).fetchSemanticsNodes().size
 
   /**
-   * The progress indicator follows `progressState()` — cu-198's shared decision — so this and
-   * cu-86's three-state rule is stated once, so a renderer cannot invent a fourth reading of it.
+   * The progress indicator follows `progressState()` — the shared decision — so this and
+   * the three-state rule is stated once, so a renderer cannot invent a fourth reading of it.
    */
   @Test
   fun `an unstarted book renders no progress bar`() {
@@ -139,7 +139,7 @@ class BookCardTest {
     assertTrue("a started book must show a bar", progressBarCount() > 0)
   }
 
-  /** cu-86: marked-as-read at zero progress is *finished*, not unstarted. */
+  /** Marked-as-read at zero progress is *finished*, not unstarted. */
   @Test
   fun `a book marked as read renders a full bar`() {
     setCard(book = book(progress = 0L, viewCount = 1L))

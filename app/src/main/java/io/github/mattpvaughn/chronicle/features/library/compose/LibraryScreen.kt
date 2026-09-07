@@ -27,7 +27,7 @@ import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
 /**
- * Everything the library screen renders, as one value (cu-201).
+ * Everything the library screen renders, as one value.
  *
  * The Fragment gated three views on `books.isEmpty()` and `isOffline` through two cached locals —
  * the pattern `CollectorCachesItsValueTest` exists to guard, because discarding a collector's
@@ -66,7 +66,7 @@ internal fun LibraryScreen(
   modifier: Modifier = Modifier,
 ) {
   // `Surface`, not a bare `Box`: MaterialTheme defines colorScheme.background but paints nothing,
-  // so the window colour shows through and the text renders near-invisible (cu-181).
+  // so the window colour shows through and the text renders near-invisible.
   Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
     when (val content = state.content) {
       LibraryContent.Loading -> Unit
@@ -92,7 +92,7 @@ private fun BookList(
     LazyVerticalGrid(
       // `Adaptive`, not `Fixed(3)`: the Fragment used `GridLayoutManager(ctx, 3)`, which divides
       // the *available* width — 640px cells on the 1920px tablet, one cover filling the screen.
-      // There is no `layout-land`, so this is also what makes landscape right (cu-187).
+      // There is no `layout-land`, so this is also what makes landscape right.
       columns = GridCells.Adaptive(minSize = 180.dp),
       contentPadding = PaddingValues(8.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp),

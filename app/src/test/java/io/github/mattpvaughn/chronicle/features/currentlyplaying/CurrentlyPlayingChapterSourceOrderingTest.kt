@@ -10,7 +10,7 @@ import org.junit.Test
 
 /**
  * `ProgressUpdater` calls `update` once a second **without** table rows, on purpose: a DAO read per
- * tick is the cost cu-110 removed. That makes the interleaving load-bearing, so it is pinned here.
+ * tick is the cost that was removed. That makes the interleaving load-bearing, so it is pinned here.
  *
  * The hazard: `OnMediaChangedCallback` resolves a book's chapters from the table, then a tick
  * arrives a moment later carrying only the legacy column. If that tick re-resolved, the list would

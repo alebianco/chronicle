@@ -45,12 +45,12 @@ open class ChronicleApplication :
   Configuration.Provider,
   SingletonImageLoader.Factory {
   /**
-   * Builds workers with their dependencies injected (cu-179, moved to Hilt in cu-185).
+   * Builds workers with their dependencies injected, moved to Hilt.
    *
    * `Configuration.Provider` replaces WorkManager's default initialisation, which is what lets a
    * `WorkerFactory` be installed at all. `HiltWorkerFactory` replaces the hand-written
    * `ChronicleWorkerFactory` and its seven graph-reading lambdas — each worker is `@HiltWorker`
-   * with an ordinary `@Inject` constructor now, so cu-179's goal (workers constructable in a unit
+   * with an ordinary `@Inject` constructor now, so the goal (workers constructable in a unit
    * test) is met by the framework rather than by a factory we maintain.
    */
   @Inject
@@ -69,11 +69,11 @@ open class ChronicleApplication :
   private var applicationJob = Job()
 
   /**
-   * The one hardcoded dispatcher outside the player layer, and it cannot be otherwise (cu-169).
+   * The one hardcoded dispatcher outside the player layer, and it cannot be otherwise.
    *
    * This is a **field initialiser on the DI root itself**: `applicationComponent` is built inside
    * `onCreate`, so an injected `DispatcherProvider` does not exist yet when this line runs. Reading
-   * one here would be a circular dependency — the same reasoning cu-72 recorded for
+   * one here would be a circular dependency — the same reasoning recorded for
    * `MediaPlayerService.serviceScope`. `DispatcherProviderExemptionTest` pins the count at one so
    * this cannot quietly become a precedent.
    */
@@ -137,7 +137,7 @@ open class ChronicleApplication :
       .build()
 
   override fun onCreate() {
-    // **First, not last** (cu-185). Hilt injects this class's members inside `super.onCreate()`,
+    // **First, not last**. Hilt injects this class's members inside `super.onCreate()`,
     // so everything below it runs with the `@Inject` fields still uninitialised — the app died on
     // launch with "lateinit property unhandledExceptionHandler has not been initialized". It used
     // to be the final statement because the old graph was built by hand *here*, before super ran.
@@ -192,14 +192,14 @@ open class ChronicleApplication :
         cachedFileManager.refreshTrackDownloadedStatus()
       }
       // A download interrupted by a Wi-Fi drop or a process death used to stay abandoned:
-      // one retry, then nothing re-enqueued it (cu-76). Launch is the first chance to pick
+      // one retry, then nothing re-enqueued it. Launch is the first chance to pick
       // it back up.
       cachedFileManager.resumeInterruptedDownloads()
     }
   }
 
   /**
-   * Installs the user's own series-index parsing rules, if they wrote a file (cu-148).
+   * Installs the user's own series-index parsing rules, if they wrote a file.
    *
    * Launched rather than awaited: a refresh that beats the install reads the built-in rules, which
    * is the behaviour the app has always had, and `Audiobook.from` re-reads the installed set on
@@ -213,7 +213,7 @@ open class ChronicleApplication :
   }
 
   /**
-   * Claims rows written before cu-127 for the connected server (decision-21).
+   * Claims rows written before source scoping existed, for the connected server (decision-21).
    *
    * The v12->v13 and v6->v7 migrations mark every pre-existing row [SourceId.LEGACY_PLEX], because
    * a `SupportSQLiteDatabase` cannot know which server the app is configured for. Until they are
@@ -222,7 +222,7 @@ open class ChronicleApplication :
    *
    * Launched rather than awaited: `onCreate` must not block on disk. The consequence is a brief
    * window on the first launch after upgrading where the library reads empty and then fills — the
-   * same trade cu-158's chapter backfill made before cu-159 retired it.
+   * same trade the chapter backfill made before it was retired.
    *
    * Idempotent and a no-op once no row carries the marker, so running it on every start is
    * cheaper than recording whether it has run.
@@ -231,7 +231,7 @@ open class ChronicleApplication :
     applicationScope.launch(unhandledExceptionHandler) {
       bookRepository.adoptLegacyRows()
       trackRepository.adoptLegacyRows()
-      // Collections additionally adopt `SourceId.UNKNOWN` rows — see `adoptUnscopedRows` (cu-197).
+      // Collections additionally adopt `SourceId.UNKNOWN` rows — see `adoptUnscopedRows`.
       collectionsRepository.adoptUnscopedRows()
     }
   }
@@ -251,10 +251,10 @@ open class ChronicleApplication :
      * Split out of [setupNetwork] so it can be tested: the branch used to be a blanket
      * `catch (e: Exception)` that logged every failure as "keeping cached server", so a real
      * `401 Unauthorized` — the one unambiguous signal that the account is dead — was discarded and
-     * the user was never told (decision-17, cu-73).
+     * the user was never told (decision-17, measured directly).
      *
      * Only an explicit 401 qualifies. A timeout, a connection error and a 5xx are all *not* this:
-     * being offline is not being signed out (cu-84), and treating it as such would nag every user
+     * being offline is not being signed out, and treating it as such would nag every user
      * on a train.
      */
     fun isAccountRejection(e: Throwable): Boolean = e is HttpException && e.code() == HTTP_UNAUTHORIZED
@@ -308,7 +308,7 @@ open class ChronicleApplication :
       applicationScope.launch(unhandledExceptionHandler) {
         // Keep the whole refreshed server, not just its connections: asServer() carries a
         // fresh accessToken, and dropping it meant a rotated server token was re-fetched
-        // and discarded on every launch (cu-10).
+        // and discarded on every launch.
         val fetched: ServerModel? =
           withTimeoutOrNull(RESOURCE_REFRESH_TIMEOUT_MS) {
             try {

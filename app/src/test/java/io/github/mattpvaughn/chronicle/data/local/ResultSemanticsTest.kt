@@ -16,7 +16,7 @@ import org.junit.Test
  *
  * kotlin-result 2.x turned `Result` into a value class: `Ok`/`Err` are factory
  * functions rather than types, so the old `x is Ok` type check silently stops
- * compiling and had to become `x.isOk` (cu-48). These branches gate whether
+ * compiling and had to become `x.isOk`. These branches gate whether
  * track loading falls back to cached data, and nothing else covers them — a
  * library upgrade that inverted this would be invisible until playback broke.
  */

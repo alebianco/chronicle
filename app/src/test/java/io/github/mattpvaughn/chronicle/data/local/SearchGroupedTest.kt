@@ -25,7 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The grouped search reads through the repository correctly (cu-25).
+ * The grouped search reads through the repository correctly.
  *
  * Against a **real database**, because the claim being tested is about the offline-mode contract:
  * every other read here filters on `isCached >= :offlineModeActive`, and a search that forgot to
@@ -41,7 +41,7 @@ class SearchGroupedTest {
   private val chapterDao = mockk<ChapterDao>(relaxed = true)
   private val plexPrefsRepo =
     mockk<PlexPrefsRepo>(relaxed = true) {
-      // The scoping key the repository's reads are filtered by (cu-127). Without it every search
+      // The scoping key the repository's reads are filtered by. Without it every search
       // is scoped to SourceId.UNKNOWN and returns nothing, so these assertions would fail on an
       // empty result rather than on a matching bug.
       every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)

@@ -38,7 +38,7 @@ import org.junit.Test
  *
  * These are small transitions, but they are the ones a user drives dozens of times a session, and
  * one of them throws: `onCurrentlyPlayingClicked` raises IllegalStateException on HIDDEN. That is
- * the same crash-on-an-unexpected-state shape as cu-92, so the current behaviour is pinned here
+ * the same crash-on-an-unexpected-state shape seen before, so the current behaviour is pinned here
  * rather than quietly changed.
  */
 class MainActivityViewModelTest {
@@ -130,7 +130,7 @@ class MainActivityViewModelTest {
 
   // --- expandCurrentlyPlaying: the idempotent, non-throwing counterpart -------------------
   //
-  // Added for the `show_player` debug hook (cu-73), which needs the player on screen without tap
+  // Added for the `show_player` debug hook, which needs the player on screen without tap
   // coordinates so the "position not synced" badge can be screenshotted. It cannot use
   // `onCurrentlyPlayingClicked`, which toggles and throws on HIDDEN.
 
@@ -274,7 +274,7 @@ class MainActivityViewModelTest {
    * Only the idle branch is covered. The populated branches of `chapters` and `currentChapterTitle`
    * hang off `audiobookId`, which is set by the `MediaControllerCompat` metadata observer and then
    * loaded through an async `mapAsync` hop — so exercising them means driving real playback
-   * metadata, not stubbing a repository. Worth doing with the media-session work (cu-89) rather
+   * metadata, not stubbing a repository. Worth doing with the media-session work rather
    * than faking the controller here.
    */
   @Test
@@ -288,7 +288,7 @@ class MainActivityViewModelTest {
     }
 
   /**
-   * The sheet state must be readable **immediately** after it is written (cu-73).
+   * The sheet state must be readable **immediately** after it is written.
    *
    * Every writer used `postValue`, which defers to the next main-loop pass. Three methods here read
    * the state back to decide what to do, and so does the activity's back handler — so a deferred
@@ -352,7 +352,7 @@ class MainActivityViewModelTest {
    * nothing could bring the sheet back, because the routes off `HIDDEN` need either a later
    * non-stopped state (there is none — playback has ended) or a *different* book id. The collapsed
    * player is the only handle that expands the sheet, so the player became unreachable, and for an
-   * already-finished book it was never reachable at all (cu-119).
+   * already-finished book it was never reachable at all.
    */
   @Test
   fun `a book reaching its end does not hide the player`() =
@@ -364,7 +364,7 @@ class MainActivityViewModelTest {
       every { mediaServiceConnection.playbackState } returns playbackState
       val viewModel = viewModel()
       // The init collector is *scheduled* on the test dispatcher, not run — every state change below
-      // needs draining before the sheet state can be read (cu-52).
+      // needs draining before the sheet state can be read.
       advanceUntilIdle()
 
       // Playing: the sheet is revealed.
@@ -427,7 +427,7 @@ class MainActivityViewModelTest {
    *
    * The back handler keys off this. Backing out of a picker used to fall through to "switch to the
    * Home tab", which rendered the previous session's books from Room — so the app looked fully
-   * configured while holding no library at all (cu-124).
+   * configured while holding no library at all.
    */
   @Test
   fun `a partial login state counts as onboarding`() =

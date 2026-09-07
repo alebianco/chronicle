@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The browse screen, asserted on what it renders (cu-202).
+ * The browse screen, asserted on what it renders.
  *
  * The View version had no rendering test — the facet list was a `RecyclerView` and the three
  * visibility decisions were spread across two `render` passes.
@@ -95,7 +95,7 @@ class BrowseScreenTest {
   /**
    * A complete index must carry no caveat.
    *
-   * cu-24's reasoning: a qualification shown when nothing is missing teaches the user to skip it,
+   * the reasoning: a qualification shown when nothing is missing teaches the user to skip it,
    * so it is no longer read when it matters.
    */
   @Test

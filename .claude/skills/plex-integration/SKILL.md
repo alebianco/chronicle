@@ -11,7 +11,7 @@ below as community-documented and keep it wrapped behind repositories / the `Med
 
 ## Auth tokens
 
-**Resolved in one place, and empty counts as absent** (cu-33). `PlaybackSession.authToken` is the
+**Resolved in one place, and empty counts as absent.** `PlaybackSession.authToken` is the
 only statement of the precedence — **server access token, then the profile's, then the account's**.
 
 It was written out **twice** before (`AudiobookMediaSessionCallback`, `ServiceModule.plexDataSourceFactory`)
@@ -28,7 +28,7 @@ swallowed on purpose (the media is already resolved, and the endpoint is unoffic
 one — it caught three live leaks, including one logging *two* tokens per media item. Logging
 *presence* (`token.isNotEmpty()`) is fine.
 
-### 401 re-auth covers the server token only (cu-10)
+### 401 re-auth covers the server token only
 
 `PlexTokenAuthenticator` re-fetches the server access token from `/api/v2/resources` and retries
 **once**. It cannot recover an *account* token: Plex has no refresh token, and a new one needs a
@@ -39,7 +39,7 @@ signed out — the app says so and keeps playing cached files.
 would hammer plex.tv. Plex tokens never expire on a timer; they are invalidated by an event
 (password change with "sign out connected devices", server re-claim).
 
-### Account state is three-way (decision-17, cu-122/cu-123)
+### Account state is three-way (decision-17)
 
 `AccountAuthState` is `Authenticated` / `Unknown` / `Revoked` — a boolean could not tell "known
 fine" from "could not check".
@@ -57,7 +57,7 @@ A revoked account stays `LOGGED_IN_FULLY` on purpose — `NOT_LOGGED_IN` routes 
 `Navigator.showLogin()`, which calls `plexConfig.clear()` and wipes server, library and
 connections, so an expired token used to cost the user their whole configuration.
 
-### Credentials file split (cu-108)
+### Credentials file split
 
 All three secrets (account token, server access token, serialized user) go through
 `credentialString` / `putCredential` / `removeCredential`, which read `ChronicleAuth.xml` first
@@ -67,7 +67,7 @@ Auto Backup excludes `ChronicleAuth.xml` and *not* `Chronicle.xml` (`data_extrac
 `backup_rules.xml`, one per API level — keep them in agreement; `BackupRulesTest` enforces it by
 parsing `path=`, not by substring).
 
-## Connections are tiered, not raced (cu-11)
+## Connections are tiered, not raced
 
 `ConnectionChooser` tries **LAN → direct WAN → relay**, each tier getting a 1.5s budget before the
 next also starts (earlier attempts keep running, so a slow LAN address can still win). The **last**
@@ -93,12 +93,12 @@ series under a series named after the author. `seriesName()` prefers a **prefixe
 back to an unprefixed one only when nothing is labelled. It reproduces only on servers with that
 preference enabled — which is why fixtures written to match the code never showed it.
 
-**Both are detail-only** (cu-24): `/library/metadata/{id}` carries them;
+**Both are detail-only:** `/library/metadata/{id}` carries them;
 `/library/sections/{id}/all` does **not** — verified against fixtures captured from a real Plex
 1.43.3 server, and there is no `includeFields`/`includeTags` that would add them.
 `FacetList.unknownCount` exists so the UI is obliged to say how partial the index is.
 
-### Tag index seeding (cu-143)
+### Tag index seeding
 
 `TagIndexSeeder` enumerates a tag filter's distinct values
 (`/library/sections/{id}/style?type=9`) and lists the books carrying each
@@ -119,7 +119,7 @@ preference enabled — which is why fixtures written to match the code never sho
   claiming four call sites was wrong — those are `/library/sections/{id}/common` and a PUT, passing
   ids as an `id=` query parameter to different endpoints). Don't re-derive this.
 
-### `@Json` names must be checked against a captured response (cu-24)
+### `@Json` names must be checked against a captured response
 
 `plexGenres` carried **no** `@Json(name = "Genre")` for the life of the project, so Moshi looked for
 a key literally called `plexGenres` and `Audiobook.genre` was empty against every real server —
@@ -128,7 +128,7 @@ while every test passed, because the hand-written fixtures were written to match
 The `*-real-shape.json` fixtures are captured from a real server and are the **authority**; pin new
 parsing tests against those.
 
-## The series index parser (cu-146, cu-147, cu-155, decision-18)
+## The series index parser (decision-18)
 
 Parsed from anywhere in `titleSort`, in **hundredths** — **not** from Plex's `index` (the album
 ordering index, 1 for nearly every audiobook) and **not** from `Mood` (which carries the series
@@ -140,7 +140,7 @@ so it read **1 of 8** real formats, the one being our own fixture.
 
 - `SERIES_INDEX_PATTERNS` holds eight patterns tried **most specific first**, and that order is
   load-bearing: `audnexus` must precede `label-first`, or `"Book 2 of the Saga, Book 5"` reads 2.
-- `audnexus_subseries` (cu-155) reads `<Series>, Book <n>, <Subseries> - <Title>` where the number
+- `audnexus_subseries` reads `<Series>, Book <n>, <Subseries> - <Title>` where the number
   is terminated by a comma. It must follow `audnexus`, and the `Book`/`Vol` label stays
   **required** — that requirement is the only thing stopping `"Warhammer 40,000"` from reading as
   book 40000, sabotage-verified.
@@ -165,17 +165,17 @@ Two traps:
   than returning null — four of the eight built-ins declare no `series` group and crashed every
   match until every named read went through `namedGroupOrNull`.
 
-User rules live in `series-index-rules.json` in the app's files directory (cu-148):
+User rules live in `series-index-rules.json` in the app's files directory:
 `{version, order, rules:[{name, pattern, description}]}`, absent by default. **Every** failure
 degrades to the built-ins (malformed JSON, newer version, unknown order, nameless rule,
 uncompilable regex). `order` is parsed as a *string*, not a Moshi enum, since an unknown constant
 would make Moshi reject the whole file and take the valid rules with it. The load runs off the main
 thread (StrictMode penalises a disk read in `Application.onCreate`) and is launched, not awaited.
 
-**The tester UI (cu-151) is not optional polish** — tvnamer's #216 is a user who could not tell
+**The tester UI is not optional polish** — tvnamer's #216 is a user who could not tell
 whether their pattern or the tool was wrong.
 
-## Search is local, not `/hubs/search` (cu-25)
+## Search is local, not `/hubs/search`
 
 `BookSearch.kt` scans the synced library in memory over four fields (title, author, narrator,
 series). `/hubs/search` cannot be the foundation: its results **omit `Style`/`Mood`** so it cannot
@@ -188,7 +188,7 @@ transposition (the commonest typo), and the cheap prefilter counts **characters,
 transposition rewrites every adjacent pair, so a bigram prefilter discards the very matches the
 fuzziness exists for. Fuzzy matching is floored at 4 characters.
 
-**Matching runs over a projection** (cu-161): `searchGrouped` reads five columns
+**Matching runs over a projection:** `searchGrouped` reads five columns
 (`BookDao.searchProjection`), matches, then fetches only the hits by id — **196.7 → 75.4 ms at
 10,000 books**. `withRealBooks` swaps the real rows back. **Do not make the matching generic** — the
 first attempt did, and `GroupedSearchResults<T>` leaked into every UI call site for no benefit.
@@ -198,7 +198,7 @@ neighbours and reported the change as 2% *worse*; the rewritten fixture then mea
 Measure with a query matching a realistic slice, and **print the hit count beside the timing**.
 `SearchReadCostTest` re-runs it in one command.
 
-## Fixture routing (cu-18, cu-19)
+## Fixture routing
 
 **`retrieveAlbum` and `retrieveChapterInfo` are the same URL** —
 `/library/metadata/{id}?includeChapters=1` — so nothing in the *request* says whether an album or a
@@ -221,5 +221,5 @@ tracks, and since `bookDao.update` is `@Insert(REPLACE)` a **track was inserted 
   deliberately, since Plex does not guarantee the field and a strict check would empty the library
   of a server that omits it.
 
-**The fixture trap, generally** (cu-24): a fixture written to match the code proves the code matches
+**The fixture trap, generally:** a fixture written to match the code proves the code matches
 itself. This has now bitten in four separate fields (genre, series index, source id, moods).

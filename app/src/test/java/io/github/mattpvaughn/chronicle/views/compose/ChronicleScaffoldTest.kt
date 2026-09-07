@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The standard screen frame (cu-206).
+ * The standard screen frame.
  *
  * The back arrow's presence is the property worth pinning: it is driven by `onNavigateUp` being
  * non-null, which is how a top-level tab differs from a pushed screen. The XML expressed the same

@@ -138,7 +138,7 @@ features/
 ```
 
 **Purpose**: Each feature is a self-contained module with a ViewModel and a `compose/` subpackage —
-there is no Fragment layer and no RecyclerView adapter anywhere in the app (cu-206)
+there is no Fragment layer and no RecyclerView adapter anywhere in the app
 
 **Pattern**: Each feature typically has:
 - `ViewModel.kt` - UI state and business logic, injected via Hilt (`@HiltViewModel`)
@@ -160,8 +160,8 @@ injection/
     └── Scopes.kt                 # @ApplicationScope / @PlayerServiceScope CoroutineScope qualifiers
 ```
 
-**Purpose**: Configure dependency injection, define object lifetimes and creation. Since cu-185
-there are no hand-written `AppComponent`/`ActivityComponent`/`ServiceComponent` classes — Hilt
+**Purpose**: Configure dependency injection, define object lifetimes and creation. Since the Hilt
+migration there are no hand-written `AppComponent`/`ActivityComponent`/`ServiceComponent` classes — Hilt
 generates the graph from `@HiltAndroidApp`/`@AndroidEntryPoint`/`@HiltViewModel` annotations plus
 these modules, and `SingletonComponent`/`ActivityComponent`/`ServiceComponent` in the `@InstallIn`
 lines above are Hilt's own component types (`dagger.hilt.android.components.*`), not project code.
@@ -175,7 +175,7 @@ navigation/
 ```
 
 **Purpose**: Define the app's routes and build the Navigation Compose graph from them. Replaces
-`Navigator.kt` (deleted in cu-206), which drove `FragmentManager` transactions by hand.
+`Navigator.kt` (deleted), which drove `FragmentManager` transactions by hand.
 
 ### `/util` - Utilities
 ```
@@ -205,7 +205,7 @@ views/
 ```
 
 **Purpose**: Reusable custom UI components. `CoverImage` is the one to know: it carries the
-placeholder for offline, no-artwork and failed-decode cases (cu-207) — `CoverImageTest` gates
+placeholder for offline, no-artwork and failed-decode cases — `CoverImageTest` gates
 against a bare `AsyncImage` reaching a screen. `BookCard.kt` in `features/library/compose/` is the
 one other file that calls `AsyncImage` directly, and it does so *through* `CoverImage`.
 
@@ -225,7 +225,7 @@ res/
 ```
 
 There is no `res/layout/` directory — every screen is Compose, so there are no layout XML files to
-hold (cu-206). A `res/menu/` directory still exists with six files (`bottom_nav_menu.xml`,
+hold. A `res/menu/` directory still exists with six files (`bottom_nav_menu.xml`,
 `home_menu.xml`, etc.), but none of them are referenced from any Kotlin source anymore; they are
 dead resources left over from the Fragment era, not a current option-menu mechanism.
 
@@ -245,7 +245,7 @@ dead resources left over from the Fragment era, not a current option-menu mechan
 - **`CONTRIBUTING.md`**: Contribution guidelines
 - **`LICENSE`**: Project license
 - **`backlog/`**: all non-code knowledge — tasks, decisions, reference docs (D13). Upstream's
-  `todo.md` is gone; its live items became tasks in cu-46.
+  `todo.md` is gone; its live items became tasks.
 
 ## Package Naming Convention
 

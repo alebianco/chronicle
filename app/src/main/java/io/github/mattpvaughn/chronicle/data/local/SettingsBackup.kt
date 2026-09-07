@@ -19,7 +19,7 @@ data class SettingsBackup(
   val version: Int = BACKUP_SCHEMA_VERSION,
   val settings: Map<String, String> = emptyMap(),
   /**
-   * The user's bookmarks (cu-22).
+   * The user's bookmarks.
    *
    * A top-level array rather than entries in [settings], because a bookmark is a **record**, not a
    * preference: [settings] is a `Map<String, String>` of preference keys, so a list of per-book
@@ -33,7 +33,7 @@ data class SettingsBackup(
 )
 
 /**
- * One bookmark, as it appears in a backup file (cu-22).
+ * One bookmark, as it appears in a backup file.
  *
  * A separate type from the `Bookmark` entity on purpose: this is a **file format**, and coupling it
  * to a Room entity means a schema change silently changes what old files mean. The fields are
@@ -41,7 +41,7 @@ data class SettingsBackup(
  * a format change nobody noticed.
  *
  * `position` is plain millis: the file is hand-editable, and a value class would serialize the same
- * anyway. It is converted to a `BookOffset` on the way in, where the frame matters (cu-136).
+ * anyway. It is converted to a `BookOffset` on the way in, where the frame matters.
  */
 @JsonClass(generateAdapter = true)
 data class BookmarkBackup(
@@ -101,11 +101,11 @@ fun importBookmarks(backup: SettingsBackup): List<Bookmark> =
  * Adding a *settings key* does **not** require a bump: unknown keys are ignored on import, so an
  * older app reading a newer file degrades rather than failing.
  *
- * **2** since cu-22 added the top-level `bookmarks` array. Strictly the rule above still holds in
- * the backwards direction — a v1 app has no such field and Moshi drops it. The bump is for the
- * other direction: this version must be able to tell "a v1 file that had no bookmarks" from "a v2
- * file whose bookmarks were lost", and [importSettingsOrNull]'s refusal of a *newer* version only
- * ever means anything if the number moves when the format grows.
+ * **2** since the bookmarks-export change added the top-level `bookmarks` array. Strictly the
+ * rule above still holds in the backwards direction — a v1 app has no such field and Moshi drops
+ * it. The bump is for the other direction: this version must be able to tell "a v1 file that had
+ * no bookmarks" from "a v2 file whose bookmarks were lost", and [importSettingsOrNull]'s refusal
+ * of a *newer* version only ever means anything if the number moves when the format grows.
  */
 const val BACKUP_SCHEMA_VERSION = 2
 
@@ -115,8 +115,8 @@ const val BACKUP_SCHEMA_VERSION = 2
  * Auth tokens live in the same `SharedPreferences` file as these settings (both prefs repos
  * inject the single instance provided for `APP_NAME`), so enumerating `sharedPreferences.all`
  * would write the Plex account and server tokens into a plaintext JSON file the user then syncs
- * to a cloud folder. `key_is_premium` and `key_premium_token` also survive on installs
- * predating cu-60, so a blanket dump would leak a Play purchase token too.
+ * to a cloud folder. `key_is_premium` and `key_premium_token` also survive on installs from
+ * before the premium-tier removal, so a blanket dump would leak a Play purchase token too.
  *
  * Anything not named here cannot leave the device by this route. Adding a setting is a
  * deliberate act, which is the point.
@@ -228,9 +228,9 @@ internal val BACKUP_SETTING_TYPES: Map<String, SettingType> =
 /**
  * The values a constrained STRING key accepts, keyed the same way as [BACKUP_SETTING_TYPES].
  *
- * The cu-17 allowlist gates **keys**; this gates **values** (cu-133). Three of these keys have
- * setters in `SharedPreferencesPrefsRepo` that throw on an unknown value, and import bypasses
- * those setters by writing through `putString` — so an out-of-range value reached preferences and
+ * The [BACKUP_SETTING_KEYS] allowlist gates **keys**; this gates **values**. Three of these
+ * keys have setters in `SharedPreferencesPrefsRepo` that throw on an unknown value, and import
+ * bypasses those setters by writing through `putString` — so an out-of-range value reached preferences and
  * then crashed the app from a *property initializer* on the next render, on every launch, with
  * the settings screen needed to undo it potentially unreachable.
  *

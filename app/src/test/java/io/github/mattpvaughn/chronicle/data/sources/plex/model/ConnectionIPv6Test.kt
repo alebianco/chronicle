@@ -12,10 +12,10 @@ import org.junit.Test
  * Without the explicit `@Json(name = "IPv6")` the property name `iPv6` is what Moshi looks for, so
  * a real response would parse to `false` for every connection — silently, with every test still
  * green, because the hand-written `resources.json` fixture omits the key entirely. That is exactly
- * how `plexGenres` went missing for the life of the project (cu-24), so the casing is pinned here
+ * how `plexGenres` went missing for the life of the project, so the casing is pinned here
  * rather than assumed.
  *
- * The flag is parsed and **not acted on**; see `Connection.iPv6` for why (cu-75).
+ * The flag is parsed and **not acted on**; see `Connection.iPv6` for why.
  */
 @OptIn(ExperimentalStdlibApi::class)
 class ConnectionIPv6Test {

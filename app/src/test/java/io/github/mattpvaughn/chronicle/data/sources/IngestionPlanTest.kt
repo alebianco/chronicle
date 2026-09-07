@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * [planIngestion] — what a refresh writes and deletes, for one source (cu-80).
+ * [planIngestion] — what a refresh writes and deletes, for one source.
  *
  * The rules under test are the two that can lose a user's data: which local values survive a merge,
  * and which rows a refresh may delete. Both were previously welded inside
@@ -62,7 +62,7 @@ class IngestionPlanTest {
 
   /**
    * Listening position is owned by the tracks and a network copy never overwrites it
-   * (decision-16, cu-90). `planIngestion` delegates that to `Audiobook.merge`; this asserts it
+   * (decision-16). `planIngestion` delegates that to `Audiobook.merge`; this asserts it
    * really is delegated, since an ingestion path that bypassed `merge` would look identical until
    * someone lost their place in a book.
    */

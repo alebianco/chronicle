@@ -22,9 +22,9 @@ import java.io.IOException
  * Why the library picker is empty.
  *
  * All three causes used to render the layout's static "No libraries found" — a claim about the
- * *server's contents*, and wrong in two of them. The owner hit the worst case during the cu-73
- * live pass: a TLS hostname mismatch after a certificate rotation, reported as though the server
- * had no audiobook libraries, with a retry button that could only fail again (cu-125).
+ * *server's contents*, and wrong in two of them. The owner hit the worst case during a live pass:
+ * a TLS hostname mismatch after a certificate rotation, reported as though the server
+ * had no audiobook libraries, with a retry button that could only fail again.
  *
  * It reads as plausible rather than broken because account and server selection succeed first —
  * those are answered by plex.tv, while libraries come from the server itself. So nothing hints at
@@ -67,7 +67,7 @@ class LibraryPickerEmptyReasonTest {
     runTest {
       val vm = viewModel(serviceReturning(emptyList()))
       // The ViewModel's init collector is *scheduled* on the test dispatcher, not run, so the
-      // state change below needs draining before its effect can be read (cu-52).
+      // state change below needs draining before its effect can be read.
       advanceUntilIdle()
 
       connectionState.value = PlexConfig.ConnectionState.CONNECTION_FAILED

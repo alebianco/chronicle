@@ -13,7 +13,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
  * A ViewModel's `StateFlow`s are shared with `WhileSubscribed`, which means they compute **only
  * while something collects them** — with no collector they sit on the seed value passed to
  * `stateIn` and never consult their sources. That is the same reason the `LiveData` tests this
- * replaces called `observeForever {}` before asserting: a `MediatorLiveData` is cold too (cu-52).
+ * replaces called `observeForever {}` before asserting: a `MediatorLiveData` is cold too.
  *
  * The `advanceUntilIdle` is not optional and is the difference from a bare `launch`. Subscribing
  * only *starts* the upstream; the collector has not run yet when `keepCollected` returns, so a

@@ -41,7 +41,7 @@ import org.robolectric.RobolectricTestRunner
  *
  * Scope is the **backup and restore** surface, because that is where a wrong answer is invisible:
  * every one of the five outcomes has to say something specific, or a refused file reads exactly
- * like a successful restore that changed nothing — the silent failure cu-77 set out to avoid.
+ * like a successful restore that changed nothing — the silent failure this reporting set out to avoid.
  */
 @RunWith(RobolectricTestRunner::class)
 class SettingsViewModelTest {
@@ -138,7 +138,7 @@ class SettingsViewModelTest {
 
   /**
    * Skipped settings get a *different* message, because "9 applied" while quietly dropping three
-   * is the failure mode this reporting exists to prevent (cu-77 — the allowlist gates keys, and a
+   * is the failure mode this reporting exists to prevent (the allowlist gates keys, and a
    * value it cannot use must be visible, not swallowed).
    */
   @Test

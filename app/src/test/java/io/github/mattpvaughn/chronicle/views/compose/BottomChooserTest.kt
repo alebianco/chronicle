@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * The chooser sheet, shared by five screens (cu-203).
+ * The chooser sheet, shared by five screens.
  *
  * `BottomSheetChooser` was a `FrameLayout` with a hand-rolled animation and an inner adapter; its
  * only test coverage was the `DiffUtil` callback.

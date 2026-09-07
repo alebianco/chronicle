@@ -126,8 +126,8 @@ class PackageValidator(
     // realistically after a Google key rotation) crashed onGetRoot — and
     // MediaBrowserService is exported, so that took playback down.
     //
-    // Latent since the UAMP import, but only reachable after cu-61: the previous
-    // constructor-time throw killed the service before this line could run.
+    // Latent since the UAMP import, but only reachable once the constructor-time throw was fixed:
+    // it used to kill the service before this line could run.
     val isPackageInWhitelist =
       callerSignature != null &&
         certificateWhitelist[callingPackage]?.signatures?.any {
@@ -241,11 +241,11 @@ class PackageValidator(
         )
       }
     } catch (e: PackageManager.NameNotFoundException) {
-      // The nullable return type only became true here (cu-100). `getPackageInfo` *throws* for an
+      // The nullable return type only became true here. `getPackageInfo` *throws* for an
       // unknown package, so every `?:` fallback downstream was unreachable — including the one in
       // [getSystemSignature] written specifically to tolerate a missing platform package and
       // degrade the allowance. Instead the throw escaped the constructor and took the exported
-      // service down, which is the failure mode cu-61 set out to remove.
+      // service down, which is the failure mode this was fixed to remove.
       Timber.i(e, "Package not found: $callingPackage")
       null
     }
@@ -363,7 +363,7 @@ class PackageValidator(
    * [MediaPlayerService], and with it all playback, at construction.
    *
    * It is absent on emulator images with no platform signature, which made
-   * playback impossible to verify on an emulator at all (cu-61). Whether any
+   * playback impossible to verify on an emulator at all. Whether any
    * real device can reach this is unproven, but a hard crash for an Android Auto
    * allowlist is the wrong failure mode either way.
    */

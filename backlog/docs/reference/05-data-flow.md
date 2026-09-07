@@ -42,7 +42,7 @@ This keeps data flow predictable and makes debugging easier.
   that must fire each time needs `Event<T>`
 - **Not lifecycle-aware by itself**: ViewModels expose `StateFlow`, Views collect it through
   `collectWhileStarted` (`util/FlowCollect.kt`), which wraps `repeatOnLifecycle(STARTED)`
-- There is **no `LiveData` in this codebase** (cu-52); `postValue` is banned by a build gate
+- There is **no `LiveData` in this codebase**; `postValue` is banned by a build gate
 
 ### Coroutines
 - Handle **asynchronous** operations (network, database, file I/O)

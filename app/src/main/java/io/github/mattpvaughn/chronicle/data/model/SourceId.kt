@@ -8,7 +8,7 @@ import androidx.room.TypeConverter
  *
  * ## Why this is a type and not a `String`
  *
- * The same reasoning as [BookOffset] (cu-136). The scoping key is compared in `planIngestion`,
+ * The same reasoning as [BookOffset]. The scoping key is compared in `planIngestion`,
  * bound into queries and used to build a download path; all three would take a bare `String`
  * happily, and a book id, a library id and a server id are all strings here. A mix-up would
  * either scope to nothing or scope to the wrong thing, and both fail *silently* by showing a
@@ -19,7 +19,7 @@ import androidx.room.TypeConverter
  * [MediaSource.id] was `Long` and every row carried the constant `0L`. A per-instance id cannot
  * be a `Long`: a Plex `clientIdentifier` is a ~40-character string, so a numeric id would have to
  * be a hash or a locally-assigned number mapped from it — a second identity to keep in sync, which
- * is the cost cu-71 removed by retyping entity ids to `String`. decision-21 chose `String` for
+ * is the cost removed by retyping entity ids to `String`. decision-21 chose `String` for
  * that reason.
  *
  * ## The prefix
@@ -37,7 +37,7 @@ value class SourceId(val value: String) {
      * Deliberately **not** equal to any real id, including [forPlexServer] of an empty
      * identifier: coalescing "not chosen yet" with a real server would file pre-login rows under
      * that server's scope, where a later refresh for a *different* server would then delete them
-     * as absent from its fetch (cu-80's removal rule).
+     * as absent from its fetch (the removal rule).
      */
     val UNKNOWN = SourceId("")
 

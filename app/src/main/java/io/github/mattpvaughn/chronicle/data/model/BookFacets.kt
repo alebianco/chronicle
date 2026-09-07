@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.model
 
 /**
- * Grouping the library by author, narrator or series (cu-24).
+ * Grouping the library by author, narrator or series.
  *
  * Pure over a book list so the grouping, the counts and the honesty about partial coverage are all
  * testable without a database or a screen.
@@ -38,7 +38,7 @@ data class FacetList(
 
   companion object {
     /**
-     * The "nothing grouped yet" value, for a `StateFlow`'s required initial emission (cu-52).
+     * The "nothing grouped yet" value, for a `StateFlow`'s required initial emission.
      *
      * `unknownCount = 0` so [isPartial] is false: an empty list is not a *partial* one, and a
      * screen with no books yet must not claim metadata is missing.

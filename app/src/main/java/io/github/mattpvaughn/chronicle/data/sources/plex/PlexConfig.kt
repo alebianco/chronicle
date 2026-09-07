@@ -71,7 +71,7 @@ class PlexConfig
      * Whether the server is reachable — derived from [connectionState], not stored beside it.
      *
      * This used to be a second `MutableLiveData` kept in sync by an anonymous subclass that
-     * overrode both `postValue` and `setValue` to mirror into it (cu-52). Two fields holding one
+     * overrode both `postValue` and `setValue` to mirror into it. Two fields holding one
      * fact, updated by hand in two overrides: the flag could disagree with the state for a frame,
      * and every new writer had to remember both. `map` makes the derivation the only definition.
      */
@@ -92,7 +92,7 @@ class PlexConfig
     /**
      * Prepends the current server url to [relativePath] with exactly one `/` between them.
      *
-     * The both-slashes branch used to emit **two** (cu-160): it stripped the path's leading slash
+     * The both-slashes branch used to emit **two**: it stripped the path's leading slash
      * and then added one back, `"$url/" + path.substring(1)`, which is precisely the case this
      * function exists to normalise. A doubled slash is not cosmetic to Plex — a path is matched,
      * not normalised — so a request on such a url would 404.
@@ -169,7 +169,7 @@ class PlexConfig
         tag = bookTitle
         // Fetch2's grouping API is Int-only, so the book id is hashed for the group id — and
         // carried verbatim in extras, because the listeners get a groupId back and need the real
-        // id to update the database. A hash cannot be reversed (cu-71).
+        // id to update the database. A hash cannot be reversed.
         groupId = downloadGroupId(bookId)
         extras = Extras(mapOf(EXTRA_BOOK_ID to bookId))
         addHeader("X-Plex-Token", token)
@@ -256,7 +256,7 @@ class PlexConfig
     /**
      * Picks a connection via [ConnectionChooser], which prefers LAN, then direct WAN, then
      * relay. The previous implementation launched every attempt at once and polled them, so
-     * a relay could win a race against a LAN address it should never have been in (cu-11).
+     * a relay could win a race against a LAN address it should never have been in.
      */
     private suspend fun chooseViableConnections(plexMediaService: PlexMediaService): ConnectionResult {
       val chosen =

@@ -6,9 +6,9 @@ import org.junit.Test
 import kotlin.system.measureNanoTime
 
 /**
- * The in-memory library scans stay usable at 1000+ books (cu-51).
+ * The in-memory library scans stay usable at 1000+ books.
  *
- * cu-25's grouped search and cu-24's facet grouping both read the **whole library** and scan it —
+ * the grouped search and the facet grouping both read the **whole library** and scan it —
  * the search per keystroke (debounced 250 ms), the facets per screen open. Both were designed
  * against this task's 1000+ book target and are cheap by construction, but neither had been
  * *measured* at that scale: the fixture pack has three books and the owner's library has 196.

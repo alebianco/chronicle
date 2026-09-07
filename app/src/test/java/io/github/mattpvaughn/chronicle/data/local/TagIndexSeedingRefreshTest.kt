@@ -32,7 +32,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
 /**
- * A library refresh fills in narrator and series for books nobody has opened (cu-143).
+ * A library refresh fills in narrator and series for books nobody has opened.
  *
  * Fixture-backed and end-to-end through the real `refreshData`, because the claim is about what a
  * refresh *does to the database* — the pure merge rule is covered by `TagIndexSeederTest`, and a
@@ -59,7 +59,7 @@ class TagIndexSeedingRefreshTest {
   private val plexPrefsRepo =
     mockk<PlexPrefsRepo>(relaxed = true) {
       every { library } returns PlexLibrary(name = "Books", type = MediaType.ARTIST, id = "1")
-      // The repository's scoping key (cu-127). Without it ingestion writes nothing at all, so
+      // The repository's scoping key. Without it ingestion writes nothing at all, so
       // every seeding assertion below would fail on an empty table rather than on a tag bug.
       every { server } returns ServerModel(name = "Test", connections = emptyList(), serverId = TEST_SERVER_ID)
     }
@@ -102,7 +102,7 @@ class TagIndexSeedingRefreshTest {
   /**
    * The headline: a book nobody opened comes back from a refresh knowing its narrator.
    *
-   * Before cu-143 this was empty until the user opened the book, because `Style` is absent from
+   * Before the tag-index seeding change this was empty until the user opened the book, because `Style` is absent from
    * the listing the refresh reads.
    */
   @Test
@@ -146,7 +146,7 @@ class TagIndexSeedingRefreshTest {
   /**
    * A narrator already learned from the book's own detail response survives the refresh.
    *
-   * This is the refresh-blanking risk cu-24 documented, in a new guise: the index is coarser than
+   * This is the refresh-blanking risk documented earlier, in a new guise: the index is coarser than
    * the detail response, so it must never overwrite it.
    */
   @Test

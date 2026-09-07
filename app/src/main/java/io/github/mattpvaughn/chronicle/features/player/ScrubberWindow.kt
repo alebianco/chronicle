@@ -13,7 +13,7 @@ data class ScrubberWindow(
 )
 
 /**
- * Narrows a book-framed position to the current chapter, for the session's scrubber (cu-165).
+ * Narrows a book-framed position to the current chapter, for the session's scrubber.
  *
  * Auto and the notification draw their seek bar from `PlaybackState.position` against
  * `METADATA_KEY_DURATION`. Both described the whole track while the title beside them named the

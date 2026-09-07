@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * An unrecognised view style must degrade, never throw (cu-133).
+ * An unrecognised view style must degrade, never throw.
  *
  * This mapping existed **seven times** and every copy ended in
  * `else -> throw IllegalStateException("Unknown view style")`. Because the value is persisted in
@@ -71,7 +71,7 @@ class ViewStyleTest {
         .flatMap { file ->
           file.readLines().mapIndexedNotNull { index, line ->
             // Comment lines are skipped: the fix documents the shape it replaced by quoting it,
-            // so a raw scan matches the explanation instead of live code (the cu-138 trap).
+            // so a raw scan matches the explanation instead of live code (the doc-comment-matches-scan trap).
             val trimmed = line.trim()
             val isComment = trimmed.startsWith("//") || trimmed.startsWith("*")
             val code = line.substringBefore("//")

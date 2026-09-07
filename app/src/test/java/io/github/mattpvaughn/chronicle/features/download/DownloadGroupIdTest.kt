@@ -9,8 +9,8 @@ import org.junit.Test
  * Mapping a backend-neutral book id to the `Int` group id Fetch2 requires.
  *
  * Fetch2's whole grouping API is `int` — `Request.groupId`, `cancelGroup(int)`,
- * `getDownloadsInGroup(int)` — and the app uses the book id as that group id. cu-71 retypes book
- * ids to `String` so a non-numeric backend (Audiobookshelf UUIDs, local file paths) can be
+ * `getDownloadsInGroup(int)` — and the app uses the book id as that group id. Book ids were
+ * retyped to `String` so a non-numeric backend (Audiobookshelf UUIDs, local file paths) can be
  * represented, so something has to bridge the two.
  *
  * The properties that matter are **stability** and **determinism**: the same book must map to the

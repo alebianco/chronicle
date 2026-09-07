@@ -20,7 +20,7 @@ import org.junit.runner.Description
  * That, rather than anything about their design, is why none of the twelve ViewModels had a test.
  * Paying it once here makes them all reachable.
  *
- * Note this is separate from the injected [DispatcherProvider] (cu-15), which covers code the
+ * Note this is separate from the injected [DispatcherProvider], which covers code the
  * project controls; this covers the framework's own use of the main dispatcher.
  */
 @OptIn(ExperimentalCoroutinesApi::class)

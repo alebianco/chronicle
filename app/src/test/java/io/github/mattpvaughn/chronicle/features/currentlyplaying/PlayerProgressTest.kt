@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The two-level progress readout (cu-19).
+ * The two-level progress readout.
  *
  * RESEARCH_FINDINGS §3.1's convergent-grammar rule 3 asks for chapter position **and**
  * time-left-in-book, never raw `h:mm:ss/h:mm:ss`. These pin the arithmetic behind that; the
@@ -18,7 +18,7 @@ import org.junit.Test
  *
  * Driven against `MultiTrackBook`, where the chapter frame and the book frame are *different
  * numbers* — six 5-minute chapters over three 10-minute tracks. On a single-track book they
- * coincide and a mix-up is invisible, which is how six of them shipped (cu-136).
+ * coincide and a mix-up is invisible, which is how six of them shipped.
  */
 class PlayerProgressTest {
   private val chapters = MultiTrackBook.chapters()
@@ -79,7 +79,7 @@ class PlayerProgressTest {
   /**
    * The chapter list arrives from the DB and the network in no guaranteed order, so the number has
    * to come from the *sorted* list. A label that depends on query order is wrong at random — the
-   * same shape as the sorted/unsorted index bugs cu-136 closed.
+   * same shape as the sorted/unsorted index bugs the offset-type split closed.
    */
   @Test
   fun `the chapter number does not depend on the order the list arrives in`() {

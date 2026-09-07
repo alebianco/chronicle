@@ -9,9 +9,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Moshi **codegen** against the shapes a real 196-book library actually sends (cu-73, [cu-62]).
+ * Moshi **codegen** against the shapes a real 196-book library actually sends.
  *
- * cu-62 switched from `KotlinJsonAdapterFactory` to generated adapters and noted that "the feared
+ * An earlier change switched from `KotlinJsonAdapterFactory` to generated adapters and noted that "the feared
  * leniency differences did not materialise on fixture data". That is true and also the weak part:
  * the hand-written fixtures contain the fields their author thought to include. Generated adapters
  * are stricter than reflection about absent and null fields, so the risk only shows up on data
@@ -35,7 +35,7 @@ import org.junit.Test
  * The single-book cases are the interesting ones: a library where 195 books have `year` and one
  * does not is exactly the shape that passes every hand-written fixture and then throws on a real
  * sync. Moshi builds these adapters with `Moshi.Builder().build()`, the way `AppModule` does — no
- * reflection factory — or the test would not be exercising codegen at all (the trap cu-62 found).
+ * reflection factory — or the test would not be exercising codegen at all (the trap the adapter switch found).
  */
 class RealLibraryShapeTest {
   private val moshi = Moshi.Builder().build()
