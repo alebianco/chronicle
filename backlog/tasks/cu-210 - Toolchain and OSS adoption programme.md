@@ -30,8 +30,8 @@ the clearest case — four version bumps that must happen in order, as four stag
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **cu-211** close the launch-crash post-mortem | Smoke test **and** the rule that failed. Everything else is unjustifiable until a repeat cannot reach a device |
-| 2 | **cu-212** CI and dependency hygiene | Dependabot, CodeQL, dependency-analysis. No app code, so it can run while cu-195 is open |
+| 1 | **cu-212** CI and dependency hygiene | Dependabot, CodeQL, dependency-analysis. No app code. **Moved ahead of cu-211**: it adds the `feature/agentic-dev` CI trigger cu-211's instrumented job needs |
+| 2 | **cu-211** close the launch-crash post-mortem | Wire the instrumented suite that already exists but never runs, **and** the rule that failed. Everything after this is unjustifiable until a repeat cannot reach a device |
 | 3 | **cu-213** Pitest, working and wired | It **fails today**; fix before strengthening |
 | 4 | **cu-214** the toolchain chain, four staged steps | Room → Kotlin/KSP → compileSdk 37/AGP 9 → Compose BOM. Sequential; step 3 is the riskiest thing here |
 | 5 | **cu-215** detekt | Wants the newer toolchain under it |
@@ -82,8 +82,9 @@ Recorded here so cu-194 can cite it rather than re-deriving:
 
 - [x] Every task exists, ordered, with its dependencies set — ten of them, consolidated from a
       first pass of seventeen
-- [ ] cu-211 lands **first** — it is the mitigation, and the programme is unjustifiable if a
-      repeat of this session's blocker can still reach a device
+- [ ] cu-211 lands **before any toolchain or library task** — it is the mitigation, and the
+      programme is unjustifiable if a repeat of this session's blocker can still reach a device.
+      Only cu-212 precedes it, because cu-211's CI job needs the branch trigger cu-212 adds
 - [ ] cu-214's four steps are committed and verified **separately**, and its step 3 (AGP 9) is
       device-verified before step 4 stacks on it
 - [ ] No task in this programme is started while cu-195 has open device criteria, except
