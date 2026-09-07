@@ -1,0 +1,245 @@
+package io.github.mattpvaughn.chronicle.features.download
+
+import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
+
+/**
+ * The download engine's resume behaviour, which is where silent corruption would live.
+ *
+ * Downloads are the highest-risk area in this app: four separate tasks have failure modes that end
+ * in *deleted audio*, and the household has real downloaded books. So these tests are about the
+ * bytes on disk, not about the event stream — a download that reports success and leaves a corrupt
+ * file is worse than one that reports failure.
+ *
+ * The case that matters most is **a server that ignores `Range`**. It answers `200` with the whole
+ * file instead of `206` with the tail, and appending that to an existing partial splices the file's
+ * beginning onto its own middle. The result is a track of entirely plausible length that plays as
+ * garbage partway through — no error, no short file, nothing a size check would catch.
+ */
+class KtorDownloaderTest {
+  @get:Rule
+  val tmp = TemporaryFolder()
+
+  private val requestedRanges = mutableListOf<String?>()
+
+  /**
+   * The downloader under test, on a **real** dispatcher.
+   *
+   * Not `runTest` + `advanceUntilIdle`, and this cost a round of debugging worth recording:
+   * `runTest`'s virtual-time scheduler does not drive Ktor's `MockEngine`, so every test failed
+   * with **zero** requests reaching the engine — which reads exactly like a broken downloader and
+   * was entirely a broken harness. Reduced to a standalone probe to be sure: the same code under
+   * `runBlocking` with a real dispatcher wrote its 10 bytes first time.
+   *
+   * So these tests use `runBlocking`, and wait by joining the downloader's own jobs via
+   * [KtorDownloader.awaitIdle] rather than by advancing a clock. Downloads are I/O; a virtual
+   * clock has nothing to advance.
+   */
+  private fun downloader(engine: MockEngine) =
+    KtorDownloader(
+      client = HttpClient(engine),
+      dispatchers = RealDispatcherProvider,
+      scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+    )
+
+  /** Records the `Range` header of every request, then answers with [handler]. */
+  private fun engine(handler: (range: String?) -> Pair<HttpStatusCode, String>) =
+    MockEngine { request ->
+      val range = request.headers[HttpHeaders.Range]
+      requestedRanges.add(range)
+      val (status, body) = handler(range)
+      if (status.value in 200..299) {
+        respond(
+          content = body,
+          status = status,
+          headers = headersOf(HttpHeaders.ContentLength, body.length.toString()),
+        )
+      } else {
+        respondError(status)
+      }
+    }
+
+  private fun request(dest: File) =
+    DownloadRequest(
+      trackId = "track-1",
+      bookId = "book-1",
+      bookTitle = "A Book",
+      url = "http://localhost/track-1.mp3",
+      destinationPath = dest.absolutePath,
+    )
+
+  @Test
+  fun `a fresh download writes the whole body and sends no Range`() =
+    runBlocking {
+      val dest = File(tmp.root, "track-1.mp3")
+      val d = downloader(engine { HttpStatusCode.OK to WHOLE })
+
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+
+      assertEquals(WHOLE, dest.readText())
+      assertNull("a fresh download must not ask for a range", requestedRanges.single())
+    }
+
+  @Test
+  fun `an existing partial is resumed with a Range header and appended to`() =
+    runBlocking {
+      val dest = File(tmp.root, "track-1.mp3")
+      dest.writeText(HEAD)
+      val d = downloader(engine { HttpStatusCode.PartialContent to TAIL })
+
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+
+      assertEquals("bytes=${HEAD.length}-", requestedRanges.single())
+      assertEquals(
+        "a resumed download must append, not restart",
+        WHOLE,
+        dest.readText(),
+      )
+    }
+
+  @Test
+  fun `a server that ignores Range causes a restart, not a splice`() =
+    runBlocking {
+      // The silent-corruption case. The partial is 5 bytes; the server ignores the range and
+      // answers 200 with all 10. Appending would give 15 bytes of "HELLOHELLOWORLD" — right-ish
+      // length, wrong contents, and nothing downstream would notice.
+      val dest = File(tmp.root, "track-1.mp3")
+      dest.writeText(HEAD)
+      val d = downloader(engine { HttpStatusCode.OK to WHOLE })
+
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+
+      assertEquals("bytes=${HEAD.length}-", requestedRanges.single())
+      assertEquals(
+        "a 200 answer to a ranged request must truncate and restart",
+        WHOLE,
+        dest.readText(),
+      )
+      assertEquals(
+        "the file must be exactly the body length, not partial + body",
+        WHOLE.length.toLong(),
+        dest.length(),
+      )
+    }
+
+  @Test
+  fun `a 416 means the file is already complete`() =
+    runBlocking {
+      // The server says the requested range is past the end, so the local file is at or beyond the
+      // full length. That is success, not an error — reporting it as failed would make a finished
+      // book look broken and invite a re-download.
+      val dest = File(tmp.root, "track-1.mp3")
+      dest.writeText(WHOLE)
+      val events = mutableListOf<DownloadEvent>()
+      val d = downloader(engine { HttpStatusCode.RequestedRangeNotSatisfiable to "" })
+      val collector = collectEvents(d, events)
+
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+      collector.cancel()
+
+      assertEquals("the complete file must be left untouched", WHOLE, dest.readText())
+      assertTrue(
+        "a 416 must report completion, not failure: $events",
+        events.any { it is DownloadEvent.Completed },
+      )
+    }
+
+  @Test
+  fun `a failed download leaves its partial on disk so it can resume later`() =
+    runBlocking {
+      // Deliberate: deleting the partial on failure is how a flaky connection turns into an
+      // infinite re-download of a 293 MB book. The bytes are the whole point of resuming.
+      val dest = File(tmp.root, "track-1.mp3")
+      dest.writeText(HEAD)
+      val events = mutableListOf<DownloadEvent>()
+      val d = downloader(engine { HttpStatusCode.InternalServerError to "" })
+      val collector = collectEvents(d, events)
+
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+      collector.cancel()
+
+      assertEquals("a failure must not discard the partial", HEAD, dest.readText())
+      assertTrue("the failure must be reported: $events", events.any { it is DownloadEvent.Failed })
+    }
+
+  @Test
+  fun `enqueueing a track already in flight does not start a second writer`() =
+    runBlocking {
+      // Two coroutines appending to one file is how a download corrupts itself, and re-enqueueing
+      // is easy to trigger — a retry on regained network over a queue that has not drained.
+      val dest = File(tmp.root, "track-1.mp3")
+      val d = downloader(engine { HttpStatusCode.OK to WHOLE })
+
+      d.enqueue(listOf(request(dest)))
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+
+      assertEquals(
+        "the duplicate enqueue must be ignored, so exactly one request is made",
+        1,
+        requestedRanges.size,
+      )
+      assertEquals(WHOLE, dest.readText())
+    }
+
+  @Test
+  fun `a completed download reports the track and book it finished`() =
+    runBlocking {
+      val dest = File(tmp.root, "track-1.mp3")
+      val events = mutableListOf<DownloadEvent>()
+      val d = downloader(engine { HttpStatusCode.OK to WHOLE })
+      val collector = collectEvents(d, events)
+
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+      collector.cancel()
+
+      val completed = events.filterIsInstance<DownloadEvent.Completed>().single()
+      assertEquals("track-1", completed.trackId)
+      // The *real* book id, not a hash. Fetch2's Int-only group API forced the id through a hash
+      // and carried the real one in an extras map; nothing here needs that workaround.
+      assertEquals("book-1", completed.bookId)
+    }
+
+  /** Subscribes before anything is enqueued; the event flow has no replay. */
+  private fun CoroutineScope.collectEvents(
+    d: Downloader,
+    into: MutableList<DownloadEvent>,
+  ) = launch { d.events.collect { into.add(it) } }
+
+  /** A [DispatcherProvider] over real dispatchers, since this exercises real file I/O. */
+  private object RealDispatcherProvider : DispatcherProvider {
+    override val io = Dispatchers.IO
+    override val main = Dispatchers.Default
+    override val default = Dispatchers.Default
+  }
+
+  private companion object {
+    const val HEAD = "HELLO"
+    const val TAIL = "WORLD"
+    const val WHOLE = "HELLOWORLD"
+  }
+}
