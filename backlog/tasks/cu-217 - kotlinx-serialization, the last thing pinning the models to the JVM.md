@@ -1,5 +1,5 @@
 ---
-id: cu-223
+id: cu-217
 title: "kotlinx-serialization, the last thing pinning the models to the JVM"
 status: To Do
 assignee: []
@@ -11,7 +11,7 @@ labels:
 milestone: m-3
 dependencies: 
   - cu-210
-  - cu-216
+  - cu-214
 priority: medium
 ---
 

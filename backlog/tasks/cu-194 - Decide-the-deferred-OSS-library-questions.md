@@ -183,34 +183,34 @@ Re-measure the 23.7% after any adoption, so cu-182 inherits a current number rat
 ## Answered — see cu-210 (2026-09-07)
 
 **The owner worked through every candidate below.** The outcomes, their reasoning and the sequence to
-deliver them live in **cu-210**, which spawned cu-211 … cu-226. This task closes by citing it rather
+deliver them live in **cu-210**, which spawned cu-211 … cu-220. This task closes by citing it rather
 than duplicating it.
 
 Three answers overturned what this task assumed, and each was **measured rather than reasoned**:
 
 - **Room is KMP-capable — at 2.8.3, not 2.8.1.** This task said *"confirm against the Room release
   notes before relying on it."* Confirmed, and the belief was wrong about the version. So SQLDelight
-  is declined on the merits (cu-216), and Room 3.0 is declined separately as an alpha breaking major
+  is declined on the merits (cu-214), and Room 3.0 is declined separately as an alpha breaking major
   with no consumer.
 - **Kotlin is capped by KSP, not by choice.** KSP's newest release is 2.3.11 and there is none for
   Kotlin 2.4, while Room, Hilt, Moshi and Ktorfit all run through it. That also fixes Ktorfit at
-  2.6.5 (cu-217).
+  2.6.5 (cu-214).
 - **`play-services-oss-licenses` is declared, its plugin applied, and nothing uses it** — and it is a
   Play Services dependency, so it blocks the F-Droid distribution decision-1 puts first. The licences
-  page gets built with a libre tool and the GMS dependency goes (cu-222).
+  page gets built with a libre tool and the GMS dependency goes (cu-216).
 
 Two candidates were **adopted after pushback**, having been declined in the first pass:
 
 - **Okio** — declined initially on the grounds that `FrameworkFreeCoreTest` is not the argument. It
   is not, but the *concentration* is: 16 `java.io.File` importers, and they are the download and
   cache-reconciliation subsystem where four tasks already have deleted-audio failure modes.
-  `FakeFileSystem` is the Android justification (cu-224).
+  `FakeFileSystem` is the Android justification (cu-218).
 - **DataStore** — declined initially as too risky against the credential file. Adopted in three
   stages, with the hard requirement that `plex-session.sh` migrates alongside `ChronicleAuth.xml`,
-  because that script *is* the device-verification tooling (cu-225).
+  because that script *is* the device-verification tooling (cu-219).
 
 Also worth recording: **`EncryptedSharedPreferences` is what upstream deprecated**, and this project
-never used it — plain `SharedPreferences` only. So cu-225 is a modernisation, not a security fix, and
+never used it — plain `SharedPreferences` only. So cu-219 is a modernisation, not a security fix, and
 Tink is declined.
 
 ## Already answered by decision-24 (2026-09-07)

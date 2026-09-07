@@ -17,13 +17,13 @@ priority: high
 ## Description
 
 **A tracking task, not a unit of work.** The owner's answers to the cu-194 library survey turned into
-a programme of ten tasks (cu-211 … cu-226), and this holds the sequence and the reasoning so neither
+a programme of ten tasks (cu-211 … cu-220), and this holds the sequence and the reasoning so neither
 has to be re-derived.
 
 **Deliberately consolidated.** A first pass produced seventeen tickets — one per decision — which the
 owner rightly called overwhelming for what is largely configuration and version bumps. Merged to ten
 by asking what a *unit of work* actually is: things worked and closed together share a ticket, and
-sequencing that matters lives in **acceptance criteria** rather than in ticket boundaries. cu-216 is
+sequencing that matters lives in **acceptance criteria** rather than in ticket boundaries. cu-214 is
 the clearest case — four version bumps that must happen in order, as four staged ACs in one task.
 
 ## The sequence
@@ -31,15 +31,15 @@ the clearest case — four version bumps that must happen in order, as four stag
 | # | Task | Why here |
 |---|---|---|
 | 1 | **cu-211** close the launch-crash post-mortem | Smoke test **and** the rule that failed. Everything else is unjustifiable until a repeat cannot reach a device |
-| 2 | **cu-213** CI and dependency hygiene | Dependabot, CodeQL, dependency-analysis. No app code, so it can run while cu-195 is open |
-| 3 | **cu-214** Pitest, working and wired | It **fails today**; fix before strengthening |
-| 4 | **cu-216** the toolchain chain, four staged steps | Room → Kotlin/KSP → compileSdk 37/AGP 9 → Compose BOM. Sequential; step 3 is the riskiest thing here |
-| 5 | **cu-220** detekt | Wants the newer toolchain under it |
-| 6 | **cu-222** licences page, drop the GMS plugin | Compliance **and** removes an F-Droid blocker |
-| 7 | **cu-223** kotlinx-serialization | Unpins the models from the JVM |
-| 8 | **cu-224** Okio | **After cu-195** — same files |
-| 9 | **cu-225** DataStore, three stages | Highest blast radius |
-| 10 | **cu-226** Circuit + Molecule + Turbine | Last; a decision task that would replace `*Destination` |
+| 2 | **cu-212** CI and dependency hygiene | Dependabot, CodeQL, dependency-analysis. No app code, so it can run while cu-195 is open |
+| 3 | **cu-213** Pitest, working and wired | It **fails today**; fix before strengthening |
+| 4 | **cu-214** the toolchain chain, four staged steps | Room → Kotlin/KSP → compileSdk 37/AGP 9 → Compose BOM. Sequential; step 3 is the riskiest thing here |
+| 5 | **cu-215** detekt | Wants the newer toolchain under it |
+| 6 | **cu-216** licences page, drop the GMS plugin | Compliance **and** removes an F-Droid blocker |
+| 7 | **cu-217** kotlinx-serialization | Unpins the models from the JVM |
+| 8 | **cu-218** Okio | **After cu-195** — same files |
+| 9 | **cu-219** DataStore, three stages | Highest blast radius |
+| 10 | **cu-220** Circuit + Molecule + Turbine | Last; a decision task that would replace `*Destination` |
 
 ## The measurements that set the order
 
@@ -56,7 +56,7 @@ Each of these was checked rather than assumed, and each one moved an answer:
 - **AGP 9.4.0 is available**, so decision-22's `compileSdk 37` gate can actually be cleared.
 - **`play-services-oss-licenses` is declared *and* its plugin applied, and nothing uses it.** It is
   dead weight *and* a distribution blocker: decision-1 puts F-Droid first, and F-Droid does not
-  accept Play Services dependencies. See cu-222.
+  accept Play Services dependencies. See cu-216.
 - **Pitest does not currently run.** `./gradlew pitestDebug` fails in 51 s because
   `excludedTestClasses` is hand-maintained and there are now 62 Robolectric test classes — the
   Compose migration added most of them. Its own comment predicted this.
@@ -72,7 +72,7 @@ Recorded here so cu-194 can cite it rather than re-deriving:
 | **Kotlin 2.4 / Ktorfit 2.7.x** | No KSP for Kotlin 2.4 |
 | **Paging 3** | cu-51 measured 10,000 books searching in 29 ms against a household library of 196 |
 | **Tink** | A new crypto dependency for tokens already excluded from Auto Backup. Fewer moving parts around credentials, not more |
-| **`EncryptedSharedPreferences`** | Deprecated upstream — and never used here; this project uses plain `SharedPreferences`, which is why cu-225 is a modernisation rather than a security fix |
+| **`EncryptedSharedPreferences`** | Deprecated upstream — and never used here; this project uses plain `SharedPreferences`, which is why cu-219 is a modernisation rather than a security fix |
 | **Kotest, Mockito** | JUnit4 + MockK is established and the mock-vs-fake guidance is written down |
 | **kotlinx-datetime** | `DurationFormat` is already pure over millis |
 | **Gradle convention plugins** | Single-module; defer to cu-182 |
@@ -84,21 +84,21 @@ Recorded here so cu-194 can cite it rather than re-deriving:
       first pass of seventeen
 - [ ] cu-211 lands **first** — it is the mitigation, and the programme is unjustifiable if a
       repeat of this session's blocker can still reach a device
-- [ ] cu-216's four steps are committed and verified **separately**, and its step 3 (AGP 9) is
+- [ ] cu-214's four steps are committed and verified **separately**, and its step 3 (AGP 9) is
       device-verified before step 4 stacks on it
 - [ ] No task in this programme is started while cu-195 has open device criteria, except
-      cu-211, cu-213 and cu-214, which do not touch app code
+      cu-211, cu-212 and cu-213, which do not touch app code
 - [ ] cu-194 is closed by citing this task rather than repeating its reasoning
-- [ ] The portable-share figure cu-182 inherits is re-measured after cu-223
+- [ ] The portable-share figure cu-182 inherits is re-measured after cu-217
 
 ## Notes
 
-**Sequencing risk to watch.** cu-216's step 3 (AGP 8 → 9) touches every build file and is the one
+**Sequencing risk to watch.** cu-214's step 3 (AGP 8 → 9) touches every build file and is the one
 item here that can break the build in a way no unit test sees. Its ACs require it to be committed and
 device-verified alone, and cu-211's launch-smoke test exists partly to give it that safety net.
 
 **Do not let this become a rewrite by increments.** Five of these ten are config, tooling or version
-bumps. Three are genuine library adoptions (cu-223, cu-224, cu-225), one is compliance work
-(cu-222), and one is an architectural decision (cu-226). If the programme stalls, **stopping after
-cu-222 leaves the project strictly better off with no half-migrated state** — that is the intended
+bumps. Three are genuine library adoptions (cu-217, cu-218, cu-219), one is compliance work
+(cu-216), and one is an architectural decision (cu-220). If the programme stalls, **stopping after
+cu-216 leaves the project strictly better off with no half-migrated state** — that is the intended
 exit point, not a fallback.

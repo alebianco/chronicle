@@ -1,5 +1,5 @@
 ---
-id: cu-213
+id: cu-212
 title: "CI and dependency hygiene, automated"
 status: To Do
 assignee: []
@@ -40,9 +40,9 @@ the bot:
 | Pin | Reason | Remove the ignore when |
 |---|---|---|
 | Kotlin, KSP | no KSP release for Kotlin 2.4 | KSP ships for 2.4 |
-| Ktorfit ≥ 2.7 | needs kotlin-stdlib 2.4.0 | Kotlin moves (cu-216) |
-| Compose BOM > 2026.06.x | needs compileSdk 37 (decision-22) | cu-216 stage 3 lands |
-| `lifecycle-*` > 2.10.0 | needs compileSdk 37 **and** AGP 9.1 | cu-216 stage 3 lands |
+| Ktorfit ≥ 2.7 | needs kotlin-stdlib 2.4.0 | Kotlin moves (cu-214) |
+| Compose BOM > 2026.06.x | needs compileSdk 37 (decision-22) | cu-214 stage 3 lands |
+| `lifecycle-*` > 2.10.0 | needs compileSdk 37 **and** AGP 9.1 | cu-214 stage 3 lands |
 | Room 3.0 | breaking major, alpha, no consumer | cu-182 names a target |
 | `hamcrest` 1.3 | 2.2 resolves the wrong version for Espresso (cu-54) | probably never |
 

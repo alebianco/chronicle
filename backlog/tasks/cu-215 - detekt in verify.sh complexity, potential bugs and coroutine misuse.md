@@ -1,5 +1,5 @@
 ---
-id: cu-220
+id: cu-215
 title: "detekt in verify.sh: complexity, potential bugs and coroutine misuse"
 status: To Do
 assignee: []
@@ -11,7 +11,7 @@ labels:
 milestone: m-3
 dependencies: 
   - cu-210
-  - cu-216
+  - cu-214
 priority: medium
 ---
 
@@ -63,7 +63,7 @@ against a clean tree.
 
 ## Notes
 
-Sequenced after cu-216 (its Kotlin step) so detekt runs against the Kotlin version it will keep analysing — a
+Sequenced after cu-214 (its Kotlin step) so detekt runs against the Kotlin version it will keep analysing — a
 compiler-version mismatch in a static analyser produces confusing parse failures rather than
 findings.
 
