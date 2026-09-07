@@ -9,7 +9,7 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.SourceId
 import io.github.mattpvaughn.chronicle.data.sources.HttpMediaSource
 import io.github.mattpvaughn.chronicle.data.sources.MediaSource
-import okhttp3.ResponseBody
+import io.ktor.client.statement.HttpStatement
 import javax.inject.Inject
 
 /** A [MediaSource] wrapping Plex media server and its media calls via audio libraries */
@@ -61,7 +61,7 @@ class PlexMediaSource
       TODO("Not yet implemented")
     }
 
-    override suspend fun fetchStream(url: String): ResponseBody {
+    override suspend fun fetchStream(url: String): HttpStatement {
       TODO("Not yet implemented")
     }
 

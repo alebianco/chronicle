@@ -8,9 +8,22 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.takeFrom
 
 /**
+ * The Plex client identity this app reports.
+ *
+ * Lived on `PlexInterceptor` until that class retired with OkHttp. Still constants rather than
+ * inlined strings because `PlexLoginRepo` sends the same values when it claims an OAuth pin — the
+ * server matches a client by them, so the two call sites must not drift.
+ */
+object PlexClientIdentity {
+  const val PLATFORM = "Android"
+  const val PRODUCT = APP_NAME
+  const val DEVICE = "$APP_NAME $PLATFORM"
+}
+
+/**
  * The Plex identity headers, and the base-URL substitution, for Ktor.
  *
- * The port of `PlexInterceptor`. Every header it set is set here, with one deliberate difference in
+ * The port of the retired `PlexInterceptor`. Every header it set is set here, with one difference in
  * shape: the token is resolved by a lambda rather than read from prefs inline, so the login and
  * media variants are the same plugin with different token sources instead of one class carrying an
  * `isLoginService` boolean.
@@ -35,15 +48,15 @@ fun plexHeadersPlugin(
 
     request.headers.apply {
       set("Accept", "application/json")
-      set("X-Plex-Platform", PlexInterceptor.PLATFORM)
+      set("X-Plex-Platform", PlexClientIdentity.PLATFORM)
       set("X-Plex-Provides", "player")
       set("X-Plex-Client-Identifier", plexPrefsRepo.uuid)
       set("X-Plex-Version", BuildConfig.VERSION_NAME)
-      set("X-Plex-Product", PlexInterceptor.PRODUCT)
+      set("X-Plex-Product", PlexClientIdentity.PRODUCT)
       set("X-Plex-Platform-Version", Build.VERSION.RELEASE)
       set("X-Plex-Session-Identifier", plexConfig.sessionIdentifier)
       set("X-Plex-Client-Name", APP_NAME)
-      set("X-Plex-Device", PlexInterceptor.DEVICE)
+      set("X-Plex-Device", PlexClientIdentity.DEVICE)
       set("X-Plex-Device-Name", Build.MODEL)
     }
 

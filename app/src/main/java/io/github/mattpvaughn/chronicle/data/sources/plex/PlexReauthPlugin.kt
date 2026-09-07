@@ -10,7 +10,7 @@ import timber.log.Timber
  * Recovers from a 401 by re-fetching the server access token and retrying the request **once**.
  *
  * The port of `PlexTokenAuthenticator`, and the one place in the Ktor migration where a guarantee
- * changed hands. That class was an `okhttp3.Authenticator` rather than an `Interceptor` on purpose:
+ * changed hands. That class was an OkHttp `Authenticator` rather than an `Interceptor` on purpose:
  * OkHttp invokes an `Authenticator` only on a 401 and threads the previous attempt through
  * `Response.priorResponse`, so *"retry exactly once"* was a property of the framework.
  *

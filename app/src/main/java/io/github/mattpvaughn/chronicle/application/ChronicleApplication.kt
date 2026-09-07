@@ -15,7 +15,7 @@ import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.network.ktor3.KtorNetworkFetcherFactory
 import dagger.hilt.android.HiltAndroidApp
 import io.github.mattpvaughn.chronicle.BuildConfig
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
@@ -30,8 +30,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.injection.chronicleGraph
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.*
-import retrofit2.HttpException
 import timber.log.Timber
 import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
 import javax.inject.Inject
@@ -122,17 +122,20 @@ open class ChronicleApplication :
   lateinit var deviceAuthorizationCheck: DeviceAuthorizationCheck
 
   /**
-   * Coil's image loader, built on the media OkHttp client so image requests carry
-   * the same Plex auth headers and connection handling as everything else.
+   * Coil's image loader, built on the media **Ktor** client so image requests carry the same Plex
+   * auth headers and connection handling as everything else.
+   *
+   * `coil-network-ktor3` rather than `coil-network-okhttp`, and this is the change that made
+   * decision-24 worth doing at all rather than half-doing: the first version of that ADR argued
+   * OkHttp would stay in the APK regardless *because* Coil pulls it, which was simply wrong — the
+   * ktor3 artifact exists at the same Coil version and is a drop-in swap. Sharing the media client
+   * matters for a Plex-specific reason: cover art is served by the media server and needs the
+   * `X-Plex-Token`, so an unauthenticated loader would render every cover as a broken image.
    */
   override fun newImageLoader(context: PlatformContext): ImageLoader =
     ImageLoader.Builder(context)
       .components {
-        add(
-          OkHttpNetworkFetcherFactory(
-            callFactory = { context.chronicleGraph().mediaOkHttpClient() },
-          ),
-        )
+        add(KtorNetworkFetcherFactory(httpClient = { context.chronicleGraph().mediaHttpClient() }))
       }
       .build()
 
@@ -257,7 +260,7 @@ open class ChronicleApplication :
      * being offline is not being signed out, and treating it as such would nag every user
      * on a train.
      */
-    fun isAccountRejection(e: Throwable): Boolean = e is HttpException && e.code() == HTTP_UNAUTHORIZED
+    fun isAccountRejection(e: Throwable): Boolean = e is ResponseException && e.response.status.value == HTTP_UNAUTHORIZED
 
     private var INSTANCE: ChronicleApplication? = null
 

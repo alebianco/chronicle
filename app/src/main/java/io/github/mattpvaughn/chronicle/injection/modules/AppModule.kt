@@ -13,6 +13,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.mattpvaughn.chronicle.application.LOG_NETWORK_REQUESTS
 import io.github.mattpvaughn.chronicle.data.local.*
 import io.github.mattpvaughn.chronicle.data.model.asServer
@@ -30,20 +31,16 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpTimeoutConfig
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.http.ContentType
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
 import timber.log.Timber
 import java.io.File
-import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -227,121 +224,16 @@ object AppModule {
   //   The replacement is `sanitizeHeader` on the download client's `Logging` plugin, which
   //   `KtorDownloadClientTest` pins with logging forced on.
 
-  /**
-   * The logging level for **download** traffic.
-   *
-   * Capped at [HttpLoggingInterceptor.Level.HEADERS] even in debug: `BODY` would buffer a whole
-   * audiobook in memory (issue #83). Headers are the useful part for a download anyway — the
-   * `206`, the `Content-Range`, and whether a retry resumed or restarted.
-   *
-   * Named rather than inlined so [io.github.mattpvaughn.chronicle.injection.DownloadLogLevelTest]
-   * can pin it: a future edit raising this to `BODY` reintroduces an OOM that no unit test could
-   * otherwise catch.
-   */
-  fun downloadLogLevel(): HttpLoggingInterceptor.Level =
-    if (LOG_NETWORK_REQUESTS) {
-      HttpLoggingInterceptor.Level.HEADERS
-    } else {
-      HttpLoggingInterceptor.Level.NONE
-    }
+  // The three `OkHttpClient` providers are gone (decision-24). OkHttp is still the *engine*
+  // Ktor runs on, so the same connection pool and TLS stack move the bytes — what left is app
+  // code written against OkHttp's API, which OkHttp 5.0 made a JVM-only commitment when it dropped
+  // Kotlin Multiplatform support. `RetiredDependencyTest` keeps them out.
+  //
+  // Their reasons live on in the Ktor equivalents: `plexMediaInterceptor` became
+  // `plexHeadersPlugin`, `PlexTokenAuthenticator` became `plexReauthPlugin` (where "retry exactly
+  // once" had to become explicit code, since Ktor has no `Authenticator` contract), and the
+  // download client's capped log level is still capped, for issue #83's reason.
 
-  @Provides
-  @Singleton
-  fun loggingInterceptor() =
-    if (LOG_NETWORK_REQUESTS) {
-      HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY)
-    } else {
-      HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.NONE)
-    }
-
-  @Provides
-  @Singleton
-  @Named(OKHTTP_CLIENT_MEDIA)
-  fun mediaOkHttpClient(
-    plexConfig: PlexConfig,
-    loggingInterceptor: HttpLoggingInterceptor,
-    plexPrefsRepo: PlexPrefsRepo,
-    // Provider, not the service: resolving PlexLoginService here would tie the media
-    // client's construction to the login Retrofit's. There is no cycle today, but a lazy
-    // edge keeps it that way if the login branch ever grows a media dependency.
-    plexLoginService: Provider<PlexLoginService>,
-    accountAuthState: AccountAuthState,
-  ): OkHttpClient =
-    OkHttpClient.Builder()
-      .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      .writeTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      .protocols(listOf(Protocol.HTTP_1_1, Protocol.QUIC))
-      .addInterceptor(plexConfig.plexMediaInterceptor)
-      .addInterceptor(loggingInterceptor)
-      // Recovers a rotated server token on a 401 and retries once. Media client
-      // only: a 401 from the *login* client means the account token is dead, and
-      // re-fetching resources with that same dead token cannot help.
-      .authenticator(
-        PlexTokenAuthenticator(
-          plexPrefsRepo = plexPrefsRepo,
-          accountAuthState = accountAuthState,
-        ) {
-          val cached = plexPrefsRepo.server ?: return@PlexTokenAuthenticator null
-          plexLoginService.get().resources()
-            .filter { it.provides.contains("server") }
-            .map { it.asServer() }
-            .firstOrNull { it.serverId == cached.serverId }
-        },
-      )
-      .build()
-
-  /**
-   * The client Fetch2 downloads through: the media client with body logging turned down.
-   *
-   * Downloads must keep everything the media client provides — [PlexConfig.plexMediaInterceptor]
-   * for the token and base URL, the [PlexTokenAuthenticator] for a rotated server token,
-   * and the chosen connection — which is why this is [OkHttpClient.newBuilder] off that
-   * client rather than a second builder. A parallel builder would be a copy to keep in sync, and
-   * downloads are meant to share playback's HTTP stack.
-   *
-   * The one thing it must **not** share is [HttpLoggingInterceptor.Level.BODY]. That level
-   * buffers an entire response body in memory in order to log it, and a download's body is the
-   * whole audiobook: a 293 MB m4b took the process from 248 MB to 350 MB PSS and then killed it
-   * with `OutOfMemoryError` on Fetch2's own thread, with zero bytes written to disk. That is
-   * issue #83, which could not be located by reading app code or Fetch2 — the defect was in
-   * neither, but in the client Fetch2 was handed.
-   *
-   * `HEADERS` rather than `NONE` on purpose: a download's status line and `Content-Range` are
-   * exactly what you need to tell a resume from a restart, and they cost nothing to log. Body
-   * logging stays on the media client, where it is genuinely useful and where bodies are small —
-   * it is how the `time=0` and the `/:/scrobble` storm were both caught.
-   */
-  @Provides
-  @Singleton
-  @Named(OKHTTP_CLIENT_DOWNLOADER)
-  fun downloaderOkHttpClient(
-    @Named(OKHTTP_CLIENT_MEDIA) mediaClient: OkHttpClient,
-  ): OkHttpClient =
-    mediaClient.newBuilder()
-      .apply {
-        // Drop every logging interceptor the media client carries, then re-add one capped at
-        // HEADERS. Filtering by type rather than by identity so an added second logger cannot
-        // slip through, and rebuilding the list because `interceptors()` on the builder is a
-        // mutable view — there is no "replace" on OkHttp's builder.
-        val survivors = interceptors().filterNot { it is HttpLoggingInterceptor }
-        interceptors().clear()
-        interceptors().addAll(survivors)
-        addInterceptor(HttpLoggingInterceptor().setLevel(downloadLogLevel()))
-      }
-      .build()
-
-  /**
-   * The Ktor client for media traffic, per decision-24.
-   *
-   * Runs on the **OkHttp engine**, which is deliberate and is what keeps this migration low-risk:
-   * the connection pool, TLS stack and HTTP/1.1 behaviour are the ones already in production. Ktor
-   * supplies the plugin pipeline and the multiplatform-shaped API; OkHttp still moves the bytes.
-   *
-   * The plugin order matters. `PlexHeaders` runs on every request and sets the token from prefs, so
-   * when `PlexReauth` persists a refreshed server and calls `proceed` again, the retry picks up the
-   * new value on the way back through. Reversing them would retry with the stale token.
-   */
   @Provides
   @Singleton
   @Named(OKHTTP_CLIENT_MEDIA)
@@ -355,9 +247,18 @@ object AppModule {
     accountAuthState: AccountAuthState,
   ): HttpClient =
     HttpClient(OkHttp) {
-      // Ktor surfaces a non-2xx as a response rather than throwing, which is what the re-auth
-      // plugin needs in order to inspect a 401 itself.
-      expectSuccess = false
+      // `true`, and the interaction with the re-auth plugin is the subtle part.
+      //
+      // Ktor 3 defaults this to **false**, which surfaces a non-2xx as an ordinary response. That
+      // looks like what `plexReauthPlugin` wants — it inspects a 401 itself — but it is wrong for
+      // everything downstream: `ProgressReporter` and the account-rejection check both branch on a
+      // thrown `ResponseException`, and with `expectSuccess = false` no exception ever arrives, so
+      // a failed scrobble looked like a success and a revoked account was never noticed.
+      //
+      // The plugin is unaffected, because it runs on the `Send` hook — *before* the validation
+      // that raises the exception. So it still sees the raw 401 and can retry, and a 401 that
+      // survives the retry still becomes an exception for the caller. Both needs are met.
+      expectSuccess = true
       install(HttpTimeout) {
         connectTimeoutMillis = CONNECT_TIMEOUT_SECONDS * 1000
         requestTimeoutMillis = READ_TIMEOUT_SECONDS * 1000
@@ -464,46 +365,95 @@ object AppModule {
     }
   }
 
+  /**
+   * The Ktor client for plex.tv login traffic.
+   *
+   * No re-auth plugin, deliberately: a 401 here means the *account* token is dead, and re-fetching
+   * resources with that same dead token cannot help. Only the media client recovers from a 401.
+   *
+   * The token differs too — the login service sends the **user** token where the media client
+   * sends the server's, which is why the header plugin takes its token as a lambda rather than
+   * reading one canonical value.
+   */
   @Provides
   @Singleton
   @Named(OKHTTP_CLIENT_LOGIN)
-  fun loginOkHttpClient(
+  fun loginKtorClient(
     plexConfig: PlexConfig,
-    loggingInterceptor: HttpLoggingInterceptor,
-  ): OkHttpClient =
-    OkHttpClient.Builder()
-      .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      .writeTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      .addInterceptor(plexConfig.plexLoginInterceptor)
-      .addInterceptor(loggingInterceptor)
-      .build()
+    plexPrefsRepo: PlexPrefsRepo,
+  ): HttpClient =
+    HttpClient(OkHttp) {
+      // See the media client: a non-2xx must throw, because callers branch on the exception.
+      expectSuccess = true
+      install(HttpTimeout) {
+        connectTimeoutMillis = CONNECT_TIMEOUT_SECONDS * 1000
+        requestTimeoutMillis = READ_TIMEOUT_SECONDS * 1000
+        socketTimeoutMillis = READ_TIMEOUT_SECONDS * 1000
+      }
+      install(
+        plexHeadersPlugin(plexPrefsRepo, plexConfig) {
+          val userToken = plexPrefsRepo.user?.authToken
+          if (userToken.isNullOrEmpty()) plexPrefsRepo.accountAuthToken else userToken
+        },
+      )
+      install(Logging) {
+        level = if (LOG_NETWORK_REQUESTS) LogLevel.BODY else LogLevel.NONE
+        sanitizeHeader { it.equals("X-Plex-Token", ignoreCase = true) }
+        logger =
+          object : Logger {
+            override fun log(message: String) = Timber.tag("KtorLogin").v(message)
+          }
+      }
+    }
 
+  /**
+   * Ktorfit over the media client, replacing the media `Retrofit` (decision-24).
+   *
+   * `baseUrl` is still [PLACEHOLDER_URL] and still meaningless on its own: the real server address
+   * is only known at runtime and can change mid-session when connectivity shifts, so
+   * `plexHeadersPlugin` rewrites it per request. That indirection is unchanged — only the library
+   * reading the annotations is different.
+   */
   @Provides
   @Named(OKHTTP_CLIENT_MEDIA)
   @Singleton
-  fun mediaRetrofit(
-    @Named(OKHTTP_CLIENT_MEDIA) okHttpClient: OkHttpClient,
+  fun mediaKtorfit(
+    @Named(OKHTTP_CLIENT_MEDIA) client: HttpClient,
     moshi: Moshi,
-  ): Retrofit =
-    Retrofit.Builder()
-      .addConverterFactory(MoshiConverterFactory.create(moshi))
-      .client(okHttpClient)
-      .baseUrl(PLACEHOLDER_URL) // this will be replaced by PlexInterceptor as needed
+  ): Ktorfit =
+    Ktorfit.Builder()
+      .baseUrl(PLACEHOLDER_URL)
+      .httpClient(client.config { installMoshiJson(moshi) })
       .build()
 
   @Provides
   @Named(OKHTTP_CLIENT_LOGIN)
   @Singleton
-  fun loginRetrofit(
-    @Named(OKHTTP_CLIENT_LOGIN) okHttpClient: OkHttpClient,
+  fun loginKtorfit(
+    @Named(OKHTTP_CLIENT_LOGIN) client: HttpClient,
     moshi: Moshi,
-  ): Retrofit =
-    Retrofit.Builder()
-      .addConverterFactory(MoshiConverterFactory.create(moshi))
-      .client(okHttpClient)
-      .baseUrl(PLACEHOLDER_URL) // this will be replaced by PlexInterceptor as needed
+  ): Ktorfit =
+    Ktorfit.Builder()
+      .baseUrl(PLACEHOLDER_URL)
+      .httpClient(client.config { installMoshiJson(moshi) })
       .build()
+
+  /**
+   * Registers [MoshiContentConverter] for JSON, and for what Plex actually sends.
+   *
+   * Plex answers `Accept: application/json` with `application/json`, but some endpoints reply
+   * `text/html` or no content type at all while still returning JSON. Retrofit's converter did not
+   * care about content type; Ktor's `ContentNegotiation` does, so the types are named explicitly
+   * rather than discovered by a 200 that fails to parse.
+   */
+  private fun HttpClientConfig<*>.installMoshiJson(moshi: Moshi) {
+    install(ContentNegotiation) {
+      val converter = MoshiContentConverter(moshi)
+      register(ContentType.Application.Json, converter)
+      register(ContentType.Text.Html, converter)
+      register(ContentType.Text.Plain, converter)
+    }
+  }
 
   @Provides
   @Singleton
@@ -517,14 +467,14 @@ object AppModule {
   @Provides
   @Singleton
   fun plexMediaService(
-    @Named(OKHTTP_CLIENT_MEDIA) mediaRetrofit: Retrofit,
-  ): PlexMediaService = mediaRetrofit.create(PlexMediaService::class.java)
+    @Named(OKHTTP_CLIENT_MEDIA) ktorfit: Ktorfit,
+  ): PlexMediaService = ktorfit.createPlexMediaService()
 
   @Provides
   @Singleton
   fun plexLoginService(
-    @Named(OKHTTP_CLIENT_LOGIN) loginRetrofit: Retrofit,
-  ): PlexLoginService = loginRetrofit.create(PlexLoginService::class.java)
+    @Named(OKHTTP_CLIENT_LOGIN) ktorfit: Ktorfit,
+  ): PlexLoginService = ktorfit.createPlexLoginService()
 
   @Provides
   @Singleton

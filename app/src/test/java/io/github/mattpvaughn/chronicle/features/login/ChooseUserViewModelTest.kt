@@ -4,6 +4,7 @@ import io.github.mattpvaughn.chronicle.data.model.LoadingStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
+import io.github.mattpvaughn.chronicle.testing.responseException
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -11,15 +12,11 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 
 /**
  * First tests for [ChooseUserViewModel], which sat at **0% instruction coverage** — 476 missed
@@ -43,10 +40,7 @@ class ChooseUserViewModelTest {
 
   private fun authed(token: String? = "token-abc") = PlexUser(uuid = "uuid-open", title = "Sam", hasPassword = false, authToken = token)
 
-  private fun httpException(code: Int) =
-    HttpException(
-      Response.error<Any>(code, "".toResponseBody("application/json".toMediaType())),
-    )
+  private fun httpException(code: Int) = responseException(code)
 
   private val loginRepo = mockk<IPlexLoginRepo>(relaxed = true)
 

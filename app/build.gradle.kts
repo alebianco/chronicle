@@ -204,9 +204,6 @@ dependencies {
   implementation(libs.annotation)
   implementation(libs.coroutines)
 
-  implementation(libs.retrofit)
-  implementation(libs.retrofit.converter)
-
   implementation(libs.ktor.client.core)
   implementation(libs.ktor.client.okhttp)
   implementation(libs.ktor.client.content.negotiation)
@@ -222,8 +219,6 @@ dependencies {
   implementation(libs.ktor.client.logging)
   implementation(libs.ktorfit.lib)
   ksp(libs.ktorfit.ksp)
-  implementation(libs.okhttp3)
-  implementation(libs.okhttp3.logging)
 
   implementation(libs.moshi)
   // Codegen, not reflection. The old KAPT processor is gone; this is the KSP
@@ -231,7 +226,7 @@ dependencies {
   ksp(libs.moshi.codegen)
 
   implementation(libs.coil)
-  implementation(libs.coil.network.okhttp)
+  implementation(libs.coil.network.ktor3)
 
   implementation(libs.room.runtime)
   ksp(libs.room.compiler)
@@ -276,6 +271,10 @@ dependencies {
   // suite run in the unit-test gate. Room's own MigrationTestHelper is
   // instrumented-only, and instrumented tests are quarantined.
   debugImplementation(libs.okhttp3.mockwebserver)
+  // Also debugImplementation: the `fail_sync` debug hook synthesises a real 400 through a
+  // MockEngine, because Ktor's ResponseException wraps a live HttpResponse that cannot be built
+  // by hand. Mirrors how mockwebserver is a debugImplementation for MockPlexServer.
+  debugImplementation(libs.ktor.client.mock)
   testImplementation(libs.ktor.client.mock)
   testImplementation(libs.okhttp3.mockwebserver)
   testImplementation(libs.retrofit)
@@ -363,6 +362,19 @@ val coverageExclusions =
     // measured, and the real-shape fixture tests still exercise the parsing through them;
     // what is excluded is the generated plumbing, exactly as the Dagger and Room entries above do.
     "**/*JsonAdapter*.*",
+    // Ktorfit codegen. `_PlexMediaServiceImpl` and `_PlexLoginServiceImpl` are the generated
+    // bodies for the 25 endpoint annotations — 2,292 instructions of URL building and header
+    // plumbing nobody writes or reviews.
+    //
+    // Worth stating why this is not a coverage loss. Retrofit created its services as **runtime
+    // proxies**, so there was no bytecode for JaCoCo to measure at all; Ktorfit generates real
+    // classes, so the same endpoints suddenly appeared in the denominator and dropped
+    // `data/sources/plex` by 7.7 points without a single test changing. Excluding them restores
+    // the like-for-like comparison.
+    //
+    // Note the existing `**/*_Impl*.*` entry (Room) does not catch these: Ktorfit puts the
+    // underscore at the *start* of the name, so the pattern has to be its own.
+    "**/_*Impl*.*",
   )
 
 tasks.register<JacocoReport>("jacocoTestReport") {

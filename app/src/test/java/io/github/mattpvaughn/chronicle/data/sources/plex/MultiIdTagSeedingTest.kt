@@ -2,20 +2,22 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
-import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
 
 /**
  * Route B — one multi-id request answering narrator **and** series — against a fixture captured
@@ -31,14 +33,21 @@ class MultiIdTagSeedingTest {
   val plex = FakePlexServer()
 
   private val service: PlexMediaService by lazy {
-    Retrofit.Builder()
-      .baseUrl(plex.url)
-      .client(OkHttpClient())
-      .addConverterFactory(
-        MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
+    Ktorfit.Builder()
+      .baseUrl(plex.url, checkUrl = false)
+      .httpClient(
+        HttpClient(OkHttp) {
+          expectSuccess = true
+          install(ContentNegotiation) {
+            register(
+              ContentType.Application.Json,
+              MoshiContentConverter(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
+            )
+          }
+        },
       )
       .build()
-      .create(PlexMediaService::class.java)
+      .createPlexMediaService()
   }
 
   private fun seeder(): TagIndexSeeder {

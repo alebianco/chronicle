@@ -5,8 +5,8 @@ import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.*
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexInterceptor.Companion.PLATFORM
-import io.github.mattpvaughn.chronicle.data.sources.plex.PlexInterceptor.Companion.PRODUCT
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexClientIdentity.PLATFORM
+import io.github.mattpvaughn.chronicle.data.sources.plex.PlexClientIdentity.PRODUCT
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.OAuthResponse
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.UsersResponse

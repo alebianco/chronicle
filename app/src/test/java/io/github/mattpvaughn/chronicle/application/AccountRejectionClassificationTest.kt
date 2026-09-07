@@ -1,13 +1,10 @@
 package io.github.mattpvaughn.chronicle.application
 
 import io.github.mattpvaughn.chronicle.application.ChronicleApplication.Companion.isAccountRejection
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.ResponseBody.Companion.toResponseBody
+import io.github.mattpvaughn.chronicle.testing.responseException
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -25,10 +22,7 @@ import java.net.UnknownHostException
  * being offline was reported as being signed out.
  */
 class AccountRejectionClassificationTest {
-  private fun httpException(code: Int) =
-    HttpException(
-      Response.error<Any>(code, "".toResponseBody("text/plain".toMediaType())),
-    )
+  private fun httpException(code: Int) = responseException(code)
 
   @Test
   fun `a 401 is an account rejection`() {

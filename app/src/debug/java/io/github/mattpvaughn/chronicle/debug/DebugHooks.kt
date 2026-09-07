@@ -20,12 +20,14 @@ import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.injection.chronicleGraph
 import io.github.mattpvaughn.chronicle.navigation.Destination
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respondError
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.ResponseBody.Companion.toResponseBody
-import retrofit2.HttpException
-import retrofit2.Response
+import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 
 /**
@@ -383,12 +385,26 @@ object DebugHooks : DebugHooksContract {
       playbackTime: Long,
       playQueueItemId: Long,
     ) {
-      throw HttpException(
-        Response.error<Unit>(
-          400,
-          "fail_sync debug hook".toResponseBody("text/plain".toMediaType()),
-        ),
-      )
+      // A real 400 from a throwaway client, not a plain exception.
+      //
+      // This used to build Retrofit's `Response.error(400, ...)`, which was a public factory.
+      // Ktor's `ResponseException` wraps a live `HttpResponse` that cannot be constructed outside
+      // a client call — so the honest way to produce one is to *make* a call that fails, against
+      // a MockEngine that answers 400.
+      //
+      // The shortcut of throwing `IllegalStateException` was tried first and is wrong:
+      // `ProgressReporter` catches `IOException` and `ResponseException` specifically, so a plain
+      // exception escapes uncaught and the sync-failure badge this hook exists to trigger never
+      // appears. Debug-only code, but a debug hook that does not reproduce the failure it names is
+      // worse than no hook.
+      throw runBlocking {
+        val client =
+          HttpClient(MockEngine { respondError(HttpStatusCode.BadRequest) }) {
+            expectSuccess = true
+          }
+        runCatching { client.get("http://localhost/fail_sync") }.exceptionOrNull()
+          ?: IllegalStateException("fail_sync debug hook could not synthesise a 400")
+      }
     }
 
     override suspend fun markWatched(key: String) = delegate.markWatched(key)

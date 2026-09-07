@@ -5,22 +5,28 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
+import io.github.mattpvaughn.chronicle.data.sources.plex.MoshiContentConverter
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
+import io.github.mattpvaughn.chronicle.data.sources.plex.createPlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
 import io.github.mattpvaughn.chronicle.testing.TEST_SERVER_ID
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -28,8 +34,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
 
 /**
  * A library refresh fills in narrator and series for books nobody has opened.
@@ -79,14 +83,21 @@ class TagIndexSeedingRefreshTest {
   }
 
   private val mediaService: PlexMediaService by lazy {
-    Retrofit.Builder()
-      .baseUrl(plexServer.url)
-      .client(OkHttpClient())
-      .addConverterFactory(
-        MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
+    Ktorfit.Builder()
+      .baseUrl(plexServer.url, checkUrl = false)
+      .httpClient(
+        HttpClient(OkHttp) {
+          expectSuccess = true
+          install(ContentNegotiation) {
+            register(
+              ContentType.Application.Json,
+              MoshiContentConverter(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
+            )
+          }
+        },
       )
       .build()
-      .create(PlexMediaService::class.java)
+      .createPlexMediaService()
   }
 
   private fun TestScope.repository() =

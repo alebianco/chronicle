@@ -1,11 +1,17 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import com.squareup.moshi.Moshi
+import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.ConnectionTier
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.tier
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -15,11 +21,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
 
 /**
- * The real `checkServer` probe, driven through Retrofit against a fake server.
+ * The real `checkServer` probe, driven through Ktorfit against a fake server.
  *
  * [ConnectionChooserTest] injects the probe lambda — deliberately, and its KDoc says so:
  * "*Injected so this is testable without Retrofit; production passes a `checkServer` call.*"
@@ -32,8 +36,14 @@ import retrofit2.converter.moshi.MoshiConverterFactory
  * "the app cannot connect", with the chooser's own tests all green — exactly that shape of
  * blind spot.
  *
- * So these use the real `PlexMediaService` interface over the real Retrofit + Moshi stack, and
+ * So these use the real `PlexMediaService` interface over the real Ktorfit + Moshi stack, and
  * make the tier decisions on real HTTP responses.
+ *
+ * **MockWebServer on purpose, not Ktor's MockEngine.** The thing under test is URL construction —
+ * `{url}/identity` with an *encoded* path parameter — and a mock engine would hand back whatever
+ * the fixture says regardless of the path requested. Only a real socket proves the request went
+ * where it was meant to, which is why `okhttp3-mockwebserver` stays a **test** dependency after
+ * OkHttp left `app/src/main`.
  */
 class ConnectionProbeWiringTest {
   @get:Rule
@@ -44,14 +54,30 @@ class ConnectionProbeWiringTest {
   private fun TestScope.chooser() = ConnectionChooser(TestDispatcherProvider(testScheduler))
 
   private fun service(): PlexMediaService =
-    Retrofit.Builder()
-      .baseUrl(plex.url)
-      .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
+    Ktorfit.Builder()
+      .baseUrl(plex.url, checkUrl = false)
+      .httpClient(
+        HttpClient(OkHttp) {
+          // `true`, matching the production media client — which is the point of this being a
+          // *wiring* test. With `false` the probe could never throw, so it would not have caught
+          // that `expectSuccess = true` makes an unreachable address abort the whole selection
+          // instead of moving to the next connection. It did catch it.
+          expectSuccess = true
+          install(ContentNegotiation) {
+            register(ContentType.Application.Json, MoshiContentConverter(Moshi.Builder().build()))
+          }
+        },
+      )
       .build()
-      .create(PlexMediaService::class.java)
+      .createPlexMediaService()
 
-  /** Exactly the lambda `PlexConfig.chooseViableConnections` passes in production. */
-  private suspend fun probe(connection: Connection): Boolean = service().checkServer(connection.uri).isSuccessful
+  /** Exactly the lambda `PlexConfig.chooseViableConnections` passes in production, `runCatching` included. */
+  private suspend fun probe(connection: Connection): Boolean =
+    runCatching {
+      // `/identity` appended here, exactly as `PlexConfig.identityUrl` does: `@Url` takes its
+      // value verbatim, so the suffix is the caller's responsibility now.
+      service().checkServer("${connection.uri.trimEnd('/')}/identity").status.isSuccess()
+    }.getOrDefault(false)
 
   private fun connection(
     path: String,

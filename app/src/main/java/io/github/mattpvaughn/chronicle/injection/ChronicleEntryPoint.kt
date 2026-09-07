@@ -10,7 +10,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
-import okhttp3.OkHttpClient
+import io.ktor.client.HttpClient
 import java.io.File
 import javax.inject.Named
 
@@ -45,7 +45,7 @@ interface ChronicleEntryPoint {
   fun externalDeviceDirs(): List<File>
 
   @Named(AppModule.OKHTTP_CLIENT_MEDIA)
-  fun mediaOkHttpClient(): OkHttpClient
+  fun mediaHttpClient(): HttpClient
 }
 
 /** Reaches [ChronicleEntryPoint] from a context. See that interface for when this is legitimate. */

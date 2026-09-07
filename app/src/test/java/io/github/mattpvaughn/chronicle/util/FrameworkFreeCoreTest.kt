@@ -117,7 +117,6 @@ class FrameworkFreeCoreTest {
         "data/sources/plex/MultiIdBatching.kt",
         "data/sources/plex/PlaybackSession.kt",
         "data/sources/plex/PlexService.kt",
-        "data/sources/plex/PlexTokenAuthenticator.kt",
         "data/sources/plex/PlexUtils.kt",
         "data/sources/plex/ProgressReporter.kt",
         "data/sources/plex/TagIndexSeeder.kt",

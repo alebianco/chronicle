@@ -1,9 +1,14 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
+import de.jensklingenberg.ktorfit.http.GET
+import de.jensklingenberg.ktorfit.http.POST
+import de.jensklingenberg.ktorfit.http.Path
+import de.jensklingenberg.ktorfit.http.Query
+import de.jensklingenberg.ktorfit.http.Streaming
+import de.jensklingenberg.ktorfit.http.Url
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.*
-import okhttp3.ResponseBody
-import retrofit2.Response
-import retrofit2.http.*
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.HttpStatement
 
 const val PLEX_LOGIN_SERVICE_URL = "https://plex.tv"
 const val PLACEHOLDER_URL = "https://fake-base-url-should-never-be-called.yyy"
@@ -51,11 +56,27 @@ interface PlexLoginService {
 }
 
 interface PlexMediaService {
-  /** A basic check used to tell whether a server is online. Returns a lightweight response */
-  @GET("{url}/identity")
+  /**
+   * A basic check used to tell whether a server is online. Returns a lightweight response.
+   *
+   * **`@Url`, not a `@Path`.** [url] is a *whole* server address — this is the one endpoint whose
+   * job is to talk to a server that has not been chosen yet, so the placeholder base URL must be
+   * replaced rather than prefixed. Retrofit happened to do that for an absolute value in an
+   * encoded `@Path`; Ktorfit concatenates, producing
+   * `http://localhost:64821http://localhost:64821/lan/identity` and a `URLParserException`.
+   *
+   * That was not a compile error and no unit test of the *chooser* could see it — the chooser
+   * takes its probe as an injected lambda. `ConnectionProbeWiringTest` caught it, which is
+   * precisely the blind spot that test was written for.
+   *
+   * **[url] must therefore include `/identity`.** `@Url` replaces the whole URL rather than
+   * templating into one, so the suffix moves to the caller — `PlexConfig.identityUrl` builds it,
+   * so the two callers cannot spell it differently.
+   */
+  @GET
   suspend fun checkServer(
-    @Path("url", encoded = true) url: String,
-  ): Response<PlexMediaContainer>
+    @Url url: String,
+  ): HttpResponse
 
   @GET("/library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
   suspend fun retrieveAllAlbums(
@@ -114,7 +135,7 @@ interface PlexMediaService {
   @Streaming
   suspend fun retrieveStreamByFilePath(
     @Path(value = "url", encoded = true) url: String,
-  ): ResponseBody
+  ): HttpStatement
 
   /** Sets a media item to "watched" in the server. Works for both tracks and albums */
   @GET("/:/scrobble")

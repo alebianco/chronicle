@@ -1,13 +1,10 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import io.github.mattpvaughn.chronicle.testing.responseException
 import kotlinx.coroutines.test.runTest
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 
 /**
  * The contract the `fail_sync` debug hook depends on.
@@ -60,12 +57,12 @@ class FailSyncInjectionTest {
       playbackTime: Long,
       playQueueItemId: Long,
     ) {
-      throw HttpException(
-        Response.error<Unit>(
-          400,
-          "fail_sync debug hook".toResponseBody("text/plain".toMediaType()),
-        ),
-      )
+      // A real ResponseException, matching what a rejected Plex request produces. An
+      // `error(...)` here would *not* be caught by `ProgressReporter`, which catches IOException
+      // and ResponseException specifically — so the fixture has to be the real shape or the test
+      // asserts against a path production never takes. Caught by this test failing when it was a
+      // plain exception.
+      throw responseException(400)
     }
 
     override suspend fun markWatched(key: String) = Unit
@@ -127,9 +124,7 @@ class FailSyncInjectionTest {
             playbackTime: Long,
             playQueueItemId: Long,
           ) {
-            throw HttpException(
-              Response.error<Unit>(503, "".toResponseBody("text/plain".toMediaType())),
-            )
+            throw responseException(503)
           }
 
           override suspend fun markWatched(key: String) = Unit

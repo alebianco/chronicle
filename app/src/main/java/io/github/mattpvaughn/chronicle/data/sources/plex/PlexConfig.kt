@@ -13,6 +13,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionSt
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.toUri
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -101,9 +102,6 @@ class PlexConfig
      * costs one line to close.
      */
     fun toServerString(relativePath: String): String = "${url.trimEnd('/')}/${relativePath.trimStart('/')}"
-
-    val plexMediaInterceptor = PlexInterceptor(plexPrefsRepo, this, isLoginService = false)
-    val plexLoginInterceptor = PlexInterceptor(plexPrefsRepo, this, isLoginService = true)
 
     /** Attempt to load in a cached bitmap for the given thumbnail */
     suspend fun getBitmapFromServer(
@@ -247,6 +245,15 @@ class PlexConfig
     }
 
     /**
+     * The identity endpoint for a server base [uri].
+     *
+     * One place, because `checkServer` takes a `@Url` — Ktorfit uses that value verbatim rather
+     * than templating `{url}/identity` the way the Retrofit version did, so the suffix is the
+     * caller's job now and two callers spelling it differently would be a silent 404.
+     */
+    private fun identityUrl(uri: String): String = "${uri.trimEnd('/')}/identity"
+
+    /**
      * Picks a connection via [ConnectionChooser], which prefers LAN, then direct WAN, then
      * relay. The previous implementation launched every attempt at once and polled them, so
      * a relay could win a race against a LAN address it should never have been in.
@@ -254,7 +261,15 @@ class PlexConfig
     private suspend fun chooseViableConnections(plexMediaService: PlexMediaService): ConnectionResult {
       val chosen =
         connectionChooser.choose(connectionSet.toList()) { connection ->
-          plexMediaService.checkServer(connection.uri).isSuccessful
+          // `runCatching`, and it is load-bearing rather than defensive. The media client sets
+          // `expectSuccess = true` so callers get a `ResponseException` to branch on — but a probe
+          // does not want an exception, it wants a boolean: an address that answers 404, refuses
+          // the connection or times out is simply *not viable*, and the chooser must move on to
+          // the next one. Letting it throw aborts the whole selection on the first dead address,
+          // which on a household with a stale WAN entry means the app never finds the LAN server
+          // sitting right there.
+          runCatching { plexMediaService.checkServer(identityUrl(connection.uri)).status.isSuccess() }
+            .getOrDefault(false)
         }
       return if (chosen != null) {
         Success(chosen.uri)

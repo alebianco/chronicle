@@ -2,21 +2,25 @@ package io.github.mattpvaughn.chronicle.testing
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import de.jensklingenberg.ktorfit.Ktorfit
+import io.github.mattpvaughn.chronicle.data.sources.plex.MoshiContentConverter
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
+import io.github.mattpvaughn.chronicle.data.sources.plex.createPlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asTrackList
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
 import kotlinx.coroutines.runBlocking
-import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
 import java.net.HttpURLConnection
 
 /**
- * Drives [FakePlexServer] through the real Retrofit/Moshi stack the app uses.
+ * Drives [FakePlexServer] through the real Ktorfit/Moshi stack the app uses.
  *
  * The contract tests prove the fixtures parse; this proves the *server* answers
  * the endpoints [PlexMediaService] actually calls, with bodies those calls can
@@ -28,14 +32,23 @@ class FakePlexServerTest {
   val plex = FakePlexServer()
 
   private val service: PlexMediaService by lazy {
-    Retrofit.Builder()
-      .baseUrl(plex.url)
-      .client(OkHttpClient())
-      .addConverterFactory(
-        MoshiConverterFactory.create(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
+    Ktorfit.Builder()
+      .baseUrl(plex.url, checkUrl = false)
+      .httpClient(
+        HttpClient(OkHttp) {
+          // The fake returns real HTTP statuses and the tests read them, so a non-2xx must throw
+          // exactly as it does in production.
+          expectSuccess = true
+          install(ContentNegotiation) {
+            register(
+              ContentType.Application.Json,
+              MoshiContentConverter(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
+            )
+          }
+        },
       )
       .build()
-      .create(PlexMediaService::class.java)
+      .createPlexMediaService()
   }
 
   @Test
@@ -98,8 +111,8 @@ class FakePlexServerTest {
         try {
           service.retrieveAllAlbums("1")
           0
-        } catch (e: retrofit2.HttpException) {
-          e.code()
+        } catch (e: io.ktor.client.plugins.ResponseException) {
+          e.response.status.value
         }
 
       assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, code)

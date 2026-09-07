@@ -107,6 +107,68 @@ class PlexReauthWiringTest {
   private suspend fun get(client: HttpClient): HttpResponse = client.get("http://localhost/library/sections")
 
   @Test
+  fun `the plugin still sees a 401 when the client is configured to throw`() =
+    runTest {
+      // The production clients set `expectSuccess = true`, because `ProgressReporter` and the
+      // account-rejection check both branch on a thrown `ResponseException` — with the Ktor 3
+      // default of `false` no exception arrives, so a failed scrobble read as a success.
+      //
+      // This asserts the two settings do not fight. The `Send` hook runs *before* the validation
+      // that raises the exception, so the plugin still gets the raw 401 and can retry; only a 401
+      // that survives the retry reaches the caller, and it reaches them as an exception. Verified
+      // here rather than reasoned about, because the ordering is a framework detail.
+      prefs.server = serverWith("stale-token")
+      val refreshes = AtomicInteger()
+      val served = AtomicInteger()
+      val responses = listOf(HttpStatusCode.Unauthorized, HttpStatusCode.OK)
+      val engine =
+        MockEngine {
+          val status = responses.getOrElse(served.getAndIncrement()) { HttpStatusCode.OK }
+          if (status == HttpStatusCode.OK) respond("{}", HttpStatusCode.OK) else respondError(status)
+        }
+      val http =
+        HttpClient(engine) {
+          expectSuccess = true
+          install(plexHeadersTokenOnly { prefs.server?.accessToken.orEmpty() })
+          install(
+            plexReauthPlugin(prefs, AccountAuthState()) {
+              refreshes.incrementAndGet()
+              serverWith("fresh-token")
+            },
+          )
+        }
+
+      val response = get(http)
+
+      assertEquals("the plugin must still be invoked on the 401", 1, refreshes.get())
+      assertEquals(HttpStatusCode.OK, response.status)
+      assertEquals(2, engine.requestHistory.size)
+    }
+
+  @Test
+  fun `a 401 that survives the retry reaches the caller as an exception`() =
+    runTest {
+      // The other half: with `expectSuccess = true`, an unrecoverable 401 must *throw*, or the
+      // account-rejection classifier never fires and a signed-out account is never surfaced.
+      prefs.server = serverWith("stale-token")
+      val engine = MockEngine { respondError(HttpStatusCode.Unauthorized) }
+      val http =
+        HttpClient(engine) {
+          expectSuccess = true
+          install(plexHeadersTokenOnly { prefs.server?.accessToken.orEmpty() })
+          install(plexReauthPlugin(prefs, AccountAuthState()) { serverWith("fresh-token") })
+        }
+
+      val thrown = runCatching { get(http) }.exceptionOrNull()
+
+      assertEquals(
+        "an unrecoverable 401 must surface as a ResponseException",
+        true,
+        thrown is io.ktor.client.plugins.ResponseException,
+      )
+    }
+
+  @Test
   fun `a 401 is retried with the refreshed server token`() =
     runTest {
       prefs.server = serverWith("stale-token")

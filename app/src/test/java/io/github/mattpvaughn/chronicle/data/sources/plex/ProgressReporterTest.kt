@@ -2,13 +2,10 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_PAUSED
+import io.github.mattpvaughn.chronicle.testing.responseException
 import kotlinx.coroutines.test.runTest
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 import java.io.IOException
 
 /**
@@ -124,10 +121,7 @@ class ProgressReporterTest {
     lookupBookViewCount = { 0L },
   )
 
-  private fun httpException(code: Int) =
-    HttpException(
-      Response.error<Unit>(code, "".toResponseBody("text/plain".toMediaType())),
-    )
+  private fun httpException(code: Int) = responseException(code)
 
   private companion object {
     val REQUEST =

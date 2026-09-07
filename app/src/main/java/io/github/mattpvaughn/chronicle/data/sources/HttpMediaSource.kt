@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.sources
 
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
-import okhttp3.ResponseBody
+import io.ktor.client.statement.HttpStatement
 
 /** A [MediaSource] whose authoritative source of truth in accessed via HTTP requests */
 interface HttpMediaSource : MediaSource {
@@ -11,8 +11,15 @@ interface HttpMediaSource : MediaSource {
    */
   suspend fun fetchAdditionalTrackInfo(): MediaItemTrack
 
-  /** Fetches a file stream associated with a URL on the server */
-  suspend fun fetchStream(url: String): ResponseBody
+  /**
+   * A file stream from the server, not yet read.
+   *
+   * An [HttpStatement] rather than OkHttp's `ResponseBody`: the caller decides when to execute and
+   * consume it, which is what keeps a whole audiobook out of memory. Same reason the seam no longer
+   * exposes a download-library request type — an engine's types do not belong on the multi-backend
+   * interface.
+   */
+  suspend fun fetchStream(url: String): HttpStatement
 
   /** Updates the playback progress of a [MediaItemTrack] to the server */
   suspend fun updateProgress(

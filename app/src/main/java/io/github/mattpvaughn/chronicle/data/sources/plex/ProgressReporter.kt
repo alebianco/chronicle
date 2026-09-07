@@ -6,7 +6,7 @@ import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_PAUSED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.ProgressUpdater.Companion.BOOK_FINISHED_END_OFFSET_MILLIS
-import retrofit2.HttpException
+import io.ktor.client.plugins.ResponseException
 import timber.log.Timber
 import java.io.IOException
 
@@ -79,14 +79,14 @@ class ProgressReporter(
       // this retry path exists to fix: the position must survive until the network returns.
       Timber.w(e, "Progress report failed transiently; will retry")
       Outcome.RETRY
-    } catch (e: HttpException) {
-      if (e.code() >= HTTP_SERVER_ERROR) {
-        Timber.w(e, "Progress report got ${e.code()}; will retry")
+    } catch (e: ResponseException) {
+      if (e.response.status.value >= HTTP_SERVER_ERROR) {
+        Timber.w(e, "Progress report got ${e.response.status.value}; will retry")
         Outcome.RETRY
       } else {
         // A 4xx is a rejection, not a blip — most likely an expired token, which a
         // retry cannot fix (re-auth owns that).
-        Timber.e(e, "Progress report rejected with ${e.code()}; giving up")
+        Timber.e(e, "Progress report rejected with ${e.response.status.value}; giving up")
         Outcome.PERMANENT_FAILURE
       }
     }

@@ -64,11 +64,6 @@ class RetiredDependencyTest {
     )
   }
 
-  // Enabled when the Ktorfit migration lands: `PlexService` and the login/media clients are the
-  // last OkHttp and Retrofit holders, and they go together — a Retrofit service *is* an OkHttp
-  // client. Left failing-if-enabled rather than deleted, so the carve is finished rather than
-  // forgotten.
-  @org.junit.Ignore("re-enable with the Ktorfit migration; PlexService is the last holder")
   @Test
   fun `no source writes against the OkHttp API`() {
     assertEquals(
@@ -80,7 +75,6 @@ class RetiredDependencyTest {
     )
   }
 
-  @org.junit.Ignore("re-enable with the Ktorfit migration; PlexService is the last holder")
   @Test
   fun `no source imports Retrofit`() {
     assertEquals(

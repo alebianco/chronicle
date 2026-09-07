@@ -8,11 +8,11 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.util.Event
 import io.github.mattpvaughn.chronicle.util.setEvent
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -115,10 +115,10 @@ class ChooseUserViewModel
         }
         plexLoginRepo.chooseUser(responseUser)
         _pinLoadingStatus.value = LoadingStatus.DONE
-      } catch (t: HttpException) {
-        when (t.code()) {
+      } catch (t: ResponseException) {
+        when (t.response.status.value) {
           403 -> _userMessage.setEvent("Incorrect pin submitted. Try again")
-          else -> _userMessage.setEvent("Error submitting pin (${t.code()}). Try again")
+          else -> _userMessage.setEvent("Error submitting pin (${t.response.status.value}). Try again")
         }
         _pinLoadingStatus.value = LoadingStatus.ERROR
       } catch (t: Throwable) {
