@@ -34,6 +34,13 @@ android {
     baseline = file("lint-baseline.xml")
     checkReleaseBuilds = true
     checkAllWarnings = true
+    // `InvalidPackage` fires on `ktor-utils-jvm`, which references `java.lang.management` from
+    // `IntellijIdeaDebugDetector` — a desktop-only debug helper that is never reached on Android.
+    // Disabled rather than baselined because the finding is inside a *dependency jar* and lint
+    // records it against an absolute path in the Gradle cache, which would not resolve on another
+    // machine or in CI. Scoped to this one id so every other Error-severity issue still fails the
+    // build, which is the property the settings above exist to preserve.
+    disable += "InvalidPackage"
   }
 
   defaultConfig {

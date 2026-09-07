@@ -28,6 +28,14 @@ import io.github.mattpvaughn.chronicle.injection.qualifiers.ApplicationScope
 import io.github.mattpvaughn.chronicle.util.DefaultDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.ServiceUtils
+import io.ktor.client.HttpClient
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.HttpTimeoutConfig
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -352,6 +360,139 @@ object AppModule {
         addInterceptor(HttpLoggingInterceptor().setLevel(downloadLogLevel()))
       }
       .build()
+
+  /**
+   * The Ktor client for media traffic, per decision-24.
+   *
+   * Runs on the **OkHttp engine**, which is deliberate and is what keeps this migration low-risk:
+   * the connection pool, TLS stack and HTTP/1.1 behaviour are the ones already in production. Ktor
+   * supplies the plugin pipeline and the multiplatform-shaped API; OkHttp still moves the bytes.
+   *
+   * The plugin order matters. `PlexHeaders` runs on every request and sets the token from prefs, so
+   * when `PlexReauth` persists a refreshed server and calls `proceed` again, the retry picks up the
+   * new value on the way back through. Reversing them would retry with the stale token.
+   */
+  @Provides
+  @Singleton
+  @Named(OKHTTP_CLIENT_MEDIA)
+  fun mediaKtorClient(
+    plexConfig: PlexConfig,
+    plexPrefsRepo: PlexPrefsRepo,
+    // Provider, not the service: resolving the login service here would tie the media client's
+    // construction to the login client's. There is no cycle today, and a lazy edge keeps it that
+    // way if the login branch ever grows a media dependency.
+    plexLoginService: Provider<PlexLoginService>,
+    accountAuthState: AccountAuthState,
+  ): HttpClient =
+    HttpClient(OkHttp) {
+      // Ktor surfaces a non-2xx as a response rather than throwing, which is what the re-auth
+      // plugin needs in order to inspect a 401 itself.
+      expectSuccess = false
+      install(HttpTimeout) {
+        connectTimeoutMillis = CONNECT_TIMEOUT_SECONDS * 1000
+        requestTimeoutMillis = READ_TIMEOUT_SECONDS * 1000
+        socketTimeoutMillis = READ_TIMEOUT_SECONDS * 1000
+      }
+      install(
+        plexHeadersPlugin(plexPrefsRepo, plexConfig) {
+          val serverToken = plexPrefsRepo.server?.accessToken
+          if (serverToken.isNullOrEmpty()) plexPrefsRepo.accountAuthToken else serverToken
+        },
+      )
+      // Media client only: a 401 from the *login* client means the account token is dead, and
+      // re-fetching resources with that same dead token cannot help.
+      install(
+        plexReauthPlugin(
+          plexPrefsRepo = plexPrefsRepo,
+          accountAuthState = accountAuthState,
+        ) {
+          val cached = plexPrefsRepo.server ?: return@plexReauthPlugin null
+          plexLoginService.get().resources()
+            .filter { it.provides.contains("server") }
+            .map { it.asServer() }
+            .firstOrNull { it.serverId == cached.serverId }
+        },
+      )
+      // Installed unconditionally, with the *level* switched off in release — the shape the
+      // OkHttp clients used. An `if (LOG_NETWORK_REQUESTS) install(...)` would mean the
+      // `sanitizeHeader` below does not exist in any build where logging is off, so a future
+      // change that turns logging on would ship without redaction. Keeping the plugin present
+      // keeps the sanitiser present.
+      install(Logging) {
+        level = if (LOG_NETWORK_REQUESTS) LogLevel.BODY else LogLevel.NONE
+        sanitizeHeader { it.equals("X-Plex-Token", ignoreCase = true) }
+        logger =
+          object : Logger {
+            override fun log(message: String) = Timber.tag("KtorMedia").v(message)
+          }
+      }
+    }
+
+  /**
+   * The Ktor client downloads run through: the media client's configuration with body logging off.
+   *
+   * Downloads must keep everything the media client provides — the Plex headers, the re-auth
+   * plugin, the chosen connection — which is why this is [HttpClient.config] off that client rather
+   * than a second builder. A parallel builder would be a copy to keep in sync, and downloads are
+   * meant to share playback's HTTP stack.
+   *
+   * The one thing it must **not** share is [LogLevel.BODY]. That level buffers an entire response
+   * body in order to log it, and a download's body is the whole audiobook: a 293 MB m4b took the
+   * process from 248 MB to 350 MB PSS and then killed it with `OutOfMemoryError`, with zero bytes
+   * written to disk. That is issue #83, and the defect was in neither the app code nor the download
+   * library — it was in the client the library was handed. The same trap exists here, so the same
+   * cap applies.
+   *
+   * [LogLevel.HEADERS] rather than `NONE` on purpose: a download's status line and `Content-Range`
+   * are exactly what you need to tell a resume from a restart, and they cost nothing to log.
+   *
+   * No `HttpTimeout` override is inherited-and-kept by accident: `config` copies the media client's,
+   * whose `requestTimeoutMillis` would abort a multi-minute download. It is removed here.
+   */
+  @Provides
+  @Singleton
+  @Named(OKHTTP_CLIENT_DOWNLOADER)
+  fun downloaderKtorClient(
+    @Named(OKHTTP_CLIENT_MEDIA) mediaClient: HttpClient,
+  ): HttpClient =
+    mediaClient.config {
+      install(HttpTimeout) {
+        connectTimeoutMillis = CONNECT_TIMEOUT_SECONDS * 1000
+        // A download is arbitrarily long; only stalls matter, which the socket timeout catches.
+        requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+        socketTimeoutMillis = READ_TIMEOUT_SECONDS * 1000
+      }
+      // Re-installed rather than inherited, which is the whole point of this provider: `config`
+      // copies the media client's BODY level, and BODY on a download is issue #83. Always present,
+      // level gated — see the media client above for why the plugin is not itself conditional.
+      installDownloadLogging(
+        level = if (LOG_NETWORK_REQUESTS) LogLevel.HEADERS else LogLevel.NONE,
+        sink = { Timber.tag("KtorDownload").v(it) },
+      )
+    }
+
+  /**
+   * Installs download logging with the token redacted.
+   *
+   * Named and taking its [level] and [sink] as parameters so `KtorDownloadClientTest` can force
+   * logging **on** and assert the redaction. That is not a convenience: `LOG_NETWORK_REQUESTS` is
+   * `BuildConfig.DEBUG`, which is false under unit test, so a redaction test against the real
+   * provider passes with the sanitiser deleted — verified by sabotage. The level had to become an
+   * argument for the guard to be able to fail.
+   */
+  fun HttpClientConfig<*>.installDownloadLogging(
+    level: LogLevel,
+    sink: (String) -> Unit,
+  ) {
+    install(Logging) {
+      this.level = level
+      sanitizeHeader { it.equals("X-Plex-Token", ignoreCase = true) }
+      logger =
+        object : Logger {
+          override fun log(message: String) = sink(message)
+        }
+    }
+  }
 
   @Provides
   @Singleton
