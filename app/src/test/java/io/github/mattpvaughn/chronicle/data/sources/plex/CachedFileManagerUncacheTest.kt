@@ -59,12 +59,14 @@ class CachedFileManagerUncacheTest {
   ): CachedFileManager {
     coEvery { trackRepo.getCachedTracks() } returns cached
     return CachedFileManager(
-      fetch = mockk(relaxed = true),
+      downloader = mockk(relaxed = true),
+      downloadIntents = mockk(relaxed = true),
       prefsRepo = mockk(relaxed = true),
       trackRepository = trackRepo,
       bookRepository = bookRepo,
       plexConfig = mockk(relaxed = true),
       applicationContext = mockk(relaxed = true),
+      workManager = mockk(relaxed = true),
       dispatchers = TestDispatcherProvider(),
       externalScope = TestScope(),
       externalFileDirs = dirs,

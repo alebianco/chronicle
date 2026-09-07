@@ -156,6 +156,23 @@ class PlexConfig
       }
     }
 
+    /**
+     * The fully-resolved URL for downloading [trackSource].
+     *
+     * Replaces `makeDownloadRequest`, and drops everything that was Fetch2-shaped. The token is
+     * **not** attached here: the download client's headers plugin adds it per request, so a Plex
+     * token is never held in a request object that might be logged or persisted. That is the same
+     * guarantee `RedactingFetchLogger` used to provide by scrubbing the logger instead.
+     *
+     * The group id and extras are gone too. Fetch2's grouping API was `Int`-only, so the book id
+     * had to be hashed for the group and carried verbatim in extras because a hash cannot be
+     * reversed; `DownloadRequest` carries the real id in a field.
+     */
+    fun makeDownloadUrl(trackSource: String): String {
+      Timber.i("Preparing download request for: ${Uri.parse(toServerString(trackSource))}")
+      return "${toServerString(trackSource)}?download=1"
+    }
+
     fun makeDownloadRequest(
       trackSource: String,
       bookId: String,

@@ -4,12 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.widget.Toast
-import android.widget.Toast.LENGTH_SHORT
 import androidx.work.*
-import com.tonyodev.fetch2.*
-import com.tonyodev.fetch2core.DownloadBlock
-import io.github.mattpvaughn.chronicle.BuildConfig
+import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -18,11 +14,11 @@ import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.model.NO_AUDIOBOOK_FOUND_ID
 import io.github.mattpvaughn.chronicle.data.model.isCompleteDownload
 import io.github.mattpvaughn.chronicle.features.download.CacheScanOutcome
+import io.github.mattpvaughn.chronicle.features.download.DownloadEvent
+import io.github.mattpvaughn.chronicle.features.download.DownloadIntentStore
 import io.github.mattpvaughn.chronicle.features.download.DownloadNotificationWorker
-import io.github.mattpvaughn.chronicle.features.download.FetchGroupStartFinishListener
-import io.github.mattpvaughn.chronicle.features.download.ResumePlan
-import io.github.mattpvaughn.chronicle.features.download.bookIdOrNull
-import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
+import io.github.mattpvaughn.chronicle.features.download.DownloadRequest
+import io.github.mattpvaughn.chronicle.features.download.Downloader
 import io.github.mattpvaughn.chronicle.features.download.isBookFullyCached
 import io.github.mattpvaughn.chronicle.features.download.partialsSafeToPrune
 import io.github.mattpvaughn.chronicle.features.download.prunePartialFiles
@@ -69,7 +65,7 @@ interface ICachedFileManager {
    * abandoned it, so a Wi-Fi blip ended it permanently and the book stayed partially
    * downloaded with no way back except re-requesting it by hand.
    *
-   * Safe to call repeatedly — Fetch2 ignores downloads that are already running or complete.
+   * Safe to call repeatedly — the downloader ignores tracks already running or complete.
    */
   fun resumeInterruptedDownloads()
 }
@@ -87,12 +83,14 @@ interface SimpleSet<T> {
 class CachedFileManager
   @Inject
   constructor(
-    private val fetch: Fetch,
+    private val downloader: Downloader,
+    private val downloadIntents: DownloadIntentStore,
     private val prefsRepo: PrefsRepo,
     private val trackRepository: ITrackRepository,
     private val bookRepository: IBookRepository,
     private val plexConfig: PlexConfig,
     private val applicationContext: Context,
+    private val workManager: WorkManager,
     private val dispatchers: DispatcherProvider,
     @ApplicationScope
     private val externalScope: CoroutineScope,
@@ -106,40 +104,52 @@ class CachedFileManager
         ) {
           when (intent?.action) {
             DownloadNotificationWorker.ACTION_CANCEL_ALL_DOWNLOADS ->
-              fetch.cancelAll()
+              externalScope.launch {
+                downloader.cancelAll()
+                downloadIntents.clear()
+              }
             DownloadNotificationWorker.ACTION_CANCEL_BOOK_DOWNLOAD -> {
               val bookId = intent.getStringExtra(DownloadNotificationWorker.KEY_BOOK_ID)
               if (!bookId.isNullOrEmpty()) {
                 Timber.i("Cancelling book: $bookId")
-                fetch.cancelGroup(downloadGroupId(bookId))
+                externalScope.launch { cancelBookDownloads(bookId) }
               }
             }
           }
         }
       }
 
+    /**
+     * Re-enqueues everything the user asked for that is not yet on disk.
+     *
+     * Fetch2 owned a durable queue, so this used to be `resumeAll()` plus a `retry()` of whatever
+     * `ResumePlan` picked out of *its* records. There is no engine-side queue now: the intent
+     * lives in [DownloadIntentStore] and the bytes live on disk, so resuming is simply enqueueing
+     * the pending tracks again — [KtorDownloader] sends a `Range` request for anything already
+     * partly there, which is the same cheap resume by a different route.
+     *
+     * A track already in flight is ignored by the downloader rather than started twice.
+     */
     override fun resumeInterruptedDownloads() {
-      // resumeAll covers PAUSED downloads; FAILED ones need an explicit retry, and a
-      // download abandoned by the old single-retry limit is FAILED rather than paused.
-      // Which ids qualify is ResumePlan's call, so it can be tested without this class.
-      fetch.resumeAll()
-      fetch.getDownloads { all ->
-        val toRetry = ResumePlan.idsToRetry(all)
-        if (toRetry.isEmpty()) {
-          return@getDownloads
+      val pending = downloadIntents.pending()
+      if (pending.isEmpty()) return
+      externalScope.launch {
+        val byBook = trackRepository.getAllTracksAsync().filter { it.id in pending }
+        Timber.i("Resuming ${pending.size} interrupted download(s)")
+        byBook.groupBy { it.parentKey }.forEach { (bookId, _) ->
+          val book = bookRepository.getAudiobookAsync(bookId)
+          downloadTracks(bookId, book?.title ?: "")
         }
-        Timber.i("Retrying ${toRetry.size} interrupted download(s)")
-        fetch.retry(toRetry)
       }
     }
 
     /**
      * Deletes incomplete files that no longer belong to anything.
      *
-     * Fetch2's own records are the authority on what is resumable, and they can only be read
-     * through a callback — so this asks, decides on the answer, and deletes there. A failure to
-     * read them deletes **nothing**: the safe direction is always to keep bytes, since keeping a
-     * stale partial costs disk while deleting a live one costs the user their download.
+     * [DownloadIntentStore] is the authority on what is resumable — see the comment in the body
+     * for why it, and not the downloader, has to answer that. The safe direction is always to keep
+     * bytes: keeping a stale partial costs disk, deleting a live one costs the user their
+     * download.
      */
     private fun pruneAbandonedPartials(
       incompleteOnDisk: List<String>,
@@ -149,27 +159,47 @@ class CachedFileManager
       if (incompleteOnDisk.isEmpty()) {
         return
       }
-      fetch.getDownloads { allDownloads ->
-        val knownToFetch = allDownloads.map { MediaItemTrack.getTrackIdFromFileName(File(it.file).name) }
-        val prunable = partialsSafeToPrune(incompleteOnDisk, knownToFetch, reportedCached)
-        if (prunable.isEmpty()) {
-          return@getDownloads
-        }
-        val outcome = prunePartialFiles(prunable, idToFileMap)
-        if (outcome.failedIds.isNotEmpty()) {
-          // Not an error the user can act on: the files are offered again on the next scan.
-          Timber.i("Could not delete ${outcome.failedIds.size} abandoned partial(s)")
-        }
-        Timber.i("Pruned ${outcome.deleted} abandoned partial(s), reclaiming ${outcome.reclaimedBytes} bytes")
+      // `DownloadIntentStore` replaces Fetch2's queue as the answer to "could this still be
+      // resumed?". That substitution is the whole reason the store exists: Fetch2's records
+      // survived a restart, and an in-memory job map does not — so reading the engine here would
+      // report *nothing* pending after a relaunch and make every resumable partial look
+      // abandoned. That is the app deleting the user's audio, which is why the durable record
+      // came first and this call reads it rather than the downloader.
+      val stillWanted = downloadIntents.pending()
+      val prunable = partialsSafeToPrune(incompleteOnDisk, stillWanted, reportedCached)
+      if (prunable.isEmpty()) {
+        return
       }
+      val outcome = prunePartialFiles(prunable, idToFileMap)
+      if (outcome.failedIds.isNotEmpty()) {
+        // Not an error the user can act on: the files are offered again on the next scan.
+        Timber.i("Could not delete ${outcome.failedIds.size} abandoned partial(s)")
+      }
+      Timber.i("Pruned ${outcome.deleted} abandoned partial(s), reclaiming ${outcome.reclaimedBytes} bytes")
     }
 
     override fun cancelGroup(id: String) {
-      fetch.cancelGroup(downloadGroupId(id))
+      externalScope.launch { cancelBookDownloads(id) }
     }
 
     override fun cancelCaching() {
-      fetch.cancelAll()
+      externalScope.launch {
+        downloader.cancelAll()
+        downloadIntents.clear()
+      }
+    }
+
+    /**
+     * Stops a book's downloads and forgets the intent, leaving bytes on disk.
+     *
+     * The intent must go, or the next cache scan would keep the partials alive forever as
+     * "resumable" — the user cancelled, so nobody is coming back for them and the prune should be
+     * free to reclaim the space.
+     */
+    private suspend fun cancelBookDownloads(bookId: String) {
+      val trackIds = trackRepository.getTracksForAudiobookAsync(bookId).map { it.id }
+      downloader.cancelBook(bookId)
+      downloadIntents.remove(trackIds)
     }
 
     override suspend fun hasUserCachedTracks(): Boolean {
@@ -182,36 +212,28 @@ class CachedFileManager
       bookId: String,
       bookTitle: String,
     ) {
-      // Add downloads to Fetch
       externalScope.launch {
-        fetch.enqueue(makeRequests(bookId, bookTitle)) {
-          val errors =
-            it.mapNotNull { (_, error) ->
-              if (error == Error.NONE) null else error
-            }
-          if (BuildConfig.DEBUG && errors.isNotEmpty()) {
-            Toast.makeText(
-              applicationContext,
-              "Error enqueuing download: $errors",
-              LENGTH_SHORT,
-            ).show()
-          }
-          if (errors.isEmpty()) {
-            DownloadNotificationWorker.start(applicationContext)
-          }
+        val requests = makeRequests(bookId, bookTitle)
+        if (requests.isEmpty()) {
+          Timber.i("Nothing to download for $bookId; every track is already cached")
+          return@launch
         }
+        // Recorded *before* enqueueing, not after. The intent is what keeps a partial safe from
+        // the prune, so a crash between these two lines must leave the bytes protected rather
+        // than orphaned — the safe direction is always to keep bytes.
+        downloadIntents.add(requests.map { it.trackId })
+        downloader.enqueue(requests)
+        DownloadNotificationWorker.start(applicationContext, workManager)
       }
     }
 
     /**
-     * Creates [Request]s for all missing files associated with [bookId]
-     *
-     * @return the number of files to be downloaded
+     * Creates a [DownloadRequest] for every file of [bookId] that is not already fully on disk.
      */
     private suspend fun makeRequests(
       bookId: String,
       bookTitle: String,
-    ): List<Request> {
+    ): List<DownloadRequest> {
       // Gets all tracks for album id
       val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
 
@@ -246,35 +268,39 @@ class CachedFileManager
             return@mapNotNull null
           }
 
-          // File exists but is not marked as cached in the database- probably means a download
-          // has failed. Delete it and try again
+          // A file that exists but is not marked cached is a **partial**, and it is now kept
+          // rather than deleted. Fetch2's request could not express "continue this file", so the
+          // old code deleted the partial and started over; `KtorDownloader` sends
+          // `Range: bytes=<len>-` instead, which is the difference between re-fetching a 293 MB
+          // book over a flaky connection and asking for the tail of it.
           if (!trackCached && destFileExists) {
-            val deleted = destFile.delete()
-            if (!deleted) {
-              Timber.e("Failed to delete previously cached file. Download will fail!")
-            } else {
-              Timber.e("Succeeding in deleting cached file")
-            }
+            Timber.i("Resuming partial download for track ${track.id} at ${destFile.length()} bytes")
           }
 
           return@mapNotNull makeTrackDownloadRequest(
             track,
             bookId,
             bookTitle,
-            "file://${destFile.absolutePath}",
+            destFile.absolutePath,
           )
         }
-      Timber.i("Made download requests: ${requests.map { it.file }}")
+      Timber.i("Made download requests: ${requests.map { it.destinationPath }}")
       return requests
     }
 
-    /** Create a [Request] for a track download with the proper metadata */
+    /** Create a [DownloadRequest] for a track download with the proper metadata */
     private fun makeTrackDownloadRequest(
       track: MediaItemTrack,
       bookId: String,
       bookTitle: String,
       dest: String,
-    ) = plexConfig.makeDownloadRequest(track.media, bookId, bookTitle, dest)
+    ) = DownloadRequest(
+      trackId = track.id.toString(),
+      bookId = bookId,
+      bookTitle = bookTitle,
+      url = plexConfig.makeDownloadUrl(track.media),
+      destinationPath = dest,
+    )
 
     override suspend fun uncacheAllInLibrary(): Int {
       Timber.i("Removing books from library")
@@ -312,7 +338,10 @@ class CachedFileManager
      */
     override suspend fun deleteCachedBook(bookId: String) {
       Timber.i("Deleting downloaded book: $bookId")
-      fetch.deleteGroup(downloadGroupId(bookId))
+      downloader.deleteBook(bookId)
+      downloadIntents.remove(
+        trackRepository.getTracksForAudiobookAsync(bookId).map { it.id },
+      )
       externalScope.launch {
         withContext(dispatchers.io) {
           val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
@@ -369,74 +398,69 @@ class CachedFileManager
         Context.RECEIVER_NOT_EXPORTED,
       )
 
-      // singleton so we can observe downloads always
-      fetch.addListener(
-        object : FetchGroupStartFinishListener() {
-          override fun onStarted(
-            groupId: Int,
-            fetchGroup: FetchGroup,
-          ) {
-            // The listener only receives Fetch2's Int group, which downloadGroupId hashed from
-            // the book id and cannot invert — so read the id back off any download in the group.
-            val bookId = fetchGroup.downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
-            if (bookId == null) {
-              Timber.i("Download group $groupId started with no book id in its extras")
-              return
-            }
-            if (bookId !in activeDownloads) {
-              Timber.i("Starting downloading book with id: $bookId")
-            }
-            activeDownloads.add(bookId)
-          }
-
-          override fun onStarted(
-            download: Download,
-            downloadBlocks: List<DownloadBlock>,
-            totalBlocks: Int,
-          ) {
-            Timber.i("Starting download!")
-            DownloadNotificationWorker.start(applicationContext)
-            super.onResumed(download)
-          }
-
-          override fun onFinished(
-            groupId: Int,
-            fetchGroup: FetchGroup,
-          ) {
-            // Handle the various downloaded statuses
-            Timber.i(
-              "Group change for book with id $groupId: ${fetchGroup.downloads.size} tracks downloaded",
-            )
-            val downloads = fetchGroup.downloads
-            Timber.i(downloads.joinToString { it.status.toString() })
-            downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
-              ?.let { activeDownloads.remove(it) }
-            val downloadSuccess =
-              downloads.all { it.error == Error.NONE } && downloads.isNotEmpty()
-            // Fetch2 reports an Int groupId, which is a hash of the book id and cannot be
-            // reversed — so the id is read back from the extras it was enqueued with.
-            // A download from an older version has none; skipping is right, because guessing
-            // would mark the wrong book as downloaded.
-            val bookId = downloads.firstNotNullOfOrNull { it.bookIdOrNull() }
-            if (downloadSuccess && bookId != null) {
-              // The *only* owner of this write. DownloadNotificationWorker used to
-              // perform it too, from a scope tied to its own cancellation, so the fact had two
-              // owners and one of them usually lost the race — which is how a downloaded book
-              // could report itself uncached until the next cache scan repaired it.
-              // This site is the right owner: a @Singleton on an injected scope outliving any
-              // single unit of work, and already the reconciliation authority for cache state.
-              externalScope.launch {
-                withContext(dispatchers.io) {
-                  Timber.i("Book download success for $bookId (group $groupId)")
-                  bookRepository.updateCachedStatus(bookId, true)
-                }
+      // Singleton, so downloads are observed for the life of the process.
+      //
+      // Fetch2 reported per-*group* start/finish, with an Int group id hashed from the book id
+      // that could not be inverted — so the real id had to be read back out of each download's
+      // extras. `DownloadEvent` carries the book id directly, which is why none of that
+      // bookkeeping survives the port.
+      //
+      // The completion rule is unchanged and is the part worth being careful about: a book counts
+      // as cached only when **every** track it wanted is on disk. Reporting per track would mark
+      // a book downloaded after its first file, which is the shape of three separate bugs where
+      // downloads went missing while the app claimed success.
+      externalScope.launch {
+        downloader.events.collect { event ->
+          when (event) {
+            is DownloadEvent.Progress -> {
+              if (event.bookId !in activeDownloads) {
+                Timber.i("Starting downloading book with id: ${event.bookId}")
+                activeDownloads.add(event.bookId)
+                DownloadNotificationWorker.start(applicationContext, workManager)
               }
-            } else if (downloadSuccess) {
-              Timber.w("Download group $groupId finished with no book id in its extras")
+            }
+
+            is DownloadEvent.Completed -> {
+              downloadIntents.remove(listOf(event.trackId))
+              withContext(dispatchers.io) {
+                trackRepository.updateCachedStatus(event.trackId, true)
+                onBookTracksSettled(event.bookId)
+              }
+            }
+
+            is DownloadEvent.Failed -> {
+              // The intent deliberately stays: a failed download is the resume candidate the
+              // prune rule protects, and dropping it here would let the next cache scan delete
+              // bytes a `Range` request could have continued.
+              Timber.w("Download failed for ${event.trackId}: ${event.cause}")
+              activeDownloads.remove(event.bookId)
+            }
+
+            is DownloadEvent.Cancelled -> {
+              activeDownloads.remove(event.bookId)
             }
           }
-        },
-      )
+        }
+      }
+    }
+
+    /**
+     * Marks [bookId] cached once every one of its tracks is.
+     *
+     * The **only** owner of this write. `DownloadNotificationWorker` used to perform it too, from
+     * a scope tied to its own cancellation, so the fact had two owners and one usually lost the
+     * race — which is how a downloaded book could report itself uncached until the next cache scan
+     * repaired it. This site is the right owner: a `@Singleton` on an injected scope outliving any
+     * single unit of work, and already the reconciliation authority for cache state.
+     */
+    private suspend fun onBookTracksSettled(bookId: String) {
+      val tracks = trackRepository.getTracksForAudiobookAsync(bookId)
+      if (tracks.isEmpty()) return
+      if (tracks.all { it.cached }) {
+        Timber.i("Book download success for $bookId")
+        bookRepository.updateCachedStatus(bookId, true)
+        activeDownloads.remove(bookId)
+      }
     }
 
     /**
@@ -492,14 +516,14 @@ class CachedFileManager
 
       val reportedCachedKeys = trackRepository.getCachedTracks().map { it.id }
 
-      // The set arithmetic lives in `reconcileCachedTracks` so it can be tested without Fetch, a
-      // Context or the Injector — see CacheReconciliation.
+      // The set arithmetic lives in `reconcileCachedTracks` so it can be tested without a
+      // downloader, a Context or the Injector — see CacheReconciliation.
       val reconciliation =
         reconcileCachedTracks(onDisk = trackIdsFoundOnDisk, reportedCached = reportedCachedKeys)
 
       // Delete partials nobody is coming back for. After the reconciliation, so the
       // database's view is the settled one; `partialsSafeToPrune` decides, and it keeps anything
-      // Fetch could still resume or the database still claims.
+      // the intent store could still resume or the database still claims.
       pruneAbandonedPartials(incompleteOnDisk, reportedCachedKeys, idToFileMap)
 
       val alteredTracks = mutableListOf<String>()

@@ -17,6 +17,8 @@ import io.github.mattpvaughn.chronicle.data.local.TrackRepository
 import io.github.mattpvaughn.chronicle.data.sources.plex.APP_NAME
 import io.github.mattpvaughn.chronicle.data.sources.plex.CachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
+import io.github.mattpvaughn.chronicle.features.download.Downloader
+import io.github.mattpvaughn.chronicle.features.download.KtorDownloader
 import javax.inject.Singleton
 
 /**
@@ -49,6 +51,16 @@ object RepositoryModule {
   @Provides
   @Singleton
   fun provideCachedFileManager(cacheManager: CachedFileManager): ICachedFileManager = cacheManager
+
+  /**
+   * The download engine, bound behind the [Downloader] seam (decision-24).
+   *
+   * Bound rather than injected concretely so callers depend on the interface — which is the point
+   * of the seam: a future engine change replaces this one line.
+   */
+  @Provides
+  @Singleton
+  fun provideDownloader(downloader: KtorDownloader): Downloader = downloader
 
   /**
    * The app's main preferences file.

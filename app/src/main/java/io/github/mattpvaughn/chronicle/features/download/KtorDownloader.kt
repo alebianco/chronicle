@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.download
 
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
+import io.github.mattpvaughn.chronicle.injection.qualifiers.ApplicationScope
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
@@ -73,6 +74,7 @@ class KtorDownloader
     // The application-wide supervisor scope, already on `dispatchers.io`. A download must outlive
     // the screen that started it, and a `SupervisorJob` means one failed track does not cancel the
     // rest of the book.
+    @ApplicationScope
     private val scope: CoroutineScope,
   ) : Downloader {
     private val _events =

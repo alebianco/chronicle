@@ -487,11 +487,20 @@ class DownloadNotificationWorker
       /**
        * Start [DownloadNotificationWorker] if it is not already running.
        *
-       * Takes a [Context] now: this used to reach `Injector.get().workManager()`, and the
-       * service locator is gone. A companion function has no injection point, so the caller — which
-       * is constructor-injected — passes what it already holds.
+       * Both dependencies arrive as parameters. The [Context] came first, when this stopped
+       * reaching `Injector.get().workManager()` — a companion function has no injection point, so
+       * the caller, which *is* constructor-injected, passes what it already holds.
+       *
+       * The [WorkManager] followed for the same reason: `WorkManager.getInstance(context)` is a
+       * static lookup, and it made every caller untestable in turn.
+       * `CachedFileManagerResumeTest` could not construct a download at all without standing up
+       * WorkManager, which is the "fetches its own dependency" problem convention 5 exists to
+       * prevent — and the instance is already in the graph.
        */
-      fun start(context: Context) {
+      fun start(
+        context: Context,
+        workManager: WorkManager,
+      ) {
         val syncWorkerConstraints =
           Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -501,7 +510,7 @@ class DownloadNotificationWorker
             .setConstraints(syncWorkerConstraints)
             .build()
 
-        WorkManager.getInstance(context).beginUniqueWork(
+        workManager.beginUniqueWork(
           DOWNLOAD_WORKER_ID,
           ExistingWorkPolicy.KEEP,
           worker,
