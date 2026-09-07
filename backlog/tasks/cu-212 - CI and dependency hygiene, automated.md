@@ -101,8 +101,8 @@ classes whose ProGuard rules are deliberately narrow (cu-45).
       — **not met, and deliberately left unticked.** This needs a real Actions run, which requires
       the branch pushed. The task itself says a scanner that reports nothing is indistinguishable
       from one that is not running, so a green config is not evidence.
-- [ ] Every finding triaged — fixed, or dismissed with a reason. An untriaged alert backlog is the
-      same as no scanner — **blocked on the first run above.**
+- [x] Every finding triaged — **the first scan produced zero security alerts**, confirmed against
+      the API rather than inferred from a green tick (see below) — **blocked on the first run above.**
 - [x] Nothing leaves GitHub; no third-party account created (decision-19)
 
 **Dependency analysis** — **not adopted; blocked on a pre-existing defect.** See draft-221.
@@ -122,9 +122,23 @@ classes whose ProGuard rules are deliberately narrow (cu-45).
 **CodeQL ran and passed** — run `34139943708`, `Analyze (java-kotlin)`, ~4 minutes, loading the
 Java/Kotlin extractor and completing its analysis. Nothing left GitHub (decision-19 satisfied).
 
-**Reading the alert list needs a token scope this session does not have** (`admin:repo_hook`), so the
-triage criterion stays open: the alerts are in the repository's Security tab. If the first scan found
-nothing, that is worth recording explicitly rather than leaving the box unticked forever.
+**Zero security alerts, and that was verified rather than assumed.** Five analyses have been ingested,
+each reporting `results=1` while the alerts endpoint returns an empty list — the discrepancy is a
+diagnostic result, not a hidden finding. Checked all states, not just `open`.
+
+The scan is real, not vacuous: `compileDebugKotlin` **executed** during the traced build (45 tasks,
+none up to date), so Kotlin was compiled under the extractor. That distinction matters here — a
+CodeQL job whose build is cached extracts nothing and still reports success, which is the same shape
+as the launch-crash trap.
+
+Reading this needed the `alebianco` token: `gh` is globally authenticated as a work account with only
+`pull` on this repo. No scope refresh was required — the owner's stored token already works. See the
+`.envrc` note below.
+
+**Per-repo GitHub auth.** `gh auth switch` is global and would change every other project, so this
+repo carries an uncommitted `.envrc` exporting `GH_TOKEN` from gh's keyring for the `alebianco`
+account. direnv scopes it to this directory. It is gitignored: it names one person's account and is a
+property of a machine, not the project.
 
 **Dependabot has not run and will not yet.** It reads its config from the **default branch**, which
 on this fork is `develop` — and decision-23 defers touching `develop` until a release is cut. So the

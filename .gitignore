@@ -51,6 +51,11 @@ docs/superpowers/
 # Kotlin build tooling session data
 .kotlin/
 
+# direnv. .envrc here selects which GitHub account gh uses for this repo, which
+# is a property of one person's machine and not of the project.
+.envrc
+.direnv/
+
 # Git worktrees (owner convention: .worktree/<branch-name>)
 .worktree/
 # Agent worktrees, created by the harness per subagent. Not ignoring these lets a
