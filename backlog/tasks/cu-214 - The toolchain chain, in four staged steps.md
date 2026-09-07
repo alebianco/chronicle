@@ -101,12 +101,17 @@ pins the palette; type and spacing are not pinned.
 ## Acceptance Criteria
 
 **Step 1 — Room, committed alone**
-- [ ] Room 2.8.3 across `room-runtime`, `room-ktx`, `room-compiler`
-- [ ] All **nineteen** exported schemas unchanged — a schema diff means the bump altered generated
-      SQL, which is a much bigger conversation: stop and escalate
-- [ ] The seven migration tests pass with `--rerun-tasks`, not from cache
-- [ ] `./test_release_build.sh` finds every reflection-dependent class
-- [ ] SQLDelight recorded as declined, citing 2.8.3, so cu-194 can close it
+- [x] Room 2.8.3 across `room-runtime`, `room-ktx`, `room-compiler` — one `room` version ref, so
+      all three move together
+- [x] All **nineteen** exported schemas unchanged — regenerated with `kspDebugKotlin
+      --rerun-tasks` and byte-identical to the committed copies (`git diff --quiet app/schemas/`)
+- [x] The migration tests pass with `--rerun-tasks`, not from cache — **26 of them**, not the
+      seven this ticket claimed: 4 in `RoomMigrationTest` and 22 in `RoomSchemaTest`. 42 Gradle
+      tasks executed, none up to date
+- [x] `./test_release_build.sh` finds every reflection-dependent class — 9,145 classes in dex, all
+      survived R8. Its later install step fails, but that is pre-existing (see below)
+- [x] SQLDelight recorded as declined in cu-194, now citing a 2.8.3 that is actually in the build
+      rather than a release note
 
 **Step 2 — Kotlin + KSP, committed alone**
 - [ ] Kotlin and KSP on the 2.3.11 line, bumped together
@@ -134,6 +139,28 @@ pins the palette; type and spacing are not pinned.
 **Throughout**
 - [ ] `./verify.sh` green after **each** step, not only at the end
 - [ ] decision-22 updated once step 3 lands: its two "held" notes are no longer current
+
+## Step 1 result (2026-09-07)
+
+**Landed, and it was uneventful — which is the good outcome for a dependency bump.** `room 2.8.1 ->
+2.8.3`, one version ref covering runtime, ktx and compiler.
+
+The schema check was the one that mattered, since a diff would have meant the bump changed generated
+SQL. Regenerated under `--rerun-tasks` and **all nineteen are byte-identical** to the committed
+copies. Room's codegen moved to Kotlin output in the 2.8 line, which was the reason to suspect drift;
+it produced none here.
+
+Two corrections to this ticket's own text, both in the safer direction:
+
+- **It says "the seven migration tests". There are 26** — 4 in `RoomMigrationTest` and 22 in
+  `RoomSchemaTest`. All green with 42 Gradle tasks executed and none up to date.
+- **`./test_release_build.sh` fails at its install step, and did so before this change too.** Proved
+  by stashing the bump and re-running: identical failure on 2.8.1. The APK it builds is
+  `app-release-unsigned.apk`, and an unsigned APK can never install
+  (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`). The script exits 0 when no device is attached, so this
+  only surfaces when one is — which is why it has gone unnoticed. **Filed as cu-224.** The criterion
+  this step needed passed at step 2b: 9,145 classes in dex, every reflection-dependent one survived
+  R8.
 
 ## Notes
 
