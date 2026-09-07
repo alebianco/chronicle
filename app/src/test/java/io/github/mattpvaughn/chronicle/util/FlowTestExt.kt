@@ -6,6 +6,38 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 
+/*
+ * ## Two traps these helpers do not cover
+ *
+ * Both were found the hard way, and both read as a broken production class when the defect is in
+ * the harness. They are recorded here because this is the file you open when a flow test misbehaves.
+ *
+ * ### 1. `advanceUntilIdle()` does not resume a `backgroundScope` collector of a `SharedFlow`
+ *
+ * `keepCollected` and `settledValues` below advance the dispatcher on purpose, and that is correct
+ * **for a `StateFlow`**: the work is queued on the test dispatcher, and draining it produces the
+ * value. A `SharedFlow` emission is not that. The value sits in the buffer and the collector is
+ * never resumed, so the collected list stays empty and every assertion about it is vacuous.
+ *
+ * Seven downloader tests failed this way with zero requests reaching the engine, which reads like a
+ * broken downloader and was a broken harness. **`yield()` resumes it; `advanceUntilIdle` does not.**
+ * `SleepTimerBusTest` measured this directly — after `publish`, `advanceUntilIdle` left the list
+ * empty and the next `yield` produced the value — and its `record`/`settle` pair is the pattern to
+ * copy. Note it also awaits `onSubscription` before emitting, because a `replay = 0` bus drops
+ * anything published before a collector exists.
+ *
+ * ### 2. A collector on an endless flow inside `runBlocking` never completes
+ *
+ * `runBlocking` returns when its body returns, and collecting a flow that never ends is a body that
+ * never returns — so the call blocks and the suite hangs rather than failing. There is no timeout to
+ * read and no assertion output. Launch such a collector as a `Job` and **cancel it** before the
+ * block ends (`KtorDownloaderTest` does this), or await a specific event with a timeout rather than
+ * collecting open-endedly.
+ *
+ * Neither trap applies to a `StateFlow` read through the helpers below, which is why those helpers
+ * can advance the dispatcher and return a value.
+ */
+
 /**
  * Keeps [flow] collected for the rest of the test **and lets it settle**, so a
  * `stateIn(WhileSubscribed)` has actually produced a value by the time the caller asserts.

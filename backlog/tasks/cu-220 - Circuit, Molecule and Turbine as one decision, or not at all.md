@@ -1,7 +1,7 @@
 ---
 id: cu-220
 title: "Circuit, Molecule and Turbine as one decision, or not at all"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -75,15 +75,16 @@ task decides** — they are the strongest concrete evidence for Turbine, and use
 
 ## Acceptance Criteria
 
-- [ ] The `*Destination` boilerplate is **measured**, not estimated — lines across all thirteen, and
+- [x] The `*Destination` boilerplate is **measured**, not estimated — lines across all thirteen, and
       how much of it Circuit would actually remove
-- [ ] A single adopt/decline covering **all three** libraries, with reasoning
-- [ ] If adopting: the navigation question is answered first, since Circuit's router and Navigation
+- [x] A single adopt/decline covering **all three** libraries, with reasoning
+- [x] If adopting: the navigation question is answered first, since Circuit's router and Navigation
       Compose cannot both own routing — and that answer amends decision-22
-- [ ] If declining: what would change the answer is written down, and the two flow traps above are
+      *(n/a — declined, so decision-22 stands unamended)*
+- [x] If declining: what would change the answer is written down, and the two flow traps above are
       added to `FlowTestExt.kt` regardless
-- [ ] No partial adoption. One of the three alone is the outcome this task exists to prevent
-- [ ] `./verify.sh` green
+- [x] No partial adoption. One of the three alone is the outcome this task exists to prevent
+- [x] `./verify.sh` green
 
 ## Notes
 
@@ -93,3 +94,38 @@ judgement about how much churn is worth it.
 **Sequenced last on purpose.** Everything in cu-210 before it either reduces risk or is reversible;
 this one is a re-architecture of every screen. If the programme stalls earlier, nothing is
 half-migrated.
+
+## Outcome (2026-09-07)
+
+**Declined, all three, recorded as [[decision-25]].**
+
+The measurement is what decided it. The `*Destination` layer is **1,421 lines across thirteen
+files**, but only **94 of them (6.6%) are the mechanical wiring Circuit removes** — 80
+`collectAsStateWithLifecycle` calls and 14 `hiltViewModel()` defaults. The remaining 1,327 are
+imports (302), KDoc and comments (227), blank lines (92), `viewModel::` method references (46),
+`ToastEffect`s (22) and the Scaffold / `PullToRefreshBox` / `SearchOverlay` layout — all of which
+**relocate into a Circuit `Ui` rather than disappearing**. `BrowseDestination` and
+`SeriesIndexTesterDestination` are each one collect, one `ChronicleScaffold` and one `*Screen` call;
+there is no ceremony left in them to delete.
+
+A `viewModel::showFacet` becoming `{ eventSink(BrowseEvent.ShowFacet(it)) }` is a sealed event class
+plus a `when` plus the dispatch — Circuit trades a method reference for a named event type. Real
+benefits (exhaustiveness, testable event streams), but not fewer lines.
+
+Against that, adopting Circuit means migrating navigation a **third** time (375 lines of
+`ChronicleNavHost.kt` + `Destination.kt`, settled by cu-188/cu-202/cu-203). cu-194's rule —
+*"adoption needs a concrete defect it fixes"* — is not met: decision-22's bug table is four
+View-system layout bugs that Compose itself already fixed, none of them a state-management defect
+Circuit's shape would have prevented. cu-182's Wear case is not built and not scheduled.
+
+Turbine falls with the bundle: without Circuit's event streams the assertions here stay
+settled-value-shaped, which `FlowTestExt` already serves by 7 suites.
+
+**What would reopen it** is written into decision-25: a structural state bug, the wiring share
+growing past roughly a third (today 6.6%), a genuine second UI target, or Navigation Compose
+becoming a maintenance problem in its own right.
+
+**Both flow traps are now in `FlowTestExt.kt`'s KDoc**, as the acceptance criteria required
+regardless of the decision — with the distinction that made them confusing: `advanceUntilIdle` is
+correct for the `StateFlow` helpers in that file and useless for a `SharedFlow` collector, which is
+why the same call works in one place and silently produces vacuous assertions in the other.
