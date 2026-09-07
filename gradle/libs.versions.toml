@@ -8,11 +8,11 @@ agp = "8.13.2"
 # bump is its own task with its own device verification -- not a side effect of adding Compose.
 # Raise this only together with compileSdk.
 composeBom = "2026.06.01"
-kotlin = "2.2.10"
+kotlin = "2.3.21"
 coroutines = "1.11.0"
 material = "1.14.0"
 room = "2.8.3"
-ksp = "2.2.10-2.0.2"
+ksp = "2.3.11"
 coil = "3.3.0"
 timber = "5.0.1"
 dagger = "2.57.2"
@@ -29,7 +29,7 @@ ktor = "3.2.1"
 # converter and the runtime are one boundary, and a newer serializer under an older Ktor is the
 # kind of mismatch that shows up as a parse failure rather than a build error.
 serialization = "1.8.1"
-ktorfit = "2.6.5"
+ktorfit = "2.7.5"
 browserx = "1.8.0"
 oss = "17.1.0"
 appcompat = "1.8.0"

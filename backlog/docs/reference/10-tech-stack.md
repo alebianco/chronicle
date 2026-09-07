@@ -7,7 +7,7 @@ Truthful as of **2026-09-06**. Versions here are a convenience — `gradle/libs.
 
 | Item | Version | Notes |
 |---|---|---|
-| Kotlin | 2.2.10 | |
+| Kotlin | 2.3.21 | **Capped by KSP, not by choice** — see below |
 | Gradle | 9.5.1 | AGP 8.x **cannot** use Gradle ≥ 9.6.0 |
 | AGP | 8.13.2 | AGP 9.x absorbs the Kotlin plugin — its own migration |
 | minSdk | 27 | The API 27 managed device exists to catch ungated new APIs |
@@ -23,13 +23,30 @@ exists. Release signing per `CONTRIBUTING.md`.
 | Pattern | MVVM + Repository | |
 | DI | Dagger 2.57.2 | Hand-rolled components. Hilt follows the screen migration |
 | Persistence | Room 2.8.1 | **Five separate databases**; all export schemas and have migration tests |
-| Network | Ktor 3.2.1 + Ktorfit 2.6.5, OkHttp engine | decision-24. Ktorfit reads the endpoint annotations; OkHttp is the engine, never named by app code (`RetiredDependencyTest`) |
+| Network | Ktor 3.2.1 + Ktorfit 2.7.5, OkHttp engine | decision-24. Ktorfit reads the endpoint annotations; OkHttp is the engine, never named by app code (`RetiredDependencyTest`) |
 | Serialization | kotlinx-serialization 1.8.1 | Compiler-plugin codegen (`@Serializable`). One shared `ChronicleJson` — its `ignoreUnknownKeys` and `encodeDefaults` are the settings-export and rules-file guarantees, not conveniences |
 | Media | Media3 1.11.0 | ExoPlayer + MediaSession + Cast |
 | State | StateFlow | LiveData removed |
 | UI | **Compose** only | DataBinding removed, then ViewBinding. Adopted by decision-22; the migration finished with the navigation shell. One deliberate `AndroidView` island: `CastButton` |
 | Downloads | Fetch2 | |
-| Annotation processing | **KSP, not KAPT** | `kotlin-kapt` is gone; Room and Dagger use `ksp(...)` |
+| Annotation processing | **KSP, not KAPT** | `kotlin-kapt` is gone; Room, Dagger/Hilt and Ktorfit use `ksp(...)` |
+
+### KSP is the Kotlin ceiling
+
+**Do not raise Kotlin past what KSP publishes for.** Kotlin 2.4.0, 2.4.10 and 2.4.20 all exist;
+`com.google.devtools.ksp:symbol-processing-gradle-plugin` returns **404 for every one of them**
+(checked 2026-09-07). Room, Dagger/Hilt and Ktorfit all run through KSP, so nothing here can outrun
+it — the ceiling is a hard fact about published artifacts, not caution.
+
+Two traps in reading those version numbers:
+
+- **KSP changed scheme.** It used to be `<kotlin>-<ksp>`, e.g. `2.2.10-2.0.2`. It is now bare, so
+  `ksp = "2.3.11"` does **not** mean Kotlin 2.3.11 — that version does not exist. It runs against
+  Kotlin 2.3.21.
+- **Raising the stdlib under KSP makes unrelated types vanish.** An earlier attempt produced nine
+  errors that never mentioned the real cause: `[MissingType]: Element 'Audiobook'`, a Room database
+  failure, and Hilt citing `error.NonExistentClass` for a class that resolved fine. If a KSP bump
+  misbehaves this way, bisect rather than read the messages literally.
 
 **Any doc claiming KAPT is wrong.** Note incremental builds are *slower* than under KAPT (+13% on
 an ordinary edit, +97% when an annotated type changes) — this is fixed per-invocation overhead in

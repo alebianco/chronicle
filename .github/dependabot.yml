@@ -92,13 +92,6 @@ updates:
       - dependency-name: "org.jetbrains.kotlin.*"
       - dependency-name: "com.google.devtools.ksp*"
 
-      # Ktorfit >= 2.7 requires kotlin-stdlib 2.4.0, which this project cannot
-      # reach until Kotlin moves. Unblock when: Kotlin moves past the KSP ceiling (cu-214).
-      - dependency-name: "de.jensklingenberg.ktorfit:*"
-        versions: [">=2.7"]
-      - dependency-name: "de.jensklingenberg.ktorfit"
-        versions: [">=2.7"]
-
       # Compose BOM beyond the 2026.06.x line pulls Compose 1.12.0, whose
       # material-ripple-android requires compileSdk 37 (decision-22); this
       # project is on 36. Unblock when: cu-214 stage 3 lands compileSdk 37.

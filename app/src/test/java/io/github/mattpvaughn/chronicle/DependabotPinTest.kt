@@ -111,7 +111,7 @@ class DependabotPinTest {
       if (body.contains("update-types:")) {
         assertTrue(
           "$coordinate restricts update-types without including semver-patch. KSP is built " +
-            "against one exact Kotlin version, so a patch bump (2.2.10 -> 2.2.11) would open " +
+            "against one exact Kotlin version, so a patch bump (2.3.21 -> 2.3.22) would open " +
             "with no published KSP twin — the broken build the kotlin group exists to prevent.",
           body.contains("version-update:semver-patch"),
         )
@@ -131,7 +131,6 @@ class DependabotPinTest {
       listOf(
         "org.jetbrains.kotlin:kotlin-stdlib" to "Kotlin — no KSP release for Kotlin 2.4",
         "com.google.devtools.ksp" to "KSP — versioned against one exact Kotlin",
-        "de.jensklingenberg.ktorfit:ktorfit-lib" to "Ktorfit >= 2.7 needs kotlin-stdlib 2.4.0",
         "androidx.compose:compose-bom" to "Compose BOM > 2026.06.x needs compileSdk 37",
         "androidx.lifecycle:lifecycle-runtime-ktx" to "lifecycle >= 2.11 needs compileSdk 37 and AGP 9.1",
         "androidx.room:room-runtime" to "Room 3.0 is a breaking major, alpha, no consumer",
@@ -174,8 +173,6 @@ class DependabotPinTest {
         "org.jetbrains.kotlin:*",
         "org.jetbrains.kotlin.*",
         "com.google.devtools.ksp*",
-        "de.jensklingenberg.ktorfit:*",
-        "de.jensklingenberg.ktorfit",
         "androidx.compose:compose-bom",
         "androidx.lifecycle:*",
         "androidx.navigation:*",

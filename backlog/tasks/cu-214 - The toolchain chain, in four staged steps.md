@@ -114,11 +114,18 @@ pins the palette; type and spacing are not pinned.
       rather than a release note
 
 **Step 2 — Kotlin + KSP, committed alone**
-- [ ] Kotlin and KSP on the 2.3.11 line, bumped together
-- [ ] Every KSP processor still generates — Room `_Impl`s, Hilt components, Moshi adapters, Ktorfit
-      service impls — confirmed by their **existence**, not by a green compile
-- [ ] Whether Ktorfit can now move past 2.6.5 is checked and recorded **either way**
-- [ ] The KSP ceiling written down where the next person looks, so Kotlin 2.4 is not attempted again
+- [x] Kotlin and KSP bumped together — **Kotlin 2.3.21, KSP 2.3.11**. Not "the 2.3.11 line" as
+      this ticket assumed: KSP dropped the `<kotlin>-<ksp>` scheme for bare versions, and Kotlin
+      2.3.11 does not exist (404 on Maven Central)
+- [x] Every KSP processor still generates, confirmed by **counting the output** before and after,
+      not by a green compile: Room `_Impl` 10 → 10, Ktorfit impls 2 → 2, generated Kotlin 12 → 12,
+      generated Java 222 → 222, Hilt/Dagger classes 259 → 259. (No Moshi adapters to check — cu-217
+      removed that processor, so this ticket's mention of them is now stale.)
+- [x] Ktorfit **can** move past 2.6.5 and has: **2.7.5**. It was pinned because 2.7.5 needed
+      stdlib 2.4.0, which is exactly what this bump supplies. Included here rather than deferred,
+      because it is the same KSP-driven constraint this step exists to lift
+- [x] The KSP ceiling written down below and in the tech-stack reference — **verified by HTTP, not
+      assumed**: no KSP publishes for 2.4.0, 2.4.10 or 2.4.20 (all 404)
 
 **Step 3 — compileSdk 37 + AGP 9, committed alone and device-verified**
 - [ ] `compileSdk = 37`, AGP 9.x, `minSdk` still 27
@@ -161,6 +168,34 @@ Two corrections to this ticket's own text, both in the safer direction:
   only surfaces when one is — which is why it has gone unnoticed. **Filed as cu-224.** The criterion
   this step needed passed at step 2b: 9,145 classes in dex, every reflection-dependent one survived
   R8.
+
+## Step 2 result (2026-09-07)
+
+**Kotlin 2.2.10 → 2.3.21, KSP 2.2.10-2.0.2 → 2.3.11, Ktorfit 2.6.5 → 2.7.5.**
+
+Two corrections to this ticket's own text, both found by querying Maven Central rather than trusting
+the note:
+
+- **"The 2.3.11 line" conflated two version schemes.** KSP used to be `<kotlin>-<ksp>`; it is now
+  bare, so KSP 2.3.11 is not "KSP for Kotlin 2.3.11" — **Kotlin 2.3.11 does not exist**. The newest
+  Kotlin that does is 2.3.21, and KSP 2.3.11 runs against it.
+- **The Kotlin 2.4 ceiling is real and now verified by HTTP.** `symbol-processing-gradle-plugin`
+  returns 404 for 2.4.0, 2.4.10 and 2.4.20, while Kotlin itself publishes all three. Room, Hilt,
+  Dagger and Ktorfit all run through KSP, so nothing here can outrun it. That is the reason this
+  step stops at 2.3.21 and not caution.
+
+**Ktorfit came unpinned as a direct consequence.** 2.7.5 was blocked on stdlib 2.4.0 — when it was
+last attempted it produced nine errors that never mentioned Ktor (`[MissingType]: Element
+'Audiobook'`, Hilt citing `error.NonExistentClass`). On 2.3.21 it builds clean and still generates
+both service impls. It is in this commit because it is the same constraint, lifted by the same bump.
+
+**The generated-output count is the evidence, not the green build.** A processor that silently stops
+running leaves a compile that still succeeds until something reflective fails at runtime — the same
+shape as the launch crash. Room 10 → 10 `_Impl`, Ktorfit 2 → 2, Java 222 → 222, Hilt/Dagger 259 →
+259, all identical.
+
+`verify.sh` green (8 stages); release build green with 9,219 classes in dex and all 20
+`@Serializable` models surviving R8.
 
 ## Notes
 
