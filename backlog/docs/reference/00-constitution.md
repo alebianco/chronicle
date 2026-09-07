@@ -123,6 +123,23 @@ today**; extending it is the implementing task's first job.
     (`Timber.e(e, "context")`).
 12. **ktlint style; no wildcard imports.** New libraries needing keep rules ⇒ update
     `app/proguard-rules.pro` **and** run `./test_release_build.sh`.
+13. **`Result<V, E>` at a source boundary; a named sealed type for a domain outcome.** *Three*
+    unrelated `Result` types coexist here, so always be sure which one is in scope:
+    kotlin-result's `com.github.michaelbull.result.Result` (`Ok`/`Err`), stdlib `kotlin.Result`
+    (`success`/`failure`, used inside `MoveSyncLocationWorker` and by `runCatching`), and
+    WorkManager's `ListenableWorker.Result` — which is why that worker writes `kotlin.Result`
+    fully-qualified. **None of them has `Result.Success` / `Result.Failure` subtypes**; a `when`
+    matching on those compiles against nothing and is a mistake this ambiguity keeps inviting.
+    Use kotlin-result **only** where the answer really is
+    "the value, or the throwable that stopped me" — that is the `MediaSource` seam
+    (`fetchAudiobooks`/`fetchTracks` and `TrackRepository`'s loader), where a caller either gets
+    data or falls back to cache. Everywhere else, write a sealed interface whose members are named
+    for what happened, because `Err` flattens exactly the distinction that matters:
+    `CacheScanOutcome.Unavailable` ("cannot tell") is deliberately *not* an error, and collapsing it
+    to a failure is what silently un-cached whole libraries; `ImportResult.WrongVersion` carries the
+    file's version, and `Applied` carries three counts. On a value class: kotlin-result 2.x made
+    `Result` a value class, so `Ok`/`Err` are factory functions, not types — branch on `.isOk` /
+    `.isErr`, never `x is Ok`. `ResultSemanticsTest` pins that.
 
 Rules 3–6 and several others are **enforced by build gates** — see
 [`09-enforced-rules.md`](09-enforced-rules.md).
