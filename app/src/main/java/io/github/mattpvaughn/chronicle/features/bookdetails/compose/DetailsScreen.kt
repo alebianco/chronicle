@@ -20,15 +20,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.ChapterRow
+import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /** What the details header can do. One object rather than seven lambdas (cu-200). */
 data class DetailsActions(
@@ -75,12 +74,10 @@ private fun DetailsHeader(
     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
   ) {
     Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-      AsyncImage(
-        model = if (state.book.serverConnected) state.book.thumb?.let(coverUrl) else null,
-        // The title below is the accessible label; describing the cover too makes TalkBack read
-        // the screen twice (cu-47).
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
+      CoverImage(
+        thumb = state.book.thumb.orEmpty(),
+        serverConnected = state.book.serverConnected,
+        coverUrl = coverUrl,
         modifier = Modifier.size(160.dp).clip(RoundedCornerShape(4.dp)),
       )
       Column(Modifier.padding(start = 16.dp).weight(1f)) {

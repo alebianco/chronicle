@@ -17,7 +17,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -25,10 +24,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
+import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /** What the collapsed mini player shows. Framework-free so it can be built in a test or preview. */
 data class MiniPlayerState(
@@ -75,12 +74,15 @@ fun MiniPlayer(
         .clickable(onClick = onClick),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    AsyncImage(
-      model = coverUrl(state.artworkUrl),
+    CoverImage(
+      thumb = state.artworkUrl,
+      // The mini player only shows while something is playing, which means a reachable server —
+      // and an unreachable one surfaces as the placeholder through `error` regardless.
+      serverConnected = true,
+      coverUrl = coverUrl,
       // The ImageView carried the book title as its contentDescription; keep that, since the
       // title text beside it is truncated and this is what a screen reader announces.
       contentDescription = state.bookTitle,
-      contentScale = ContentScale.Crop,
       modifier = Modifier.size(MiniPlayerHeight),
     )
     Column(

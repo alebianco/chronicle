@@ -29,18 +29,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.ChapterRow
 import io.github.mattpvaughn.chronicle.features.bookdetails.compose.chapterList
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.PlayerText
+import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /**
  * What the player screen can do, as one object.
@@ -114,13 +113,10 @@ private fun PlayerArtwork(
   artwork: ArtworkState,
   coverUrl: (String) -> String,
 ) {
-  AsyncImage(
-    // Offline the model is null and Coil renders nothing rather than retrying an unreachable host.
-    model = if (artwork.serverConnected) artwork.thumb?.let(coverUrl) else null,
-    // The book title is announced by the text below; describing the cover too would make TalkBack
-    // read every screen twice (cu-47).
-    contentDescription = null,
-    contentScale = ContentScale.Crop,
+  CoverImage(
+    thumb = artwork.thumb.orEmpty(),
+    serverConnected = artwork.serverConnected,
+    coverUrl = coverUrl,
     modifier =
       Modifier
         .fillMaxWidth(0.7f)

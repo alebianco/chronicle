@@ -48,10 +48,18 @@ class MockPlexServer(private val context: Context) {
           // which made playback look like it was never fetching audio and cost a
           // full diagnostic run to disprove (cu-64).
           Timber.i("MockPlexServer: ${request.method} $path range=${request.headers["Range"]}")
-          // Cover art: serve a real (solid-colour) PNG so image loading is
-          // actually exercised end-to-end rather than always falling back to the
-          // placeholder.
-          if (path.startsWith("/photo/")) {
+          // Cover art, in **both** the shapes the app asks for (cu-207).
+          //
+          // `/photo/:/transcode` is what `PlexConfig.getBitmapFromServer` builds, and it was the
+          // only route here for a long time — so the notification's artwork worked while every
+          // cover in the UI was blank. The screens ask for the raw `thumb` path instead, through
+          // `PlexConfig.toServerString(book.thumb)`, and that fell through to `fixtureFor`, which
+          // knows nothing about thumbs and answered an **empty 200**: a zero-byte body Coil
+          // cannot decode, with no error anywhere.
+          //
+          // The empty-200 fallthrough is why this cost a whole diagnostic pass. A 404 would have
+          // been visible in one glance at the log; a 200 with no body looks like a served request.
+          if (path.startsWith("/photo/") || THUMB_PATH.containsMatchIn(path)) {
             return imageResponse()
           }
           // Audio: serve a generated tone so playback can actually be decoded and
@@ -177,12 +185,21 @@ class MockPlexServer(private val context: Context) {
     }
 
   /**
+   * A raw artwork path: `/library/metadata/{id}/thumb/{version}`, and the `art` variant beside it.
+   *
+   * Matched by shape rather than by id, because the version segment changes whenever Plex
+   * re-generates the image and an id list would silently stop matching.
+   */
+  private val THUMB_PATH = Regex("""^/library/metadata/[^/]+/(thumb|art)/""")
+
+  /**
    * The album fixture for a book id, the track fixture for anything else.
    *
    * Book ids in this fixture pack are `100x` and track ids `200x`, so the prefix is enough — and
    * an unknown id falls through to the track fixture, which is what `retrieveChapterInfo` asks
    * for and the only caller that passes an id this does not know.
    */
+
   private fun metadataFixtureFor(path: String): String {
     val id = path.removePrefix("/library/metadata/").substringBefore('/').substringBefore('?')
     return when {

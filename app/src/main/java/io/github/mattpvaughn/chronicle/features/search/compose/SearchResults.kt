@@ -15,17 +15,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.SearchField
 import io.github.mattpvaughn.chronicle.features.search.SearchOverlayState
 import io.github.mattpvaughn.chronicle.features.search.SearchRow
+import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /**
  * Grouped search results (cu-25, migrated in cu-202).
@@ -158,10 +157,11 @@ private fun BookRow(
   ) {
     // Cover art is only fetched when the server can answer; offline this would be a request per
     // row that can only fail.
-    AsyncImage(
-      model = if (serverConnected) coverUrl(row.book.thumb) else null,
+    CoverImage(
+      thumb = row.book.thumb,
+      serverConnected = serverConnected,
+      coverUrl = coverUrl,
       contentDescription = row.book.title,
-      contentScale = ContentScale.Crop,
       modifier = Modifier.size(56.dp),
     )
     Column(modifier = Modifier.padding(start = 12.dp)) {

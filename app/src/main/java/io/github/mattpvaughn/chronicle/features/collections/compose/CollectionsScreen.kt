@@ -20,16 +20,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Collection
+import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /**
  * Everything the collections screen renders, as one value (cu-181).
@@ -177,14 +176,10 @@ private fun CollectionCard(
       .clickable(onClickLabel = collection.title, onClick = onClick)
       .padding(4.dp),
   ) {
-    AsyncImage(
-      // Cover art is only fetched when the server is reachable — offline, the model is null and
-      // Coil renders nothing rather than retrying against an unreachable host.
-      model = if (serverConnected) coverUrl(collection.thumb) else null,
-      // Null on purpose: the title below is the accessible label, and describing the cover too
-      // would make TalkBack read every item twice (cu-47).
-      contentDescription = null,
-      contentScale = ContentScale.Crop,
+    CoverImage(
+      thumb = collection.thumb,
+      serverConnected = serverConnected,
+      coverUrl = coverUrl,
       modifier =
         Modifier
           .fillMaxWidth()

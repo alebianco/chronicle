@@ -17,15 +17,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookProgressState
 import io.github.mattpvaughn.chronicle.data.model.progressBarMax
 import io.github.mattpvaughn.chronicle.data.model.progressState
+import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /**
  * One book, in whichever of the three view styles is chosen (cu-201).
@@ -123,13 +122,12 @@ private fun Cover(
   coverUrl: (String) -> String,
   modifier: Modifier,
 ) {
-  AsyncImage(
-    // Offline the model is null and Coil renders nothing rather than retrying an unreachable host.
-    model = if (serverConnected) coverUrl(book.thumb) else null,
-    // The title below is the accessible label; describing the cover too makes TalkBack read every
-    // item twice (cu-47).
-    contentDescription = null,
-    contentScale = ContentScale.Crop,
+  // `CoverImage`, not a bare `AsyncImage`: it carries the placeholder for the offline, no-artwork
+  // and failed-decode cases, which this call site used to leave as a hole in the layout (cu-207).
+  CoverImage(
+    thumb = book.thumb,
+    serverConnected = serverConnected,
+    coverUrl = coverUrl,
     modifier = modifier.clip(RoundedCornerShape(4.dp)),
   )
 }
