@@ -118,32 +118,35 @@ classes whose ProGuard rules are deliberately narrow (cu-45).
 
 ## Notes
 
-Closing status **In Review**: the observed-PR criterion and the triage judgements need the owner.
+Closing status **In Review**: three criteria need a real Actions run the worktree cannot produce —
+an observed Dependabot PR, CodeQL's run log, and its first triage.
 
-The dependency-analysis part is the lowest-value third — it automates work already done twice, so the
-remaining unused surface is probably small. Its value is preventing the *next* accumulation. If time
-is short, Dependabot and CodeQL are the halves worth having.
+**Assembled from two agent attempts, because neither was complete alone.** The first added
+Dependabot, CodeQL and the `ci.yml` trigger; QA rejected it over two real pin defects. The rework
+fixed those but was handed a *fresh* worktree, could not see the first attempt, and rewrote the
+config from scratch — losing CodeQL. The landed commit takes the first attempt's breadth plus the
+rework's fixes and its `DependabotPinTest` guard.
 
-## Closing notes (2026-09-07)
+**Three pin defects, all found by review rather than by a green build:**
 
-Shipped **the two halves the task itself named as the ones worth having**: Dependabot and CodeQL.
-The dependency-analysis third is not adopted, and that is the one judgement here worth the owner's
-eye.
+1. `org.hamcrest:hamcrest-all` alone left `org.hamcrest:hamcrest:2.2` free to move, and the pair is
+   deliberately unbalanced (cu-54). Now `org.hamcrest:*`.
+2. An `update-types` filter on Kotlin/KSP let *patch* bumps through, which still move kotlin-stdlib
+   past the KSP ceiling. Filter dropped.
+3. `>2.10.0` on lifecycle blocked a harmless 2.10.x patch; the constraint belongs to 2.11.0.
 
-**Why the third was dropped rather than forced.** Applying the plugin surfaced a real defect:
-`compileReleaseUnitTestKotlin` has never succeeded in this repository. Confirmed against a clean
-checkout with the plugin fully reverted, so the plugin exposed it rather than caused it. Two ways
-around it were available and both rejected — modifying app code (the task states three times that
-none of its parts changes app code, and moving test files carries its own verification), or
-configuring the analysis to depend on the breakage persisting, which is the "scanner that reports
-nothing" failure this task explicitly warns against. Filed as draft-221 with three options and a
-recommendation instead.
+**The guard test took three attempts, and the first two passed against a real sabotage** — worth
+recording, because both looked reasonable. A `notes >= entries / 2` ratio passed because a surplus of
+comments in one block pays for a pin documented nowhere. Attributing each pin to the comment block
+above it also passed: the sabotage sat *inside* an already-documented group, directly beneath the
+Room entry, and inherited its note. No comment-scanning rule separates "covered by the comment
+above" from "slipped in beneath it". The assertion is now an explicit roster of the ten ignored
+coordinates, so adding a pin means declaring it where a reviewer sees it.
 
-**What no agent can tick here.** Both remaining Dependabot and CodeQL criteria need the branch
-pushed and a real Actions run — Dependabot does not read its config from an unmerged worktree, and
-CodeQL's "confirmed it analysed Kotlin sources" is by design not satisfiable by a config file.
-Ticking either from a green `verify.sh` would be exactly the substitution the task warns about.
+All three defects are sabotage-verified: each reintroduced, the guard fails, restored in a separate
+call per the Gradle up-to-date trap.
 
-**Verified:** `./verify.sh` green, 8/8 stages. `dependabot.yml` and `codeql.yml` parse, and all six
-documented pins resolve to coordinates that exist in `libs.versions.toml`. No app code was touched —
-the diff is two workflow files, one Dependabot config, one doc section, and one draft.
+**The dependency-analysis third is not built.** It is blocked on a pre-existing defect — the release
+unit-test variant has never compiled — filed as draft-221 rather than worked around. That is the
+lowest-value third (it automates an audit already done twice by hand), so the task is worth reviewing
+without it.
