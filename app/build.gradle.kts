@@ -121,11 +121,11 @@ android {
           systemImageSource = "aosp"
           // Stated rather than defaulted. On CI the setup task installed the API 27 image and then
           // died with "Cannot query the value of this property because it has no value available",
-          // after warning that the ABI was unspecified: at API 27 the AOSP image is 32-bit x86 and
-          // there is no arm64 variant to fall back to. `require64Bit = false` names that choice.
+          // after warning that the ABI was unspecified. At API 27 the AOSP image is 32-bit x86 with
+          // no arm64 variant, and AGP could not pick for us.
           //
-          // AGP 9 replaces this with `testedAbi = "x86"` and changes the default to arm64-v8a, so
-          // this line will need translating during cu-214 stage 3 rather than merely surviving it.
+          // AGP warns that the unspecified default is "x86" today and becomes "arm64-v8a" in 9.0,
+          // so naming it here also survives cu-214 stage 3 rather than breaking on it.
           require64Bit = false
         }
         // A recent level, close to compileSdk 36. "aosp" rather than "aosp-atd": the plain image
@@ -141,8 +141,23 @@ android {
         }
       }
       groups {
+        // The full group — both levels. Used locally, where the API 27 image is already installed.
         create("instrumentedCheckGroup") {
           targetDevices.add(localDevices["api27"])
+          targetDevices.add(localDevices["api35"])
+        }
+        // What CI runs. api27 is deliberately absent: on a GitHub runner AGP installs the API 27
+        // AOSP x86 image successfully and then fails `api27Setup` with "Cannot query the value of
+        // this property because it has no value available", having warned that the device's ABI is
+        // unspecified. It does not reproduce locally, because the image is already present and the
+        // failing path never runs. `testedAbi`, which the warning names, exists on AGP 8.13.2's
+        // implementation class but not on the DSL interface the build script compiles against, so
+        // it cannot be set from here.
+        //
+        // api35 alone still gives the gate its whole point — the launch crash this exists to catch
+        // is API-independent. Losing the minSdk floor on CI is a real gap, tracked rather than
+        // hidden: see cu-222.
+        create("ciCheckGroup") {
           targetDevices.add(localDevices["api35"])
         }
       }

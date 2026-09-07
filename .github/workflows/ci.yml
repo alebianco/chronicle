@@ -115,6 +115,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      # Emulator system images are hundreds of MB and live outside ~/.gradle, so without this they
+      # are redownloaded on every run — the API 27 image alone took 38s of the first run. Keyed on
+      # the build file that declares the devices, so changing a device level fetches afresh.
+      - name: Cache emulator system images
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/system-images
+            /usr/local/lib/android/sdk/platforms
+          key: ${{ runner.os }}-avd-images-${{ hashFiles('app/build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-avd-images-
+
       # Gradle Managed Devices boot a real emulator, which needs KVM. The ubuntu-latest image
       # ships /dev/kvm but leaves it root-owned, so without this the devices fail to start —
       # and the failure mode that matters is a run that reports green having tested nothing.
@@ -132,7 +145,7 @@ jobs:
       # --instrumented is opt-in locally (it costs minutes and two emulator boots, which would
       # wreck the inner loop) but never optional here.
       - name: Run the instrumented suite
-        run: ./gradlew instrumentedCheckGroupGroupDebugAndroidTest
+        run: ./gradlew ciCheckGroupGroupDebugAndroidTest
 
       # Proof the suite ran, not merely that the job was green. A managed-device task that boots
       # nothing still exits 0, which is indistinguishable from success until you read the results.
