@@ -99,19 +99,19 @@ instance is already guarded.
 **The gate — it must be proved to run, not merely configured**
 - [x] `ci.yml` runs the instrumented suite on pull requests, on its own `instrumented` job, and its
       triggers include `feature/agentic-dev` (cu-212 added the branch)
-- [ ] **Confirmed from the run log that an emulator actually booted and tests executed** — KVM must
-      be enabled on the runner. A job that reports green having silently skipped the suite is the
-      precise failure this task exists to prevent
+- [x] **Confirmed from the run log that an emulator actually booted and tests executed** — run
+      34139943502: `Starting 10 tests on api35`, `10/10 completed`, and the assert-results step
+      passed on real XML
 - [x] `--instrumented` stays **off** by default locally; the inner loop is unchanged
 - [x] **Sabotage-verified against the real defect, on hardware**: with `PLACEHOLDER_URL` reverted
       to its slash-less form, the run dies with `RuntimeException: Unable to create application
       ... IllegalStateException: Base URL needs to end with /` and **0 tests execute**. Restored in a
       separate call; 3 tests then start
-- [ ] `LoggedInLaunchTest` is confirmed to still assert a rendered Home shelf, not merely the absence
-      of an exception; extended if it does not
+- [x] `LoggedInLaunchTest` asserts a rendered Home shelf — and currently fails doing so, which is
+      cu-221, not a gap in the assertion
 - [x] It runs in mock mode with no real Plex credentials — `mockPlexModeIsActive` passes
-- [ ] The measured wall-clock cost of the PR job is recorded in the closing notes — the owner accepted
-      it on PRs, and the number is what makes that reviewable
+- [x] The measured wall-clock cost is recorded below — **4m 23s** for the instrumented job,
+      against 8m 48s for `verify`, running in parallel
 
 **The rule that failed**
 - [x] The Definition of Done gains it as step 3: run `./verify.sh --instrumented` before moving a
@@ -138,6 +138,37 @@ Searched for the general shape — a test switching off something production per
 
 **Nothing else found.** Recorded explicitly because "we looked and found nothing" is a different
 statement from "we did not look", and only one of them is worth anything later.
+
+## The measured run (2026-09-07)
+
+Run **34139943502**, four attempts in, on `feature/agentic-dev`.
+
+| Job | Result | Wall clock |
+|---|---|---|
+| `Verify` | ✅ success | 8m 48s |
+| `Instrumented (api35)` | ❌ 2 of 10 failed | **4m 23s** |
+| `CodeQL` | ✅ success | ~4m |
+
+They run in parallel, so the instrumented gate adds **nothing** to the critical path today — `verify`
+is the slower job. That is the number the ruling deserves attached to it: on current timings, putting
+this on every PR costs no extra wall-clock at all.
+
+**The emulator demonstrably ran**: `Starting 10 tests on api35` … `10/10 completed. (0 skipped) (2
+failed)`, and the assert-results step passed against real XML. The two failures are cu-221,
+reproducing the local result exactly.
+
+**Three CI-only defects had to be fixed to get here**, none of which could be seen from a green local
+gate — recorded because that is the whole argument for having CI at all:
+
+1. **`.editorconfig` had no `root = true`**, so it inherited the owner's `~/.editorconfig` and its
+   `indent_size = 2`. Every `.kts` file failed ktlint on a machine without that dotfile.
+2. **The KVM step ran under `bash -e`** and `udevadm control --reload-rules` exits non-zero on a
+   runner, killing the step 24s in. It now asserts `/dev/kvm` is writable rather than assuming the
+   udev rule applied.
+3. **`api27Setup` fails on a runner** after installing its image. CI runs api35 only; see cu-222.
+
+Also cached the emulator system images — they live outside `~/.gradle` and were being refetched
+every run.
 
 ## Notes
 

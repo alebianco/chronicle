@@ -96,7 +96,8 @@ classes whose ProGuard rules are deliberately narrow (cu-45).
 
 **CodeQL**
 - [x] Runs on push and pull request for the CI branches, `feature/agentic-dev` included
-- [ ] Confirmed by the run log that it **analysed Kotlin sources**
+- [x] Confirmed by the run log that it **analysed Kotlin sources** — run 34139943708:
+      `Successfully loaded extractor Java/Kotlin (java)`, analysis completed, conclusion success
       — **not met, and deliberately left unticked.** This needs a real Actions run, which requires
       the branch pushed. The task itself says a scanner that reports nothing is indistinguishable
       from one that is not running, so a green config is not evidence.
@@ -115,6 +116,21 @@ classes whose ProGuard rules are deliberately narrow (cu-45).
 - [ ] Anything removed is measured — nothing was removed.
 - [ ] `./test_release_build.sh` passes after any removal — not applicable, no removal.
 - [x] `./verify.sh` green — 8/8 stages, run in the task worktree.
+
+## CI evidence (2026-09-07)
+
+**CodeQL ran and passed** — run `34139943708`, `Analyze (java-kotlin)`, ~4 minutes, loading the
+Java/Kotlin extractor and completing its analysis. Nothing left GitHub (decision-19 satisfied).
+
+**Reading the alert list needs a token scope this session does not have** (`admin:repo_hook`), so the
+triage criterion stays open: the alerts are in the repository's Security tab. If the first scan found
+nothing, that is worth recording explicitly rather than leaving the box unticked forever.
+
+**Dependabot has not run and will not yet.** It reads its config from the **default branch**, which
+on this fork is `develop` — and decision-23 defers touching `develop` until a release is cut. So the
+"observed PR" criterion is blocked by a deliberate branching decision, not by anything missing here.
+Either wait for the release, or place `dependabot.yml` on `develop` alone as an exception. That is a
+call for the owner; it is recorded rather than silently worked around.
 
 ## Notes
 
