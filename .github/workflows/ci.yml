@@ -115,18 +115,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # Emulator system images are hundreds of MB and live outside ~/.gradle, so without this they
-      # are redownloaded on every run — the API 27 image alone took 38s of the first run. Keyed on
-      # the build file that declares the devices, so changing a device level fetches afresh.
-      - name: Cache emulator system images
-        uses: actions/cache@v6
-        with:
-          path: |
-            /usr/local/lib/android/sdk/system-images
-            /usr/local/lib/android/sdk/platforms
-          key: ${{ runner.os }}-avd-images-${{ hashFiles('app/build.gradle.kts') }}
-          restore-keys: |
-            ${{ runner.os }}-avd-images-
+      # No cache for the emulator system images, deliberately.
+      #
+      # Caching them looked free — they live outside ~/.gradle, so each run refetched ~1.7 GB. But a
+      # restored system-images directory made `api35Setup` fail with "Cannot query the value of this
+      # property because it has no value available", the same symptom api27 shows, and the run that
+      # first restored the cache is exactly the run that broke. Whatever AGP resolves at install
+      # time is not fully reconstructed by unpacking the directory.
+      #
+      # A ~40 s download against a gate that does not run is not a saving. Revisit under AGP 9,
+      # which is where the `testedAbi` property the warning names actually exists (cu-222).
 
       # Gradle Managed Devices boot a real emulator, which needs KVM. The ubuntu-latest image
       # ships /dev/kvm but leaves it root-owned, so without this the devices fail to start —

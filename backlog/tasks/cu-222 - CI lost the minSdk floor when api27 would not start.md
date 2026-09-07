@@ -45,6 +45,21 @@ However, in 9.0 this will change to "arm64-v8a"
 - **It does not reproduce locally.** The image is already installed on the owner's machine, so the
   failing path never executes. That makes this a CI-only debug loop of ~2 minutes per attempt.
 
+## It is not only api27 — a cache made api35 fail the same way
+
+**Update, 2026-09-07.** After the emulator system images were cached to avoid refetching ~1.7 GB per
+run, **`api35Setup` began failing with the identical error**, with the identical ABI warning above
+it. The run that first restored the cache is the run that broke, and removing the cache restored the
+gate.
+
+So the failure is not specific to API 27 or to a 32-bit image. Whatever AGP resolves when it
+*installs* a system image is not fully reconstructed by unpacking a cached copy of the directory,
+and the symptom is this same unhelpful "no value available".
+
+That reframes the fix: it is about how AGP resolves a device's ABI at setup time, not about API 27's
+image being unusual. It also means **the cache stays off** until this is understood — a 40 s download
+against a gate that does not run is not a saving.
+
 ## Why it matters
 
 The minSdk floor is not decoration. `api27` was chosen because *"a new API called without a version
@@ -57,8 +72,9 @@ than quietly accepted.
 
 ## Acceptance Criteria
 
-- [ ] The cause is established — an AGP bug with the API 27 AOSP x86 image, a missing SDK component
-      on the runner, or a DSL property that must be set another way
+- [ ] The cause is established — it affects **both** api27 (fresh install) and api35 (restored from
+      cache), so it is about how AGP resolves a device ABI at setup time rather than anything
+      specific to the API 27 image
 - [ ] `api27` runs in CI again, **or** an alternative gives minSdk coverage (a different image
       source such as `aosp-atd`, a different API level near the floor, or a lint/API-desugaring
       check that catches the same defect class)
