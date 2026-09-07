@@ -53,6 +53,9 @@ docs/superpowers/
 
 # Git worktrees (owner convention: .worktree/<branch-name>)
 .worktree/
+# Agent worktrees, created by the harness per subagent. Not ignoring these lets a
+# `git add -A` commit them as gitlinks, which is how three landed in a commit once.
+.claude/worktrees/
 
 # Captured device session prefs — these hold real Plex tokens. plex-session.sh keeps its
 # backup in $HOME by default; these rules exist so a copy made inside the repo by mistake
