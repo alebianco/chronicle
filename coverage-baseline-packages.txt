@@ -16,7 +16,7 @@ io/github/mattpvaughn/chronicle/features/browse/compose 49.08
 io/github/mattpvaughn/chronicle/features/collections 75.12
 io/github/mattpvaughn/chronicle/features/collections/compose 45.26
 io/github/mattpvaughn/chronicle/features/currentlyplaying 39.91
-io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 55.38
+io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 55.40
 io/github/mattpvaughn/chronicle/features/download 42.84
 io/github/mattpvaughn/chronicle/features/home 54.51
 io/github/mattpvaughn/chronicle/features/home/compose 36.15

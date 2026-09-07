@@ -24,7 +24,7 @@ kotlin {
 
 android {
   namespace = "io.github.mattpvaughn.chronicle"
-  compileSdk = 36
+  compileSdk = 37
 
   lint {
     // Fatal, so `verify.sh`'s lint stage means what it claims. With `abortOnError = false` the

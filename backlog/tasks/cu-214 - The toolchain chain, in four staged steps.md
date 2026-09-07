@@ -1,7 +1,7 @@
 ---
 id: cu-214
 title: "The toolchain chain, in four staged steps"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -128,24 +128,42 @@ pins the palette; type and spacing are not pinned.
       assumed**: no KSP publishes for 2.4.0, 2.4.10 or 2.4.20 (all 404)
 
 **Step 3 — compileSdk 37 + AGP 9, committed alone and device-verified**
-- [ ] `compileSdk = 37`, AGP 9.x, `minSdk` still 27
-- [ ] **Device-verified**: installed, launched, library loads, playback starts, a download completes.
-      A toolchain major is precisely where a green suite is not evidence
-- [ ] Both orientations on at least the player
-- [ ] `lint-baseline.xml` movement reviewed rather than regenerated blindly; the diff summarised
-- [ ] The `InvalidPackage` suppression re-justified or removed
-- [ ] **No library version other than AGP, the Gradle wrapper and compileSdk moves**
+- [x] `compileSdk = 37`, `minSdk` still 27 — **on AGP 8.13.2**. AGP 9 is skipped; see below
+- [x] **Device-verified** on the tablet: installed, launched (`LOGGED_IN_FULLY`, `Loaded books: 3`),
+      a download completed (3 tracks × 2,880,044 bytes), playback started from the downloaded files
+      (`Media uri is: file:///…/2001.wav`), no `FATAL EXCEPTION` anywhere in the session
+- [x] Both orientations exercised on the player, no crash. (The tablet is landscape-native and
+      reports the same geometry either way, so the two screenshots look alike — the rotation was
+      still driven, it simply has nothing different to show)
+- [x] `lint-baseline.xml` reviewed, **not regenerated**. Lint passes and reports **278 of its 546
+      entries as no longer found** — a shrinking baseline, mostly XML resources the Compose
+      migration deleted (`UnusedIds` 93, `UnusedResources` 91). Cleaning it up is real work and a
+      separate concern from this bump, so the file is left alone
+- [x] `InvalidPackage` re-justified and kept: it fires inside `ktor-utils-jvm` and lint records it
+      against an absolute Gradle-cache path that would not resolve on another machine or in CI, so
+      baselining it is not an option. Still scoped to that one id
+- [x] **No library version moved at all** — not even AGP or the wrapper. This turned out to be
+      one line: `compileSdk = 36` → `37`
 
-**Step 4 — Compose BOM + lifecycle, committed alone**
-- [ ] Both moved, versions recorded
-- [ ] **Before-and-after screenshots** of player, library, home, details and settings, in **both
-      orientations**, compared rather than merely collected
-- [ ] Ripple, type scale and section-title casing specifically checked — the recorded failure modes
-- [ ] `ChronicleThemeTest` and the Compose screen suites green
+**Step 4 — Compose BOM + lifecycle — SKIPPED, blocked on AGP 9.1**
+- [~] Both moved, versions recorded — **skipped.** Compose 1.12.0 and lifecycle 2.11.0 refuse to
+      resolve below AGP 9.1.0, enforced by `checkDebugAarMetadata`, so there is nothing to move
+      until AGP 9 is viable
+- [~] Before-and-after screenshots — skipped, nothing changed to screenshot
+- [~] Ripple, type scale and section-title casing — skipped, same reason
+- [~] `ChronicleThemeTest` and the Compose screen suites green — they are green, but on the
+      *unchanged* Compose, so this proves nothing about the bump and is not claimed
+
+**Dependabot will surface these when they become takeable.** cu-212 pins the Compose BOM and
+`lifecycle-*` with unblock conditions, so a weekly PR appears once the constraint lifts rather than
+anyone having to remember. The pins' recorded reason needs correcting first — see below.
 
 **Throughout**
-- [ ] `./verify.sh` green after **each** step, not only at the end
-- [ ] decision-22 updated once step 3 lands: its two "held" notes are no longer current
+- [x] `./verify.sh` green after **each** step, not only at the end — and CI green after steps 1
+      and 2, both jobs including the instrumented suite on a real emulator
+- [ ] **decision-22 needs the owner**: its two "held" notes cite compileSdk 37, but the measured
+      constraint is AGP 9.1.0 — and compileSdk 37 has now landed without lifting either hold. The
+      Dependabot pins carry the corrected reason; the decision record is owner-only
 
 ## Step 1 result (2026-09-07)
 
@@ -291,9 +309,54 @@ should be broken deliberately, not quietly.
 - **Drop mutation testing.** Honest but wasteful — cu-213 was landed one session ago and its
   derivation guard is the part with lasting value.
 
+## AGP 9 is skipped, and what that actually costs (2026-09-07)
+
+**compileSdk 37 landed on AGP 8.13.2. It never needed AGP 9.** That was the question worth asking
+before spending more on the migration, and the answer was one line of build file plus a device pass.
+
+**decision-22's recorded reason is wrong, and this is the correction that matters** — it is what the
+next person reads. It says the Compose BOM and `lifecycle-*` are held because they need
+**compileSdk 37**. Measured on AGP 8.13.2 *with compileSdk 37 in place*:
+
+```
+Dependency 'androidx.compose.material:material-ripple-android:1.12.0'
+  requires Android Gradle plugin 9.1.0 or higher.
+Dependency 'androidx.lifecycle:lifecycle-viewmodel-compose-android:2.11.0'
+  requires Android Gradle plugin 9.1.0 or higher.
+```
+
+The constraint is **AGP 9.1.0**, enforced by `checkDebugAarMetadata`, and no SDK level changes it.
+The Dependabot pins have been corrected to say so; **decision-22 itself has not been touched**, since
+amending a decision record is the owner's call.
+
+### So AGP 9 buys exactly one thing: step 4
+
+Everything else in this chain is already landed and needed none of it — Room 2.8.3, Kotlin 2.3.21,
+KSP 2.3.11, compileSdk 37. Against that single gain, AGP 9 costs five measured incompatibilities,
+three of them silent, plus the open question of whether its built-in Kotlin caps metadata at 2.2.0 —
+which would trade away the Kotlin 2.3.21 this chain just landed.
+
+**Trading a real Kotlin bump for a Compose refresh is a bad trade, so AGP 9 is skipped rather than
+forced.** Two plugins have to catch up first (`pl.droidsonroids.pitest`, `kotlin-parcelize`), and
+both are third-party timelines.
+
+**Dependabot is the mechanism for picking this up later.** The pins carry their real reason now, so
+a PR appears when the constraint lifts instead of depending on anyone remembering.
+
 ## Notes
 
-Closing status **In Review**. Steps 3 and 4 both want the owner's eye — one is a toolchain major with
+Closing status **In Review**: two of four steps landed as written, the third landed in a reduced form
+that this ticket did not anticipate, and the fourth is skipped on a third-party constraint. That
+shape is a judgement about scope, not a fact a test settles.
+
+**Two things want the owner specifically:**
+
+1. **decision-22 records the wrong reason** for the Compose/lifecycle hold — compileSdk 37, when the
+   real constraint is AGP 9.1.0. Measured, not inferred. Amending a decision record is owner-only, so
+   it is flagged rather than edited.
+2. **Hilt 2.57.2 → 2.60.1 was needed for AGP 9** and is *not* in what landed, because AGP 9 was
+   skipped. Recorded so the next AGP 9 attempt does not rediscover it.
+
 device evidence, the other is a judgement about how screens look — and step 3 edits decision-22.
 
 **If step 3 needs changes beyond build files** — a source change forced by a DSL removal, say — stop

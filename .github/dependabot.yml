@@ -92,16 +92,20 @@ updates:
       - dependency-name: "org.jetbrains.kotlin.*"
       - dependency-name: "com.google.devtools.ksp*"
 
-      # Compose BOM beyond the 2026.06.x line pulls Compose 1.12.0, whose
-      # material-ripple-android requires compileSdk 37 (decision-22); this
-      # project is on 36. Unblock when: cu-214 stage 3 lands compileSdk 37.
+      # Compose BOM beyond the 2026.06.x line pulls Compose 1.12.0, which requires
+      # **AGP 9.1.0** — not compileSdk 37, which decision-22 recorded and which this
+      # project now has. Measured: `checkDebugAarMetadata` fails with "Dependency
+      # 'androidx.compose.material:material-ripple-android:1.12.0' requires Android
+      # Gradle plugin 9.1.0 or higher" on AGP 8.13.2 with compileSdk 37.
+      # Unblock when: AGP 9 becomes viable (cu-214 records what blocks it).
       - dependency-name: "androidx.compose:compose-bom"
         versions: [">=2026.07.00"]
 
-      # lifecycle 2.11.0 requires compileSdk 37 *and* AGP 9.1; 2.10.x does not.
+      # lifecycle 2.11.0 requires **AGP 9.1.0**; 2.10.x does not. Measured the same
+      # way as the Compose BOM above — compileSdk 37 alone is not enough.
       # The bound is >=2.11.0 rather than >2.10.0 so a 2.10.x patch fix is not
       # held back for a constraint that does not apply to it.
-      # Unblock when: cu-214 stage 3 lands compileSdk 37 and AGP 9.
+      # Unblock when: AGP 9 becomes viable (cu-214).
       - dependency-name: "androidx.lifecycle:*"
         versions: [">=2.11.0"]
 
