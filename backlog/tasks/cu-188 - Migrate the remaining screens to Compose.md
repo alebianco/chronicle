@@ -1,7 +1,7 @@
 ---
 id: cu-188
 title: Migrate the remaining screens to Compose
-status: In Progress
+status: In Review
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -66,7 +66,7 @@ Delete each with its screen, never before:
       can sit over a visibly broken screen, since the semantics tree is right and only pixels are wrong
 - [x] Every screen checked on a device in **both orientations** — cu-141, cu-142 and cu-19 were all
       landscape-only, and a Compose test measures whatever width it is told
-- [ ] The retirement list above worked through as each becomes dead — **cu-203**, once the last
+- [x] The retirement list above worked through as each becomes dead — **cu-203**, once the last
       layout goes. Nothing on it can retire while any XML screen remains.
 - [x] `./verify.sh` green throughout; no coverage regression per screen
 
@@ -114,3 +114,57 @@ so no duplicate could ever reach it. Fixed in `assembleChapters`.
 Sequencing set by decision-22: **Navigation Component for Fragments must not be adopted** (Navigation
 Compose is the target, and doing the Fragment variant first migrates navigation twice), and
 **cu-185 (Hilt) follows rather than leads**, since `hiltViewModel()` and Compose are designed together.
+
+## The retirement list, audited 2026-09-07
+
+cu-202 and cu-203 have both shipped (`In Review`), so this criterion is checkable rather than
+pending. Measured, not assumed:
+
+| item | state |
+|---|---|
+| every `res/layout` XML | **0 files.** The one XML the glob catches is `res/color/material_text_input_layout_outline.xml`, a colour selector |
+| `buildFeatures.viewBinding` | gone from `app/build.gradle.kts` |
+| `FirstFrameFlashTest` | gone |
+| `isShown` visibility guards | gone. Three greps survive and none is one: `CollapsedSheetGuardTest` *asserts their absence*, one is a comment quoting the old condition, and `SummaryState.isShown` is a state field on a data class, not `View.isShown` |
+| `ActivityComponentHost` / `AppComponentHost` / `injectFromHost` / `injectFromAppGraph` | gone |
+| `setToolbarMenu` | gone |
+| the scenario suites | gone (see cu-186 — the screens went with them) |
+| `ChronicleTheme`'s duplication of `colors.xml`, and `ChronicleThemeTest` | **not retired — see below** |
+
+### The last item cannot be executed as written, and should not be
+
+The list assumed `colors.xml` dies with the last layout. It did not: **the XML palette is still the
+authority**, for three consumers that are not screens and are not going away.
+
+- **10 drawables and 3 `res/color` selectors** reference `@color/…` — `ic_play_button_large_colored`,
+  `book_cover_missing_placeholder`, `chip_background_color` and the rest.
+- **`styles.xml` defines `AppTheme`**, which `AndroidManifest.xml` and the debug manifest set as the
+  window theme. `MainActivity` is still an `AppCompatActivity` — which decision-22 explicitly says
+  does *not* retire.
+- **`ColorContrastTest` reads `colors.xml` as the source of truth** for its WCAG-AA floor,
+  including the recorded 4.5:1 reasoning behind `textError = #FF8A80`.
+
+So the duplication is not redundancy left over from the migration; it is a Compose mirror of a
+palette the framework still owns. And `ChronicleThemeTest` is the guard that stops the two
+drifting — deleting it would leave every Compose screen free to keep an old cyan while every
+drawable changed. The original rationale still holds too: a `@Preview` and a Compose UI test render
+with no Android theme, so `colorResource` there either fails or silently yields stock Material.
+
+**Retiring this needs `colors.xml` itself to go**, which means porting 13 drawables/selectors and
+the window theme — a separate piece of work, not a tail of the screen migration. Filed as a draft
+rather than smuggled in here.
+
+### Dead weight found while auditing (also drafted, not done here)
+
+`styles.xml` is now mostly unreferenced. Only **`AppTheme`** and **`FilterChip`** (via `AppTheme`'s
+`chipStyle`) are live. `TextAppearance.Body1`, `.Body2`, `.Button`, `.SectionHeader`,
+`.RoundedRectInput`, `.SleepTimerCountdown`, `ToolbarTheme`, `ProgressSliderTooltip` and
+`Widget.BottomNavigationView` have **zero** references; `TextAppearance.Title`,
+`ProgressSliderTextAppearance` and `FilterChipGroup` are referenced only from inside `styles.xml`
+itself. Both `values-land/` files are dead — `currently_playing_seekbar_margin_top` and
+`currently_playing_artwork_visibility` have no consumer, only a comment in `PlayerScreen.kt`
+recording the decision the latter used to encode.
+
+Closing this task **In Review**: the migration it tracked is complete and every retirement item is
+either done or shown to be wrongly specified, but the last row is a judgement call the owner should
+see rather than a box I can tick silently.
