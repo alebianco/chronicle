@@ -27,23 +27,66 @@ cd "$(dirname "$0")"
 REPORT="app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
 BASELINE_FILE="coverage-baseline.txt"
 PACKAGE_BASELINE_FILE="coverage-baseline-packages.txt"
+TEST_RESULTS_DIR="app/build/test-results/testDebugUnitTest"
 
-# Tolerance for codegen/compiler jitter, in percentage points. The aggregate
-# baseline only ever moves *up* (the OK branch deliberately does not rewrite
-# it), so this is a per-comparison allowance against a high-water mark and not
-# a per-run licence to drift downhill: a second consecutive drop is measured
-# against the same high baseline and fails.
+# Tolerance for codegen/compiler jitter, in percentage points.
+#
+# **Both gates keep a high-water mark**, and this is the property that makes a
+# tolerance safe at all. The aggregate baseline only ever moves *up* (the OK
+# branch deliberately does not rewrite it); the per-package baseline does the
+# same explicitly, in compare-package-coverage.py:
+#
+#     ratcheted = {n: max(v, baseline.get(n, v)) for n, v in current.items()}
+#
+# So a tolerance is a per-*comparison* allowance against that high mark, never a
+# per-run licence to drift downhill: a within-tolerance dip keeps the higher
+# number, and a second consecutive drop is measured against the same high
+# baseline and fails. Within-tolerance drops therefore cannot accumulate.
+#
+# The two tolerances differ only in magnitude, because per-package numbers are
+# computed over far fewer instructions and the same absolute jitter is a larger
+# percentage there — a package of 400 instructions moves 0.25% per instruction.
 TOLERANCE=0.05
-
-# Per-package numbers are computed over far fewer instructions, so the same
-# absolute jitter is a larger percentage. A package of 400 instructions moves
-# 0.25% per instruction.
 PACKAGE_TOLERANCE=0.50
 
 if [ ! -f "$REPORT" ]; then
   echo "coverage-ratchet: no JaCoCo report at $REPORT" >&2
   echo "coverage-ratchet: run './gradlew jacocoTestReport' first." >&2
   exit 1
+fi
+
+# ------------------------------------------------------------------ staleness --
+#
+# `jacocoTestReport` is frequently UP-TO-DATE, so the XML on disk can predate the
+# test run that is supposed to have produced it. The gate then compares — and
+# *commits as the new baseline* — numbers that describe code nobody just ran.
+#
+# That is not hypothetical. It is how `features/settings/compose 84.84` came to
+# sit in the committed baseline while a clean tree measured 83.14: the number
+# was never reproducible. The same trap is recorded for sabotage verification,
+# where `--rerun-tasks` is required for the same reason.
+#
+# So: if any test result is newer than the report, the report does not describe
+# those results and the gate refuses rather than recording old numbers. Silence
+# here is the failure mode, so this must be loud.
+if [ -d "$TEST_RESULTS_DIR" ]; then
+  NEWER_RESULTS=$(find "$TEST_RESULTS_DIR" -name '*.xml' -newer "$REPORT" -print -quit 2>/dev/null || true)
+  if [ -n "$NEWER_RESULTS" ]; then
+    echo "" >&2
+    echo "  STALE COVERAGE REPORT" >&2
+    echo "" >&2
+    echo "  $REPORT" >&2
+    echo "  is older than the test results it is supposed to describe:" >&2
+    echo "    $NEWER_RESULTS" >&2
+    echo "" >&2
+    echo "  jacocoTestReport was almost certainly UP-TO-DATE while the tests" >&2
+    echo "  re-ran. Comparing this report would gate on — and commit — numbers" >&2
+    echo "  measured against different code." >&2
+    echo "" >&2
+    echo "  Regenerate it, then re-run this script:" >&2
+    echo "    ./gradlew testDebugUnitTest jacocoTestReport --rerun-tasks" >&2
+    exit 1
+  fi
 fi
 
 # Instruction coverage is JaCoCo's most stable metric across compiler versions.

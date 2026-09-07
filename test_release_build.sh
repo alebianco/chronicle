@@ -61,8 +61,17 @@ print "  (${$(wc -l < ${DESCRIPTORS})// /} classes in dex)"
 
 # Anything reached by reflection rather than a direct call: Room resolves the
 # @Database/@Dao/@Entity types by name, Retrofit reads the service interfaces,
-# Dagger instantiates the generated components. If R8 strips one the app builds
-# fine and dies at runtime, so assert it here rather than on a device.
+# and Hilt's @EntryPoint is looked up by interface at runtime. If R8 strips one
+# the app builds fine and dies at runtime, so assert it here rather than on a
+# device.
+#
+# This list used to name `injection.components.DaggerAppComponent`. The Hilt
+# migration deleted `injection/components/` outright, so that class stopped
+# existing in *any* build — and the assertion then failed for a class nobody had
+# stripped, which is a guard reporting a phantom rather than a real R8 problem.
+# `ChronicleEntryPoint` is the Hilt-era equivalent with the same hazard: it is
+# reached through `EntryPointAccessors` by interface, so R8 has no direct call to
+# see, and stripping it is a runtime failure.
 typeset -a REQUIRED
 REQUIRED=(
   "io.github.mattpvaughn.chronicle.data.local.BookDatabase"
@@ -76,7 +85,7 @@ REQUIRED=(
   "io.github.mattpvaughn.chronicle.data.model.Chapter"
   "io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService"
   "io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService"
-  "io.github.mattpvaughn.chronicle.injection.components.DaggerAppComponent"
+  "io.github.mattpvaughn.chronicle.injection.ChronicleEntryPoint"
 )
 
 MISSING=0

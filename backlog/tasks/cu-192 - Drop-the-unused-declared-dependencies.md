@@ -1,7 +1,7 @@
 ---
 id: cu-192
 title: Drop the unused declared dependencies
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -60,11 +60,72 @@ Note this is a *dependency* removal, not a capability decision: Google Cast (cu-
 
 ## Acceptance Criteria
 
-- [ ] `media3-ui` removed from `app/build.gradle.kts` and the version catalogue
-- [ ] `facebook-infer-annotation` removed (or its purpose recorded if it turns out to have one)
-- [ ] `work-testing` decided deliberately in light of cu-179, not swept
-- [ ] `hamcrest-modern` left in place — verified as a runtime-only Espresso need (cu-54)
-- [ ] `./verify.sh` green, including the release-compile stage
-- [ ] `./test_release_build.sh` passes its dex assertions
-- [ ] APK size delta recorded in the closing notes
-- [ ] Confirmed that Cast (cu-168) and the media notification are unaffected
+- [x] `media3-ui` removed from `app/build.gradle.kts` and the version catalogue
+- [x] `facebook-infer-annotation` removed (or its purpose recorded if it turns out to have one)
+- [x] `work-testing` decided deliberately in light of cu-179, not swept
+- [x] `hamcrest-modern` left in place — verified as a runtime-only Espresso need (cu-54)
+- [x] `./verify.sh` green, including the release-compile stage
+- [x] `./test_release_build.sh` passes its dex assertions
+- [x] APK size delta recorded in the closing notes
+- [x] Confirmed that Cast (cu-168) and the media notification are unaffected
+
+## Closing notes
+
+Three dependencies removed, plus the now-orphaned `inferAnnotation` version entry.
+
+**Measured, not assumed** — release APK, before and after:
+
+| | bytes |
+|---|---:|
+| before | 7,605,018 |
+| after | 7,307,809 |
+| **delta** | **-297,209 (-290.2 KiB, -3.91%)** |
+
+Bigger than cu-167's 218 KB. The `releaseRuntimeClasspath` diff is exactly one artifact leaving,
+which is the clean result the task asked for:
+
+```
+< androidx.media3:media3-ui:1.11.0
+```
+
+**`work-testing`: dropped.** The task said decide it deliberately in light of cu-179 rather than by
+sweep — so: cu-179 has shipped (In Review) *and* was subsequently superseded by Hilt's
+`HiltWorkerFactory`, which replaced the hand-written `ChronicleWorkerFactory`. After all of that
+there are still **zero** `androidx.work.testing` imports. The task's own alternative ("drop and
+re-add in cu-179") is now the only one left standing, since cu-179 is not coming back. It is a
+one-line re-add in the catalogue whenever a worker actually gains a unit test.
+
+Note `WorkerDispatcherTest`'s KDoc is now partly stale — it argues the `WorkerFactory` plumbing
+"would buy nothing today", which Hilt has since made moot. Left alone: it is a comment in a passing
+guard test, not behaviour, and rewriting it belongs with whoever writes the first worker unit test.
+
+**`hamcrest-modern` left in place and re-verified**, exactly as the task warned: it is
+`androidTestImplementation`, needed because Espresso's `ViewMatchers` reference
+`org.hamcrest.Matchers` at *runtime*. The 24 `org.hamcrest` source imports resolve through
+`libs.hamcrest` in `testImplementation`, so an import-keyed sweep would have wrongly flagged it.
+
+**Cast and the notification confirmed unaffected.** Cast lives entirely in `CastPlayerProvider.kt`
+against `androidx.media3.cast` — a different artifact, still declared. Notifications are drawn from
+`NotificationCompat` in `NotificationBuilder.kt` / `NotificationRebuild.kt`. Neither references
+`androidx.media3.ui`, and zero files in the tree do.
+
+### One pre-existing failure fixed to get here
+
+`./test_release_build.sh` was **already failing before this change**, and not for a dependency
+reason: it asserted `injection.components.DaggerAppComponent` survived R8, but the Hilt migration
+deleted `injection/components/` outright, so that class exists in no build at all. The guard was
+reporting a phantom strip.
+
+Replaced with `injection.ChronicleEntryPoint`, which carries the same hazard the original was
+guarding — reached via `EntryPointAccessors` by interface, so R8 sees no direct call and stripping
+it fails at runtime. Confirmed present in the shipped dex.
+
+Sabotage-verified rather than assumed: adding a genuinely absent class to the `REQUIRED` list still
+produces `❌ stripped or renamed by R8`, so the guard has not been softened into always passing.
+
+Step 3 of that script still fails, and is **out of scope here**: it `adb install`s the *unsigned*
+release APK, which the platform rejects with `INSTALL_PARSE_FAILED_NO_CERTIFICATES`. That is a
+scripting gap around signing, untouched because signing config needs owner sign-off. The dex
+assertions this task depends on all pass.
+
+`./verify.sh` green, 8 stages.

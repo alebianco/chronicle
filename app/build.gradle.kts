@@ -196,7 +196,6 @@ dependencies {
   implementation(libs.lifecycle.viewmodel.ktx)
   implementation(libs.annotation)
   implementation(libs.coroutines)
-  compileOnly(libs.facebook.infer.annotation)
 
   implementation(libs.retrofit)
   implementation(libs.retrofit.converter)
@@ -232,7 +231,6 @@ dependencies {
   // — the same failure mode that `androidx.lifecycle` and `androidx.localbroadcastmanager` hit.
   implementation(libs.media)
   implementation(libs.media3.exoplayer)
-  implementation(libs.media3.ui)
   implementation(libs.media3.session)
   implementation(libs.media3.datasource)
   implementation(libs.media3.cast)
@@ -266,7 +264,6 @@ dependencies {
   testImplementation(libs.kotlin.reflect)
   testImplementation(libs.robolectric)
   testImplementation(libs.androidx.test.core)
-  testImplementation(libs.work.testing)
 
     /*
      * Instrumented Tests
