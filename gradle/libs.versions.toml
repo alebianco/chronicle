@@ -28,6 +28,7 @@ ktor = "3.2.1"
 # The version Ktor 3.2.1 resolves to on its own. Kept in step with `ktor` deliberately: the
 # converter and the runtime are one boundary, and a newer serializer under an older Ktor is the
 # kind of mismatch that shows up as a parse failure rather than a build error.
+datastore = "1.2.1"
 okio = "3.17.0"
 serialization = "1.8.1"
 ktorfit = "2.7.5"
@@ -157,6 +158,10 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 # Okio: already on the runtime classpath transitively via Coil and Ktor, so declaring it adds no
 # APK weight — it makes an existing dependency explicit. `okio-fakefilesystem` is test-only and is
 # the thing actually being bought: an in-memory filesystem for the download and cache paths.
+# DataStore replaces SharedPreferences as the settings store. The synchronous PrefsRepo surface is
+# kept: 113 call sites read it directly, 21 of them from the player while configuring ExoPlayer,
+# where there is no suspend context and blocking on I/O would be worse than what it replaces.
+datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }

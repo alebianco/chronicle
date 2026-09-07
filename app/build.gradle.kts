@@ -290,6 +290,7 @@ dependencies {
   implementation(libs.ktorfit.lib)
   // Okio for the download and cache-reconciliation paths. Already arrives transitively
   // via Coil and Ktor, so this declares what is already there rather than adding weight.
+  implementation(libs.datastore.preferences)
   implementation(libs.okio)
   ksp(libs.ktorfit.ksp)
 
