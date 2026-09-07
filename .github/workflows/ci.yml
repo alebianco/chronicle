@@ -82,3 +82,76 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Full HTML report is in the \`coverage-report\` artifact." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  # The instrumented suite, on its own job rather than appended to `verify`.
+  #
+  # It exists because a 100% launch crash once shipped with 1,678 unit tests green: the Ktorfit
+  # base URL lacked a trailing slash, the clients are @Singleton so Hilt built them inside
+  # Application.onCreate, and no window was ever created. `LoggedInLaunchTest` would have caught it
+  # on the day it was written — nothing ever ran it. An unwired gate is not a gate.
+  #
+  # Separate from `verify` so the fast gate still reports in ~2 minutes instead of queueing behind
+  # two emulator boots, and so a red tick names which half broke. Both run on every PR.
+  instrumented:
+    name: Instrumented (API 27 + 35)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Gradle Managed Devices boot a real emulator, which needs KVM. The ubuntu-latest image
+      # ships /dev/kvm but leaves it root-owned, so without this the devices fail to start —
+      # and the failure mode that matters is a run that reports green having tested nothing.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -w /dev/kvm && echo "/dev/kvm is writable"
+
+      - name: Grant execute permissions
+        run: chmod +x gradlew verify.sh coverage-ratchet.sh
+
+      # --instrumented is opt-in locally (it costs minutes and two emulator boots, which would
+      # wreck the inner loop) but never optional here.
+      - name: Run the instrumented suite
+        run: ./gradlew instrumentedCheckGroupGroupDebugAndroidTest
+
+      # Proof the suite ran, not merely that the job was green. A managed-device task that boots
+      # nothing still exits 0, which is indistinguishable from success until you read the results.
+      - name: Confirm tests actually executed
+        if: always()
+        run: |
+          results=$(find app/build/outputs/androidTest-results -name '*.xml' 2>/dev/null | wc -l)
+          if [ "$results" -eq 0 ]; then
+            echo "::error::No instrumented test results were produced — the emulators did not run."
+            exit 1
+          fi
+          echo "found $results result file(s)"
+          grep -ho 'tests="[0-9]*"' $(find app/build/outputs/androidTest-results -name '*.xml') \
+            | head -20
+
+      - name: Upload instrumented test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-results
+          path: app/build/outputs/androidTest-results/
+          if-no-files-found: warn

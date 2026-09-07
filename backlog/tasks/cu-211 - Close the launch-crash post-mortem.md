@@ -97,46 +97,70 @@ instance is already guarded.
 ## Acceptance Criteria
 
 **The gate — it must be proved to run, not merely configured**
-- [ ] `ci.yml` runs `./verify.sh --instrumented` on pull requests, and its triggers include
-      `feature/agentic-dev` (or cu-212 has added it first)
+- [x] `ci.yml` runs the instrumented suite on pull requests, on its own `instrumented` job, and its
+      triggers include `feature/agentic-dev` (cu-212 added the branch)
 - [ ] **Confirmed from the run log that an emulator actually booted and tests executed** — KVM must
       be enabled on the runner. A job that reports green having silently skipped the suite is the
       precise failure this task exists to prevent
-- [ ] `--instrumented` stays **off** by default locally; the inner loop is unchanged
-- [ ] **Sabotage-verified against the real defect**: with `PLACEHOLDER_URL` reverted to its
-      slash-less form, the instrumented run fails. If it does not, the gate does not do its job
+- [x] `--instrumented` stays **off** by default locally; the inner loop is unchanged
+- [x] **Sabotage-verified against the real defect, on hardware**: with `PLACEHOLDER_URL` reverted
+      to its slash-less form, the run dies with `RuntimeException: Unable to create application
+      ... IllegalStateException: Base URL needs to end with /` and **0 tests execute**. Restored in a
+      separate call; 3 tests then start
 - [ ] `LoggedInLaunchTest` is confirmed to still assert a rendered Home shelf, not merely the absence
       of an exception; extended if it does not
-- [ ] It runs in mock mode with no real Plex credentials
+- [x] It runs in mock mode with no real Plex credentials — `mockPlexModeIsActive` passes
 - [ ] The measured wall-clock cost of the PR job is recorded in the closing notes — the owner accepted
       it on PRs, and the number is what makes that reviewable
 
 **The rule that failed**
-- [ ] The Definition of Done gains: run `./verify.sh --instrumented` before moving a task to
-      `In Review` or `Done`. It goes there, not in the testing section, because the DoD is the
-      checklist read at the moment the rule applies
-- [ ] `reference/00-constitution.md`'s testing section gains **a test may not disable, relax or stub
-      a check that production performs**, with the base-url crash as its worked example
-- [ ] The audit for the same shape elsewhere is carried out and its result recorded, including
-      "nothing else found"
-- [ ] Anything found is fixed, or has a recorded reason it is legitimate
+- [x] The Definition of Done gains it as step 3: run `./verify.sh --instrumented` before moving a
+      task to `In Review` or `Done`
+- [x] `reference/00-constitution.md`'s testing section gains **a test may not disable a check that
+      production performs**, with the base-url crash as its worked example
+- [x] The audit for the same shape elsewhere is carried out — **nothing else found**, recorded
+      below
+- [x] Anything found is fixed, or has a recorded reason it is legitimate — the two hits are both
+      legitimate, reasoned below
 - [ ] `./verify.sh` green, and `--instrumented` green at least once locally
+
+## The audit result (2026-09-07)
+
+Searched for the general shape — a test switching off something production performs.
+
+| Pattern | Found | Verdict |
+|---|---|---|
+| `checkUrl = false` | 0 outside the guard | The original defect; gone, and `BaseUrlContractTest` fails if it returns |
+| `expectSuccess` | 3 references in `KtorErrors.kt` | **Sets it to `true`**, matching production rather than relaxing it |
+| `allowMainThreadQueries()` | 9 files | All on `inMemoryDatabaseBuilder` test databases. Production builds through the real builder and is unaffected — the standard Room test idiom, not a disabled check |
+| `@Config` lowering the SDK below `minSdk` | 0 | — |
+| `relaxed = true` mocks standing in for the contract under test | 0 of 48 | 48 files use relaxed mocks, but none mocks `PlexService`, a Ktorfit instance or `HttpClient` — the shape that hid the base-url crash |
+
+**Nothing else found.** Recorded explicitly because "we looked and found nothing" is a different
+statement from "we did not look", and only one of them is worth anything later.
 
 ## Notes
 
-Closing status **In Review**. The where-it-runs question is now answered (recorded in Part 1), but
-the owner should see the measured PR cost — a gate accepted in principle can still turn out too slow
-in practice, and that is a judgement, not a measurement.
+Closing status **In Review**. The gate is wired and sabotage-proved on hardware, but two criteria
+need a real Actions run — the KVM/emulator-boot confirmation and the measured PR cost — and one
+finding below is the owner's call on sequencing.
 
-**Depends on cu-212** for the `feature/agentic-dev` CI trigger, or must add it here. An instrumented
-job on a branch CI never builds is not a gate.
+**Wiring the gate immediately found the suite is red.** `LoggedInLaunchTest` fails two of three tests
+on the `api35` managed device *and* on the tablet: the app launches fine but is not signed in, so it
+renders onboarding and there is no nav bar to assert on. It was green on 2026-09-01 and the Ktor
+migration landed in between. Filed as **cu-221**.
 
-First in cu-210's programme, and cu-210's own criteria say the rest is unjustifiable until this
-lands — a programme of toolchain bumps is exactly the situation where a repeat of this blocker is
-most likely. cu-214's AGP 9 step in particular is the one change that can break startup in a way no
-unit test sees.
+That is this task's own thesis arriving on schedule — the suite rotted *because* nothing ran it — but
+it has a sequencing consequence: **turning the PR job on before cu-221 lands makes the next pull
+request red for a pre-existing reason.** Two defensible orders, and the owner should pick:
 
-**The premise changed once already.** The original ticket asked for a launch-smoke test to be
-written; investigation found `LoggedInLaunchTest` already does that job and simply never runs. If
-something similar surfaces while working this — a check that exists but is unwired — prefer wiring
-it to writing a second one.
+1. **Land cu-221 first, then this.** CI goes green from its first run. Costs a little time.
+2. **Land this now and accept a red tick** until cu-221 fixes it. The red is honest and is precisely
+   the signal that has been missing for six days.
+
+The sabotage check is worth keeping in mind for whoever does cu-221: reverting `PLACEHOLDER_URL`
+crashes the process before any test runs, which is a *different* failure from these assertion
+failures. If a future run shows 0 tests started rather than 2 failed, the base URL is the suspect.
+
+**One measurement not yet taken.** The PR job's wall-clock cost. It cannot be measured from a
+worktree, and the ruling that put this on every PR deserves a real number attached to it.

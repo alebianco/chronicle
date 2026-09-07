@@ -181,6 +181,26 @@ read its seed.
 A check that cannot fail proves nothing. Gradle's up-to-date checks make a sabotaged test look like
 it passed — use `--rerun-tasks`, and restore in a separate call.
 
+### A test may not disable a check that production performs
+
+If a fixture cannot satisfy a production constraint, **fix the fixture** — do not switch off the
+constraint.
+
+The worked example is worth the space, because the cost was a 100% launch crash reaching a device
+with 1,678 tests green. `PLACEHOLDER_URL` lost its trailing slash; `Ktorfit.Builder.baseUrl`
+validates for one and throws. The clients are `@Singleton`, so Hilt built them inside
+`Application.onCreate` — no window was ever created and the user bounced to the launcher with no
+crash dialog.
+
+Four tests built Ktorfit instances and **every one passed `checkUrl = false`**, to accommodate a
+`FakePlexServer.url` that trims its trailing slash. The suite had switched off precisely the
+validation that fires in production. The missing slash was one character; the disabled check is the
+actual defect.
+
+Watch for the same shape in `expectSuccess`, `validateEagerly`-style flags, `allowMainThreadQueries()`,
+a `@Config` lowering the SDK below `minSdk`, and `relaxed = true` mocks standing in for the
+collaborator whose contract is under test.
+
 ### Commit characterisation tests before optimising
 
 Untracked tests get lost. Commit them green against the old code first.
@@ -192,12 +212,17 @@ Untracked tests get lost. Commit them green against the old code first.
 1. **Verify loop green** — `./verify.sh`. That script *is* the definition of "the build is fine"
    (D12 rule 6), not CI.
 2. **Tests added/extended** for touched repositories, ViewModels, sync/download/chapter logic (D6).
-3. **Self-review pass done** (principle 2) — diff re-read for correctness, silent failures, dead
+3. **`./verify.sh --instrumented` run** before moving a task to `In Review` or `Done`. Opt-in
+   locally, because two emulator boots would wreck the inner loop — but a green unit suite is not
+   evidence the app starts. A 100% launch crash once shipped with 1,678 tests green (the base-url
+   story under *Testing*), and the test that would have caught it existed and was simply never run.
+   CI runs it on every PR; running it before review is what stops you learning this from a red tick.
+4. **Self-review pass done** (principle 2) — diff re-read for correctness, silent failures, dead
    code, simpler alternatives; error paths log with context and never swallow.
-4. **Docs synced in the same PR** — the relevant `reference/` file if architecture or behaviour
+5. **Docs synced in the same PR** — the relevant `reference/` file if architecture or behaviour
    changed; the task file's status and criteria; `CLAUDE.md` if any statement there became false.
-5. **Attribution trailer** if code was ported (principle 4).
-6. **Commit messages** per [Scoped Commits](https://scopedcommits.com/) — see the
+6. **Attribution trailer** if code was ported (principle 4).
+7. **Commit messages** per [Scoped Commits](https://scopedcommits.com/) — see the
    `backlog-workflow` skill.
 
 **The correct closing status is `In Review`, not `Done`, whenever the work changed a screen or made
