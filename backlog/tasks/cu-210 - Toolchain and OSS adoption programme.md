@@ -17,37 +17,29 @@ priority: high
 ## Description
 
 **A tracking task, not a unit of work.** The owner's answers to the cu-194 library survey turned into
-a sixteen-item programme with a real dependency chain, so the sequence lives here and each item is
-its own task (cu-211 … cu-226).
+a programme of ten tasks (cu-211 … cu-226), and this holds the sequence and the reasoning so neither
+has to be re-derived.
 
-This exists because the ordering is not arbitrary and the reasons are easy to lose:
-
-- Two items are **mitigations for a defect this session shipped** — a 100% launch crash that 1,678
-  green unit tests did not catch — and they go first for that reason.
-- Four items form a **toolchain chain** where each unlocks the next, and one of them (AGP 9) is the
-  riskiest change on the list.
-- Two library adoptions must wait for cu-195 to close because they touch the same files.
+**Deliberately consolidated.** A first pass produced seventeen tickets — one per decision — which the
+owner rightly called overwhelming for what is largely configuration and version bumps. Merged to ten
+by asking what a *unit of work* actually is: things worked and closed together share a ticket, and
+sequencing that matters lives in **acceptance criteria** rather than in ticket boundaries. cu-216 is
+the clearest case — four version bumps that must happen in order, as four staged ACs in one task.
 
 ## The sequence
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | cu-211 launch-smoke test | Mitigates the crash the unit suite missed |
-| 2 | cu-212 "a test may not disable a production check" | Mitigates *why* it was missed |
-| 3 | cu-213 Dependabot + CI trigger fix | Config only; makes every later bump cheaper |
-| 4 | cu-214 fix Pitest's stale exclusion | It **fails today**; fix before strengthening |
-| 5 | cu-215 CodeQL | Free, additive, no code change |
-| 6 | cu-216 Room 2.8.1 → 2.8.3 | Small; settles the SQLDelight question |
-| 7 | cu-217 Kotlin → 2.3.11 + KSP | A ceiling, not a choice — see below |
-| 8 | cu-218 compileSdk 37 + AGP 9.x | **Riskiest.** Lands alone, device-verified |
-| 9 | cu-219 Compose BOM + lifecycle 2.11 | Only possible after cu-218 |
-| 10 | cu-220 detekt | Wants the newer toolchain under it |
-| 11 | cu-221 Dependency Analysis plugin | Pairs with cu-213: newer vs unused |
-| 12 | cu-222 licences page, drop the GMS plugin | Compliance **and** removes an F-Droid blocker |
-| 13 | cu-223 kotlinx-serialization | Unpins the models from the JVM |
-| 14 | cu-224 Okio | **After cu-195** — same files |
-| 15 | cu-225 DataStore, all three stages | Highest blast radius; wants detekt and the guards in place |
-| 16 | cu-226 Circuit + Molecule + Turbine | Last; replaces `*Destination` |
+| 1 | **cu-211** close the launch-crash post-mortem | Smoke test **and** the rule that failed. Everything else is unjustifiable until a repeat cannot reach a device |
+| 2 | **cu-213** CI and dependency hygiene | Dependabot, CodeQL, dependency-analysis. No app code, so it can run while cu-195 is open |
+| 3 | **cu-214** Pitest, working and wired | It **fails today**; fix before strengthening |
+| 4 | **cu-216** the toolchain chain, four staged steps | Room → Kotlin/KSP → compileSdk 37/AGP 9 → Compose BOM. Sequential; step 3 is the riskiest thing here |
+| 5 | **cu-220** detekt | Wants the newer toolchain under it |
+| 6 | **cu-222** licences page, drop the GMS plugin | Compliance **and** removes an F-Droid blocker |
+| 7 | **cu-223** kotlinx-serialization | Unpins the models from the JVM |
+| 8 | **cu-224** Okio | **After cu-195** — same files |
+| 9 | **cu-225** DataStore, three stages | Highest blast radius |
+| 10 | **cu-226** Circuit + Molecule + Turbine | Last; a decision task that would replace `*Destination` |
 
 ## The measurements that set the order
 
@@ -88,22 +80,25 @@ Recorded here so cu-194 can cite it rather than re-deriving:
 
 ## Acceptance Criteria
 
-- [x] Every task cu-211 … cu-226 exists, ordered, with its dependencies set
-- [ ] cu-211 and cu-212 land **first** — they are the mitigations, and the programme is
-      unjustifiable if a repeat of this session's blocker can still reach a device
-- [ ] cu-218 (AGP 9) lands **alone** and is device-verified before cu-219 stacks on it
+- [x] Every task exists, ordered, with its dependencies set — ten of them, consolidated from a
+      first pass of seventeen
+- [ ] cu-211 lands **first** — it is the mitigation, and the programme is unjustifiable if a
+      repeat of this session's blocker can still reach a device
+- [ ] cu-216's four steps are committed and verified **separately**, and its step 3 (AGP 9) is
+      device-verified before step 4 stacks on it
 - [ ] No task in this programme is started while cu-195 has open device criteria, except
-      cu-211 … cu-215, which do not touch app code
+      cu-211, cu-213 and cu-214, which do not touch app code
 - [ ] cu-194 is closed by citing this task rather than repeating its reasoning
 - [ ] The portable-share figure cu-182 inherits is re-measured after cu-223
 
 ## Notes
 
-**Sequencing risk to watch.** cu-218 (AGP 8 → 9) touches every build file and is the one item here
-that can break the build in a way no unit test sees. It is deliberately isolated, and cu-211's
-launch-smoke test exists partly so that bump has a device-level safety net.
+**Sequencing risk to watch.** cu-216's step 3 (AGP 8 → 9) touches every build file and is the one
+item here that can break the build in a way no unit test sees. Its ACs require it to be committed and
+device-verified alone, and cu-211's launch-smoke test exists partly to give it that safety net.
 
-**Do not let this become a rewrite by increments.** Twelve of these sixteen are config, tooling or a
-version bump. Three are genuine library adoptions (cu-223, cu-224, cu-225) and one is an
-architectural change (cu-226). If the programme stalls, stopping after cu-222 leaves the project
-strictly better off with no half-migrated state.
+**Do not let this become a rewrite by increments.** Five of these ten are config, tooling or version
+bumps. Three are genuine library adoptions (cu-223, cu-224, cu-225), one is compliance work
+(cu-222), and one is an architectural decision (cu-226). If the programme stalls, **stopping after
+cu-222 leaves the project strictly better off with no half-migrated state** — that is the intended
+exit point, not a fallback.

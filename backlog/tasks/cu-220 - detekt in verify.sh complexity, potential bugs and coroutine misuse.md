@@ -11,7 +11,7 @@ labels:
 milestone: m-3
 dependencies: 
   - cu-210
-  - cu-217
+  - cu-216
 priority: medium
 ---
 
@@ -63,7 +63,7 @@ against a clean tree.
 
 ## Notes
 
-Sequenced after cu-217 so detekt runs against the Kotlin version it will keep analysing — a
+Sequenced after cu-216 (its Kotlin step) so detekt runs against the Kotlin version it will keep analysing — a
 compiler-version mismatch in a static analyser produces confusing parse failures rather than
 findings.
 
