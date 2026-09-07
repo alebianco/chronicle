@@ -1,3 +1,20 @@
+# root = true stops EditorConfig walking up past the repo.
+#
+# Without it, this file inherited whatever the machine's ~/.editorconfig said. The owner's supplies
+# indent_size = 2, which happens to match this codebase — so ktlint passed locally and failed on CI,
+# where no such file exists and ktlint_official's own 4-space default applied instead. A style gate
+# that depends on a file outside the repo is not a gate.
+root = true
+
+# 2 spaces, stated here rather than inherited. This is the indentation the whole codebase uses.
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
 [*.{kt,kts}]
 ktlint_code_style = ktlint_official
 ktlint_standard_no-wildcard-imports = disabled

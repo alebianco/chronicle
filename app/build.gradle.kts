@@ -119,6 +119,14 @@ android {
           apiLevel = 27
           // AOSP has no Play Services; nothing here needs them, and the images are smaller.
           systemImageSource = "aosp"
+          // Stated rather than defaulted. On CI the setup task installed the API 27 image and then
+          // died with "Cannot query the value of this property because it has no value available",
+          // after warning that the ABI was unspecified: at API 27 the AOSP image is 32-bit x86 and
+          // there is no arm64 variant to fall back to. `require64Bit = false` names that choice.
+          //
+          // AGP 9 replaces this with `testedAbi = "x86"` and changes the default to arm64-v8a, so
+          // this line will need translating during cu-214 stage 3 rather than merely surviving it.
+          require64Bit = false
         }
         // A recent level, close to compileSdk 36. "aosp" rather than "aosp-atd": the plain image
         // is the one already installed and licensed on the owner's machine, so a local run needs
