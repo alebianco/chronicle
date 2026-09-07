@@ -16,7 +16,8 @@ This document explains the most important classes in Chronicle and what they do.
 
 **What it does**:
 - Initializes the entire app when it starts
-- Creates the Dagger dependency injection graph
+- Is the Hilt DI root (`@HiltAndroidApp`) — since cu-185 the graph is Hilt-generated, not a
+  hand-rolled `AppComponent`
 - Sets up image loading (Coil 3)
 - Configures logging (Timber)
 - Registers for network connectivity changes
@@ -25,21 +26,23 @@ This document explains the most important classes in Chronicle and what they do.
 
 **Key responsibilities**:
 - One-time app setup
-- Provide access to AppComponent (dependency injection)
+- Root of the Hilt dependency graph
 - Monitor network connectivity
 
 ### MainActivity
 **Location**: `application/MainActivity.kt`
 
 **What it does**:
-- The single Activity that hosts all screens (fragments)
-- Manages the bottom navigation bar
+- The single Activity; calls `setContent {}` and hosts every screen as a Compose destination
+  inside a Navigation Compose `NavHost` (cu-206 — there is no Fragment layer left)
+- Manages the bottom navigation bar (`ChronicleApp`'s `NavigationBar`)
 - Handles the mini player (currently playing bar at bottom)
-- Manages back button behavior
+- Manages back button behavior, via `OnBackPressedDispatcher` (not an `onBackPressed()` override,
+  which the mandatory predictive-back gesture at targetSdk 36 never calls)
 
 **Key features**:
-- Fragment container for all screens
-- Bottom sheet player (expandable mini player)
+- Hosts the Navigation Compose graph (`ChronicleNavHost`) for all screens
+- Bottom sheet player (expandable mini player), driven by `MainActivityViewModel.BottomSheetState`
 - Connects to MediaPlayerService for playback control
 - Handles search intent from system
 
@@ -175,7 +178,7 @@ This document explains the most important classes in Chronicle and what they do.
 **Location**: `features/player/MediaServiceConnection.kt`
 
 **What it does**:
-- Connects Fragments/Activities to MediaPlayerService
+- Connects `MainActivity` (and, through it, screens/ViewModels) to MediaPlayerService
 - Sends commands to the player (play, pause, seek)
 - Receives playback state updates
 - Provides `StateFlow` of playback state to UI
@@ -207,26 +210,30 @@ This document explains the most important classes in Chronicle and what they do.
 
 ## View Layer (Screens)
 
-### HomeFragment & HomeViewModel
-**Location**: `features/home/`
+### HomeScreen & HomeViewModel
+**Location**: `features/home/` (ViewModel), `features/home/compose/` (`HomeScreen.kt` +
+`HomeDestination.kt`)
 
 **What they do**:
 - Home screen with recently added, recently listened, and downloaded books
-- Pull to refresh
+- Pull to refresh (`PullToRefreshBox`, since cu-206 removed the XML `SwipeRefreshLayout` host)
 - Quick access to search
 - Displays curated book lists
 
-### LibraryFragment & LibraryViewModel
-**Location**: `features/library/`
+### LibraryScreen & LibraryViewModel
+**Location**: `features/library/` (ViewModel), `features/library/compose/` (`LibraryScreen.kt`,
+`LibraryDestination.kt`, `BookCard.kt`, `BookGrid.kt`, `LibraryFilterSheet.kt`)
 
 **What they do**:
 - Complete library view with all audiobooks
 - Search functionality
 - Sort and filter options
-- Grid or list view toggle
+- Grid or list view toggle — the grid is `LazyVerticalGrid(GridCells.Adaptive(minSize))`, never
+  `Fixed`, so cover size does not depend on a hardcoded column count
 
-### AudiobookDetailsFragment & AudiobookDetailsViewModel
-**Location**: `features/bookdetails/`
+### DetailsScreen & AudiobookDetailsViewModel
+**Location**: `features/bookdetails/` (ViewModel), `features/bookdetails/compose/`
+(`DetailsScreen.kt`, `DetailsDestination.kt`, `ChapterList.kt`)
 
 **What they do**:
 - Show detailed information about an audiobook
@@ -235,8 +242,9 @@ This document explains the most important classes in Chronicle and what they do.
 - Show listening progress
 - Mark as favorite
 
-### CurrentlyPlayingFragment & CurrentlyPlayingViewModel
-**Location**: `features/currentlyplaying/`
+### PlayerScreen & CurrentlyPlayingViewModel
+**Location**: `features/currentlyplaying/` (ViewModel, `CurrentlyPlaying.kt`),
+`features/currentlyplaying/compose/` (`PlayerScreen.kt`, `PlayerDestination.kt`, `MiniPlayer.kt`)
 
 **What they do**:
 - Full player screen (expands from mini player)
@@ -245,9 +253,12 @@ This document explains the most important classes in Chronicle and what they do.
 - Progress bar with seeking
 - Chapter list
 - Sleep timer control
+- The Cast route button (`features/player/compose/CastButton.kt`) is the one `AndroidView` in the
+  whole player — the Cast SDK has no Compose surface (decision-19)
 
-### SettingsFragment & SettingsViewModel
-**Location**: `features/settings/`
+### SettingsScreen & SettingsViewModel
+**Location**: `features/settings/` (ViewModel), `features/settings/compose/` (`SettingsScreen.kt`,
+`SettingsDestination.kt`)
 
 **What they do**:
 - User preferences
@@ -259,13 +270,18 @@ This document explains the most important classes in Chronicle and what they do.
 
 ## Dependency Injection
 
-### AppComponent
-**Location**: `injection/components/AppComponent.kt`
+Since cu-185 the three components below are **Hilt's own** generated types
+(`dagger.hilt.android.components.*` / `dagger.hilt.components.SingletonComponent`), not classes
+this codebase declares. `injection/modules/*.kt` attach providers to them with
+`@Module @InstallIn(...)`; there is no `injection/components/` package anymore.
+
+### SingletonComponent
+**Provided by**: Hilt, populated by `injection/modules/AppModule.kt` and `RepositoryModule.kt`
 
 **What it does**:
-- Top-level Dagger component
+- Top-level component, rooted at `ChronicleApplication` (`@HiltAndroidApp`)
 - Provides application-scoped dependencies (singletons)
-- Creates ActivityComponent and ServiceComponent
+- Parent of ActivityComponent and ServiceComponent in Hilt's hierarchy
 
 **What it provides**:
 - Repositories
@@ -275,23 +291,23 @@ This document explains the most important classes in Chronicle and what they do.
 - Plex services
 
 ### ActivityComponent
-**Location**: `injection/components/ActivityComponent.kt`
+**Provided by**: Hilt, populated by `injection/modules/ActivityModule.kt`
 
 **What it does**:
-- Dagger component for MainActivity
+- Scoped to `MainActivity` (`@AndroidEntryPoint`)
 - Provides activity-scoped dependencies
-- Injects dependencies into Fragments
+- Every screen's ViewModel is obtained via `hiltViewModel()` in its `<X>Destination.kt`, backed by
+  Hilt's generated ViewModel factories — there are no Fragments to inject into
 
 **What it provides**:
-- ViewModelFactories
-- Navigator
+- Activity-scoped providers (e.g. `ProgressUpdater`)
 - UI-related dependencies
 
 ### ServiceComponent
-**Location**: `injection/components/ServiceComponent.kt`
+**Provided by**: Hilt, populated by `injection/modules/ServiceModule.kt`
 
 **What it does**:
-- Dagger component for MediaPlayerService
+- Scoped to `MediaPlayerService` (`@AndroidEntryPoint`)
 - Provides service-scoped dependencies
 
 **What it provides**:
@@ -301,21 +317,36 @@ This document explains the most important classes in Chronicle and what they do.
 
 ## Navigation
 
-### Navigator
-**Location**: `navigation/Navigator.kt`
+`Navigator.kt` is deleted (cu-206). Navigation Compose replaced it with two files:
+
+### Destination
+**Location**: `navigation/Destination.kt`
 
 **What it does**:
-- Centralized navigation logic
-- Handles all screen transitions
-- Manages fragment back stack
-- Handles login flow routing
+- Framework-free sealed interface — one entry per screen, each carrying its own route string
+- `encodeArg`/`decodeArg` percent-encode route arguments that can hold arbitrary text (a book
+  title, a facet value), so a raw `/` or `?` cannot silently break route matching
+- `destinationForLogin(state)` — the pure function deciding where a login state should navigate,
+  called from `MainActivity` (the old `Navigator` init block)
 
-**Key methods**:
-- `showHome()` - Go to home screen
-- `showLibrary()` - Go to library
-- `showBookDetails(bookId)` - Show book details
-- `showSettings()` - Go to settings
-- `showLogin()` - Show login flow
+**Key entries**: `Home`, `Library`, `Collections`, `Settings`, `Browse`, `SeriesIndexTester`,
+`Login`/`ChooseUser`/`ChooseServer`/`ChooseLibrary`, `BookDetails(bookId)`,
+`CollectionDetails(collectionId)`, `FacetBooks(kind, value)`
+
+### ChronicleNavHost
+**Location**: `navigation/compose/ChronicleNavHost.kt`
+
+**What it does**:
+- Builds the `NavHost` graph: one `composable(...)` block per `Destination`, each instantiating
+  that screen's `<X>Destination.kt`
+- Owns the one shared navigation callback, `openBook`, since six different screens navigate to a
+  book the same way
+
+**Handled instead by the framework** (no longer hand-written methods):
+- Clearing the back stack before a tab switch → `popUpTo(startDestination)`
+- "Is this screen already showing" → `currentBackStackEntry`
+- Login-flow routing → `MainActivity` collects `IPlexLoginRepo.loginEvent` and calls
+  `destinationForLogin`
 
 ## Data Models
 
@@ -369,8 +400,9 @@ on the book.
 
 ### Example: Playing an Audiobook
 
-1. User taps book in **LibraryFragment**
-2. **Navigator** opens **AudiobookDetailsFragment**
+1. User taps book in **LibraryScreen**
+2. `onBookClick` (wired in `ChronicleNavHost`) navigates to `Destination.BookDetails(bookId)`,
+   rendering **DetailsScreen**
 3. **AudiobookDetailsViewModel** loads book from **BookRepository**
 4. User taps play button
 5. ViewModel calls **MediaServiceConnection** to start playback
@@ -378,13 +410,13 @@ on the book.
 7. **MediaPlayerService** uses **TrackRepository** to load tracks
 8. ExoPlayer in service starts playing audio
 9. Service updates **CurrentlyPlaying** state
-10. **CurrentlyPlayingFragment** (mini player) shows current book
+10. The mini player (**MiniPlayer**, hosted from `MainActivity`) shows the current book
 11. Service periodically updates progress in **BookRepository**
 12. **BookRepository** saves to database and syncs to Plex via **PlexService**
 
 ### Example: Downloading a Book
 
-1. User taps download button in **AudiobookDetailsFragment**
+1. User taps download button in **DetailsScreen**
 2. ViewModel calls **CachedFileManager**.downloadBook()
 3. **CachedFileManager** uses **Fetch** library to download tracks
 4. Download progress shown in UI via `StateFlow`

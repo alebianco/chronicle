@@ -11,6 +11,16 @@ Welcome to the Chronicle Audiobook Player documentation. This guide will help yo
 
 ## Documentation Index
 
+**Standards and process** (the constitution set — start here):
+
+- **[Constitution](./00-constitution.md)** — development principles, conventions, testing, definition of done, never-touch list
+- **[Enforced rules](./09-enforced-rules.md)** — the build gates; generated from the guard tests themselves
+- **[Tech stack](./10-tech-stack.md)** — versions, architecture, build variants
+- **[Verify loop](./11-verify-loop.md)** — `verify.sh`, the coverage ratchet, release and instrumented tests
+- **[Agent memory](./12-agent-memory.md)** — the auto-memory loop, why there is no automatic writer, and how to correct a wrong memory
+
+**How the code works:**
+
 1. **[Project Overview](./01-project-overview.md)** - High-level introduction to the app and its features
 2. **[Architecture](./02-architecture.md)** - Understanding the app's architectural patterns
 3. **[Project Structure](./03-project-structure.md)** - How the code is organized
@@ -42,7 +52,7 @@ If you're new to the project, we recommend reading the documentation in order:
 ## Key Technologies
 
 - **Language**: Kotlin 2.2.10 (minSdk 27, target/compileSdk 36)
-- **UI**: **Compose** for new and migrated screens ([[decision-22]]); **ViewBinding** for the screens not yet migrated. DataBinding was removed in cu-58 and LiveData in cu-52 — UI state is `StateFlow`.
+- **UI**: **Compose**, all of it ([[decision-22]]; cu-181 → cu-206). No layouts, no Fragments, no ViewBinding. DataBinding was removed in cu-58 and LiveData in cu-52 — UI state is `StateFlow`.
 - **Async**: Coroutines with an injected `DispatcherProvider` (never `Dispatchers.*` directly, never `GlobalScope`)
 - **Dependency Injection**: Dagger 2.57.2, hand-rolled components, via **KSP** (not KAPT)
 - **Database**: Room 2.8.1 — **five** databases, each with its own version and migration list

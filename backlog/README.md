@@ -11,6 +11,7 @@ All project knowledge that isn't code lives here as markdown (decision D13 / [[d
 | `decisions/` | Decision records (`decision-<n> - <Title>.md`): context → decision → consequences. Product decisions (D1–D14) and technical ADRs both live here. | **owner only** for product decisions; agents may add technical ADRs |
 | `docs/reference/` | Architecture knowledge base (project overview, architecture, data flow, components, glossary) — explains the code *as it is*. | agents keep in sync with behavior |
 | `docs/analysis/` | *Optional* deep-reference for debt items (C/H/M) — problem/current-state/risk — linked from a task only when too large to inline. `archive/` holds stale ones. A task's own plan/notes live in the task file, not here. | reference |
+| `memory/` | Durable, **shared** lessons an agent accumulates — traps, methods, corrections. Committed, and gated by `./check-memory-safe.sh` (stage 1 of `verify.sh`) so nothing private lands here; machine and household facts stay in local auto-memory. | agents + owner |
 | `docs/research/` | Evidence base: `RESEARCH_FINDINGS.md`, `COMMERCIAL_VIABILITY_REPORT.md`. | reference |
 | `docs/research/design-references/` | Competitor/design screenshots (third-party — uncommitted assets). | reference |
 

@@ -14,11 +14,11 @@ This document provides visual representations of Chronicle's architecture for qu
 ```mermaid
 graph TB
     subgraph Chronicle App
-        subgraph UI Layer - Views
-            A[Home<br/>Fragment]
-            B[Library<br/>Fragment]
-            C[Book Details<br/>Fragment]
-            D[Player<br/>Fragment]
+        subgraph UI Layer - Compose Screens
+            A[Home<br/>Screen]
+            B[Library<br/>Screen]
+            C[Book Details<br/>Screen]
+            D[Player<br/>Screen]
         end
         
         subgraph ViewModel Layer
@@ -69,7 +69,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant User
-    participant View as VIEW (Fragment)<br/>• Displays UI<br/>• Handles input<br/>• Collects StateFlow
+    participant View as VIEW (Compose Screen)<br/>• Displays UI<br/>• Handles input<br/>• Collects StateFlow
     participant VM as VIEWMODEL<br/>• Holds UI state<br/>• Business logic<br/>• Survives config changes
     participant Repo as REPOSITORY<br/>• Single source of truth<br/>• Manages data sources<br/>• Decides network vs cache
     participant DS as DATA SOURCES<br/>Plex API / Room / File System
@@ -86,10 +86,14 @@ sequenceDiagram
 
 ## Dependency Injection Hierarchy
 
+Since cu-185 these three components are Hilt's own generated types, not hand-written classes —
+`ActivityModule.kt`/`ServiceModule.kt`/`AppModule.kt` attach providers to them with
+`@InstallIn(...)`:
+
 ```mermaid
 graph TB
-    subgraph "ChronicleApplication - @Singleton"
-        A[AppComponent<br/>Lifetime: Entire app]
+    subgraph "ChronicleApplication - @HiltAndroidApp"
+        A[SingletonComponent<br/>Lifetime: Entire app]
         A1[Repositories<br/>BookRepository, TrackRepository]
         A2[Databases - Room]
         A3[Network<br/>Retrofit, PlexService]
@@ -102,17 +106,15 @@ graph TB
         A --> A5
     end
     
-    subgraph "MainActivity - @ActivityScope"
+    subgraph "MainActivity - @AndroidEntryPoint"
         B[ActivityComponent<br/>Lifetime: While Activity exists]
-        B1[ViewModelFactories]
-        B2[Navigator]
-        B3[MediaServiceConnection]
+        B1[hiltViewModel factories, per screen]
+        B2[MediaServiceConnection]
         B --> B1
         B --> B2
-        B --> B3
     end
     
-    subgraph "MediaPlayerService - @ServiceScope"
+    subgraph "MediaPlayerService - @AndroidEntryPoint"
         C[ServiceComponent<br/>Lifetime: While Service exists]
         C1[ExoPlayer]
         C2[MediaSession]
@@ -124,8 +126,8 @@ graph TB
         C --> C4
     end
     
-    A -->|creates| B
-    A -->|creates| C
+    A -->|parent of| B
+    A -->|parent of| C
     
     style A fill:#e3f2fd
     style B fill:#f3e5f5
@@ -139,21 +141,22 @@ Each feature in `features/` follows this pattern:
 ```
 features/home/
 │
-├── HomeFragment.kt
-│   ├─ Inflates layout
-│   ├─ Collects ViewModel StateFlow
-│   ├─ Handles user interactions
-│   └─ Updates UI when data changes
-│
 ├── HomeViewModel.kt
 │   ├─ Holds UI state (StateFlow properties)
 │   ├─ Calls Repository methods
 │   ├─ Transforms data for UI
-│   └─ Factory for Dagger injection
+│   └─ @HiltViewModel — injected via Hilt, obtained with hiltViewModel()
 │
-└── (Adapters, custom views if needed)
-    └─ AudiobookAdapter.kt
-       └─ RecyclerView adapter for book lists
+└── compose/
+    ├── HomeScreen.kt
+    │   ├─ Pure function of state — no ViewModel reference
+    │   ├─ Renders the shelves (LazyColumn / LazyVerticalGrid, never a RecyclerView adapter)
+    │   └─ Emits callbacks for user interactions (onBookClick, etc.)
+    │
+    └── HomeDestination.kt
+        ├─ Calls hiltViewModel() to get the ViewModel
+        ├─ Collects its StateFlow via collectAsStateWithLifecycle()
+        └─ Passes state + callbacks into HomeScreen
 ```
 
 ## Data Flow Example: Loading Books
@@ -161,21 +164,21 @@ features/home/
 ```mermaid
 sequenceDiagram
     participant User
-    participant LibraryFragment
+    participant LibraryDestination
     participant LibraryViewModel
     participant BookRepository
     participant RoomDatabase
     
-    User->>LibraryFragment: Opens App
-    LibraryFragment->>LibraryFragment: onCreate()
-    LibraryFragment->>LibraryViewModel: collectWhileStarted(viewModel.books)
+    User->>LibraryDestination: Opens App
+    LibraryDestination->>LibraryDestination: hiltViewModel()
+    LibraryDestination->>LibraryViewModel: collectAsStateWithLifecycle(viewModel.books)
     LibraryViewModel->>BookRepository: getAllBooks()
     BookRepository->>RoomDatabase: bookDao.getAllBooks()
     Note over RoomDatabase: Query: SELECT * FROM Audiobook<br/>Returns: Flow
     Note over RoomDatabase: Room automatically emits data
-    RoomDatabase-->>LibraryFragment: collector invoked
-    LibraryFragment->>LibraryFragment: adapter.submitList()
-    LibraryFragment->>User: UI Updated! ✓
+    RoomDatabase-->>LibraryDestination: new State value
+    LibraryDestination->>LibraryDestination: recomposes LibraryScreen (LazyVerticalGrid)
+    LibraryDestination->>User: UI Updated! ✓
 ```
 
 ## Media Playback Architecture
@@ -192,7 +195,7 @@ graph TB
     end
     
     F[MediaServiceConnection<br/>Bridge between Service and UI]
-    G[CurrentlyPlayingFragment<br/>Mini player and full player UI]
+    G[MiniPlayer / PlayerScreen<br/>Mini player and full player UI]
     
     A -->|Media commands| B
     B --> C
@@ -281,14 +284,14 @@ graph TB
 ```mermaid
 flowchart TD
     A[1. App Launch<br/>ChronicleApplication.onCreate]
-    B[Initialize Dagger<br/>Setup Coil, Timber]
+    B[Hilt builds the DI graph<br/>Setup Coil, Timber]
     C{2. Check Login State}
-    D[LoginFragment]
-    E[3. MainActivity]
-    F[Setup bottom navigation<br/>Show HomeFragment<br/>Initialize MediaServiceConnection]
-    G[4. Browse Books<br/>HomeFragment or LibraryFragment]
-    H[Load books from Repository<br/>Display in RecyclerView]
-    I[5. Select Book<br/>Navigate to AudiobookDetailsFragment]
+    D[LoginDestination]
+    E[3. MainActivity.setContent]
+    F[Setup bottom navigation<br/>Show HomeDestination<br/>Initialize MediaServiceConnection]
+    G[4. Browse Books<br/>HomeDestination or LibraryDestination]
+    H[Load books from Repository<br/>Display in LazyColumn / LazyVerticalGrid]
+    I[5. Select Book<br/>Navigate to DetailsDestination]
     J[Load book details<br/>Show chapters, metadata]
     K[6. Play Book<br/>ViewModel → MediaServiceConnection → MediaPlayerService]
     L[Service loads tracks<br/>ExoPlayer starts playback<br/>Mini player appears]
@@ -326,9 +329,9 @@ flowchart TD
 | Change Plex API calls       | `data/sources/plex/PlexService.kt`      |
 | Modify playback logic       | `features/player/MediaPlayerService.kt` |
 | Add a setting               | `features/settings/SettingsList.kt` (+ `SharedPreferencesPrefsRepo.kt`) |
-| Change UI layout            | `features/*/compose/` (new) or `res/layout/` (not yet migrated) |
-| Add dependency injection    | `injection/`                            |
-| Modify navigation           | `navigation/Navigator.kt`               |
+| Change UI layout            | `features/*/compose/`                   |
+| Add dependency injection    | `injection/` (Hilt modules)              |
+| Modify navigation           | `navigation/Destination.kt` (routes) + `navigation/compose/ChronicleNavHost.kt` (graph) |
 | Change app initialization   | `application/ChronicleApplication.kt`   |
 | Add database table/field    | one of **five** DBs in `data/local/` — chapters live in `ChapterDatabase`, bookmarks in `BookmarkDatabase` |
 

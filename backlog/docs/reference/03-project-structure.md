@@ -42,14 +42,16 @@ chronicle/
 ### `/application` - Application Entry Point
 ```
 application/
-├── ChronicleApplication.kt    # Application class (app-wide initialization)
-├── MainActivity.kt             # Single activity hosting all fragments
+├── ChronicleApplication.kt    # Application class (@HiltAndroidApp)
+├── MainActivity.kt             # setContent {}; hosts the Navigation Compose NavHost
 ├── MainActivityViewModel.kt    # ViewModel for shared app state
-├── Injector.kt                 # Dagger component accessor
-└── Constants.kt                # App-wide constants
+├── Constants.kt                # App-wide constants
+└── compose/
+    ├── ChronicleApp.kt         # The shell: bottom NavigationBar + nav host + player sheet
+    └── MiniPlayerHost.kt
 ```
 
-**Purpose**: App initialization, single activity container, global state management
+**Purpose**: App initialization, single activity hosting the Compose UI, global state management
 
 ### `/data` - Data Layer
 ```
@@ -87,69 +89,93 @@ data/
 ```
 features/
 ├── home/                       # Home screen
-│   ├── HomeFragment.kt
-│   └── HomeViewModel.kt
+│   ├── HomeViewModel.kt
+│   └── compose/
+│       ├── HomeScreen.kt       # Pure function of state
+│       └── HomeDestination.kt  # Wires hiltViewModel() into HomeScreen
 ├── library/                    # Library/browse screen
-│   ├── LibraryFragment.kt
 │   ├── LibraryViewModel.kt
-│   └── AudiobookAdapter.kt     # RecyclerView adapter
+│   └── compose/
+│       ├── LibraryScreen.kt
+│       ├── LibraryDestination.kt
+│       ├── BookCard.kt
+│       ├── BookGrid.kt         # LazyVerticalGrid(GridCells.Adaptive)
+│       └── LibraryFilterSheet.kt
 ├── bookdetails/                # Book details screen
-│   ├── AudiobookDetailsFragment.kt
-│   └── AudiobookDetailsViewModel.kt
-├── currentlyplaying/           # Mini player (bottom bar)
-│   ├── CurrentlyPlayingFragment.kt
+│   ├── AudiobookDetailsViewModel.kt
+│   └── compose/
+│       ├── DetailsScreen.kt
+│       ├── DetailsDestination.kt
+│       └── ChapterList.kt
+├── currentlyplaying/           # Mini player + full player
 │   ├── CurrentlyPlayingViewModel.kt
-│   └── CurrentlyPlaying.kt     # Player state manager
+│   ├── CurrentlyPlaying.kt     # Player state manager
+│   └── compose/
+│       ├── MiniPlayer.kt
+│       ├── PlayerScreen.kt
+│       └── PlayerDestination.kt
 ├── player/                     # Media playback service
 │   ├── MediaPlayerService.kt   # Background playback service
 │   ├── MediaServiceConnection.kt
 │   ├── NotificationBuilder.kt
-│   └── SleepTimer.kt
+│   ├── SleepTimer.kt
+│   └── compose/
+│       └── CastButton.kt       # The one AndroidView island (Cast SDK)
 ├── search/                     # Search functionality
 ├── collections/                # Collections screens
 ├── download/                   # Download management
 ├── settings/                   # Settings screen
-│   ├── SettingsFragment.kt
-│   └── SettingsViewModel.kt
+│   ├── SettingsViewModel.kt
+│   └── compose/
+│       ├── SettingsScreen.kt
+│       └── SettingsDestination.kt
 └── login/                      # Login flow
-    ├── LoginFragment.kt
-    ├── ChooseServerFragment.kt
-    ├── ChooseLibraryFragment.kt
-    └── ChooseUserFragment.kt
+    ├── LoginViewModel.kt, ChooseServerViewModel.kt, ChooseLibraryViewModel.kt, ChooseUserViewModel.kt
+    └── compose/
+        ├── LoginDestination.kt
+        ├── PickerScreen.kt, PickerDestinations.kt   # Choose-server/library/user share one screen
+        └── OnboardingScaffold.kt
 ```
 
-**Purpose**: Each feature is a self-contained module with Fragment, ViewModel, and related UI code
+**Purpose**: Each feature is a self-contained module with a ViewModel and a `compose/` subpackage —
+there is no Fragment layer and no RecyclerView adapter anywhere in the app (cu-206)
 
 **Pattern**: Each feature typically has:
-- `Fragment.kt` - UI and user interaction
-- `ViewModel.kt` - UI state and business logic
-- `Adapter.kt` - RecyclerView adapter (if needed)
+- `ViewModel.kt` - UI state and business logic, injected via Hilt (`@HiltViewModel`)
+- `compose/<X>Screen.kt` - a pure composable function of state — no ViewModel reference, so it is
+  previewable and unit-testable without Hilt or a `SavedStateHandle`
+- `compose/<X>Destination.kt` - the thin composable that calls `hiltViewModel()`, collects the
+  ViewModel's `StateFlow`, and passes state + callbacks into the `Screen`
 
-### `/injection` - Dependency Injection (Dagger 2)
+### `/injection` - Dependency Injection (Dagger 2 via Hilt)
 ```
 injection/
-├── components/                 # Dagger components (dependency graphs)
-│   ├── AppComponent.kt         # App-level dependencies
-│   ├── ActivityComponent.kt    # Activity-level dependencies
-│   └── ServiceComponent.kt     # Service-level dependencies
-├── modules/                    # Dagger modules (provide dependencies)
-│   ├── AppModule.kt            # App-level providers
-│   ├── ActivityModule.kt       # Activity-level providers
-│   └── ServiceModule.kt        # Service-level providers
-└── scopes/                     # Custom Dagger scopes
-    ├── ActivityScope.kt
-    └── ServiceScope.kt
+├── ChronicleEntryPoint.kt       # @EntryPoint for code Hilt cannot inject into directly
+├── modules/                     # Dagger modules (provide dependencies)
+│   ├── AppModule.kt             # @InstallIn(SingletonComponent::class)
+│   ├── RepositoryModule.kt      # @InstallIn(SingletonComponent::class)
+│   ├── ActivityModule.kt        # @InstallIn(ActivityComponent::class)
+│   └── ServiceModule.kt         # @InstallIn(ServiceComponent::class)
+└── qualifiers/
+    └── Scopes.kt                 # @ApplicationScope / @PlayerServiceScope CoroutineScope qualifiers
 ```
 
-**Purpose**: Configure dependency injection, define object lifetimes and creation
+**Purpose**: Configure dependency injection, define object lifetimes and creation. Since cu-185
+there are no hand-written `AppComponent`/`ActivityComponent`/`ServiceComponent` classes — Hilt
+generates the graph from `@HiltAndroidApp`/`@AndroidEntryPoint`/`@HiltViewModel` annotations plus
+these modules, and `SingletonComponent`/`ActivityComponent`/`ServiceComponent` in the `@InstallIn`
+lines above are Hilt's own component types (`dagger.hilt.android.components.*`), not project code.
 
 ### `/navigation` - Navigation
 ```
 navigation/
-└── Navigator.kt                # Centralized navigation logic
+├── Destination.kt               # Every route, framework-free (no Android imports)
+└── compose/
+    └── ChronicleNavHost.kt       # The NavHost graph
 ```
 
-**Purpose**: Manage fragment transactions and screen transitions
+**Purpose**: Define the app's routes and build the Navigation Compose graph from them. Replaces
+`Navigator.kt` (deleted in cu-206), which drove `FragmentManager` transactions by hand.
 
 ### `/util` - Utilities
 ```
@@ -165,33 +191,43 @@ util/
 ### `/views` - Custom Views
 ```
 views/
-├── BindingAdapters.kt          # Data binding adapters
-├── BottomSheetChooser.kt       # Custom bottom sheet
-├── ModalBottomSheetSpeedChooser.kt
-└── (other custom views)
+├── BindingAdapters.kt           # Legacy adapters (no ViewBinding call sites remain to use them)
+├── BottomSheetChooser.kt
+├── ChipGroupExt.kt
+├── SpeedChooserState.kt
+└── compose/
+    ├── CoverImage.kt            # Cover art — every call site uses this, never a bare AsyncImage
+    ├── ChronicleScaffold.kt
+    ├── BottomChooser.kt
+    ├── SpeedChooserSheet.kt
+    ├── BookmarkList.kt
+    └── BookmarkNoteSheet.kt
 ```
 
-**Purpose**: Reusable custom UI components
+**Purpose**: Reusable custom UI components. `CoverImage` is the one to know: it carries the
+placeholder for offline, no-artwork and failed-decode cases (cu-207) — `CoverImageTest` gates
+against a bare `AsyncImage` reaching a screen. `BookCard.kt` in `features/library/compose/` is the
+one other file that calls `AsyncImage` directly, and it does so *through* `CoverImage`.
 
 ## Resource Structure (`/res`)
 
 ```
 res/
-├── layout/                     # XML layout files
-│   ├── activity_main.xml
-│   ├── fragment_home.xml
-│   ├── fragment_library.xml
-│   └── (other layouts)
 ├── drawable/                   # Images, icons, shapes
 ├── values/                     # Strings, colors, dimensions, styles
 │   ├── strings.xml
 │   ├── colors.xml
 │   ├── dimens.xml
 │   └── styles.xml
-├── menu/                       # Menu definitions
-├── xml/                        # Other XML resources
+├── font/                       # OFL fonts
+├── xml/                        # Network security config, backup rules, etc.
 └── (other resource folders)
 ```
+
+There is no `res/layout/` directory — every screen is Compose, so there are no layout XML files to
+hold (cu-206). A `res/menu/` directory still exists with six files (`bottom_nav_menu.xml`,
+`home_menu.xml`, etc.), but none of them are referenced from any Kotlin source anymore; they are
+dead resources left over from the Fragment era, not a current option-menu mechanism.
 
 ## Key Files
 
@@ -239,7 +275,7 @@ This is typical for small to medium Android apps. As the app grows, it could be 
 **To find a specific screen:**
 1. Look in `features/` directory
 2. Find the feature name (e.g., `home`, `library`, `bookdetails`)
-3. Fragment and ViewModel will be in that folder
+3. The ViewModel is directly in that folder; the `Screen.kt`/`Destination.kt` pair is in its `compose/` subfolder
 
 **To find data logic:**
 1. Look in `data/` directory
@@ -248,11 +284,11 @@ This is typical for small to medium Android apps. As the app grows, it could be 
 4. Check `data/model/` for data classes
 
 **To understand dependencies:**
-1. Look in `injection/components/` for dependency graphs
-2. Look in `injection/modules/` for how objects are created
+1. Look in `injection/modules/` for how objects are created and which Hilt component
+   (`@InstallIn(...)`) they belong to
 
 **To modify UI:**
-1. Find the Fragment in `features/<feature>/`
-2. Layout XML in `res/layout/`
-3. Strings in `res/values/strings.xml`
+1. Find the screen in `features/<feature>/compose/` — `<X>Screen.kt` for the composable content,
+   `<X>Destination.kt` for how it gets its ViewModel and its route arguments
+2. Strings in `res/values/strings.xml`
 

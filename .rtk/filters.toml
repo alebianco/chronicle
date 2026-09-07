@@ -1,0 +1,29 @@
+# Project-local RTK filters for Chronicle.
+#
+# RTK ships a built-in `gradlew` handler, but NONE for adb. Measured over 352
+# sessions / 32,697 Bash calls: adb is 2,772 calls with zero filtering, and
+# `rtk discover` lists it as the top unhandled command.
+#
+# Do NOT add a [filters.gradlew] here — the built-in handler wins and a custom
+# one is silently ignored (verified: 45 -> 44 lines, i.e. no effect).
+#
+# Verify a change here with:  ./verify-rtk-filters.sh
+schema_version = 1
+
+[filters.adb-logcat]
+description = "Drop Android framework noise from logcat; keep app + W/E lines"
+match_command = "^adb(\\s+-s\\s+\\S+)?\\s+logcat"
+strip_ansi = true
+strip_lines_matching = [
+  "^-+ beginning of",
+  "\\bD nativeloader:",
+  "\\bV GraphicsEnvironment:",
+  "\\bD CompatibilityChangeReporter:",
+  "\\bI ForceDarkHelperStubImpl:",
+  "\\bD OpenGLRenderer:",
+  "\\bD BufferQueueProducer:",
+  "\\bI chatty\\s*:",
+  "\\bV MediaSessionCompat:",
+  "^\\s*$",
+]
+max_lines = 200

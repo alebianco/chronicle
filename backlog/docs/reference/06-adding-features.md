@@ -126,21 +126,20 @@ fun FavoritesScreen(viewModel: HomeViewModel) {
 Use `GridCells.Adaptive`, not `Fixed(n)` — `Fixed(3)` gives 640px cells on the 1200px tablet and
 one cover fills the screen.
 
-**On a not-yet-migrated screen** you are in ViewBinding. There is no DataBinding: layouts have no
-`<layout>` wrapper and no `@{...}` expressions, and `binding.viewModel` / `binding.lifecycleOwner`
-do not exist. Set state from Kotlin and collect with `collectWhileStarted` on
-`viewLifecycleOwner`:
+**Collect with `collectAsStateWithLifecycle()`**, and for a one-shot `Event` use `EventEffect` /
+`ToastEffect` / `ToastResEffect` from `util/compose/EventEffects.kt` — they gate on STARTED, which
+matters because a `Toast` raised while backgrounded appears over whatever the user is looking at and
+the event is consumed either way.
 
-```kotlin
-val binding = FragmentHomeBinding.inflate(inflater, container, false)
-collectWhileStarted(viewModel.favorites) { books ->
-    binding.favoritesSection.isVisible = books.isNotEmpty()
-}
-```
+**Seed a cold flow with a state that cannot be mistaken for data.** The first-frame flash of the
+ViewBinding era is gone with XML, but its cause survives in a new shape: a `stateIn` seed that is a
+*real-looking value* renders as one. `FacetList.EMPTY` showed "No narrators yet" before the first
+grouping ran. That is why screens seed a sealed `Loading` rather than an empty result (cu-201,
+cu-202) — make the pre-emission state unrepresentable, not plausible.
 
-**A view whose visibility is Kotlin-driven needs an XML default**, or it flashes its default for a
-frame — and `FirstFrameFlashTest` fails the build without one. A view defaulted to `gone` with no
-writer is *permanently* invisible, which is the worse half of that guard.
+**Cover art goes through `CoverImage`**, never a bare `AsyncImage`. A bare call sets no
+`placeholder`/`error`/`fallback`, so a failed load renders as *nothing* — a hole in the layout that
+no semantics assertion can see. `CoverImageTest` fails the build on one (cu-207).
 
 ### 4. Strings and tests
 
@@ -160,49 +159,68 @@ flow-shaped.
 
 ### Adding a New Screen
 
-New screens are **Compose** ([[decision-22]]). Navigation Compose is the target, so **do not adopt
-the Fragment Navigation Component** — it would be migrated twice.
+Screens are **Compose** ([[decision-22]]), routed by **Navigation Compose** — there are no Fragments
+and no layouts (cu-206).
 
-1. **Create Feature Package**: `features/newfeature/`
-2. **Create ViewModel**: `NewFeatureViewModel.kt` — constructor injection, no `Injector.get()`
-3. **Create the screen**: `features/newfeature/compose/NewFeatureScreen.kt`
-4. **Host it**: a Fragment holding a `ComposeView`, while the app still has XML screens
-5. **Update `Navigator.kt`**: navigation goes through it, data via Bundles/args
-6. **Update Dagger**: inject into `ActivityComponent` if needed
+The split is deliberate and worth keeping: a `*Screen` is a **pure function of its state**, which is
+what makes it testable by asserting on what it renders; a `*Destination` is the only part that knows
+about a ViewModel.
+
+1. **Create the feature package**: `features/newfeature/`
+2. **Create the ViewModel**: `NewFeatureViewModel.kt` — `@HiltViewModel` with an `@Inject`
+   constructor. Never `Injector.get()`; a class that fetches its own dependencies cannot be
+   constructed in a unit test.
+3. **Create the screen**: `features/newfeature/compose/NewFeatureScreen.kt` — state in, callbacks
+   out, no ViewModel reference. Wrap it in `Surface`: `MaterialTheme` *defines*
+   `colorScheme.background` but paints nothing, so a bare `Box` lets the window colour through.
+4. **Create the destination**: `features/newfeature/compose/NewFeatureDestination.kt`
 
 ```kotlin
-class NewFeatureFragment : Fragment() {
-    @Inject lateinit var viewModelFactory: NewFeatureViewModel.Factory
-    private lateinit var viewModel: NewFeatureViewModel
+@Composable
+fun NewFeatureDestination(
+  onNavigateUp: () -> Unit,
+  modifier: Modifier = Modifier,
+  viewModel: NewFeatureViewModel = hiltViewModel(),
+) {
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        (requireActivity() as MainActivity).activityComponent!!.inject(this)
-        super.onCreate(savedInstanceState)
-        viewModel = ViewModelProvider(this, viewModelFactory)[NewFeatureViewModel::class.java]
-    }
-
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View = ComposeView(requireContext()).apply {
-        setContent { ChronicleTheme { Surface { NewFeatureScreen(viewModel) } } }
-    }
-}
-
-class NewFeatureViewModel(
-    private val repository: SomeRepository,
-) : ViewModel() {
-
-    @Suppress("UNCHECKED_CAST")
-    class Factory @Inject constructor(
-        private val repository: SomeRepository,
-    ) : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            NewFeatureViewModel(repository) as T
-    }
+  ChronicleScaffold(
+    title = stringResource(R.string.new_feature_title),
+    onNavigateUp = onNavigateUp,
+    modifier = modifier,
+  ) {
+    NewFeatureScreen(state = state, onSomething = viewModel::onSomething)
+  }
 }
 ```
+
+`hiltViewModel()` scopes the ViewModel to the **back-stack entry**: it survives a configuration
+change and is cleared when the entry is popped — the lifetime `by viewModels()` gave a Fragment,
+without needing one.
+
+`ChronicleScaffold` supplies the top bar and consumes the status-bar inset. Pass `onNavigateUp =
+null` for a top-level tab, which is what makes the back arrow absent there.
+
+5. **Add the route** to `navigation/Destination.kt`, then register it in
+   `navigation/compose/ChronicleNavHost.kt`:
+
+```kotlin
+composable(Destination.NewFeature.ROUTE) {
+  NewFeatureDestination(onNavigateUp = navController::popBackStack)
+}
+```
+
+**If the destination takes an argument, reuse the ViewModel's own argument-name constant.** A route
+argument lands in the same `SavedStateHandle` the ViewModel reads, so a route declaring `{itemId}`
+against a ViewModel reading `"item_id"` compiles, navigates, and renders an **empty screen** — the
+ViewModel reads null and falls back to its default. `DestinationTest` pins the two together.
+
+Arbitrary text in a route must go through `encodeArg`: a raw `/` or `?` makes the path match no
+pattern and navigation silently does nothing.
+
+6. **Write the tests.** A `*Screen` is testable with `createComposeRule` and no DI at all — state
+   in, assert on what is displayed. Wrap it in `ChronicleTheme`, or it renders in stock Material
+   purple.
 
 ### Adding a Setting
 
@@ -375,7 +393,8 @@ Before submitting:
 
 1. **Don't access database from ViewModels** - Always use Repository
 2. **Don't block the UI thread** - Use coroutines for heavy work
-3. **Don't forget lifecycle** - Use viewLifecycleOwner for Fragment observers
+3. **Don't forget lifecycle** - `collectAsStateWithLifecycle()` in a composable, never a bare
+   `lifecycleScope.launch` (it keeps collecting while backgrounded)
 4. **Don't ignore errors** - Handle exceptions gracefully
 5. **Don't hardcode strings** - Use strings.xml
 6. **Don't forget offline mode** - Consider cached data

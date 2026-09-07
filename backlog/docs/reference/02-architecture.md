@@ -17,7 +17,7 @@ The app uses **Model-View-ViewModel (MVVM)** architecture:
 
 ```mermaid
 graph TD
-    A[View<br/>Fragments, Activities, XML Layouts<br/>UI Layer]
+    A[View<br/>Compose screens, single Activity<br/>UI Layer]
     B[ViewModel<br/>Business Logic, UI State<br/>Presentation Layer]
     C[Model<br/>Repository, Data Sources, Database<br/>Data Layer]
     
@@ -30,10 +30,9 @@ graph TD
 ```
 
 ### View (UI Layer)
-- **Fragments**: Each screen is a Fragment (HomeFragment, LibraryFragment, etc.)
-- **Activities**: Single MainActivity hosts all fragments
-- **Compose** for new and migrated screens ([[decision-22]]); **ViewBinding** for the rest.
-  DataBinding was removed in cu-58 — layouts have no `<layout>` wrapper and no `@{...}` expressions
+- **Compose screens**: every screen is a composable function of state — `features/<x>/compose/<X>Screen.kt` — paired with a `<X>Destination.kt` that wires a `hiltViewModel()` into it and passes callbacks. The Fragment-per-screen structure ([[decision-22]]) is gone entirely as of cu-206; there is no ViewBinding and no XML layout left
+- **Activities**: single `MainActivity` calls `setContent {}` once and hosts a Navigation Compose `NavHost` — see the Navigation section below
+- **One deliberate exception**: `features/player/compose/CastButton.kt` wraps the Cast SDK's `MediaRouteButton` in an `AndroidView`, because the SDK has no Compose surface (decision-19)
 - **Responsibilities**: Display data, handle user input, navigation
 
 ### ViewModel (Presentation Layer)
@@ -50,13 +49,18 @@ graph TD
 
 ## Key Architectural Components
 
-### 1. Dependency Injection (Dagger 2)
+### 1. Dependency Injection (Dagger 2 via Hilt)
 
-Dagger 2 handles all object creation and dependency management:
+Dagger 2 still handles all object creation, but since cu-185 it is Hilt's generated components,
+not hand-rolled ones: `@HiltAndroidApp` on `ChronicleApplication`, `@AndroidEntryPoint` on
+`MainActivity` and `MediaPlayerService`, `hiltViewModel()` in every `<X>Destination.kt`.
+`injection/modules/*.kt` are `@Module @InstallIn(SingletonComponent::class | ActivityComponent::class
+| ServiceComponent::class)` — those three component types are Hilt's own
+(`dagger.hilt.android.components.*`), not classes this codebase declares:
 
 ```mermaid
 graph TD
-    A[AppComponent<br/>Application Scope]
+    A[SingletonComponent<br/>Application Scope]
     B[Singletons<br/>Repositories, Services, Databases]
     C[ActivityComponent<br/>Activity Scope]
     D[Activity-specific dependencies]
@@ -137,7 +141,7 @@ graph TD
     style C fill:#f3e5f5
 ```
 
-**MediaServiceConnection**: Activities/Fragments bind to the service
+**MediaServiceConnection**: `MainActivity` (and, through it, screens/ViewModels) binds to the service
 - Sends playback commands
 - Receives playback state updates
 - Survives across the entire app lifecycle
@@ -171,11 +175,27 @@ listening progress.
 
 ## Navigation
 
-**Navigator**: Single class managing all screen transitions
-- Fragment transactions
-- Back stack management
-- Login flow routing
-- Deep linking support
+Navigation Compose replaced `Navigator` in cu-206 (`Navigator.kt` is deleted). Three pieces:
+
+- **`navigation/Destination.kt`**: a framework-free sealed interface — one `data object`/`data
+  class` per screen, each holding its own route string. `encodeArg`/`decodeArg` percent-encode
+  route arguments that can contain arbitrary text (a book title, a facet value), since
+  Navigation Compose addresses destinations by string route and a raw `/` or `?` in an argument
+  would silently fail to match the pattern. `destinationForLogin(state)` is the pure routing
+  decision `Navigator`'s init block used to make from `IPlexLoginRepo.loginEvent`.
+- **`navigation/compose/ChronicleNavHost.kt`**: the `NavHost` graph — one `composable(...)` entry
+  per `Destination`, wiring each to its `<X>Destination.kt`.
+- **`application/compose/ChronicleApp.kt`**: the app shell — the Compose `NavigationBar` (bottom
+  tabs), the nav host, and the currently-playing sheet stacked on top of both.
+
+`MainActivity` builds the `NavHostController` (`rememberNavController()`), collects
+`plexLoginRepo.loginEvent` itself and navigates on it — the one thing that has to live above any
+single screen — and registers the back handler via `OnBackPressedDispatcher` (not an
+`onBackPressed()` override, which the platform's mandatory predictive-back gesture at targetSdk 36
+never calls, cu-73). Backstack clearing (`Navigator`'s
+`while (backStackEntryCount > 0) popBackStackImmediate()`) is `popUpTo(startDestination)`; the tab
+tags that drove "is this fragment already showing" checks are gone with the tags themselves —
+Navigation Compose exposes `currentBackStackEntry` instead.
 
 ## Threading Model
 

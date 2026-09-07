@@ -1,0 +1,104 @@
+# The verify loop
+
+```bash
+./verify.sh            # the full gate
+./verify.sh --quick    # inner loop while iterating: ktlint + unit tests + coverage
+./verify.sh --format   # runs ktlintFormat first, then the full gate
+./verify.sh --instrumented   # adds a 7th stage on two managed emulators
+```
+
+**`verify.sh` *is* the definition of "the build is fine"** (D12 rule 6) — not CI, not a forge's
+required checks. CI is a thin wrapper calling this same script, so the gate is identical on a
+laptop and on any forge.
+
+## What green means
+
+| Stage | Check |
+|---|---|
+| 1 | `check-memory-safe` — nothing private in `backlog/memory/` |
+| 2 | `check-agent-refs` — every `agentType` resolves; agent/command frontmatter well-formed |
+| 3 | `ktlintCheck` — code style |
+| 4 | `testDebugUnitTest` — unit tests |
+| 5 | Coverage ratchet (two gates, see below) |
+| 6 | `assembleDebug` — debug APK builds |
+| 7 | `lintDebug` — Android lint |
+| 8 | `compileReleaseKotlin` — **the release variant compiles** |
+
+Nothing less. The last stage exists because the debug and release source sets each provide their own
+`DebugHooks` object: `DebugHooksContract` makes the compiler check the shape, but only for the
+variant being built — so a drifted release twin used to pass every debug-only check and break the
+first release build (cu-70).
+
+## The coverage ratchet (cu-135)
+
+`coverage-ratchet.sh` checks JaCoCo instruction coverage **twice from one report**, and both
+baselines are plain committed files so every movement is reviewable in a diff (D12 rule 6).
+
+**Aggregate**, against `coverage-baseline.txt` — fails on a drop of more than **0.05%**. That
+tolerance absorbs codegen jitter, and it *is* a high-water mark: the no-regression branch
+deliberately does not rewrite the file, so a second consecutive dip is measured against the same
+high number and fails. **Drops cannot accumulate.**
+
+> An earlier doc claimed the opposite and cu-135 was filed to "fix" it. The walk does not exist —
+> the comment in the script was simply describing a 0.01% tolerance the code never had.
+
+**Per package**, against `coverage-baseline-packages.txt` — fails when any single package drops
+more than **0.50%**, even while the aggregate rises. The looser tolerance is because a small
+package moves several tenths of a percent per instruction.
+
+This gate exists because coverage here sits **backwards** — `data/model` above 80% next to
+`features/collections` and `features/home` at 0% — so the average passes while the expensive
+packages rot. A **new package is seeded and announced, never silently admitted**, and a departed
+one is pruned.
+
+Both ratchet *up* on a rise — **commit the changed file**. To lower either on purpose:
+`./coverage-ratchet.sh --update`, and justify it in the commit message.
+
+## Release builds
+
+`./test_release_build.sh` — an R8/ProGuard smoke test (see CONTRIBUTING.md "Release Builds &
+ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (Moshi models, Room
+entities), or dependencies.
+
+It asserts **against the dex** that Room/Retrofit/Dagger/Moshi classes survived R8 — these fail at
+runtime, not build time.
+
+Keep rules are deliberately narrow (cu-45): **prefer adding one precise rule over widening a
+blanket `-keep`**, which silently exempts code from R8.
+
+## Instrumented tests (cu-54)
+
+`./verify.sh --instrumented` adds them as a 7th stage; `./gradlew
+instrumentedCheckGroupGroupDebugAndroidTest` runs them directly.
+
+Two Gradle Managed Devices: **API 27** (the minSdk floor, which catches a new API called without a
+version guard) and **API 35**, both AOSP `arm64-v8a`.
+
+**Opt-in, not in the default gate** — two emulators take minutes where the unit gate takes seconds.
+
+The suite is `LoggedInLaunchTest`: three cases against the cu-16 fixture server via `MockPlexMode`,
+so **no credentials and no live server**. It is deliberately small; it exists to make the
+Fragment/Activity/media-session layer reachable at all, not to cover it.
+
+See the `device-verification` skill for the four traps it cost to learn.
+
+## Other measurement scripts
+
+| Script | Purpose |
+|---|---|
+| `./capture-screens.sh <dir>` | Drives the app and screenshots the main screens |
+| `./plex-session.sh {backup\|real\|mock\|status}` | Switch between a real Plex session and mock mode without `pm clear` |
+| `./measure-audio-glitches.sh` | Audio glitch measurement |
+| `./list-build-gates.sh` | Regenerates the enforced-rules table |
+| `./check-agent-refs.sh` | Agent/command definitions resolve and are well-formed |
+| `./check-memory-safe.sh` | Committed memory carries nothing private |
+| `./setup-repo.sh --check` | Pre-commit hook, RTK trust and `local.properties` present |
+| `./compare-package-coverage.py` | Per-package coverage comparison |
+
+## Two traps
+
+**Gradle's up-to-date checks make a sabotaged test look like it passed.** When verifying a guard by
+sabotage, use `--rerun-tasks` — and restore the sabotage in a separate call.
+
+**A green suite is not device verification.** 1301 green tests once missed "No books found" over a
+full library. Open every tab after rewiring fragments.

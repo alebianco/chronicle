@@ -49,6 +49,12 @@ if [ "$FORMAT" = true ]; then
   "$GRADLE" ktlintFormat
 fi
 
+stage "check-memory-safe — no private data in committed memory"
+./check-memory-safe.sh
+
+stage "check-agent-refs — agent/command definitions resolve"
+./check-agent-refs.sh
+
 stage "ktlintCheck — code style"
 "$GRADLE" ktlintCheck
 

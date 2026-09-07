@@ -75,8 +75,8 @@ Chronicle is an Android audiobook player designed specifically for Plex media se
 - Handles large audiobook libraries efficiently — profiled against the household's 196-book server
   (cu-51), with paged loading and linear scans
 - **UI state is `StateFlow`** throughout; there is no `LiveData` (cu-52) and `postValue` is banned
-  by a build gate. UI is **Compose** for new and migrated screens ([[decision-22]], cu-181),
-  ViewBinding for the rest
+  by a build gate. UI is **Compose**, all of it ([[decision-22]]; cu-181 → cu-206) —
+  no layouts, no Fragments, no ViewBinding
 - Background playback with notification controls
 - Media session integration for external controls (Bluetooth, Android Auto)
 - Automatic progress scrobbling to Plex server

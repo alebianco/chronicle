@@ -12,10 +12,13 @@ This glossary explains common Android, Kotlin, and architecture terms used throu
 ## Android Terms
 
 ### Activity
-A single screen in an Android app with a user interface. Chronicle has one Activity (`MainActivity`) that hosts multiple Fragments.
+A single screen in an Android app with a user interface. Chronicle has one Activity
+(`MainActivity`); it calls `setContent` and hosts a Compose `NavHost` (cu-206).
 
 ### Fragment
-A reusable portion of UI that represents a screen or part of a screen. Each main screen in Chronicle is a Fragment (HomeFragment, LibraryFragment, etc.).
+A reusable portion of UI representing a screen or part of one. **Chronicle has none** — every
+screen was a Fragment until cu-206, which replaced them with Compose destinations. The term appears
+throughout the task history, which is why it is still defined here.
 
 ### Service
 A component that runs in the background without a user interface. `MediaPlayerService` plays audio in the background.
@@ -27,13 +30,16 @@ A message that requests an action from another app component. Used for navigatio
 Provides access to application resources and system services. Activities and Services are Contexts.
 
 ### Layout
-XML files that define the user interface structure. Located in `res/layout/`.
+XML files defining UI structure, in `res/layout/`. **Chronicle has none** as of cu-206; a screen is
+a `*Screen` composable.
 
 ### RecyclerView
-An efficient view for displaying large lists or grids. Used to display book lists in Chronicle.
+An efficient View for large lists or grids. **No longer used** — book lists are `LazyColumn` /
+`LazyVerticalGrid`. Use `GridCells.Adaptive(minSize)`, never `Fixed(n)`: `Fixed(3)` gives 640px
+cells on the 1200px tablet and one cover fills the screen.
 
 ### ViewHolder
-Pattern for efficiently recycling views in a RecyclerView.
+Pattern for recycling views in a RecyclerView. **Not used** — Compose handles reuse itself.
 
 ### Notification
 Message displayed outside the app's UI, typically in the status bar. Used for playback controls.
@@ -105,13 +111,24 @@ API for scheduling background tasks that need guaranteed execution.
 and **Compose**.
 
 ### ViewBinding
-Generated type-safe accessors for the views in a layout (`FragmentHomeBinding.inflate(...)`). What
-the not-yet-migrated screens use. Unlike DataBinding it has no `viewModel`/`lifecycleOwner`
-property.
+Generated type-safe accessors for a layout's views (`FragmentHomeBinding.inflate(...)`).
+**Removed in cu-206** along with the last layout; `buildFeatures.viewBinding` is off. DataBinding
+went earlier, in cu-58.
 
 ### Compose
-Declarative UI toolkit, and the **target for all new and migrated UI** ([[decision-22]], cu-181).
-Compose and ViewBinding run side by side while screens migrate one at a time.
+Declarative UI toolkit, and **the whole UI** ([[decision-22]]; cu-181 → cu-206). A screen is a
+`*Screen` composable — a pure function of its state — behind a `*Destination` that wires a ViewModel
+to it with `hiltViewModel()`.
+
+### Navigation Compose
+The navigation library that replaced `Navigator`'s `FragmentManager` transactions (cu-206). Routes
+are declared in `navigation/Destination.kt` and registered in
+`navigation/compose/ChronicleNavHost.kt`; an argument travels in the route string and arrives in the
+ViewModel's `SavedStateHandle`.
+
+### AndroidView
+The Compose escape hatch that hosts a real `View`. Chronicle uses it **once**, deliberately:
+`CastButton`, because the Cast SDK has no Compose surface (decision-19).
 
 ## Dagger 2 Terms
 
