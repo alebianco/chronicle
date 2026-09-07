@@ -55,7 +55,7 @@ class ConnectionProbeWiringTest {
 
   private fun service(): PlexMediaService =
     Ktorfit.Builder()
-      .baseUrl(plex.url, checkUrl = false)
+      .baseUrl("${plex.url}/")
       .httpClient(
         HttpClient(OkHttp) {
           // `true`, matching the production media client — which is the point of this being a

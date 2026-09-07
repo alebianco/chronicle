@@ -33,7 +33,7 @@ class FakePlexServerTest {
 
   private val service: PlexMediaService by lazy {
     Ktorfit.Builder()
-      .baseUrl(plex.url, checkUrl = false)
+      .baseUrl("${plex.url}/")
       .httpClient(
         HttpClient(OkHttp) {
           // The fake returns real HTTP statuses and the tests read them, so a non-2xx must throw

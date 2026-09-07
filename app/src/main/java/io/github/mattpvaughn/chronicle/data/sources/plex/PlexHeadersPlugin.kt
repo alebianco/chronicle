@@ -72,9 +72,17 @@ fun plexHeadersPlugin(
  *
  * A no-op for any other host, so an absolute URL — a `plex.tv` login call, or a download URL
  * already resolved by `toServerString` — passes through untouched.
+ *
+ * **Matched and replaced without the trailing slash, on both sides.** `PLACEHOLDER_URL` must end
+ * in `/` because Ktorfit validates that, but `plexConfig.url` is a server address that does *not*
+ * — every `uri` in `/api/v2/resources` comes without one. A naive `replace(PLACEHOLDER_URL, url)`
+ * would therefore drop the separator and turn `…yyy/identity` into `…54identity`. Trimming both
+ * and re-joining is also robust to Ktor normalising the built string, which is why the match is
+ * on the slash-less prefix rather than on the constant verbatim.
  */
 internal fun HttpRequestBuilder.substitutePlaceholderHost(plexConfig: PlexConfig) {
+  val placeholder = PLACEHOLDER_URL.trimEnd('/')
   val current = url.buildString()
-  if (!current.contains(PLACEHOLDER_URL)) return
-  url.takeFrom(URLBuilder(current.replace(PLACEHOLDER_URL, plexConfig.url)))
+  if (!current.contains(placeholder)) return
+  url.takeFrom(URLBuilder(current.replace(placeholder, plexConfig.url.trimEnd('/'))))
 }

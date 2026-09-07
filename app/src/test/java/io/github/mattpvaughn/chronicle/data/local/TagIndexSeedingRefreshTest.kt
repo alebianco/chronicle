@@ -84,7 +84,7 @@ class TagIndexSeedingRefreshTest {
 
   private val mediaService: PlexMediaService by lazy {
     Ktorfit.Builder()
-      .baseUrl(plexServer.url, checkUrl = false)
+      .baseUrl("${plexServer.url}/")
       .httpClient(
         HttpClient(OkHttp) {
           expectSuccess = true

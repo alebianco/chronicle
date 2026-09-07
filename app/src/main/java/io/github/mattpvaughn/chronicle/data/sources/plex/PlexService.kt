@@ -10,8 +10,22 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.*
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.HttpStatement
 
-const val PLEX_LOGIN_SERVICE_URL = "https://plex.tv"
-const val PLACEHOLDER_URL = "https://fake-base-url-should-never-be-called.yyy"
+/**
+ * Base URLs, **both with a trailing slash** — Ktorfit requires it.
+ *
+ * `Ktorfit.Builder.baseUrl` validates this and throws `IllegalStateException: Base URL needs to end
+ * with /`. Retrofit tolerated a slash-less base, so the omission was invisible until the migration
+ * — and then it was a **100% launch crash**: the clients are `@Singleton`, so Hilt builds them
+ * inside `Application.onCreate`, before any window exists. The user bounces to the launcher with no
+ * crash dialog at all.
+ *
+ * [PLACEHOLDER_URL] is never called. Every media endpoint is declared against it and rewritten per
+ * request by `plexHeadersPlugin`, because the real server address is only known at runtime and can
+ * change mid-session. The hostname is deliberately unresolvable so a request that escapes the
+ * rewrite fails loudly instead of reaching something real.
+ */
+const val PLEX_LOGIN_SERVICE_URL = "https://plex.tv/"
+const val PLACEHOLDER_URL = "https://fake-base-url-should-never-be-called.yyy/"
 
 interface PlexLoginService {
   @POST("https://plex.tv/api/v2/pins.json?strong=true")
@@ -55,6 +69,21 @@ interface PlexLoginService {
   suspend fun devices(): List<PlexDevice>
 }
 
+/**
+ * The media endpoints.
+ *
+ * **Paths are relative — no leading slash.** The base URL ends with `/` because Ktorfit requires
+ * that, so a path beginning with `/` produces a doubled separator:
+ * `http://host//library/sections/1/all`. Plex **matches** paths rather than normalising them, so
+ * that is a 404, not a cosmetic difference — the same hazard `PlexConfig.toServerString` normalises
+ * for the URLs it builds by hand.
+ *
+ * Retrofit hid both halves of this: it accepted a base without a trailing slash *and* treated a
+ * leading slash as absolute-from-root. Ktorfit does neither, so base and path have to agree, and
+ * the convention here is trailing slash on the base, none on the path.
+ *
+ * The `https://plex.tv/...` endpoints are absolute on purpose and ignore the base entirely.
+ */
 interface PlexMediaService {
   /**
    * A basic check used to tell whether a server is online. Returns a lightweight response.
@@ -78,25 +107,25 @@ interface PlexMediaService {
     @Url url: String,
   ): HttpResponse
 
-  @GET("/library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
+  @GET("library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
   suspend fun retrieveAllAlbums(
     @Path("libraryId") libraryId: String,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
+  @GET("library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
   suspend fun retrieveAlbumPage(
     @Path("libraryId") libraryId: String,
     @Query("X-Plex-Container-Start") containerStart: Int = 0,
     @Query("X-Plex-Container-Size") containerSize: Int = 100,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/metadata/{trackId}")
+  @GET("library/metadata/{trackId}")
   suspend fun retrieveChapterInfo(
     @Path("trackId") trackId: String,
     @Query("includeChapters") includeChapters: Int = 1,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/metadata/{albumId}")
+  @GET("library/metadata/{albumId}")
   suspend fun retrieveAlbum(
     @Path("albumId") albumId: String,
     @Query("includeChapters") includeChapters: Int = 1,
@@ -118,17 +147,17 @@ interface PlexMediaService {
    * Chapters are **not** requested: this is the catalogue-wide tag pass, and `includeChapters=1`
    * on 196 books would multiply the response for data the seeder does not read.
    */
-  @GET("/library/metadata/{albumIds}")
+  @GET("library/metadata/{albumIds}")
   suspend fun retrieveAlbums(
     @Path("albumIds", encoded = true) albumIds: String,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/metadata/{albumId}/children")
+  @GET("library/metadata/{albumId}/children")
   suspend fun retrieveTracksForAlbum(
     @Path("albumId") albumId: String,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/sections")
+  @GET("library/sections")
   suspend fun retrieveLibraries(): PlexMediaContainerWrapper
 
   @GET("{url}")
@@ -138,14 +167,14 @@ interface PlexMediaService {
   ): HttpStatement
 
   /** Sets a media item to "watched" in the server. Works for both tracks and albums */
-  @GET("/:/scrobble")
+  @GET(":/scrobble")
   suspend fun watched(
     @Query("key") key: String,
     @Query("identifier") identifier: String = "com.plexapp.plugins.library",
   )
 
   /** Sets a media item to "unwatched" in the server. Works for both tracks and albums */
-  @GET("/:/unscrobble")
+  @GET(":/unscrobble")
   suspend fun unwatched(
     @Query("key") key: String,
     @Query("identifier") identifier: String = "com.plexapp.plugins.library",
@@ -155,7 +184,7 @@ interface PlexMediaService {
    * Updates the runtime of a media item with a corresponding [ratingKey] to [offset], the number
    * of milliseconds progress from the start of the media item
    */
-  @GET("/:/timeline")
+  @GET(":/timeline")
   suspend fun progress(
     @Query("ratingKey") ratingKey: String,
     @Query("time") offset: String,
@@ -176,7 +205,7 @@ interface PlexMediaService {
    * Note: Initial exploration indicates that this call is required in order for [progress]
    * updates to register in Plex, although I haven't confirmed it 100%
    */
-  @POST("/playQueues")
+  @POST("playQueues")
   suspend fun startMediaSession(
     /** [serverUri] is in the form: "server://<MACHINE_IDENTIFIER>/com.plexapp.plugins.library/library/metadata/<BOOK_ID> */
     @Query("uri") serverUri: String,
@@ -187,12 +216,12 @@ interface PlexMediaService {
   )
 
   /** Loads all [MediaType.TRACK]s available in the server */
-  @GET("/library/sections/{libraryId}/all?type=$MEDIA_TYPE_TRACK")
+  @GET("library/sections/{libraryId}/all?type=$MEDIA_TYPE_TRACK")
   suspend fun retrieveAllTracksInLibrary(
     @Path("libraryId") libraryId: String,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/sections/{libraryId}/all?type=$MEDIA_TYPE_TRACK")
+  @GET("library/sections/{libraryId}/all?type=$MEDIA_TYPE_TRACK")
   suspend fun retrieveTracksPaginated(
     @Path("libraryId") libraryId: String,
     @Query("X-Plex-Container-Start") containerStart: Int = 0,
@@ -215,7 +244,7 @@ interface PlexMediaService {
    * Community-documented rather than guaranteed, like the rest of the tag surface — verified in
    * python-plexapi's `listFilterChoices`, which queries exactly this path.
    */
-  @GET("/library/sections/{libraryId}/{filterName}?type=$MEDIA_TYPE_ALBUM")
+  @GET("library/sections/{libraryId}/{filterName}?type=$MEDIA_TYPE_ALBUM")
   suspend fun retrieveFilterChoices(
     @Path("libraryId") libraryId: String,
     @Path("filterName") filterName: String,
@@ -229,21 +258,21 @@ interface PlexMediaService {
    * so `asAudiobooks()` reads it unchanged; the point is not the metadata on each item but *which*
    * items came back, which is what associates a narrator or series with a set of books.
    */
-  @GET("/library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
+  @GET("library/sections/{libraryId}/all?type=$MEDIA_TYPE_ALBUM")
   suspend fun retrieveAlbumsWithTag(
     @Path("libraryId") libraryId: String,
     @Query("style") styleKey: String? = null,
     @Query("mood") moodKey: String? = null,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/sections/{libraryId}/collections?includeCollections=1")
+  @GET("library/sections/{libraryId}/collections?includeCollections=1")
   suspend fun retrieveCollectionsPaginated(
     @Path("libraryId") libraryId: String,
     @Query("X-Plex-Container-Start") containerStart: Int = 0,
     @Query("X-Plex-Container-Size") containerSize: Int = 100,
   ): PlexMediaContainerWrapper
 
-  @GET("/library/collections/{collectionId}/children")
+  @GET("library/collections/{collectionId}/children")
   suspend fun fetchBooksInCollection(
     @Path("collectionId") collectionId: String,
   ): PlexMediaContainerWrapper

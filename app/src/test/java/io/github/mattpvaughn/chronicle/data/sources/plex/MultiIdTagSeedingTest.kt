@@ -34,7 +34,7 @@ class MultiIdTagSeedingTest {
 
   private val service: PlexMediaService by lazy {
     Ktorfit.Builder()
-      .baseUrl(plex.url, checkUrl = false)
+      .baseUrl("${plex.url}/")
       .httpClient(
         HttpClient(OkHttp) {
           expectSuccess = true
