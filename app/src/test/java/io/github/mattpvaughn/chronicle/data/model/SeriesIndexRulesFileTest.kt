@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.model
 
-import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
+import io.github.mattpvaughn.chronicle.data.ChronicleJsonPretty
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,16 +17,13 @@ import org.junit.Test
  */
 class SeriesIndexRulesFileTest {
   /**
-   * The **codegen** adapters, not the reflective ones.
+   * The app's own parser, not a locally configured one.
    *
-   * The app removed `KotlinJsonAdapterFactory` and parses with `@JsonClass`-generated
-   * adapters, so a test using the reflective factory would exercise a different parser than the
-   * one that ships — and would leave the generated code with no coverage at all, which is what the
-   * per-package gate caught.
+   * `parseSeriesIndexRules` goes through `ChronicleJson`, so these exercise the parser that ships
+   * — settings and all. A test that built its own `Json` would assert against a parser the app
+   * does not use, which is how a leniency difference reaches a user's file unnoticed.
    */
-  private val moshi = Moshi.Builder().build()
-
-  private fun parse(json: String) = parseSeriesIndexRules(json, moshi)
+  private fun parse(json: String) = parseSeriesIndexRules(json)
 
   // ---- the happy path ----
 
@@ -103,12 +101,100 @@ class SeriesIndexRulesFileTest {
     assertTrue(parsed.isEmpty)
   }
 
+  /**
+   * The tolerance that costs a field its type.
+   *
+   * `order` is a `String`, not [PatternOrder], precisely so a typo is *reported* rather than
+   * fatal — a serializer asked for the enum rejects an unknown constant and takes the whole file
+   * with it, valid rules included. That is true of every serializer this project has used, and
+   * `ignoreUnknownKeys` does not help: it covers unknown *keys*, not unknown enum *values*. So the
+   * assertion that matters here is the second one — the rule survived the bad order.
+   */
   @Test
   fun `an unknown order falls back to before rather than failing`() {
     val parsed = parse("""{"order":"sideways","rules":[{"name":"x","pattern":"(?<index>\\d+)"}]}""")
 
     assertEquals(PatternOrder.BEFORE, parsed.order)
-    assertEquals(1, parsed.rules.size)
+    assertEquals("a typo in `order` must not discard the rules beside it", 1, parsed.rules.size)
+  }
+
+  /**
+   * The shape in [SeriesIndexRulesFile]'s own KDoc, written and read back.
+   *
+   * The KDoc shows an example file and tells a user to write one — so it is documentation that can
+   * be wrong, and the only way it stays true is a test that produces the same shape from the types
+   * themselves. It also covers the *writing* direction, which nothing else does: the parser builds
+   * these through a generated serializer, so an ordinary construction is otherwise never exercised.
+   */
+  @Test
+  fun `the documented file shape round-trips through the types`() {
+    val file =
+      SeriesIndexRulesFile(
+        version = RULES_SCHEMA_VERSION,
+        order = "before",
+        rules =
+          listOf(
+            SeriesIndexRuleEntry(
+              name = "my_shelf",
+              pattern = """^(?<series>.+?) - Part (?<index>\d+)""",
+              description = "How my own tagger writes a series",
+            ),
+          ),
+      )
+
+    val json = ChronicleJsonPretty.encodeToString(file)
+
+    // Every field the KDoc names must actually appear — `encodeDefaults` is what puts `version`
+    // and `order` there even though both sit at their defaults.
+    assertTrue("the written file must name its version: $json", json.contains("\"version\""))
+    assertTrue(json.contains("\"order\""))
+    assertTrue(json.contains("\"my_shelf\""))
+
+    assertEquals(file, ChronicleJson.decodeFromString<SeriesIndexRulesFile>(json))
+
+    // And the parser accepts what the writer produced, which is the property a user relies on
+    // when they copy the example out of the KDoc.
+    val parsed = parse(json)
+    assertEquals(PatternOrder.BEFORE, parsed.order)
+    assertEquals(listOf("my_shelf"), parsed.rules.map { it.name })
+  }
+
+  /**
+   * The defaults the KDoc leans on: a file naming only what it changes.
+   *
+   * `description` is optional and `version`/`order` have defaults, so the smallest useful rules
+   * file is a name and a pattern. Constructing one that way asserts the defaults are what the
+   * documentation says — and that an omitted `description` is an empty string rather than a
+   * failure, which is what the parser relies on for a hand-written file.
+   */
+  @Test
+  fun `the smallest useful file uses every default`() {
+    val minimal = SeriesIndexRulesFile(rules = listOf(SeriesIndexRuleEntry(name = "x", pattern = "(?<index>\\d+)")))
+
+    assertEquals(RULES_SCHEMA_VERSION, minimal.version)
+    assertEquals("before", minimal.order)
+    assertEquals("", minimal.rules.single().description)
+
+    // And it still yields a usable rule, which is the thing a user writing the minimum expects.
+    assertEquals(listOf("x"), parse(ChronicleJson.encodeToString(minimal)).rules.map { it.name })
+  }
+
+  @Test
+  fun `an unknown field does not discard the file`() {
+    // A rules file written by a future build, or hand-edited with a stray key. Unknown keys at
+    // both levels — beside `rules`, and inside a rule — must be ignored rather than thrown on,
+    // which is `ChronicleJson`'s `ignoreUnknownKeys` and not the parser's default.
+    val parsed =
+      parse(
+        """{
+          "order":"after",
+          "somethingTheFutureAdded":{"nested":[1,2]},
+          "rules":[{"name":"x","pattern":"(?<index>\\d+)","futureField":true}]
+        }""",
+      )
+
+    assertEquals(PatternOrder.AFTER, parsed.order)
+    assertEquals(listOf("x"), parsed.rules.map { it.name })
   }
 
   /** One bad rule must not take the good ones with it. */

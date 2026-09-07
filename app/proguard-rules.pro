@@ -58,17 +58,39 @@
 -keep interface io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService { *; }
 -keep interface io.github.mattpvaughn.chronicle.data.sources.plex.PlexLoginService { *; }
 
-# ============= Moshi =============
--keep class com.squareup.moshi.** { *; }
--keep interface com.squareup.moshi.** { *; }
--dontwarn com.squareup.moshi.**
--keep @com.squareup.moshi.JsonClass class * { *; }
--keepclassmembers class * {
-    @com.squareup.moshi.FromJson *;
-    @com.squareup.moshi.ToJson *;
+# ============= kotlinx-serialization =============
+# The library ships consumer rules that keep the generated serializers, so this section is
+# deliberately much smaller than the Moshi one it replaces — which had to keep a whole reflective
+# runtime plus every `**JsonAdapter`.
+#
+# What is *not* covered by those consumer rules is the `Companion.serializer()` lookup: the
+# generated `$serializer` object is found by name from the class it belongs to, and R8 cannot see
+# that edge. `@Serializable` classes are named explicitly rather than trusting a `-keepnames`
+# blanket, because the failure mode is a runtime `SerializationException` on a release build only
+# — exactly the class of break `test_release_build.sh` exists to catch, and the reason the Plex
+# models were already kept here under Moshi.
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.**
+
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
 }
--keep class **JsonAdapter { *; }
--keep class * extends com.squareup.moshi.JsonAdapter
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# The app's own serializable types, and the generated `$serializer` beside each.
+-keep,includedescriptorclasses class io.github.mattpvaughn.chronicle.**$$serializer { *; }
+-keepclassmembers class io.github.mattpvaughn.chronicle.** {
+    *** Companion;
+}
+-keepclasseswithmembers class io.github.mattpvaughn.chronicle.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# The Plex wire models, kept whole as they were under the previous serializer: their property
+# *names* are the JSON keys wherever no explicit `@SerialName` overrides them, so obfuscating one
+# renames a wire field and the response silently parses to defaults.
 -keep class io.github.mattpvaughn.chronicle.data.sources.plex.model.** { *; }
 
 # ============= Dagger 2 =============
@@ -104,7 +126,7 @@
 
 # ============= Kotlin & Coroutines =============
 # A blanket `-keep class kotlin.** { *; }` pinned ~1845 kotlin.reflect.jvm.internal
-# classes that nothing here reflects over. Keep only the metadata R8 and Moshi
+# classes that nothing here reflects over. Keep only the metadata R8 and the serializer
 # actually read.
 -keep class kotlin.Metadata { *; }
 -dontwarn kotlin.**

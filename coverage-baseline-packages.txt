@@ -1,11 +1,12 @@
 io/github/mattpvaughn/chronicle/application 20.42
 io/github/mattpvaughn/chronicle/application/compose 0.00
-io/github/mattpvaughn/chronicle/data/local 68.69
-io/github/mattpvaughn/chronicle/data/model 95.64
+io/github/mattpvaughn/chronicle/data 100.00
+io/github/mattpvaughn/chronicle/data/local 68.78
+io/github/mattpvaughn/chronicle/data/model 95.61
 io/github/mattpvaughn/chronicle/data/sources 86.99
 io/github/mattpvaughn/chronicle/data/sources/local 74.32
-io/github/mattpvaughn/chronicle/data/sources/plex 55.19
-io/github/mattpvaughn/chronicle/data/sources/plex/model 84.20
+io/github/mattpvaughn/chronicle/data/sources/plex 55.26
+io/github/mattpvaughn/chronicle/data/sources/plex/model 81.72
 io/github/mattpvaughn/chronicle/debug 0.86
 io/github/mattpvaughn/chronicle/debug/compose 0.00
 io/github/mattpvaughn/chronicle/features/bookdetails 51.43
@@ -30,7 +31,7 @@ io/github/mattpvaughn/chronicle/features/search/compose 82.59
 io/github/mattpvaughn/chronicle/features/settings 84.43
 io/github/mattpvaughn/chronicle/features/settings/compose 65.50
 io/github/mattpvaughn/chronicle/injection 0.00
-io/github/mattpvaughn/chronicle/injection/modules 9.76
+io/github/mattpvaughn/chronicle/injection/modules 10.35
 io/github/mattpvaughn/chronicle/navigation 87.46
 io/github/mattpvaughn/chronicle/navigation/compose 0.00
 io/github/mattpvaughn/chronicle/ui/theme 85.14

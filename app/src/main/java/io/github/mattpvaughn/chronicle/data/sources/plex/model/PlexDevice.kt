@@ -1,6 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
-import com.squareup.moshi.JsonClass
+import kotlinx.serialization.Serializable
 
 /**
  * One client registered against the Plex account, from `GET /api/v2/devices`.
@@ -15,7 +15,7 @@ import com.squareup.moshi.JsonClass
  * shape (`id` is a number here, and `connections` differs). The failure was safe — the check
  * treats any exception as inconclusive — but it meant the check could never succeed.
  */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class PlexDevice(
   /** This app's `X-Plex-Client-Identifier`, which is what the check matches on. */
   val clientIdentifier: String = "",

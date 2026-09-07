@@ -168,7 +168,9 @@ the catalogue row; moving bookmarks into `BookDatabase` breaks it, which is the 
 top-level `bookmarks` array, because forcing per-book rows through that map means JSON encoded
 inside a string value, and the file is meant to be openable in an editor (D12 rule 7).
 
-`BACKUP_SCHEMA_VERSION` is **2**: adding a settings key needs no bump (unknown keys are ignored),
+`BACKUP_SCHEMA_VERSION` is **2**: adding a settings key needs no bump (unknown keys are ignored —
+that tolerance is `ChronicleJson`'s `ignoreUnknownKeys`, a **setting**, not the parser's default,
+and `encodeDefaults` is what keeps `version` in a file whose version sits at its default),
 but the format growing a field does — otherwise `importSettingsOrNull`'s refusal of a newer version
 can never distinguish "a v1 file with no bookmarks" from "a v2 file whose bookmarks were lost".
 

@@ -23,7 +23,8 @@ exists. Release signing per `CONTRIBUTING.md`.
 | Pattern | MVVM + Repository | |
 | DI | Dagger 2.57.2 | Hand-rolled components. Hilt follows the screen migration |
 | Persistence | Room 2.8.1 | **Five separate databases**; all export schemas and have migration tests |
-| Network | Retrofit/OkHttp + Moshi | **codegen** (`@JsonClass(generateAdapter = true)`); the reflective `KotlinJsonAdapterFactory` was removed |
+| Network | Ktor 3.2.1 + Ktorfit 2.6.5, OkHttp engine | decision-24. Ktorfit reads the endpoint annotations; OkHttp is the engine, never named by app code (`RetiredDependencyTest`) |
+| Serialization | kotlinx-serialization 1.8.1 | Compiler-plugin codegen (`@Serializable`). One shared `ChronicleJson` — its `ignoreUnknownKeys` and `encodeDefaults` are the settings-export and rules-file guarantees, not conveniences |
 | Media | Media3 1.11.0 | ExoPlayer + MediaSession + Cast |
 | State | StateFlow | LiveData removed |
 | UI | **Compose** only | DataBinding removed, then ViewBinding. Adopted by decision-22; the migration finished with the navigation shell. One deliberate `AndroidView` island: `CastButton` |

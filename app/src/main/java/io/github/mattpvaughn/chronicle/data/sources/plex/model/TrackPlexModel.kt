@@ -1,17 +1,17 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /** A model for the "Media" element of a "Track" entity. Only requires a "Part" for our uses */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class Media(
-  @Json(name = "Part") val part: List<Part> = emptyList(),
+  @SerialName("Part") val part: List<Part> = emptyList(),
 )
 
 /** A model for the "Part" element of a "Media" entity. Only need the key for our uses */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class Part(val key: String = "", val size: Long = 0)
 
 fun List<PlexDirectory>?.asMediaItemTracks(): List<MediaItemTrack> {

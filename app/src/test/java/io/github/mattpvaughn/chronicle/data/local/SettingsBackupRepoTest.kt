@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
-import com.squareup.moshi.Moshi
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
@@ -47,7 +46,6 @@ class SettingsBackupRepoTest {
       SettingsBackupRepo(
         sharedPreferences = prefs,
         contentResolver = context.contentResolver,
-        moshi = Moshi.Builder().build(),
         dispatchers = TestDispatcherProvider(),
         bookmarkRepository = bookmarks,
       )
@@ -227,6 +225,40 @@ class SettingsBackupRepoTest {
     }
 
   @Test
+  fun `an empty file is reported rather than crashing`() =
+    runTest {
+      // Its own case: the previous parser returned *null* for empty input and the repo had an
+      // explicit null branch for it. This one throws instead, so the branch went — and this is
+      // what proves the outcome is unchanged rather than merely uncrashed. An empty file is a
+      // real thing to pick: a zero-byte file left by an interrupted export, or the wrong one.
+      backupFile.writeText("")
+
+      val result = repo.importFrom(backupFile.toUri())
+
+      assertTrue(
+        "expected Unreadable, got $result",
+        result is SettingsBackupRepo.ImportResult.Unreadable,
+      )
+    }
+
+  @Test
+  fun `a json array where an object is required is reported rather than crashing`() =
+    runTest {
+      // Structurally valid JSON of the wrong shape — the third distinct way a picked file can be
+      // wrong, after malformed and empty. Worth its own case because the *type* raised here is an
+      // `IllegalArgumentException` subclass rather than an obvious parse error, and the question
+      // of whether the repo's catch covers it is answered by this test rather than by reading.
+      backupFile.writeText("""["not","an","object"]""")
+
+      val result = repo.importFrom(backupFile.toUri())
+
+      assertTrue(
+        "expected Unreadable, got $result",
+        result is SettingsBackupRepo.ImportResult.Unreadable,
+      )
+    }
+
+  @Test
   fun `a json file that is not a backup is reported rather than applied`() =
     runTest {
       // Valid JSON, wrong document — the user picked the wrong file in the picker.
@@ -234,7 +266,7 @@ class SettingsBackupRepoTest {
 
       val result = repo.importFrom(backupFile.toUri())
 
-      // Moshi fills absent fields with the data class defaults, so this parses to
+      // The parser fills absent fields with the data class defaults, so this parses to
       // version 0 with no settings. Applying nothing is the honest outcome; what must not
       // happen is a crash or a silent success claim about settings that were never there.
       assertEquals(
@@ -346,9 +378,9 @@ class SettingsBackupRepoTest {
   /**
    * The whole point of criterion 3: a bookmark written to a file comes back from it.
    *
-   * Through the real Moshi adapter and a real file, so the JSON shape is exercised rather than
-   * assumed — a field Moshi cannot serialize would pass a pure round-trip test of the mapping
-   * functions and fail here.
+   * Through the real serializer and a real file, so the JSON shape is exercised rather than
+   * assumed — a field the serializer could not write would pass a pure round-trip test of the
+   * mapping functions and fail here.
    */
   @Test
   fun `a bookmark survives an export and import through a real file`() =

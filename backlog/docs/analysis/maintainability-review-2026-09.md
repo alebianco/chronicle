@@ -1004,13 +1004,29 @@ Compose first — a rewrite of all 42 screens, not a library swap. Neither is a 
 
 ### The code is not portable, and the unportable part is the app
 
-Of 32,508 lines in `app/src/main`:
+Of 32,508 lines in `app/src/main`, as first measured:
 
 | | lines | |
 |---|---:|---|
 | pure Kotlin (portable today) | 7,710 | 23.7% |
 | Android framework | 24,122 | 74.2% |
 | Room/entity only | 676 | 2.1% |
+
+**Re-measured after the serializer moved to kotlinx-serialization**, which was the last thing
+holding the models to the JVM — Moshi is JVM-only and codegen-based, so every Plex DTO stayed
+Android-side no matter what happened underneath it. Of 33,865 lines:
+
+| | lines | | change |
+|---|---:|---|---|
+| pure Kotlin (portable today) | 8,819 | **26.0%** | +2.3 pts |
+| Android framework | 24,355 | 71.9% | −2.3 pts |
+| Room/entity only | 691 | 2.0% | −0.1 pts |
+
+Worth reading honestly: **+2.3 points is a real but small move**, and it does not change the
+conclusion below. The models were already among the smaller, better-tested part of the tree; what
+the migration bought is that the portable part is now portable *in fact* rather than portable
+except for its serializer. The 74% that is UI, WorkManager and media/playback is untouched by it,
+and that is still the reason KMP would be paid for the part needing least help.
 
 The Android-bound three quarters, by what it actually touches:
 

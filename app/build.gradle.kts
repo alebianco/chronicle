@@ -6,6 +6,7 @@ plugins {
   alias(libs.plugins.ktorfit)
   alias(libs.plugins.hilt)
   alias(libs.plugins.compose.compiler)
+  alias(libs.plugins.kotlin.serialization)
   id("com.google.android.gms.oss-licenses-plugin")
   alias(libs.plugins.pitest)
   jacoco
@@ -243,10 +244,12 @@ dependencies {
   implementation(libs.ktorfit.lib)
   ksp(libs.ktorfit.ksp)
 
-  implementation(libs.moshi)
-  // Codegen, not reflection. The old KAPT processor is gone; this is the KSP
-  // one, which is what `@JsonClass(generateAdapter = true)` has been asking for ever since.
-  ksp(libs.moshi.codegen)
+  // kotlinx-serialization is the serializer, replacing Moshi. Moshi was JVM-only and
+  // codegen-based, so it kept every model Android-side no matter what happened to the transport;
+  // this is the last piece decision-24 deliberately left behind. The compiler plugin generates
+  // the serializers at compile time — no reflection, no KSP processor, no runtime adapter lookup.
+  implementation(libs.kotlinx.serialization.json)
+  implementation(libs.ktor.serialization.kotlinx.json)
 
   implementation(libs.coil)
   implementation(libs.coil.network.ktor3)
@@ -300,12 +303,6 @@ dependencies {
   debugImplementation(libs.ktor.client.mock)
   testImplementation(libs.ktor.client.mock)
   testImplementation(libs.okhttp3.mockwebserver)
-  testImplementation(libs.retrofit)
-  testImplementation(libs.retrofit.converter)
-  testImplementation(libs.moshi)
-  // Reflection, for tests that build adapters for types with no @JsonClass. Production is
-  // codegen-only, so `moshi-kotlin` and the kotlin-reflect it drags in stay out of the APK.
-  testImplementation(libs.moshi.kotlin.reflect)
   testImplementation(libs.kotlin.reflect)
   testImplementation(libs.robolectric)
   testImplementation(libs.androidx.test.core)
@@ -379,12 +376,13 @@ val coverageExclusions =
     "**/*_HiltComponents*.*",
     "**/hilt_aggregated_deps/**",
     "**/dagger/hilt/**",
-    // Moshi codegen — every model uses `@JsonClass(generateAdapter = true)`. These are
-    // generated `fromJson`/`toJson` bodies nobody writes or reviews — 7,882 instructions, 9.2% of
-    // the measured codebase, sitting in the denominator. The *models* they serialize stay
-    // measured, and the real-shape fixture tests still exercise the parsing through them;
-    // what is excluded is the generated plumbing, exactly as the Dagger and Room entries above do.
-    "**/*JsonAdapter*.*",
+    // Serializer codegen — every model carries `@Serializable`, and the compiler plugin emits a
+    // `$$serializer` object beside each holding the generated `serialize`/`deserialize` bodies.
+    // Nobody writes or reviews them, and they sat in the denominator as the equivalent Moshi
+    // adapters did (7,882 instructions, 9.2% of the measured codebase, before the swap). The
+    // *models* stay measured, and the real-shape fixture tests still exercise the parsing through
+    // them; what is excluded is the generated plumbing, as the Dagger and Room entries above do.
+    "**/*\$\$serializer*.*",
     // Ktorfit codegen. `_PlexMediaServiceImpl` and `_PlexLoginServiceImpl` are the generated
     // bodies for the 25 endpoint annotations — 2,292 instructions of URL building and header
     // plumbing nobody writes or reviews.

@@ -4,9 +4,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexDirectory
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
+import timber.log.Timber
 
 @TypeConverters(CollectionIdConverter::class, SourceIdConverters::class)
 @Entity
@@ -62,33 +65,45 @@ data class Collection(
  *
  * Room instantiates a `@TypeConverters(::class)` converter reflectively, so this cannot take a
  * dependency by construction without moving to `addTypeConverter` plumbing on every database that
- * uses it. It does not need to: this builds its **own** `Moshi` rather than reaching into
- * the DI graph, which is what made the model unconstructable in a test without standing up
+ * uses it. It does not need to: it names a **serializer directly** rather than reaching into the DI
+ * graph, which is what made the model unconstructable in a test without standing up
  * `ChronicleApplication`.
  *
- * That is safe here because the application's Moshi is a bare `Moshi.Builder().build()` with no
- * custom adapters, and the payload is a `List<String>` — the most primitive thing Moshi handles.
- * **If the app's Moshi ever gains an adapter that changes how a string list is written, this must
- * move to `addTypeConverter`**; `CollectionIdConverterTest` pins the stored form so that change
- * cannot pass unnoticed.
+ * `ListSerializer(String.serializer())` rather than the app's shared `Json`, on purpose: this is a
+ * **database column format**, not a wire or file format, and it must not inherit a configuration
+ * change made for one of those. `Json.Default` writes a `List<String>` as a plain JSON array —
+ * identical bytes to what the previous Moshi adapter wrote, so every already-stored row still
+ * reads. `CollectionIdConverterTest` pins that stored form so a change cannot pass unnoticed.
  */
 class CollectionIdConverter {
-  private val stringType = Types.newParameterizedType(List::class.java, String::class.java)
-  private val stringsAdapter = Moshi.Builder().build().adapter<List<String>>(stringType)
+  private val stringsSerializer = ListSerializer(String.serializer())
 
   // The stored form is unchanged: this always serialized a JSON array of strings
   // and only converted to Long in Kotlin. Dropping that conversion removes a lossy step —
   // `toLong()` would throw on a non-numeric child id.
   @TypeConverter
   fun fromList(value: List<String>): String {
-    return stringsAdapter.toJson(value)
+    return Json.encodeToString(stringsSerializer, value)
   }
 
+  /**
+   * Reads the stored array back, treating an unreadable column as no children.
+   *
+   * The `catch` is not defensive padding: Moshi's `fromJson` returned `null` for a malformed value
+   * and the old code mapped that to an empty list, whereas kotlinx **throws**. Without this, a row
+   * corrupted by a hand-edited database would take down every query that touches the collection
+   * table rather than costing one collection its child list.
+   */
   @TypeConverter
   fun toList(value: String): List<String> {
     if (value.isEmpty()) {
       return emptyList()
     }
-    return stringsAdapter.fromJson(value) ?: emptyList()
+    return try {
+      Json.decodeFromString(stringsSerializer, value)
+    } catch (e: SerializationException) {
+      Timber.w(e, "Unreadable collection childIds column; treating it as empty")
+      emptyList()
+    }
   }
 }

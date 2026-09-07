@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import com.squareup.moshi.Moshi
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.PatternOrder
 import io.github.mattpvaughn.chronicle.data.model.SERIES_INDEX_RULES_FILENAME
@@ -30,14 +29,12 @@ class SeriesIndexRulesLoaderTest {
   val folder = TemporaryFolder()
 
   /** Codegen adapters, matching what the app ships rather than the reflective factory. */
-  private val moshi = Moshi.Builder().build()
-
   @After
   fun tearDown() {
     Audiobook.resetSeriesIndexPatterns()
   }
 
-  private fun loader() = SeriesIndexRulesLoader(folder.root, moshi, TestDispatcherProvider())
+  private fun loader() = SeriesIndexRulesLoader(folder.root, TestDispatcherProvider())
 
   private fun writeRules(json: String) {
     folder.newFile(SERIES_INDEX_RULES_FILENAME).writeText(json)

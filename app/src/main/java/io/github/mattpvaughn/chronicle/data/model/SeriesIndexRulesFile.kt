@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.model
 
-import com.squareup.moshi.JsonClass
-import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
+import kotlinx.serialization.Serializable
 import timber.log.Timber
 
 /**
@@ -28,22 +28,25 @@ import timber.log.Timber
  * }
  * ```
  */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class SeriesIndexRulesFile(
   val version: Int = RULES_SCHEMA_VERSION,
   /**
    * Where the user's rules sit relative to the built-ins: `before`, `after` or `replace`.
    *
    * A string rather than the enum, so a hand-edited file with a typo can be *reported* rather than
-   * failing to parse — Moshi would reject an unknown enum constant outright, and the whole file
-   * with it, taking the valid rules down alongside the typo.
+   * failing to parse — a serializer asked for [PatternOrder] would reject an unknown constant
+   * outright, and the whole file with it, taking the valid rules down alongside the typo. That was
+   * true of Moshi and is true of kotlinx-serialization: `ignoreUnknownKeys` covers unknown *keys*,
+   * not unknown enum *values*, so keeping the field a `String` is what carries the tolerance.
+   * `SeriesIndexRulesFileTest` pins it.
    */
   val order: String = PatternOrder.BEFORE.name.lowercase(),
   val rules: List<SeriesIndexRuleEntry> = emptyList(),
 )
 
 /** One rule as written in the file. */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class SeriesIndexRuleEntry(
   val name: String = "",
   val pattern: String = "",
@@ -69,14 +72,15 @@ const val SERIES_INDEX_RULES_FILENAME = "series-index-rules.json"
  * taking the *whole* index down — is exactly tvnamer's failure mode that decision-18 exists to
  * avoid. Everything dropped is logged with the name the user gave it, so a typo is findable.
  */
-fun parseSeriesIndexRules(
-  json: String,
-  moshi: Moshi,
-): ParsedSeriesIndexRules {
+fun parseSeriesIndexRules(json: String): ParsedSeriesIndexRules {
   val file =
     try {
-      moshi.adapter(SeriesIndexRulesFile::class.java).fromJson(json)
+      ChronicleJson.decodeFromString<SeriesIndexRulesFile>(json)
     } catch (e: Exception) {
+      // Deliberately `Exception`, not `SerializationException`: this is decision-18's whole
+      // contract — a bad file costs the user their rules, never their series index — and that
+      // holds for *every* way a hand-edited file can be wrong, including ways this parser does not
+      // currently express as a `SerializationException`. Breadth here is the contract, not caution.
       Timber.w(e, "Ignoring $SERIES_INDEX_RULES_FILENAME: it is not valid JSON")
       null
     } ?: return ParsedSeriesIndexRules.NONE

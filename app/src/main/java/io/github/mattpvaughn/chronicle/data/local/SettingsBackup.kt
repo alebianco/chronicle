@@ -1,9 +1,9 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import com.squareup.moshi.JsonClass
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
+import kotlinx.serialization.Serializable
 import timber.log.Timber
 
 /**
@@ -14,7 +14,7 @@ import timber.log.Timber
  * key is parsed against its known type at import. That keeps the file readable and hand-editable
  * — which matters for the file-over-app principle — at the cost of parsing on restore.
  */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class SettingsBackup(
   val version: Int = BACKUP_SCHEMA_VERSION,
   val settings: Map<String, String> = emptyMap(),
@@ -43,7 +43,7 @@ data class SettingsBackup(
  * `position` is plain millis: the file is hand-editable, and a value class would serialize the same
  * anyway. It is converted to a `BookOffset` on the way in, where the frame matters.
  */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class BookmarkBackup(
   val id: String,
   val bookId: String,
@@ -101,11 +101,17 @@ fun importBookmarks(backup: SettingsBackup): List<Bookmark> =
  * Adding a *settings key* does **not** require a bump: unknown keys are ignored on import, so an
  * older app reading a newer file degrades rather than failing.
  *
+ * **That tolerance is a setting, not a default.** Moshi dropped an unknown key on its own;
+ * kotlinx-serialization **throws** on one unless `ignoreUnknownKeys = true`, which `ChronicleJson`
+ * sets. Get it wrong and restore breaks across app versions in the direction nobody exercises by
+ * hand — it is the *older* app that fails, on a file written by a *newer* one. `BackupSchemaTest`
+ * pins it against a file carrying an unknown top-level field and an unknown settings key.
+ *
  * **2** since the bookmarks-export change added the top-level `bookmarks` array. Strictly the
- * rule above still holds in the backwards direction — a v1 app has no such field and Moshi drops
- * it. The bump is for the other direction: this version must be able to tell "a v1 file that had
- * no bookmarks" from "a v2 file whose bookmarks were lost", and [importSettingsOrNull]'s refusal
- * of a *newer* version only ever means anything if the number moves when the format grows.
+ * rule above still holds in the backwards direction — a v1 app has no such field and the parser
+ * drops it. The bump is for the other direction: this version must be able to tell "a v1 file that
+ * had no bookmarks" from "a v2 file whose bookmarks were lost", and [importSettingsOrNull]'s
+ * refusal of a *newer* version only ever means anything if the number moves when the format grows.
  */
 const val BACKUP_SCHEMA_VERSION = 2
 

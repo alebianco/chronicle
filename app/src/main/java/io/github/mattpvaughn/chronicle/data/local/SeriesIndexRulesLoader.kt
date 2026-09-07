@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.local
 
-import com.squareup.moshi.Moshi
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.ParsedSeriesIndexRules
 import io.github.mattpvaughn.chronicle.data.model.SERIES_INDEX_RULES_FILENAME
@@ -29,7 +28,6 @@ class SeriesIndexRulesLoader
   @Inject
   constructor(
     private val filesDir: File,
-    private val moshi: Moshi,
     private val dispatchers: DispatcherProvider,
   ) {
     /** Where a user puts their rules. Named in the KDoc of the file format so it is discoverable. */
@@ -68,6 +66,6 @@ class SeriesIndexRulesLoader
             Timber.w(e, "Could not read $SERIES_INDEX_RULES_FILENAME")
             return@withContext ParsedSeriesIndexRules.NONE
           }
-        parseSeriesIndexRules(json, moshi)
+        parseSeriesIndexRules(json)
       }
   }

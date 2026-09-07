@@ -1,11 +1,11 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
 import android.os.Parcelable
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-@JsonClass(generateAdapter = true)
+@Serializable
 @Parcelize
 data class PlexUser(
   val id: Long = 0L,
@@ -20,7 +20,7 @@ data class PlexUser(
   val authToken: String? = "",
 ) : Parcelable
 
-@JsonClass(generateAdapter = true)
+@Serializable
 data class UsersResponse(
-  @Json(name = "users") val users: List<PlexUser>,
+  @SerialName("users") val users: List<PlexUser>,
 )

@@ -3,10 +3,10 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
-import com.squareup.moshi.Moshi
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.ConnectionTier
+import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.tier
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -75,7 +75,7 @@ class PlexPrefsConnectionRoundTripTest {
     prefs.edit().clear().commit()
     authPrefs = context.getSharedPreferences("PlexPrefsConnectionRoundTripTestAuth", Context.MODE_PRIVATE)
     authPrefs.edit().clear().commit()
-    repo = SharedPreferencesPlexPrefsRepo(prefs, authPrefs, Moshi.Builder().build())
+    repo = SharedPreferencesPlexPrefsRepo(prefs, authPrefs)
   }
 
   @Test
@@ -258,5 +258,54 @@ class PlexPrefsConnectionRoundTripTest {
     // Nothing to fall back to, so honest failure: no reachable connection means no usable
     // server, which is the pre-existing contract.
     assertNull(repo.server)
+  }
+
+  // ---- the stored user ----
+
+  @Test
+  fun `a stored user keeps every field`() {
+    val user =
+      PlexUser(
+        id = 7,
+        uuid = "user-uuid",
+        title = "Listener",
+        username = "listener",
+        thumb = "https://plex.tv/thumb",
+        hasPassword = true,
+        admin = true,
+        guest = false,
+        authToken = "user-token",
+      )
+
+    repo.user = user
+
+    assertEquals(user, repo.user)
+  }
+
+  /**
+   * A user whose optional fields are genuinely null.
+   *
+   * `username` and `authToken` are `String?` **with a default of `""`**, and `ChronicleJson` sets
+   * `explicitNulls = false` — so a null is written by *omitting* the key, and an omitted key reads
+   * back as the default. That means null becomes `""` across a round trip. Pinned rather than left
+   * implicit: `""` and `null` are both falsy at every call site that reads these, so the collapse
+   * is harmless *today* and would stop being harmless the moment someone distinguished them.
+   */
+  @Test
+  fun `a user with null optional fields round-trips to the empty defaults`() {
+    repo.user = PlexUser(id = 7, uuid = "user-uuid", username = null, authToken = null)
+
+    val read = repo.user
+    assertEquals("user-uuid", read?.uuid)
+    assertEquals("", read?.username)
+    assertEquals("", read?.authToken)
+  }
+
+  /** A corrupt stored user reads as absent rather than crashing the launch path. */
+  @Test
+  fun `an unreadable stored user reads as absent`() {
+    authPrefs.edit().putString("user", "{not json").commit()
+
+    assertNull(repo.user)
   }
 }

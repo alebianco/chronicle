@@ -1,6 +1,6 @@
 package io.github.mattpvaughn.chronicle.testing
 
-import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.UsersResponse
@@ -19,22 +19,18 @@ import org.junit.Test
  * Proves the fixtures still deserialize into the domain objects the app uses.
  *
  * A fixture that has silently drifted from its model is worse than no fixture:
- * every test built on it keeps passing while asserting nothing real. Moshi runs
- * in reflection mode here and fills absent fields with defaults rather than
- * failing, so a renamed JSON key produces an empty list, not an exception —
- * which is exactly how that drift stays invisible. These tests assert on
- * *values*, so a mismatch fails loudly.
+ * every test built on it keeps passing while asserting nothing real. The parser
+ * fills absent fields with their Kotlin defaults rather than failing, so a
+ * renamed JSON key produces an empty list, not an exception — which is exactly
+ * how that drift stays invisible. These tests assert on *values*, so a mismatch
+ * fails loudly.
  */
 class PlexFixtureContractTest {
   @get:Rule
   val server = FakePlexServer()
 
-  private val moshi = Moshi.Builder().build()
-
   private fun container(fixture: String): PlexMediaContainerWrapper =
-    moshi.adapter(PlexMediaContainerWrapper::class.java)
-      .fromJson(FakePlexServer.fixture(fixture))
-      ?: error("Failed to parse $fixture")
+    ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(FakePlexServer.fixture(fixture))
 
   @Test
   fun `libraries fixture maps to library directories`() {
@@ -195,9 +191,7 @@ class PlexFixtureContractTest {
   @Test
   fun `home users fixture maps to users including a managed one`() {
     val users =
-      moshi.adapter(UsersResponse::class.java)
-        .fromJson(FakePlexServer.fixture("home-users.json"))
-        ?: error("Failed to parse home-users.json")
+      ChronicleJson.decodeFromString<UsersResponse>(FakePlexServer.fixture("home-users.json"))
 
     assertEquals(2, users.users.size)
     assertTrue("admin user is present", users.users.any { it.admin })
@@ -206,8 +200,8 @@ class PlexFixtureContractTest {
   }
 
   /**
-   * The leniency question the Moshi codegen switch turned on: generated adapters are stricter than reflection about
-   * absent and null fields, and these models parse live Plex responses whose shape varies by server
+   * The leniency question every serializer change turns on: a strict parser rejects what a lenient
+   * one defaults, and these models parse live Plex responses whose shape varies by server
    * version. A missing key must fall back to the Kotlin default, not throw.
    */
   @Test
@@ -216,8 +210,7 @@ class PlexFixtureContractTest {
       """{"MediaContainer":{"size":1,"Metadata":[{"ratingKey":"1001","title":"Sparse Book"}]}}"""
 
     val parsed =
-      moshi.adapter(PlexMediaContainerWrapper::class.java).fromJson(sparse)
-        ?: error("sparse container failed to parse")
+      ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(sparse)
 
     val book = parsed.plexMediaContainer.metadata.single()
     assertEquals("1001", book.ratingKey)
@@ -228,9 +221,11 @@ class PlexFixtureContractTest {
   }
 
   /**
-   * An explicit JSON `null` on a non-null Kotlin field is the case where codegen and reflection
-   * genuinely differ — codegen throws. Pinning the behaviour so a server that starts sending nulls
-   * produces a known failure rather than a mystery.
+   * An explicit JSON `null` on a non-null Kotlin field is the case where parsers genuinely differ,
+   * and this one throws. `ChronicleJson` leaves `coerceInputValues` off specifically so it keeps
+   * throwing: with it on, a server that started sending nulls would produce a library of books
+   * silently titled "" instead of a known failure. Absent keys still take their defaults — that is
+   * the test above, and the case Plex actually exercises.
    */
   @Test
   fun `an explicit null on a non-null field is rejected, not silently defaulted`() {
@@ -239,7 +234,7 @@ class PlexFixtureContractTest {
 
     val failure =
       runCatching {
-        moshi.adapter(PlexMediaContainerWrapper::class.java).fromJson(withNull)
+        ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(withNull)
       }.exceptionOrNull()
 
     assertTrue(
@@ -254,8 +249,7 @@ class PlexFixtureContractTest {
     val empty = """{"MediaContainer":{"size":0}}"""
 
     val parsed =
-      moshi.adapter(PlexMediaContainerWrapper::class.java).fromJson(empty)
-        ?: error("empty container failed to parse")
+      ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(empty)
 
     assertTrue(parsed.plexMediaContainer.metadata.isEmpty())
   }
@@ -412,8 +406,7 @@ class PlexFixtureContractTest {
     val body = client.newCall(request).execute().use { it.body!!.string() }
 
     val tracks =
-      moshi.adapter(PlexMediaContainerWrapper::class.java)
-        .fromJson(body)!!
+      ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(body)
         .plexMediaContainer
         .asTrackList()
 

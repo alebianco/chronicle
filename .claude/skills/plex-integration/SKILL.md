@@ -119,11 +119,14 @@ preference enabled — which is why fixtures written to match the code never sho
   claiming four call sites was wrong — those are `/library/sections/{id}/common` and a PUT, passing
   ids as an `id=` query parameter to different endpoints). Don't re-derive this.
 
-### `@Json` names must be checked against a captured response
+### `@SerialName` names must be checked against a captured response
 
-`plexGenres` carried **no** `@Json(name = "Genre")` for the life of the project, so Moshi looked for
+`plexGenres` carried **no** name annotation for the life of the project, so the parser looked for
 a key literally called `plexGenres` and `Audiobook.genre` was empty against every real server —
 while every test passed, because the hand-written fixtures were written to match the *code*.
+
+The same trap in the other casing: `Connection.iPv6` needs `@SerialName("IPv6")`, because the
+inferred name differs only by case and the fixture omits the key entirely.
 
 The `*-real-shape.json` fixtures are captured from a real server and are the **authority**; pin new
 parsing tests against those.
@@ -168,8 +171,10 @@ Two traps:
 User rules live in `series-index-rules.json` in the app's files directory:
 `{version, order, rules:[{name, pattern, description}]}`, absent by default. **Every** failure
 degrades to the built-ins (malformed JSON, newer version, unknown order, nameless rule,
-uncompilable regex). `order` is parsed as a *string*, not a Moshi enum, since an unknown constant
-would make Moshi reject the whole file and take the valid rules with it. The load runs off the main
+uncompilable regex). `order` is parsed as a *string*, not the `PatternOrder` enum, since an unknown
+constant would make the parser reject the whole file and take the valid rules with it. Note
+`ignoreUnknownKeys` does **not** cover this: it forgives unknown *keys*, not unknown enum *values*,
+so keeping the field a `String` is what carries the tolerance. The load runs off the main
 thread (StrictMode penalises a disk read in `Application.onCreate`) and is launched, not awaited.
 
 **The tester UI is not optional polish** — tvnamer's #216 is a user who could not tell

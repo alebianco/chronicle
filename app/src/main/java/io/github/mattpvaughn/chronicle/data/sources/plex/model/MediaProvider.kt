@@ -1,9 +1,9 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-@JsonClass(generateAdapter = true)
+@Serializable
 data class MediaProvider(
-  @Json(name = "Feature") val feature: List<Feature> = emptyList(),
+  @SerialName("Feature") val feature: List<Feature> = emptyList(),
 )

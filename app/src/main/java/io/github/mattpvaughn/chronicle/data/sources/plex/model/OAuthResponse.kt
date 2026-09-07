@@ -1,8 +1,8 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
-import com.squareup.moshi.JsonClass
+import kotlinx.serialization.Serializable
 
-@JsonClass(generateAdapter = true)
+@Serializable
 data class OAuthResponse(
   val id: Long,
   val clientIdentifier: String,

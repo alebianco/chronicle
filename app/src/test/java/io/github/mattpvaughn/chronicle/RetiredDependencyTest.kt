@@ -9,7 +9,8 @@ import java.io.File
  * Dependencies this project deliberately removed, kept out.
  *
  * The pattern of `ServiceLocatorUsageTest`: a carve is only finished if something stops it growing
- * back. Two entries so far, both from decision-24.
+ * back. Four entries, all from the same programme — decision-24 moved the transport, and the
+ * serializer followed once a parsing regression could no longer be confused with a transport one.
  *
  * **Fetch2** was abandoned upstream — last commit 2024-12-03, no release after 3.4.1, and served
  * from JitPack, which builds from source on demand and guarantees nothing about an artifact
@@ -72,6 +73,19 @@ class RetiredDependencyTest {
         "an Interceptor or Authenticator here is a JVM-only commitment. Use a Ktor plugin.",
       emptyList<String>(),
       filesImporting("okhttp3"),
+    )
+  }
+
+  @Test
+  fun `no source imports Moshi`() {
+    assertEquals(
+      "kotlinx-serialization replaced Moshi. Moshi is JVM-only and codegen-based, so it kept " +
+        "every model Android-side no matter what happened to the transport — the last thing " +
+        "pinning the data layer to the JVM after Ktor. Annotate with @Serializable and parse " +
+        "through ChronicleJson, whose settings (ignoreUnknownKeys, encodeDefaults) are the " +
+        "file-format guarantees SettingsBackup and SeriesIndexRulesFile depend on.",
+      emptyList<String>(),
+      filesImporting("com.squareup.moshi"),
     )
   }
 

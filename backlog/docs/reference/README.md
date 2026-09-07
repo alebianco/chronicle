@@ -57,7 +57,8 @@ If you're new to the project, we recommend reading the documentation in order:
 - **Dependency Injection**: Dagger 2.57.2, hand-rolled components, via **KSP** (not KAPT)
 - **Database**: Room 2.8.1 — **five** databases, each with its own version and migration list
 - **Media Playback**: Media3 1.11.0 (ExoPlayer + MediaSession + Cast)
-- **Networking**: Retrofit + OkHttp + Moshi (**codegen**, `@JsonClass(generateAdapter = true)`)
+- **Networking**: Ktor + Ktorfit over the OkHttp engine (decision-24)
+- **Serialization**: kotlinx-serialization (`@Serializable`), through the shared `ChronicleJson`
 - **Image Loading**: **Coil 3** (Fresco and Glide were both removed)
 - **Downloads**: Fetch2
 

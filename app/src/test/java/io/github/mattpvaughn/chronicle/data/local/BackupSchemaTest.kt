@@ -1,5 +1,7 @@
 package io.github.mattpvaughn.chronicle.data.local
 
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
+import io.github.mattpvaughn.chronicle.data.ChronicleJsonPretty
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -203,5 +205,92 @@ class BackupSchemaTest {
   @Test
   fun `a key with no declared type is skipped`() {
     assertNull(parseSettingOrNull("key_invented_by_a_future_version", "whatever"))
+  }
+
+  // ---- the parser, not just the mapping ----
+  //
+  // Everything above operates on a `SettingsBackup` that already exists. These four go through
+  // the JSON, because the forward-compatibility rule is a property of the *parser*: Moshi dropped
+  // an unknown key on its own and kotlinx-serialization throws on one unless told otherwise, so
+  // the guarantee moved from "the library happens to do this" to "`ChronicleJson` sets
+  // `ignoreUnknownKeys`". A test on the mapping functions cannot see that change at all.
+
+  @Test
+  fun `an older app reading a newer file degrades rather than failing`() {
+    // The direction nobody exercises by hand, and the one that breaks silently: a file written by
+    // a future build, read by this one. Both kinds of unknown appear — a *top-level* field beside
+    // `version`, and an unknown key *inside* `settings`.
+    val fromANewerApp =
+      """
+      {
+        "version": $BACKUP_SCHEMA_VERSION,
+        "settings": {
+          "key_playback_speed": "1.5",
+          "key_invented_by_a_future_version": "whatever"
+        },
+        "bookmarks": [],
+        "somethingTheFutureAdded": {"nested": ["values", 1, true]}
+      }
+      """.trimIndent()
+
+    val backup = ChronicleJson.decodeFromString<SettingsBackup>(fromANewerApp)
+
+    assertEquals(BACKUP_SCHEMA_VERSION, backup.version)
+    assertEquals(
+      "the settings this build understands must still restore",
+      mapOf(PrefsRepo.KEY_PLAYBACK_SPEED to "1.5"),
+      importSettings(backup),
+    )
+  }
+
+  @Test
+  fun `an unknown field does not cost the file its bookmarks`() {
+    // The expensive half of a failed import: settings are re-derivable from the app, bookmarks are
+    // the user's own writing and the server holds no copy (D8). A throw here loses those.
+    val withUnknownFields =
+      """
+      {
+        "version": $BACKUP_SCHEMA_VERSION,
+        "settings": {},
+        "bookmarks": [
+          {"id": "b1", "bookId": "1001", "positionMillis": 5000, "note": "here",
+           "createdAt": 42, "colour": "future-field"}
+        ],
+        "somethingTheFutureAdded": true
+      }
+      """.trimIndent()
+
+    val backup = ChronicleJson.decodeFromString<SettingsBackup>(withUnknownFields)
+
+    val restored = importBookmarks(backup).single()
+    assertEquals("b1", restored.id)
+    assertEquals("here", restored.note)
+  }
+
+  @Test
+  fun `a v1 file with no bookmarks array still parses`() {
+    // The backwards direction. A v1 file has no `bookmarks` field at all, and the default must
+    // apply rather than the absence being an error.
+    val v1 = """{"version": 1, "settings": {"key_playback_speed": "1.5"}}"""
+
+    val backup = ChronicleJson.decodeFromString<SettingsBackup>(v1)
+
+    assertEquals(1, backup.version)
+    assertTrue("an absent bookmarks array is empty, not a failure", backup.bookmarks.isEmpty())
+  }
+
+  @Test
+  fun `an exported file names its schema version even at the default`() {
+    // `version` equals its default on every file this build writes, and a serializer that omits
+    // defaults would drop the field entirely — leaving a format with no self-description, and
+    // `importSettingsOrNull`'s version check reading 0 on a file that never said so.
+    // `ChronicleJson` sets `encodeDefaults` for exactly this.
+    val written = ChronicleJsonPretty.encodeToString(exportSettings(emptyMap()))
+
+    assertTrue("the export must declare its schema: $written", written.contains("\"version\""))
+    assertEquals(
+      BACKUP_SCHEMA_VERSION,
+      ChronicleJson.decodeFromString<SettingsBackup>(written).version,
+    )
   }
 }

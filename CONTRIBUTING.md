@@ -59,5 +59,5 @@ Checklist:
 ### Common Issues
 
 - `ClassNotFoundException`: Add `-keep` rule for the class/package
-- JSON parsing fails: Keep model classes / Moshi adapters
+- JSON parsing fails: Keep model classes and their generated `$$serializer`
 - Dagger injection fails: Ensure generated components/modules are kept

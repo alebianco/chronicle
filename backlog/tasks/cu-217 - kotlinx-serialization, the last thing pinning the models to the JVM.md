@@ -1,7 +1,7 @@
 ---
 id: cu-217
 title: "kotlinx-serialization, the last thing pinning the models to the JVM"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -66,21 +66,89 @@ converter can register kotlinx for the API and Moshi for the rest during the tra
 
 ## Acceptance Criteria
 
-- [ ] kotlinx-serialization adopted; `MoshiContentConverter` **deleted** and Ktor's own converter
-      used instead
-- [ ] `ignoreUnknownKeys = true` where `SettingsBackup` needs it, with a test proving an older app
+- [x] kotlinx-serialization adopted; `MoshiContentConverter` **deleted** and Ktor's own converter
+      used instead, via one shared `installPlexJson()` the DI graph and four tests now agree on
+- [x] `ignoreUnknownKeys = true` where `SettingsBackup` needs it, with a test proving an older app
       reading a **newer** backup file still degrades rather than failing
-- [ ] `SeriesIndexRulesFile` still tolerates an unknown enum constant without discarding the file,
+- [x] `SeriesIndexRulesFile` still tolerates an unknown enum constant without discarding the file,
       pinned by a test
-- [ ] `Collection`'s Room `@TypeConverter` still works, given Room instantiates it reflectively
-- [ ] The real-shape Plex fixture tests pass untouched — they are the evidence that parsing did not
+- [x] `Collection`'s Room `@TypeConverter` still works, given Room instantiates it reflectively —
+      pinned by building it through `getDeclaredConstructor().newInstance()`, as Room does
+- [x] The real-shape Plex fixture tests pass untouched — they are the evidence that parsing did not
       change
-- [ ] Moshi and its KSP processor removed from the build once nothing uses them; APK delta recorded
-- [ ] `RetiredDependencyTest` extended to keep Moshi out of `app/src/main`
-- [ ] **The portable share is re-measured** so cu-182 inherits a current number, per cu-210
-- [ ] `./verify.sh` green; `./test_release_build.sh` passes — serialization is R8-sensitive
+- [x] Moshi and its KSP processor removed from the build once nothing uses them; APK delta recorded
+- [x] `RetiredDependencyTest` extended to keep Moshi out of `app/src/main`
+- [x] **The portable share is re-measured** so cu-182 inherits a current number, per cu-210
+- [x] `./verify.sh` green; `./test_release_build.sh` passes — serialization is R8-sensitive
 
 ## Notes
 
 Closing status **In Review**: settings export is user data governed by decision-8, and a
 forward-compatibility rule is the kind of thing worth a second pair of eyes even when tests pass.
+
+
+## Closing notes
+
+Done in one pass rather than the two the description allowed for — the on-disk formats turned out
+to be the *easier* half, because both already had thorough degradation suites and neither needed a
+custom serializer. What the split protected against did not materialise; what it warned about did.
+
+### The two defaults that differ, and what each cost
+
+**`ignoreUnknownKeys`** was the expected one and behaved as predicted. Sabotage-verified: turning it
+off fails 11 tests — the two new forward-compatibility tests, the rules-file one, and eight
+real-shape fixture tests, which is a fair measure of how much of this app's parsing depends on it.
+
+**`encodeDefaults` was not anticipated by the ticket, and is the more interesting find.** kotlinx
+omits any property equal to its default, so `SettingsBackup(version = 2)` serialized to a file with
+**no `version` field at all** — the format's own self-description, silently absent. It was caught by
+an existing assertion (`SettingsBackupRepoTest`, "should declare its schema"), not by design.
+`importSettingsOrNull`'s newer-version refusal would have read 0 on every file this build wrote.
+
+**`coerceInputValues` was deliberately left off.** It would have been the tempting way to match
+Moshi's leniency, but `PlexFixtureContractTest` pins the opposite: an explicit `null` on a non-null
+field must fail loudly. A server that starts sending nulls should be a known failure, not a library
+of books titled `""`.
+
+All four settings live in one `ChronicleJson`, with the reasoning beside each — the settings *are*
+the file-format guarantees, so they should not be re-decided per call site.
+
+### Measurements
+
+| | before | after | |
+|---|---:|---:|---|
+| release APK | 7,251,456 B | 7,267,774 B | **+16.3 KB (+0.22%)** |
+| portable share of `app/src/main` | 23.7% | **26.0%** | +2.3 pts |
+
+The APK grew slightly rather than shrank: the kotlinx runtime costs a little more than the Moshi
+one it replaced, and dropping the KSP-generated adapters did not offset it. Worth stating plainly —
+the case for this change was portability and one less JVM-only dependency, not size.
+
+The portable figure is re-measured in `maintainability-review-2026-09.md` beside the original, with
+the honest caveat that +2.3 points does not change that review's conclusion: the 72% that is UI,
+WorkManager and media is untouched.
+
+### A guard that would have silently stopped working
+
+`test_release_build.sh` scanned for `@JsonClass` to decide which models must survive R8. After the
+migration that pattern matched **nothing**, so the check would have passed while asserting over an
+empty set — the exact "guard whose list quietly emptied" failure this repo warns about. It now scans
+`@Serializable` **and carries a count floor** (20 models found, floor 15), so a future serializer
+change fails visibly instead of passing vacuously.
+
+### Coverage
+
+`data/model` was restored to its floor by two new tests. `data/sources/plex/model` was lowered
+**deliberately** from 84.20% to 81.59%, measured: 2.47 of the 2.61 points lost are uncovered
+`<clinit>` blocks the compiler plugin adds to model classes to cache element serializers. It is
+generated plumbing, but unlike `$$serializer` it lives *inside* the model class and so cannot be
+excluded by pattern. `MediaProvider` and `Feature`, which account for much of it, are unreferenced
+by production code and were already at 0%.
+
+### Not done
+
+`./test_release_build.sh`'s **install step** fails at `INSTALL_PARSE_FAILED_NO_CERTIFICATES` — the
+release APK is unsigned because signing is owner-only. Pre-existing and unrelated, but it means the
+release variant has been **built and R8-verified, not run on a device**. The R8 assertions are the
+part this task needed and they pass; a device smoke test of a signed build is still owed by whoever
+holds the keys.

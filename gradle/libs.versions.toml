@@ -16,17 +16,19 @@ ksp = "2.2.10-2.0.2"
 coil = "3.3.0"
 timber = "5.0.1"
 dagger = "2.57.2"
-moshi = "1.15.2"
 media3 = "1.11.0"
 media = "1.7.0"
 kotlinReflect = "2.2.10"
 work = "2.11.2"
 result = "2.0.1"
-retrofit = "3.0.0"
 swiperefresh = "1.1.0"
 seismic = "1.0.3"
 okhttp3 = "5.4.0"
 ktor = "3.2.1"
+# The version Ktor 3.2.1 resolves to on its own. Kept in step with `ktor` deliberately: the
+# converter and the runtime are one boundary, and a newer serializer under an older Ktor is the
+# kind of mismatch that shows up as a parse failure rather than a build error.
+serialization = "1.8.1"
 ktorfit = "2.6.5"
 browserx = "1.8.0"
 oss = "17.1.0"
@@ -87,10 +89,6 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version = "2.9.0" }
 javapoet = { group = "com.squareup", name = "javapoet", version = "1.13.0" }
 hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "dagger" }
-moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
-# Reflection-based adapters. Tests only — production is codegen.
-moshi-kotlin-reflect = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshi" }
-moshi-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version.ref = "moshi" }
 media = { group = "androidx.media", name = "media", version.ref = "media" }
 kotlin-reflect = { group = "org.jetbrains.kotlin", name = "kotlin-reflect", version.ref = "kotlinReflect" }
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
@@ -105,8 +103,6 @@ mediarouter = { group = "androidx.mediarouter", name = "mediarouter", version = 
 # Plex interceptor, the 401 re-auth and the tiered connection chooser.
 work = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 result = { group = "com.michael-bull.kotlin-result", name = "kotlin-result", version.ref = "result" }
-retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
-retrofit-converter = { group = "com.squareup.retrofit2", name = "converter-moshi", version.ref = "retrofit" }
 swiperefresh = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefresh" }
 seismic = { group = "com.squareup", name = "seismic", version.ref = "seismic" }
 okhttp3 = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp3" }
@@ -115,6 +111,9 @@ ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.r
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
 ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref = "ktor" }
+# Ktor's own kotlinx-serialization converter, replacing the hand-written `MoshiContentConverter`
+# (decision-24 deferred the serializer deliberately; this is the change that finishes it).
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktorfit-lib = { group = "de.jensklingenberg.ktorfit", name = "ktorfit-lib", version.ref = "ktorfit" }
 ktorfit-ksp = { group = "de.jensklingenberg.ktorfit", name = "ktorfit-ksp", version.ref = "ktorfit" }
 okhttp3-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
@@ -142,6 +141,10 @@ lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtim
 lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
 annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
 coroutines = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+# Declared at the version Ktor 3.2.1 already resolves to, so this pins today's behaviour rather
+# than changing it — the same rule the androidx entries above follow. It is the *serializer* now,
+# not just a transitive of the transport, so it is named explicitly.
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
@@ -187,3 +190,6 @@ ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 # sourceSets.main/test, which com.android.application does not provide.
 pitest = { id = "pl.droidsonroids.pitest", version.ref = "pitest" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# Ships with Kotlin itself, so it reuses the `kotlin` ref rather than carrying a version that
+# could drift out of step with the compiler it plugs into.
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

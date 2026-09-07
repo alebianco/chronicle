@@ -3,13 +3,13 @@ package io.github.mattpvaughn.chronicle.data.local
 import android.content.ContentResolver
 import android.content.SharedPreferences
 import android.net.Uri
-import com.squareup.moshi.JsonDataException
-import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
+import io.github.mattpvaughn.chronicle.data.ChronicleJsonPretty
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 import okio.buffer
 import okio.sink
-import okio.source
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,12 +28,9 @@ class SettingsBackupRepo
   constructor(
     private val sharedPreferences: SharedPreferences,
     private val contentResolver: ContentResolver,
-    moshi: Moshi,
     private val dispatchers: DispatcherProvider,
     private val bookmarkRepository: IBookmarkRepository,
   ) {
-    private val adapter = moshi.adapter(SettingsBackup::class.java).indent("  ")
-
     /**
      * Serializes the allowlisted settings to [destination].
      *
@@ -50,7 +47,7 @@ class SettingsBackupRepo
               // part of this file that actually cannot be re-derived (D8).
               bookmarks = bookmarkRepository.getAllAsync().map { it.toBackup() },
             )
-          val json = adapter.toJson(backup)
+          val json = ChronicleJsonPretty.encodeToString(backup)
           // "wt" truncates. Without it, overwriting an existing longer file leaves the old
           // tail behind and produces trailing garbage after valid JSON.
           val stream =
@@ -87,21 +84,28 @@ class SettingsBackupRepo
                 ?: return@withContext ImportResult.Unreadable(
                   IllegalStateException("Could not open $source for reading"),
                 )
-            stream.source().buffer().use { adapter.fromJson(it) }
-          } catch (e: JsonDataException) {
+            // Read whole rather than streamed. A settings backup is a handful of kilobytes — the
+            // allowlist is seventeen keys plus the user's bookmarks — and kotlinx's streaming
+            // decoder is still experimental, so this trades nothing real for a stable API.
+            val json = stream.use { it.readBytes().decodeToString() }
+            // The plain instance on the way in: pretty-printing is purely a *writing* choice, and
+            // reading through the indented one would suggest the file's formatting mattered to the
+            // parse. It does not — a hand-edited file with no indentation must restore identically.
+            ChronicleJson.decodeFromString<SettingsBackup>(json)
+          } catch (e: SerializationException) {
+            // Every way the *content* can be wrong lands here — malformed JSON, an empty file, a
+            // JSON array where an object is required. Checked by narrowing this catch and watching
+            // the tests still pass, rather than assumed: the parser's `IllegalArgumentException`
+            // subclasses turned out not to escape it.
             Timber.w(e, "Backup file at $source is not a settings backup")
             return@withContext ImportResult.Unreadable(e)
           } catch (e: Exception) {
+            // The stream itself, not the parse: an unreadable descriptor, a revoked SAF grant. Kept
+            // broad because this is a file the *user* picked, and no way of failing to read one is
+            // worth crashing the settings screen over.
             Timber.e(e, "Failed to read a backup from $source")
             return@withContext ImportResult.Unreadable(e)
           }
-
-        if (backup == null) {
-          Timber.w("Backup file at $source parsed to null")
-          return@withContext ImportResult.Unreadable(
-            IllegalStateException("Empty backup file"),
-          )
-        }
 
         val allowed =
           importSettingsOrNull(backup)

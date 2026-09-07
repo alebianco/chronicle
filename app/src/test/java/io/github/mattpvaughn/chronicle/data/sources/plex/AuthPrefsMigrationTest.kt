@@ -3,8 +3,7 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,10 +32,6 @@ class AuthPrefsMigrationTest {
   private lateinit var settings: SharedPreferences
   private lateinit var auth: SharedPreferences
 
-  // Matches AppModule.moshi(): codegen is disabled in this project, so a bare Moshi cannot
-  // serialize PlexUser and these tests would fail for a reason unrelated to the migration.
-  private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-
   private val user =
     PlexUser(id = 1, uuid = "user-uuid", title = "Listener", authToken = "user-token")
 
@@ -49,14 +44,14 @@ class AuthPrefsMigrationTest {
     auth.edit().clear().commit()
   }
 
-  private fun newRepo() = SharedPreferencesPlexPrefsRepo(settings, auth, moshi)
+  private fun newRepo() = SharedPreferencesPlexPrefsRepo(settings, auth)
 
   /** Writes credentials the legacy way: into the settings file. */
   private fun writeLegacyCredentials() {
     settings.edit()
       .putString("auth_token", "account-token")
       .putString("server_token", "server-access-token")
-      .putString("user", moshi.adapter(PlexUser::class.java).toJson(user))
+      .putString("user", ChronicleJson.encodeToString(user))
       // A setting, to prove the migration leaves unrelated keys alone.
       .putBoolean("key_skip_silence", true)
       .commit()
@@ -134,7 +129,7 @@ class AuthPrefsMigrationTest {
       .putBoolean("credentials_migrated", true)
       .putString("auth_token", "account-token")
       .putString("server_token", "server-access-token")
-      .putString("user", moshi.adapter(PlexUser::class.java).toJson(user))
+      .putString("user", ChronicleJson.encodeToString(user))
       .commit()
 
     val repo = newRepo()

@@ -1,8 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import androidx.test.core.app.ApplicationProvider
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
@@ -132,11 +130,7 @@ class ReauthenticationTest {
         context.getSharedPreferences("reauth-test-${System.nanoTime()}", android.content.Context.MODE_PRIVATE)
       val authPrefs =
         context.getSharedPreferences("reauth-auth-${System.nanoTime()}", android.content.Context.MODE_PRIVATE)
-      // KotlinJsonAdapterFactory, matching AppModule.moshi(): codegen is disabled in this
-      // project, so a bare Moshi cannot serialize PlexUser and the test would fail for a reason
-      // that has nothing to do with re-authentication.
-      val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-      return SharedPreferencesPlexPrefsRepo(prefs, authPrefs, moshi).apply {
+      return SharedPreferencesPlexPrefsRepo(prefs, authPrefs).apply {
         accountAuthToken = "account-token"
         // A real connection, not emptyList(): the production getter returns null for a server
         // with no connections, so an empty one is indistinguishable from an absent one and the

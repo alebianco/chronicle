@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex
 
-import com.squareup.moshi.Moshi
 import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.ConnectionTier
@@ -9,8 +8,6 @@ import io.github.mattpvaughn.chronicle.testing.FakePlexServer
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.http.ContentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -63,9 +60,7 @@ class ConnectionProbeWiringTest {
           // that `expectSuccess = true` makes an unreachable address abort the whole selection
           // instead of moving to the next connection. It did catch it.
           expectSuccess = true
-          install(ContentNegotiation) {
-            register(ContentType.Application.Json, MoshiContentConverter(Moshi.Builder().build()))
-          }
+          installPlexJson()
         },
       )
       .build()

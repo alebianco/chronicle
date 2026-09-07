@@ -1,6 +1,6 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
-import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -16,11 +16,8 @@ import org.junit.Test
  * bug.
  */
 class AudnexusTagsTest {
-  private val moshi = Moshi.Builder().build()
-
   private fun container(fixture: String) =
-    moshi.adapter(PlexMediaContainerWrapper::class.java)
-      .fromJson(FakePlexServer.fixture(fixture))!!
+    ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(FakePlexServer.fixture(fixture))
       .plexMediaContainer
 
   private fun realDetailBook() = container("album-detail-real-shape.json").metadata.single()
@@ -69,7 +66,7 @@ class AudnexusTagsTest {
       """.trimIndent()
 
     val book =
-      moshi.adapter(PlexMediaContainerWrapper::class.java).fromJson(json)!!
+      ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(json)
         .plexMediaContainer.metadata.single()
 
     assertEquals(

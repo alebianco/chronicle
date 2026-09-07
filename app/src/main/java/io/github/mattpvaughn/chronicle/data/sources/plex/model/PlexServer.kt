@@ -1,13 +1,13 @@
 package io.github.mattpvaughn.chronicle.data.sources.plex.model
 
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * A <Device/> type object from the Plex API. Can represent a Plex server, player, or remote, as
  * designated by the [provides] field
  */
-@JsonClass(generateAdapter = true)
+@Serializable
 data class PlexServer(
   val name: String = "",
   val provides: String = "",
@@ -18,7 +18,7 @@ data class PlexServer(
   val owned: Boolean = true,
 )
 
-@JsonClass(generateAdapter = true)
+@Serializable
 data class Connection(
   val uri: String = "",
   val local: Boolean = false,
@@ -46,10 +46,10 @@ data class Connection(
    * what a future decision would need. Adding a tier or a filter on today's evidence would be
    * guesswork, and a wrong guess degrades the networks that already work.
    *
-   * `@Json` names it explicitly: the wire key is `IPv6` and Moshi is case-sensitive, so the
-   * inferred `iPv6` would silently never match — the exact defect once found in `plexGenres`.
+   * `@SerialName` names it explicitly: the wire key is `IPv6` and the serializer is case-sensitive,
+   * so the inferred `iPv6` would silently never match — the exact defect once found in `plexGenres`.
    */
-  @Json(name = "IPv6")
+  @SerialName("IPv6")
   val iPv6: Boolean = false,
 )
 

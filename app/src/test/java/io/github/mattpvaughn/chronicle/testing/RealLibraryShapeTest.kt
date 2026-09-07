@@ -1,6 +1,6 @@
 package io.github.mattpvaughn.chronicle.testing
 
-import com.squareup.moshi.Moshi
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexMediaContainerWrapper
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import org.junit.Assert.assertEquals
@@ -9,13 +9,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Moshi **codegen** against the shapes a real 196-book library actually sends.
+ * The **real serializer** against the shapes a real 196-book library actually sends.
  *
- * An earlier change switched from `KotlinJsonAdapterFactory` to generated adapters and noted that "the feared
- * leniency differences did not materialise on fixture data". That is true and also the weak part:
- * the hand-written fixtures contain the fields their author thought to include. Generated adapters
- * are stricter than reflection about absent and null fields, so the risk only shows up on data
- * nobody designed.
+ * This test has now survived two serializer changes and its value is the same each time: the
+ * hand-written fixtures contain the fields their author thought to include, so a leniency
+ * difference only shows up on data nobody designed. It caught nothing when Moshi moved from
+ * reflection to codegen, and it is the reason the move to kotlinx-serialization could be
+ * made with evidence rather than hope — these are the assertions that say parsing did not change.
  *
  * So these fixtures were **captured from a real Plex server** (1.43.3) and scrubbed of identifying
  * values while keeping the exact *set of keys* each object had. A survey of all 196 albums found ten
@@ -34,15 +34,13 @@ import org.junit.Test
  *
  * The single-book cases are the interesting ones: a library where 195 books have `year` and one
  * does not is exactly the shape that passes every hand-written fixture and then throws on a real
- * sync. Moshi builds these adapters with `Moshi.Builder().build()`, the way `AppModule` does — no
- * reflection factory — or the test would not be exercising codegen at all (the trap the adapter switch found).
+ * sync. These parse through `ChronicleJson`, the very instance `AppModule` hands the HTTP client —
+ * not a locally configured one, or the test would be exercising a parser the app does not use. That
+ * was the trap the earlier adapter switch found, and it is why the shared instance exists.
  */
 class RealLibraryShapeTest {
-  private val moshi = Moshi.Builder().build()
-
   private fun container(fixture: String) =
-    moshi.adapter(PlexMediaContainerWrapper::class.java)
-      .fromJson(FakePlexServer.fixture(fixture))!!
+    ChronicleJson.decodeFromString<PlexMediaContainerWrapper>(FakePlexServer.fixture(fixture))
       .plexMediaContainer
 
   @Test
@@ -55,7 +53,7 @@ class RealLibraryShapeTest {
 
   @Test
   fun `a book with no year parses rather than throwing`() {
-    // 1 of 196. Generated adapters reject an absent field only when the property has no default;
+    // 1 of 196. The parser rejects an absent field only when the property has no default;
     // this pins that `year` keeps one.
     val books = container("albums-real-shape.json").asAudiobooks()
 
@@ -105,10 +103,10 @@ class RealLibraryShapeTest {
     // Those flags are part of the D11 scaffolding CLAUDE.md calls "declared but not yet
     // load-bearing".
     //
-    // What this test pins is the property that matters for codegen: generated adapters must
-    // *ignore* unknown keys rather than reject them. The real detail response carries Style,
-    // Mood, Image, UltraBlurColors and more that no model mentions, and if codegen were strict
-    // about unknown fields every book detail fetch would fail.
+    // What this test pins is the property that matters for any serializer: it must
+    // *ignore* unknown keys rather than reject them — `ignoreUnknownKeys`, which kotlinx needs
+    // told explicitly. The real detail response carries Style, Mood, Image, UltraBlurColors and
+    // more that no model mentions; if the parser were strict, every book detail fetch would fail.
     val books = container("album-detail-real-shape.json").asAudiobooks()
 
     val book = books.single()

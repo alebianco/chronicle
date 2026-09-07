@@ -58,11 +58,13 @@ Both ratchet *up* on a rise — **commit the changed file**. To lower either on 
 ## Release builds
 
 `./test_release_build.sh` — an R8/ProGuard smoke test (see CONTRIBUTING.md "Release Builds &
-ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (Moshi models, Room
-entities), or dependencies.
+ProGuard"). Run it whenever touching ProGuard rules, reflection-adjacent code (`@Serializable`
+models, Room entities), or dependencies.
 
-It asserts **against the dex** that Room/Retrofit/Dagger/Moshi classes survived R8 — these fail at
-runtime, not build time.
+It asserts **against the dex** that Room, Ktorfit, Dagger and `@Serializable` classes survived R8 —
+these fail at runtime, not build time. The `@Serializable` scan carries a **count floor**: it keys
+on an annotation name, and when the serializer changed the old `@JsonClass` pattern matched nothing
+and the check passed while asserting over an empty set.
 
 Keep rules are deliberately narrow: **prefer adding one precise rule over widening a
 blanket `-keep`**, which silently exempts code from R8.

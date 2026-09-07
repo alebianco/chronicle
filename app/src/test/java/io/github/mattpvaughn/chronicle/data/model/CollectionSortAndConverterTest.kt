@@ -52,9 +52,11 @@ class CollectionSortAndConverterTest {
 
   /**
    * The stored form is a JSON array of strings and always has been (the id-retype migration changed the Kotlin type,
-   * not the encoding). Pinned literally, because this converter builds its **own** `Moshi` rather
-   * than the app's — so if the app's ever gains an adapter that writes a string list differently,
-   * nothing else would notice the divergence.
+   * not the encoding). Pinned **literally**, because this is a database column format and every
+   * already-stored row depends on it: the serializer under this converter has changed once
+   * already, and the only thing that proved the new one wrote the same bytes as the old was this
+   * assertion. It deliberately names its own serializer rather than the app's shared `Json`, so a
+   * configuration change made for the wire or the export cannot reach stored rows.
    */
   @Test
   fun `the stored form is a plain json array of strings`() {
@@ -62,8 +64,8 @@ class CollectionSortAndConverterTest {
   }
 
   /**
-   * A freshly-inserted row reads back an empty string, not `"[]"`. Moshi throws on empty input, so
-   * the guard is what stops a collection with no children from crashing the read.
+   * A freshly-inserted row reads back an empty string, not `"[]"`. The parser throws on empty
+   * input, so the guard is what stops a collection with no children from crashing the read.
    */
   @Test
   fun `an empty stored value reads back as an empty list`() {
@@ -87,5 +89,36 @@ class CollectionSortAndConverterTest {
     val ids = listOf("abs:book:9f3c", "local/path/one.m4b")
 
     assertEquals(ids, converter.toList(converter.fromList(ids)))
+  }
+
+  /**
+   * Room builds a `@TypeConverters(::class)` converter **reflectively**, by calling the no-argument
+   * constructor. A converter that grew a constructor parameter — an injected serializer, say —
+   * would compile, pass every test that constructs it by hand, and then fail at database-open time
+   * with a message about the converter rather than about the dependency. So the property is
+   * asserted the way Room actually does it.
+   */
+  @Test
+  fun `Room can build the converter reflectively`() {
+    val built = CollectionIdConverter::class.java.getDeclaredConstructor().newInstance()
+
+    assertEquals("""["1001"]""", built.fromList(listOf("1001")))
+    assertEquals(listOf("1001"), built.toList("""["1001"]"""))
+  }
+
+  /**
+   * A column that is not a JSON array of strings costs one collection its children, not the query.
+   *
+   * The previous serializer returned null for a malformed value and the code mapped that to an
+   * empty list; this one **throws**. Without the catch, a single row corrupted by a hand-edited
+   * database would take down every read that touches the collections table.
+   */
+  @Test
+  fun `an unreadable stored value reads back as an empty list`() {
+    val converter = CollectionIdConverter()
+
+    assertEquals(emptyList<String>(), converter.toList("not json at all"))
+    assertEquals(emptyList<String>(), converter.toList("""{"not":"an array"}"""))
+    assertEquals(emptyList<String>(), converter.toList("""[1001, 1002]"""))
   }
 }

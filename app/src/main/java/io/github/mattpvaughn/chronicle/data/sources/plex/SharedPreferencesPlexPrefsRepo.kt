@@ -2,9 +2,7 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
-import com.squareup.moshi.JsonDataException
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
+import io.github.mattpvaughn.chronicle.data.ChronicleJson
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
@@ -12,8 +10,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.ConnectionTier
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.injection.modules.AppModule
+import kotlinx.serialization.builtins.ListSerializer
 import timber.log.Timber
-import java.io.IOException
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Named
@@ -71,7 +69,6 @@ class SharedPreferencesPlexPrefsRepo
   constructor(
     private val prefs: SharedPreferences,
     @Named(AppModule.AUTH_PREFS) private val authPrefs: SharedPreferences,
-    private val moshi: Moshi,
   ) : PlexPrefsRepo {
     init {
       migrateCredentialsToAuthPrefs()
@@ -82,13 +79,13 @@ class SharedPreferencesPlexPrefsRepo
     private var hasLoggedLegacyConnections = false
 
     /**
-     * Reused rather than rebuilt per call: `Moshi.adapter` walks its reflective factory list on
-     * every lookup, and this is on the launch path.
+     * Reused rather than rebuilt per call, and this is on the launch path.
+     *
+     * Now a compile-time-generated serializer rather than a reflective adapter lookup, so the
+     * per-call cost this was avoiding is gone — but naming it once still says plainly that both
+     * the read and the write use the same shape.
      */
-    private val connectionsAdapter =
-      moshi.adapter<List<Connection>>(
-        Types.newParameterizedType(List::class.java, Connection::class.java),
-      )
+    private val connectionsSerializer = ListSerializer(Connection.serializer())
 
     private companion object {
       const val PREFS_AUTH_TOKEN_KEY = "auth_token"
@@ -179,7 +176,15 @@ class SharedPreferencesPlexPrefsRepo
         if (userString.isEmpty()) {
           return null
         }
-        return moshi.adapter<PlexUser>(PlexUser::class.java).fromJson(userString)
+        // A stored user that will not parse reads as "no user", which sends the account back
+        // through sign-in. Throwing here instead would crash on launch, since this is read from
+        // the startup path — and a corrupt preference is not worth an unstartable app.
+        return try {
+          ChronicleJson.decodeFromString<PlexUser>(userString)
+        } catch (e: Exception) {
+          Timber.e(e, "Stored Plex user is unreadable; treating it as absent")
+          null
+        }
       }
 
       @SuppressLint("ApplySharedPref")
@@ -188,7 +193,7 @@ class SharedPreferencesPlexPrefsRepo
           removeCredential(PREFS_USER)
           return
         }
-        val userString = moshi.adapter<PlexUser>(PlexUser::class.java).toJson(value)
+        val userString = ChronicleJson.encodeToString(value)
         putCredential(PREFS_USER, userString)
       }
 
@@ -272,11 +277,12 @@ class SharedPreferencesPlexPrefsRepo
       if (!serialized.isNullOrEmpty()) {
         val parsed =
           try {
-            connectionsAdapter.fromJson(serialized)
-          } catch (e: JsonDataException) {
-            Timber.e(e, "Stored connections are unreadable; falling back to the legacy keys")
-            null
-          } catch (e: IOException) {
+            ChronicleJson.decodeFromString(connectionsSerializer, serialized)
+          } catch (e: Exception) {
+            // One `Exception` where there were two typed catches. Every way a stored preference
+            // can be unreadable means the same thing here — fall back to the legacy keys — and
+            // this runs on the launch path, so a type this catch failed to name would turn a
+            // corrupt preference into an app that cannot start.
             Timber.e(e, "Stored connections are unreadable; falling back to the legacy keys")
             null
           }
@@ -345,7 +351,10 @@ class SharedPreferencesPlexPrefsRepo
     @SuppressLint("ApplySharedPref")
     private fun putConnections(connections: List<Connection>) {
       prefs.edit()
-        .putString(PREFS_SERVER_CONNECTIONS_KEY, connectionsAdapter.toJson(connections))
+        .putString(
+          PREFS_SERVER_CONNECTIONS_KEY,
+          ChronicleJson.encodeToString(connectionsSerializer, connections),
+        )
         .remove(PREFS_LOCAL_SERVER_CONNECTIONS_KEY)
         .remove(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
         .commit()

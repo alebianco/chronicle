@@ -3,16 +3,14 @@ package io.github.mattpvaughn.chronicle.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
-import io.github.mattpvaughn.chronicle.data.sources.plex.MoshiContentConverter
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.createPlexMediaService
+import io.github.mattpvaughn.chronicle.data.sources.plex.installPlexJson
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.testing.FakePlexServer
 import io.github.mattpvaughn.chronicle.testing.TEST_SERVER_ID
@@ -20,8 +18,6 @@ import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.http.ContentType
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -88,12 +84,7 @@ class TagIndexSeedingRefreshTest {
       .httpClient(
         HttpClient(OkHttp) {
           expectSuccess = true
-          install(ContentNegotiation) {
-            register(
-              ContentType.Application.Json,
-              MoshiContentConverter(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
-            )
-          }
+          installPlexJson()
         },
       )
       .build()

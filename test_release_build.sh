@@ -96,29 +96,44 @@ for cls in ${REQUIRED[@]}; do
   fi
 done
 
-# Every Moshi model must survive under its own name: these parse live Plex JSON,
-# and a stripped or renamed model fails at parse time, not build time.
+# Every serializable model must survive under its own name: these parse live Plex JSON and the
+# user's own backup and rules files, and a stripped or renamed model fails at parse time, not
+# build time.
 #
-# Only classes actually carrying @JsonClass count. This used to take *every* `data class` in any
-# file containing the annotation, which is a different claim: SettingsBackup.kt holds one annotated
-# DTO plus four `internal` sealed-interface members that never touch JSON, so R8 rightly inlined
-# them and the check reported four phantom failures. Widening proguard-rules.pro to
+# Only classes actually carrying @Serializable count. This used to take *every* `data class` in
+# any file containing the annotation, which is a different claim: SettingsBackup.kt holds two
+# annotated DTOs plus four `internal` sealed-interface members that never touch JSON, so R8
+# rightly inlined them and the check reported phantom failures. Widening proguard-rules.pro to
 # silence that would have exempted correctly-optimised code from R8 — the opposite of the rule
-# that keeps stay narrow. A nested class also has a `Parent$Child` descriptor, so the flat
+# that keeps keeps narrow. A nested class also has a `Parent$Child` descriptor, so the flat
 # `PKG.Child` name it looked for could not have matched even if the class had survived.
+ANNOTATED_TOTAL=0
 for f in app/src/main/java/**/*.kt(N); do
-  grep -q "@JsonClass" "${f}" || continue
+  grep -q "@Serializable" "${f}" || continue
   PKG=$(grep -m1 '^package ' "${f}" | cut -d' ' -f2)
-  # The `data class` on the line *after* an @JsonClass annotation, which is where Moshi codegen
-  # requires it. -A1 keeps the pairing rather than trusting file-level co-occurrence.
-  ANNOTATED=$(grep -A1 '@JsonClass' "${f}" | grep -oE 'data class [A-Za-z0-9_]+' | cut -d' ' -f3)
+  # The `data class` on the line *after* a @Serializable annotation. -A1 keeps the pairing rather
+  # than trusting file-level co-occurrence.
+  ANNOTATED=$(grep -A1 '@Serializable' "${f}" | grep -oE 'data class [A-Za-z0-9_]+' | cut -d' ' -f3)
   for cls in ${(f)ANNOTATED}; do
+    [[ -z ${cls} ]] && continue
+    ANNOTATED_TOTAL=$((ANNOTATED_TOTAL + 1))
     if ! grep -qxF "${PKG}.${cls}" "${DESCRIPTORS}"; then
-      print "${RED}❌ Moshi model missing from dex: ${PKG}.${cls} (${f:t})${NC}"
+      print "${RED}❌ serializable model missing from dex: ${PKG}.${cls} (${f:t})${NC}"
       MISSING=$((MISSING + 1))
     fi
   done
 done
+
+# Guards the guard. The scan above keys on an annotation name, and when the serializer changed
+# from Moshi to kotlinx-serialization the old `@JsonClass` pattern matched nothing at all — a
+# check that asserts over an empty set passes loudly and proves nothing. A floor makes that
+# failure visible instead.
+if (( ANNOTATED_TOTAL < 15 )); then
+  print "${RED}❌ only ${ANNOTATED_TOTAL} @Serializable models found; the scan pattern is stale${NC}"
+  MISSING=$((MISSING + 1))
+else
+  print "  (${ANNOTATED_TOTAL} @Serializable models checked)"
+fi
 
 if (( MISSING > 0 )); then
   print "${RED}❌ ${MISSING} reflection-dependent class(es) did not survive R8${NC}"

@@ -7,7 +7,6 @@ import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import androidx.core.content.ContextCompat
 import androidx.work.WorkManager
-import com.squareup.moshi.Moshi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,11 +30,9 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpTimeoutConfig
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
-import io.ktor.http.ContentType
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -419,11 +416,10 @@ object AppModule {
   @Singleton
   fun mediaKtorfit(
     @Named(OKHTTP_CLIENT_MEDIA) client: HttpClient,
-    moshi: Moshi,
   ): Ktorfit =
     Ktorfit.Builder()
       .baseUrl(PLACEHOLDER_URL)
-      .httpClient(client.config { installMoshiJson(moshi) })
+      .httpClient(client.config { installPlexJson() })
       .build()
 
   @Provides
@@ -431,38 +427,11 @@ object AppModule {
   @Singleton
   fun loginKtorfit(
     @Named(OKHTTP_CLIENT_LOGIN) client: HttpClient,
-    moshi: Moshi,
   ): Ktorfit =
     Ktorfit.Builder()
       .baseUrl(PLACEHOLDER_URL)
-      .httpClient(client.config { installMoshiJson(moshi) })
+      .httpClient(client.config { installPlexJson() })
       .build()
-
-  /**
-   * Registers [MoshiContentConverter] for JSON, and for what Plex actually sends.
-   *
-   * Plex answers `Accept: application/json` with `application/json`, but some endpoints reply
-   * `text/html` or no content type at all while still returning JSON. Retrofit's converter did not
-   * care about content type; Ktor's `ContentNegotiation` does, so the types are named explicitly
-   * rather than discovered by a 200 that fails to parse.
-   */
-  private fun HttpClientConfig<*>.installMoshiJson(moshi: Moshi) {
-    install(ContentNegotiation) {
-      val converter = MoshiContentConverter(moshi)
-      register(ContentType.Application.Json, converter)
-      register(ContentType.Text.Html, converter)
-      register(ContentType.Text.Plain, converter)
-    }
-  }
-
-  @Provides
-  @Singleton
-  fun moshi(): Moshi =
-    // No `KotlinJsonAdapterFactory`: every model carries
-    // `@JsonClass(generateAdapter = true)` and the KSP processor now generates a real adapter for
-    // each, so the reflective fallback is dead weight — and worse, it would mask a model that
-    // *lost* its annotation by silently handling it reflectively.
-    Moshi.Builder().build()
 
   @Provides
   @Singleton

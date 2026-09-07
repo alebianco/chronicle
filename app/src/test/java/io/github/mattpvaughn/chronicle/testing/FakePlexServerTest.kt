@@ -1,17 +1,13 @@
 package io.github.mattpvaughn.chronicle.testing
 
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import de.jensklingenberg.ktorfit.Ktorfit
-import io.github.mattpvaughn.chronicle.data.sources.plex.MoshiContentConverter
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.createPlexMediaService
+import io.github.mattpvaughn.chronicle.data.sources.plex.installPlexJson
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asAudiobooks
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.asTrackList
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.http.ContentType
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -20,7 +16,7 @@ import org.junit.Test
 import java.net.HttpURLConnection
 
 /**
- * Drives [FakePlexServer] through the real Ktorfit/Moshi stack the app uses.
+ * Drives [FakePlexServer] through the real Ktorfit/kotlinx-serialization stack the app uses.
  *
  * The contract tests prove the fixtures parse; this proves the *server* answers
  * the endpoints [PlexMediaService] actually calls, with bodies those calls can
@@ -39,12 +35,7 @@ class FakePlexServerTest {
           // The fake returns real HTTP statuses and the tests read them, so a non-2xx must throw
           // exactly as it does in production.
           expectSuccess = true
-          install(ContentNegotiation) {
-            register(
-              ContentType.Application.Json,
-              MoshiContentConverter(Moshi.Builder().add(KotlinJsonAdapterFactory()).build()),
-            )
-          }
+          installPlexJson()
         },
       )
       .build()
