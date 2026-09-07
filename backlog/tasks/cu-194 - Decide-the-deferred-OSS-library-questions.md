@@ -180,6 +180,28 @@ the KMP-capable option and record the portability delta.
 
 Re-measure the 23.7% after any adoption, so cu-182 inherits a current number rather than this one.
 
+## Already answered by decision-24 (2026-09-07)
+
+Three of the candidates below were settled as a side effect of the download-stack replacement, so
+they need deciding here only in so far as this task records *why*:
+
+- **Ktor** — **adopted**, and it is now the app's only HTTP stack. The reasoning is in decision-24;
+  the short version is that OkHttp 5.0 dropped Kotlin Multiplatform support and Retrofit 3.0 never
+  had it, so "keep them" was the choice that foreclosed portability, not the neutral one. The
+  concern noted below — that Ktor "costs a second HTTP stack alongside OkHttp unless Retrofit moves
+  too" — was correct, and the answer was to move Retrofit too (Ktorfit).
+- **kotlinx-serialization vs Moshi** — **still open, deliberately.** `MoshiContentConverter` (~40
+  lines) was written specifically so the transport migration did not also become a serializer
+  migration: doing both at once would make a parsing regression and a transport regression
+  indistinguishable. Moshi's KSP adapters still work. Note this is now the *only* thing keeping the
+  Plex models JVM-bound, so it is the single change that would move the most model code — which is
+  exactly what §2 already says.
+- **Okio** — unaffected. Ktor uses `kotlinx-io`, which arrives transitively, so the `java.io.File`
+  question in §5 stands on its own merits.
+
+The portable-share figure in §5 is **stale** and should be re-measured before this task closes: the
+HTTP layer is no longer JVM-bound, but the models still are.
+
 ## Explicitly out of scope
 
 - **Hilt** — has its own task, cu-185.
