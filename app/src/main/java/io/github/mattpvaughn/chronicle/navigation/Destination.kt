@@ -67,6 +67,13 @@ sealed interface Destination {
     override val route = ROUTE
   }
 
+  /** The third-party licences list, reached from Settings. */
+  data object Licenses : Destination {
+    const val ROUTE = "licenses"
+
+    override val route = ROUTE
+  }
+
   data object Login : Destination {
     const val ROUTE = "login"
 

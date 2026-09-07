@@ -19,6 +19,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.CachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.features.download.Downloader
 import io.github.mattpvaughn.chronicle.features.download.KtorDownloader
+import io.github.mattpvaughn.chronicle.features.settings.licenses.GeneratedLicenseCatalogSource
+import io.github.mattpvaughn.chronicle.features.settings.licenses.LicenseCatalogSource
 import javax.inject.Singleton
 
 /**
@@ -61,6 +63,18 @@ object RepositoryModule {
   @Provides
   @Singleton
   fun provideDownloader(downloader: KtorDownloader): Downloader = downloader
+
+  /**
+   * The reader for the generated third-party dependency catalogue.
+   *
+   * Here rather than in `AppModule` for the reason this module exists: it is a seam a screen test
+   * wants to replace. The real one reads a raw resource the Gradle plugin generates, so a test that
+   * did not replace it would be asserting against the build's own dependency list — which changes
+   * whenever any dependency does, and would make an unrelated bump fail a UI test.
+   */
+  @Provides
+  @Singleton
+  fun provideLicenseCatalogSource(source: GeneratedLicenseCatalogSource): LicenseCatalogSource = source
 
   /**
    * The app's main preferences file.

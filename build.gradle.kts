@@ -4,6 +4,7 @@ plugins {
 
   alias(libs.plugins.ktlint)
   alias(libs.plugins.detekt)
+  alias(libs.plugins.aboutlibraries) apply false
 }
 
 allprojects {
@@ -12,11 +13,17 @@ allprojects {
 
 buildscript {
   dependencies {
-    classpath(libs.oss.plugin)
-
-    // The OSS-licences plugin drags in a JavaPoet old enough that Hilt's Gradle plugin fails in
-    // `hiltAggregateDepsDebug` with `NoSuchMethodError: ClassName.canonicalName()`. Both are on
-    // the same buildscript classpath, so the newer one has to win explicitly.
+    // Hilt's Gradle plugin fails in `hiltAggregateDepsDebug` with
+    // `NoSuchMethodError: ClassName.canonicalName()` against an old JavaPoet on the same
+    // buildscript classpath, so the newer one has to win explicitly.
+    //
+    // The comment that stood here until the licences page was rebuilt blamed the
+    // `play-services-oss-licenses` plugin for dragging that old JavaPoet in. It does not:
+    // removing that plugin left the conflict exactly where it was. `./gradlew buildEnvironment`
+    // puts `com.squareup:javapoet:1.10.0` under **AGP's own `com.android.tools.build:gradle`**,
+    // which is not going anywhere. The pin is kept and the stated cause corrected — a wrong
+    // explanation beside a load-bearing line is the half that invites the next reader to delete
+    // it.
     classpath(libs.javapoet)
   }
 }

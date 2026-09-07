@@ -7,7 +7,7 @@ plugins {
   alias(libs.plugins.hilt)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
-  id("com.google.android.gms.oss-licenses-plugin")
+  alias(libs.plugins.aboutlibraries)
   alias(libs.plugins.pitest)
   alias(libs.plugins.detekt)
   jacoco
@@ -20,6 +20,50 @@ kotlin {
   compilerOptions {
     jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     freeCompilerArgs.add("-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi")
+  }
+}
+
+/**
+ * Third-party dependency metadata, generated from the resolved dependency graph.
+ *
+ * This replaces `play-services-oss-licenses` and its Gradle plugin. That pair was a **Google Play
+ * Services** dependency, and decision-1 puts sideload/F-Droid/homelab distribution first — F-Droid
+ * does not accept a GMS dependency, so the tool nominally doing this job was itself a distribution
+ * blocker. AboutLibraries is Apache-2.0 and needs no Play Services.
+ *
+ * **The plugin only — no AboutLibraries artifact is on the runtime classpath.** Two independent
+ * reasons, either of which alone would be decisive:
+ *
+ * - `aboutlibraries-core` 14.0.0 and newer are compiled for **Java 21** (class file 65) while this
+ *   project is Java 17 throughout. It loads on a device, where everything is dexed, but the JVM
+ *   unit suite cannot even construct it: `UnsupportedClassVersionError`. The last Java-17 line is
+ *   13.x, which is a version behind and adds `kotlinx-collections-immutable`. The *plugin* is Java
+ *   17, so it runs on the Gradle daemon exactly as it should.
+ * - `aboutlibraries-compose-m3` would pull Compose Multiplatform 1.12.0 and material3 1.9.0, a
+ *   second Compose stack beside the BOM this project pins deliberately.
+ *
+ * So the plugin generates `res/raw/aboutlibraries.json` and the app parses it with the
+ * kotlinx-serialization it already ships — which is also the fewest transitive dependencies of any
+ * option considered, since it adds none at all.
+ *
+ * `offlineMode` is on, and `fetchRemoteLicense` deliberately off: fetching full licence text hits
+ * the GitHub API at build time, which is rate-limited without a token and would make the build
+ * depend on the network. Each entry carries its SPDX licence id and a link instead, which is what
+ * compliance needs and what a build can promise.
+ */
+aboutLibraries {
+  offlineMode = true
+
+  collect {
+    fetchRemoteLicense = false
+    fetchRemoteFunding = false
+  }
+
+  library {
+    // Two artifacts of the same library published for different platforms (`-android`, `-jvm`)
+    // are one entry, so the list names libraries rather than repeating each with a suffix.
+    duplicationMode = com.mikepenz.aboutlibraries.plugin.DuplicateMode.MERGE
+    duplicationRule = com.mikepenz.aboutlibraries.plugin.DuplicateRule.GROUP
   }
 }
 
@@ -204,7 +248,6 @@ dependencies {
   implementation(libs.swiperefresh)
   implementation(libs.seismic)
   implementation(libs.browserx)
-  implementation(libs.oss)
   implementation(libs.appcompat)
   // Declared because the app imports them directly, not because it needs a newer version — each
   // is pinned at what it already resolved to transitively. Three transitive-only breakages
@@ -651,4 +694,14 @@ val writePitestScope by
     }
   }
 
-tasks.withType<Test>().configureEach { dependsOn(writePitestScope) }
+tasks.withType<Test>().configureEach {
+  dependsOn(writePitestScope)
+
+  // The unit suite runs against **debug**, but the licences page is a claim about what *ships* — so
+  // `LicenseCatalogCountTest` reconciles against the catalogue generated from
+  // `releaseRuntimeClasspath`. Without this dependency the generated file would simply be absent on
+  // a clean checkout and the guard would have nothing to compare against; it fails loudly on a
+  // missing file rather than skipping, because a reconciliation that silently does not run is the
+  // very omission it exists to catch, one level up.
+  dependsOn("prepareLibraryDefinitionsRelease")
+}

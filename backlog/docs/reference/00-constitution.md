@@ -56,9 +56,22 @@ all four hold:
 3. it is **confined behind a seam**, so an open replacement would be a swap;
 4. there is **genuinely no open alternative** reaching the same hardware.
 
-Each one admitted is recorded as an ADR. Google Cast is the first — every SDK reference
-sits inside `CastPlayerProvider`, and no open protocol reaches a Chromecast.
-`play-services-oss-licenses` qualifies retroactively.
+Each one admitted is recorded as an ADR. Google Cast is the **only** one — every SDK reference sits
+inside `CastPlayerProvider`, and no open protocol reaches a Chromecast.
+
+`play-services-oss-licenses` was admitted retroactively on the same reading and has since been
+**removed**, so the exception now has a single occupant. Decision-19 still names it and is left
+alone deliberately: a decision file records what was decided at the time, and amending it is the
+owner's call. The removal was not a reversal of that reading — the licences plugin passed the
+four-part test on its merits. It failed a *different* one. **Decision-1 puts sideload/F-Droid/
+homelab distribution first, and F-Droid does not accept a GMS dependency at all**, so the tool that
+generated the app's own licences page could not ship where the app ships. Google Cast is unaffected:
+it is the fourth condition — no open protocol reaches a Chromecast — and a build without Play
+Services degrades it to absent, as the rule requires.
+
+The reusable lesson is that the four-part test asks *may we depend on this*, and distribution asks
+*where can the result be installed*. A dependency can pass the first and still be disqualified by
+the second, and only the first was written down.
 
 > The earlier wording was a flat "no proprietary SDKs" whose three examples (Firebase, analytics,
 > ads) were all *extraction* SDKs — it banned a category while describing a narrower harm, and

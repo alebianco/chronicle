@@ -11,14 +11,12 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import io.github.mattpvaughn.chronicle.features.settings.SettingsViewModel
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 import io.github.mattpvaughn.chronicle.util.compose.EventEffect
@@ -58,6 +56,7 @@ private val BACKUP_OPEN_MIME_TYPES = arrayOf("*/*")
 @Composable
 fun SettingsDestination(
   onShowSeriesIndexTester: () -> Unit,
+  onShowLicenses: () -> Unit,
   modifier: Modifier = Modifier,
   viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -65,7 +64,6 @@ fun SettingsDestination(
   val resources = context.resources
   val rows by viewModel.settingsRows.collectAsStateWithLifecycle()
   val chooser by viewModel.bottomChooserState.collectAsStateWithLifecycle()
-  val showLicenses by viewModel.showLicenseActivity.collectAsStateWithLifecycle()
 
   val exportFileLauncher =
     rememberLauncherForActivityResult(
@@ -104,16 +102,7 @@ fun SettingsDestination(
     }
   }
   EventEffect(viewModel.showSeriesIndexTester) { onShowSeriesIndexTester() }
-
-  // A `LaunchedEffect`, not a bare `if`: starting an activity straight from the composition is a
-  // side effect in the composition phase, so it would fire again on any recomposition that happened
-  // before the flag was cleared. Keyed on the flag, so it runs once per transition to true.
-  LaunchedEffect(showLicenses) {
-    if (showLicenses) {
-      context.startActivity(Intent(context, OssLicensesMenuActivity::class.java))
-      viewModel.setShowLicenseActivity(false)
-    }
-  }
+  EventEffect(viewModel.showLicenses) { onShowLicenses() }
 
   Surface(
     modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),

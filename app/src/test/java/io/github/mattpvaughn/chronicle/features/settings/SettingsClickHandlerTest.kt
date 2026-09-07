@@ -125,7 +125,7 @@ class SettingsClickHandlerTest {
             vm.exportFileRequest.value != null ||
             vm.importFileRequest.value != null ||
             vm.showSeriesIndexTester.value != null ||
-            vm.showLicenseActivity.value
+            vm.showLicenses.value != null
         !changed
       }
 

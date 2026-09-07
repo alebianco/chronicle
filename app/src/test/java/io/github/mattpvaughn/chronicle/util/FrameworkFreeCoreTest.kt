@@ -161,6 +161,14 @@ class FrameworkFreeCoreTest {
         // the list rather than left to fail as "missing", which is what this guard reports for a
         // deleted entry.
         "features/settings/PreferenceModel.kt",
+        // The licences catalogue, its display rules and the reader for the generated dependency
+        // JSON. The Android half — opening one raw resource — is `GeneratedLicenseCatalogSource`
+        // and is deliberately the only part that needs a `Context`: everything with a fallback in
+        // it sits here, where a hand-written document can drive it without Robolectric.
+        "features/settings/licenses/GeneratedCatalogJson.kt",
+        "features/settings/licenses/LicenseCatalog.kt",
+        "features/settings/licenses/LicenseCatalogParser.kt",
+        "features/settings/licenses/LicenseCatalogSource.kt",
         // Route strings and their argument encoding. Framework-free on purpose: building
         // a route and parsing one back are pure string work, and a mis-encoded argument matches no
         // pattern and navigates *nowhere, silently* — exactly the failure a test without a NavHost

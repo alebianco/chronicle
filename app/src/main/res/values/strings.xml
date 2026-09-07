@@ -339,6 +339,20 @@
     <string name="settings_category_etc">Etc</string>
     <string name="settings_licenses_title">Licenses</string>
     <string name="settings_licenses_explanation">Open source libraries used by Chronicle</string>
+    <!-- Third-party licences screen. Every string here describes the generated list
+         rather than asserting anything about it: the content comes from the resolved dependency
+         graph at build time, and wording that promised completeness the code could not prove
+         would be exactly the "looks like diligence" failure the screen exists to avoid. -->
+    <string name="licenses_screen_title">Open source licenses</string>
+    <string name="licenses_intro">Chronicle Unabridged is built on the libraries below. This list is generated from the app\'s resolved dependencies when the app is built, so it cannot fall behind what actually ships.</string>
+    <plurals name="licenses_count">
+        <item quantity="one">%1$d library</item>
+        <item quantity="other">%1$d libraries</item>
+    </plurals>
+    <string name="licenses_no_license">No license declared</string>
+    <string name="licenses_failed">The license list could not be read. This is a bug in Chronicle, not a missing license \u2014 the sources and their licenses are in the project repository.</string>
+    <string name="licenses_own_license_note">Chronicle Unabridged itself is licensed under the GNU General Public License v3, and its source is public.</string>
+    <string name="licenses_open_link">Open the license for %1$s</string>
     <string name="settings_github_title">github.com/alebianco/chronicle</string>
     <string name="settings_github_explanation">Chronicle Unabridged is free and open source (GPLv3). Report an issue or read the code here.</string>
     <!-- Series index rules tester (cu-151). The screen exists so a user can see what a parsing

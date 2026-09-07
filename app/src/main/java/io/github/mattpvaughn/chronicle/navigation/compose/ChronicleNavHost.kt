@@ -23,6 +23,7 @@ import io.github.mattpvaughn.chronicle.features.login.compose.ChooseLibraryDesti
 import io.github.mattpvaughn.chronicle.features.login.compose.ChooseServerDestination
 import io.github.mattpvaughn.chronicle.features.login.compose.ChooseUserDestination
 import io.github.mattpvaughn.chronicle.features.login.compose.LoginDestination
+import io.github.mattpvaughn.chronicle.features.settings.compose.LicensesDestination
 import io.github.mattpvaughn.chronicle.features.settings.compose.SeriesIndexTesterDestination
 import io.github.mattpvaughn.chronicle.features.settings.compose.SettingsDestination
 import io.github.mattpvaughn.chronicle.navigation.Destination
@@ -94,6 +95,7 @@ fun ChronicleNavHost(
         onShowSeriesIndexTester = {
           navController.navigate(Destination.SeriesIndexTester.ROUTE)
         },
+        onShowLicenses = { navController.navigate(Destination.Licenses.ROUTE) },
       )
     }
 
@@ -108,6 +110,10 @@ fun ChronicleNavHost(
 
     composable(Destination.SeriesIndexTester.ROUTE) {
       SeriesIndexTesterDestination(onNavigateUp = navController::popBackStack)
+    }
+
+    composable(Destination.Licenses.ROUTE) {
+      LicensesDestination(onNavigateUp = navController::popBackStack)
     }
 
     composable(

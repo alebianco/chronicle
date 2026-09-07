@@ -25,6 +25,65 @@ class DestinationTest {
     )
   }
 
+  /**
+   * Every argument-free destination has a distinct, non-blank route.
+   *
+   * Two destinations sharing a route string is not a compile error and not a crash: `NavHost`
+   * registers both `composable` entries and the second silently shadows the first, so one screen
+   * becomes unreachable while every other test stays green. A blank route fails the same way. This
+   * is cheap to state and is the only place that states it.
+   */
+  @Test
+  fun `every argument-free destination has a distinct, non-blank route`() {
+    val routes =
+      listOf(
+        Destination.Home,
+        Destination.Library,
+        Destination.Collections,
+        Destination.Settings,
+        Destination.Browse,
+        Destination.SeriesIndexTester,
+        Destination.Licenses,
+        Destination.Login,
+        Destination.ChooseUser,
+        Destination.ChooseServer,
+        Destination.ChooseLibrary,
+      ).map { it.route }
+
+    assertEquals(
+      "a blank route matches nothing and navigates nowhere",
+      emptyList<String>(),
+      routes.filter { it.isBlank() },
+    )
+    assertEquals(
+      "two destinations share a route; NavHost silently registers the second over the first",
+      routes.size,
+      routes.toSet().size,
+    )
+  }
+
+  /**
+   * The route each `data object` reports is the `ROUTE` constant beside it.
+   *
+   * They are two declarations of the same string, and `ChronicleNavHost` addresses the graph by the
+   * constant while callers navigate by the instance — so a drift between them registers one route
+   * and navigates to another.
+   */
+  @Test
+  fun `each destination's route is its own ROUTE constant`() {
+    assertEquals(Destination.Home.ROUTE, Destination.Home.route)
+    assertEquals(Destination.Library.ROUTE, Destination.Library.route)
+    assertEquals(Destination.Collections.ROUTE, Destination.Collections.route)
+    assertEquals(Destination.Settings.ROUTE, Destination.Settings.route)
+    assertEquals(Destination.Browse.ROUTE, Destination.Browse.route)
+    assertEquals(Destination.SeriesIndexTester.ROUTE, Destination.SeriesIndexTester.route)
+    assertEquals(Destination.Licenses.ROUTE, Destination.Licenses.route)
+    assertEquals(Destination.Login.ROUTE, Destination.Login.route)
+    assertEquals(Destination.ChooseUser.ROUTE, Destination.ChooseUser.route)
+    assertEquals(Destination.ChooseServer.ROUTE, Destination.ChooseServer.route)
+    assertEquals(Destination.ChooseLibrary.ROUTE, Destination.ChooseLibrary.route)
+  }
+
   @Test
   fun `book route matches its own pattern shape`() {
     assertEquals("book/12345", Destination.BookDetails("12345").route)

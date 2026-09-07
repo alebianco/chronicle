@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -81,6 +82,17 @@ class SettingsViewModelTest {
   private fun SettingsViewModel.lastMessage(): FormattableString? = messageForUser.value?.peekContent()
 
   private fun stringResOf(message: FormattableString?): Int? = (message as? FormattableString.ResourceString)?.stringRes
+
+  /**
+   * The "Licenses" row, found by its title resource rather than by position.
+   *
+   * Position would make the test fail on any settings reordering, which is a change the row is
+   * indifferent to.
+   */
+  private fun SettingsViewModel.licencesRow() =
+    preferences.value.single {
+      stringResOf(it.title) == R.string.settings_licenses_title
+    }
 
   @Test
   fun `the preference list is built during construction`() {
@@ -238,16 +250,25 @@ class SettingsViewModelTest {
 
   // ---- small surface ----
 
+  /**
+   * Tapping "Licenses" asks the screen to navigate, once.
+   *
+   * Was a `Boolean` flag the screen had to clear again, because the destination was an `Activity`
+   * and starting one from composition fires on every recomposition. It is now a navigation
+   * destination, so it is an `Event` like every other one-shot here — consumed by being handled,
+   * with no round trip back into the ViewModel.
+   */
   @Test
-  fun `the licence activity flag round trips`() {
+  fun `tapping licences raises a navigation event, once`() {
     val vm = viewModel()
-    assertFalse(vm.showLicenseActivity.value)
+    assertNull(vm.showLicenses.value)
 
-    vm.setShowLicenseActivity(true)
-    assertTrue(vm.showLicenseActivity.value)
+    vm.licencesRow().click.onClick()
 
-    vm.setShowLicenseActivity(false)
-    assertFalse(vm.showLicenseActivity.value)
+    val event = vm.showLicenses.value
+    assertNotNull("tapping the licences row raised no event", event)
+    assertNotNull("the event had already been consumed", event?.getContentIfNotHandled())
+    assertNull("an event is one-shot; the second read must be empty", event?.getContentIfNotHandled())
   }
 
   @Test

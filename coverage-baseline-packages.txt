@@ -29,13 +29,14 @@ io/github/mattpvaughn/chronicle/features/player/compose 0.00
 io/github/mattpvaughn/chronicle/features/search 99.21
 io/github/mattpvaughn/chronicle/features/search/compose 82.59
 io/github/mattpvaughn/chronicle/features/settings 84.43
-io/github/mattpvaughn/chronicle/features/settings/compose 65.50
+io/github/mattpvaughn/chronicle/features/settings/compose 66.03
+io/github/mattpvaughn/chronicle/features/settings/licenses 80.10
 io/github/mattpvaughn/chronicle/injection 0.00
 io/github/mattpvaughn/chronicle/injection/modules 10.35
-io/github/mattpvaughn/chronicle/navigation 87.46
+io/github/mattpvaughn/chronicle/navigation 96.15
 io/github/mattpvaughn/chronicle/navigation/compose 0.00
 io/github/mattpvaughn/chronicle/ui/theme 85.14
-io/github/mattpvaughn/chronicle/util 73.04
+io/github/mattpvaughn/chronicle/util 73.67
 io/github/mattpvaughn/chronicle/util/compose 0.00
 io/github/mattpvaughn/chronicle/views 65.69
 io/github/mattpvaughn/chronicle/views/compose 85.77

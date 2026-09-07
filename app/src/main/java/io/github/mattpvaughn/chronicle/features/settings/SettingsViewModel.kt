@@ -155,9 +155,19 @@ class SettingsViewModel
     val showSeriesIndexTester: StateFlow<Event<Unit>?>
       get() = _showSeriesIndexTester
 
-    private val _showLicenseActivity = MutableStateFlow(false)
-    val showLicenseActivity: StateFlow<Boolean>
-      get() = _showLicenseActivity
+    /**
+     * Asks the screen to navigate to the third-party licences list.
+     *
+     * An `Event`, matching [showSeriesIndexTester], where this used to be a plain `Boolean` flag.
+     * The flag existed because the destination was `OssLicensesMenuActivity` and the screen had to
+     * *start an activity*: doing that from composition fires again on every recomposition, so the
+     * flag had to be raised here, acted on in a keyed `LaunchedEffect`, and then cleared by calling
+     * back into this ViewModel. That activity is now a navigation destination instead, and
+     * the round trip goes with it — a one-shot event is consumed by being handled.
+     */
+    private val _showLicenses = MutableStateFlow<Event<Unit>?>(null)
+    val showLicenses: StateFlow<Event<Unit>?>
+      get() = _showLicenses
 
     /**
      * Asks the fragment to open the system "create document" picker, carrying the default filename.
@@ -1010,7 +1020,7 @@ class SettingsViewModel
           click =
             object : PreferenceClick {
               override fun onClick() {
-                _showLicenseActivity.value = true
+                _showLicenses.setEvent(Unit)
               }
             },
         ),
@@ -1072,10 +1082,6 @@ class SettingsViewModel
 
     fun showUserMessage(formattableString: FormattableString) {
       _messageForUser.setEvent(formattableString)
-    }
-
-    fun setShowLicenseActivity(showLicense: Boolean) {
-      _showLicenseActivity.value = showLicense
     }
 
     /**
