@@ -1,0 +1,58 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:BookSearch.kt$i &gt; 1 &amp;&amp; j &gt; 1 &amp;&amp; left[i - 1] == right[j - 2] &amp;&amp; left[i - 2] == right[j - 1]</ID>
+    <ID>CyclomaticComplexMethod:MediaPlayerService.kt$MediaPlayerService$override fun onGetRoot( clientPackageName: String, clientUid: Int, rootHints: Bundle?, ): BrowserRoot?</ID>
+    <ID>CyclomaticComplexMethod:MockPlexServer.kt$MockPlexServer$private fun fixtureFor(path: String): String?</ID>
+    <ID>CyclomaticComplexMethod:PackageValidator.kt$PackageValidator$fun isKnownCaller( callingPackage: String, callingUid: Int, ): Boolean</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:AudiobookDetailsViewModel.kt$AudiobookDetailsViewModel.&lt;no name provided&gt;$when (formattableString) { FormattableString.yes -&gt; jumpToChapter(bookStartTimeOffset, trackId, true) FormattableString.no -&gt; Unit else -&gt; throw NoWhenBranchMatchedException() }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:AudiobookDetailsViewModel.kt$AudiobookDetailsViewModel.&lt;no name provided&gt;$when (formattableString) { FormattableString.yes -&gt; uncacheFiles() FormattableString.no -&gt; { // Do nothing } else -&gt; throw NoWhenBranchMatchedException("Unknown option selected!") }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel.&lt;no name provided&gt;$when (formattableString) { FormattableString.yes -&gt; jumpToChapter( bookStartTimeOffset, trackId, true, ) FormattableString.no -&gt; Unit else -&gt; throw NoWhenBranchMatchedException() }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:DetailsDestination.kt$when (connection) { ConnectionState.CONNECTING -&gt; CircularProgressIndicator( modifier = Modifier.align(Alignment.TopCenter).padding(8.dp), color = ChronicleColors.Accent, ) ConnectionState.CONNECTION_FAILED -&gt; Text( text = stringResource(R.string.failed_to_connect_to_server), color = ChronicleColors.TextError, modifier = Modifier .align(Alignment.TopCenter) .fillMaxWidth() .clickable { viewModel.connectToServer() } .padding(8.dp), ) else -&gt; Unit }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:DetailsScreen.kt$when (download) { is DownloadState.Cached -&gt; R.drawable.ic_cloud_done_white else -&gt; R.drawable.ic_cloud_download_white }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:DetailsScreen.kt$when (download) { is DownloadState.Cached -&gt; R.string.download_remove is DownloadState.Caching -&gt; R.string.download_cancel else -&gt; R.string.download }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:DownloadNotificationWorker.kt$DownloadNotificationWorker$when (status) { BookDownloadStatus.Failed -&gt; R.drawable.ic_cloud_download_failed BookDownloadStatus.Completed -&gt; R.drawable.ic_cloud_done_white else -&gt; return null }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:DownloadNotificationWorker.kt$DownloadNotificationWorker$when (status) { BookDownloadStatus.Failed -&gt; R.string.download_failed_notification_content BookDownloadStatus.Completed -&gt; R.string.download_successful_notification_content else -&gt; return null }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:LibraryViewModel.kt$LibraryViewModel.&lt;no name provided&gt;$when (formattableString) { FormattableString.yes -&gt; downloadAll(tracks) FormattableString.no -&gt; { } else -&gt; throw NoWhenBranchMatchedException() }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:MainActivityViewModel.kt$MainActivityViewModel$when (currentlyPlayingLayoutState.value) { COLLAPSED -&gt; _currentlyPlayingLayoutState.value = EXPANDED EXPANDED -&gt; _currentlyPlayingLayoutState.value = COLLAPSED HIDDEN -&gt; throw IllegalStateException("Cannot click on hidden sheet!") else -&gt; {} }</ID>
+    <ID>ElseCaseInsteadOfExhaustiveWhen:SettingsViewModel.kt$SettingsViewModel.&lt;no name provided&gt;.&lt;no name provided&gt;$when (formattableString) { FormattableString.yes -&gt; { viewModelScope.launch { val deletedFileCount = cachedFileManager.uncacheAllInLibrary() showUserMessage( FormattableString.ResourceString( R.string.settings_delete_synced_response, placeHolderStrings = listOf( deletedFileCount.toString(), ), ), ) } } else -&gt; { } // do nothing }</ID>
+    <ID>ExitOutsideMain:DebugHooks.kt$DebugHooks$exit(0)</ID>
+    <ID>ImplicitDefaultLocale:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel$String.format("%.2f", PLAYBACK_SPEED_DEFAULT)</ID>
+    <ID>ImplicitDefaultLocale:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel$String.format("%.2f", it)</ID>
+    <ID>ImplicitDefaultLocale:PackageValidator.kt$PackageValidator$String.format("%02x", it)</ID>
+    <ID>IteratorNotThrowingNoSuchElementException:PlexMediaRepository.kt$PlexMediaRepository$&lt;no name provided&gt; : Iterator</ID>
+    <ID>LargeClass:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel : ViewModel</ID>
+    <ID>LongMethod:AudiobookMediaSessionCallback.kt$AudiobookMediaSessionCallback$private fun playBook( bookId: String, extras: Bundle, playWhenReady: Boolean, trackFetchAttempts: Int = 0, )</ID>
+    <ID>LongMethod:CachedFileManager.kt$CachedFileManager$override suspend fun refreshTrackDownloadedStatus()</ID>
+    <ID>LongMethod:ChronicleNavHost.kt$@UnstableApi @Composable fun ChronicleNavHost( navController: NavHostController, prefsRepo: PrefsRepo, plexConfig: PlexConfig, modifier: Modifier = Modifier, startDestination: String = Destination.Home.ROUTE, )</ID>
+    <ID>LongMethod:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel$private fun skipToChapter( action: PlaybackStateCompat.CustomAction, forward: Boolean, )</ID>
+    <ID>LongMethod:DetailsDestination.kt$@UnstableApi @Composable fun DetailsDestination( plexConfig: PlexConfig, onNavigateUp: () -&gt; Unit, onSeriesClick: (String) -&gt; Unit, modifier: Modifier = Modifier, viewModel: AudiobookDetailsViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:DownloadNotificationWorker.kt$DownloadNotificationWorker$private fun makeFinishedSummary(bookStatuses: List&lt;DownloadOutcome&gt;): Notification?</ID>
+    <ID>LongMethod:LibraryDestination.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun LibraryDestination( prefsRepo: PrefsRepo, plexConfig: PlexConfig, onBookClick: (Audiobook) -&gt; Unit, onBrowseClick: () -&gt; Unit, modifier: Modifier = Modifier, viewModel: LibraryViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:LibraryFilterSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun LibraryFilterSheet( sortOptions: List&lt;FilterOption&gt;, selectedSortKey: String, onSortKeyChange: (String) -&gt; Unit, isSortDescending: Boolean, onToggleSortDirection: () -&gt; Unit, viewStyleOptions: List&lt;FilterOption&gt;, selectedViewStyleKey: String, onViewStyleChange: (String) -&gt; Unit, hidePlayed: Boolean, onToggleHidePlayed: () -&gt; Unit, onDismiss: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$@UnstableApi override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>LongMethod:MediaPlayerService.kt$MediaPlayerService$override fun onGetRoot( clientPackageName: String, clientUid: Int, rootHints: Bundle?, ): BrowserRoot?</ID>
+    <ID>LongMethod:MiniPlayer.kt$@Composable fun MiniPlayer( state: MiniPlayerState, coverUrl: (String) -&gt; String, onClick: () -&gt; Unit, onPlayPauseClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:NotificationBuilder.kt$NotificationBuilder$fun buildNotificationWithoutArtwork(sessionToken: MediaSessionCompat.Token): Notification</ID>
+    <ID>LongMethod:PlayerDestination.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlayerDestination( plexConfig: PlexConfig, onCollapse: () -&gt; Unit, modifier: Modifier = Modifier, viewModel: CurrentlyPlayingViewModel, )</ID>
+    <ID>LongMethod:SearchTopBar.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SearchTopBar( title: String, isActive: Boolean, query: String, onQueryChange: (String) -&gt; Unit, onActiveChange: (Boolean) -&gt; Unit, modifier: Modifier = Modifier, actions: @Composable () -&gt; Unit = {}, )</ID>
+    <ID>LongMethod:SeriesIndexTesterScreen.kt$@Composable fun SeriesIndexTesterScreen( state: SeriesIndexTesterUiState, onTitleSortChanged: (String) -&gt; Unit, onSampleChosen: (String) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:SettingsViewModel.kt$SettingsViewModel$private fun makePreferences(): List&lt;PreferenceModel&gt;</ID>
+    <ID>LongMethod:SettingsViewModel.kt$SettingsViewModel$private fun playbackPreferences(): List&lt;PreferenceModel&gt;</ID>
+    <ID>LongMethod:SpeedChooserSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun SpeedChooserSheet( state: SpeedChooserState, skipSilence: Boolean, onSpeedChange: (Float) -&gt; Unit, onToggleOverride: (Boolean) -&gt; Unit, onToggleSkipSilence: (Boolean) -&gt; Unit, onDismiss: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>NestedBlockDepth:BookSortComparators.kt$BookSortComparators$fun compareTitlesNaturally( left: String, right: String, ): Int</ID>
+    <ID>NestedBlockDepth:ChapterAssembly.kt$inline fun assembleChapters( tracks: List&lt;MediaItemTrack&gt;, chaptersForTrack: (MediaItemTrack) -&gt; List&lt;Chapter&gt;, ): List&lt;Chapter&gt;</ID>
+    <ID>NestedBlockDepth:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel$private fun skipToChapter( action: PlaybackStateCompat.CustomAction, forward: Boolean, )</ID>
+    <ID>NestedBlockDepth:PackageValidator.kt$PackageValidator$private fun buildCertificateWhitelist(parser: XmlResourceParser): Map&lt;String, KnownCallerInfo&gt;</ID>
+    <ID>UnnecessarySafeCall:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel$target?.let { bookTarget -&gt; awaitSeek(inTrackOffsetFor(bookTarget, currentlyPlaying.chapter.value.trackId)) }</ID>
+    <ID>UnnecessarySafeCall:MediaPlayerService.kt$MediaPlayerService$timelineWindow.mediaItem?.localConfiguration</ID>
+    <ID>UnsafeCallOnNullableType:BookRepository.kt$BookRepository$plexPrefsRepo.library!!</ID>
+    <ID>UnsafeCallOnNullableType:BookSortComparators.kt$BookSortComparators$digitRun.find(l, i)!!</ID>
+    <ID>UnsafeCallOnNullableType:BookSortComparators.kt$BookSortComparators$digitRun.find(r, j)!!</ID>
+    <ID>UnsafeCallOnNullableType:ChronicleApplication.kt$ChronicleApplication.Companion$INSTANCE!!</ID>
+    <ID>UnsafeCallOnNullableType:CurrentlyPlayingViewModel.kt$CurrentlyPlayingViewModel$audiobook.value!!</ID>
+    <ID>UnsafeCallOnNullableType:MediaItemTrack.kt$earliest!!</ID>
+    <ID>UnsafeCallOnNullableType:TrackRepository.kt$TrackRepository$plexPrefs.library!!</ID>
+  </CurrentIssues>
+</SmellBaseline>

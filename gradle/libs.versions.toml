@@ -53,6 +53,14 @@ androidx-sqlite = "2.6.1"
 lifecycle = "2.10.0"
 annotation = "1.10.0"
 ktlint = "12.1.2"
+# Held on the 1.23.x line deliberately. detekt 2.x is a rewrite: rule ids move, the config schema
+# changes and the baseline format is not compatible, so adopting it is its own task rather than a
+# version bump. 1.23.8 is the last release of the 1.23 line.
+#
+# 1.23.x embeds a Kotlin 1.9 parser. That reads the sources here without complaint because nothing
+# in the tree uses post-1.9 syntax; `DetektRuleSetTest` is what notices if the config drifts, and a
+# parse failure would surface as a detekt error rather than a finding.
+detekt = "1.23.8"
 pitest = "0.2.27"
 pitestTool = "1.22.1"
 junit = "4.13.2"
@@ -192,6 +200,10 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktorfit = { id = "de.jensklingenberg.ktorfit", version.ref = "ktorfit" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "dagger" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+# detekt owns complexity, potential bugs and coroutine misuse. It does **not** own formatting,
+# naming or style: ktlint owns those, and running both on the same concerns produces contradictory
+# advice. `config/detekt/detekt.yml` disables those rule sets explicitly.
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 # droidsonroids fork, not mainline solidsoft: solidsoft is built on JavaPlugin and needs
 # sourceSets.main/test, which com.android.application does not provide.
 pitest = { id = "pl.droidsonroids.pitest", version.ref = "pitest" }

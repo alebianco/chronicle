@@ -16,9 +16,14 @@ check_mode=0
 [ "${1:-}" = "--check" ] && check_mode=1
 missing=0
 
-# A structural gate reads the source tree. Behaviour tests do not.
+# A structural gate reads files on disk rather than exercising behaviour: the source tree, or the
+# build's own configuration. The second half of that was added for `DetektRuleSetTest`, which pins
+# which detekt rule sets are on — a build invariant that fails the gate exactly like a forbidden
+# source pattern does, but expressed in `.gradle.kts` and `.yml` rather than in `.kt`. Without it
+# the guard existed and the generated table did not know about it, which is the specific rot this
+# script was written to prevent.
 is_gate() {
-  grep -qE 'File\("app/src|walkTopDown|\.walk\(\)|sourceFiles|kotlinSources' "$1" 2>/dev/null
+  grep -qE 'File\("app/src|walkTopDown|\.walk\(\)|sourceFiles|kotlinSources|build\.gradle\.kts|config/detekt' "$1" 2>/dev/null
 }
 
 while IFS= read -r f; do

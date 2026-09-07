@@ -27,6 +27,7 @@ around a gate.
 | `ModelsWithoutDiTest` | **(no KDoc summary — add one)** |
 | `TokenLoggingTest` | Auth tokens must never reach logcat. |
 | `DeclaredDependencyTest` | Every AndroidX package the app imports is **declared**, not inherited. |
+| `DetektRuleSetTest` | detekt owns complexity, potential bugs and coroutines — never formatting, style or naming. |
 | `RawDurationFormatTest` | The player must not print a raw duration. |
 | `WorkerDispatcherTest` | `CoroutineWorker` is the one place `Dispatchers.*` is allowed directly. |
 | ~~`OrphanedAdapterTest`~~ | *Retired* — zero `RecyclerView.Adapter`s remain. |

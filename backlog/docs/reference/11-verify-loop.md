@@ -4,7 +4,7 @@
 ./verify.sh            # the full gate
 ./verify.sh --quick    # inner loop while iterating: ktlint + unit tests + coverage
 ./verify.sh --format   # runs ktlintFormat first, then the full gate
-./verify.sh --instrumented   # adds a 9th stage on two managed emulators
+./verify.sh --instrumented   # adds a 10th stage on two managed emulators
 ./verify.sh --mutation       # adds the PIT mutation score — reported, never fatal
 ```
 
@@ -22,13 +22,60 @@ laptop and on any forge.
 | 4 | `testDebugUnitTest` — unit tests |
 | 5 | Coverage ratchet (two gates, see below) |
 | 6 | `assembleDebug` — debug APK builds |
-| 7 | `lintDebug` — Android lint |
-| 8 | `compileReleaseKotlin` — **the release variant compiles** |
+| 7 | `:app:detektDebug` — complexity, potential bugs, coroutine misuse |
+| 8 | `lintDebug` — Android lint |
+| 9 | `compileReleaseKotlin` — **the release variant compiles** |
 
 Nothing less. The last stage exists because the debug and release source sets each provide their own
 `DebugHooks` object: `DebugHooksContract` makes the compiler check the shape, but only for the
 variant being built — so a drifted release twin used to pass every debug-only check and break the
 first release build.
+
+## detekt (stage 7)
+
+Config: `config/detekt/detekt.yml` · baseline: `config/detekt/baseline-debug.xml` · pinned by
+`DetektRuleSetTest`.
+
+**Three rule sets, and only three: complexity, potential-bugs, coroutines.** `style`, `naming` and
+`comments` are disabled explicitly, and `formatting` is absent rather than disabled — **ktlint owns
+formatting.** Two linters with opinions about the same lines produce advice that contradicts
+itself: ktlint's rule says wrap here, detekt's says do not, and no edit satisfies both. That is a
+build someone deletes a stage from rather than fixes.
+
+**The stage is `:app:detektDebug`, not `detekt`.** The bare task analyses without a classpath, and
+roughly half the potential-bugs set — `UnsafeCallOnNullableType`, `ElseCaseInsteadOfExhaustiveWhen`,
+`IgnoredReturnValue` — needs type resolution to decide anything. Without it those rules report
+*nothing*, which is indistinguishable from a clean tree. Measured on this codebase: **31 findings
+without type resolution, 120 with**.
+
+**It is ratcheted, and the baseline is visible debt.** `config/detekt/baseline-debug.xml` holds
+**52** findings as of its first generation. Those do not block; a 53rd does. Working the number down
+is its own effort, not a side project of whatever change happens to touch the file. The current
+composition:
+
+| Rule | Count |
+|---|---|
+| `LongMethod` | 18 |
+| `ElseCaseInsteadOfExhaustiveWhen` | 11 |
+| `UnsafeCallOnNullableType` | 7 |
+| `NestedBlockDepth` | 4 |
+| `CyclomaticComplexMethod` | 3 |
+| `ImplicitDefaultLocale` | 3 |
+| `UnnecessarySafeCall` | 2 |
+| `LargeClass`, `ComplexCondition`, `IteratorNotThrowingNoSuchElementException`, `ExitOutsideMain` | 1 each |
+
+Regenerate with `./gradlew :app:detektBaselineDebug` — and only deliberately: regenerating absorbs
+whatever new findings exist, which is exactly what the gate is meant to stop.
+
+**Two rules are off despite being in an enabled set**, with the reasons recorded in `detekt.yml`
+next to each: `UnreachableCode` (broken under 1.23.x — it flags the `return` of every
+`?: return null`, 34 false positives and no true ones) and `NullableToStringCall` (correct but not
+defects — all 34 were `Timber.e("… ${e.message}")`, where "null" in a log line is the honest
+rendering of a null).
+
+**Cost: ~12s** of analysis on top of an already-compiled debug variant. That is why it sits after
+`assembleDebug` in the full gate and **not** in `--quick`: it needs the debug compile that `--quick`
+deliberately skips, so putting it there would add the whole compile to the inner loop.
 
 ## The coverage ratchet
 
@@ -71,7 +118,7 @@ blanket `-keep`**, which silently exempts code from R8.
 
 ## Instrumented tests
 
-`./verify.sh --instrumented` adds them as a 9th stage; `./gradlew
+`./verify.sh --instrumented` adds them as a 10th stage; `./gradlew
 instrumentedCheckGroupGroupDebugAndroidTest` runs them directly.
 
 Two Gradle Managed Devices: **API 27** (the minSdk floor, which catches a new API called without a

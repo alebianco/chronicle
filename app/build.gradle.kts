@@ -9,6 +9,7 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
   id("com.google.android.gms.oss-licenses-plugin")
   alias(libs.plugins.pitest)
+  alias(libs.plugins.detekt)
   jacoco
 }
 
@@ -337,6 +338,61 @@ dependencies {
   androidTestImplementation(platform(libs.compose.bom))
   androidTestImplementation(libs.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.ext.junit.ktx)
+}
+
+// ---------------------------------------------------------------------------------------------
+// detekt — complexity, potential bugs and coroutine misuse
+// ---------------------------------------------------------------------------------------------
+//
+// The division of labour with ktlint is the reason this is worth having at all: **ktlint owns
+// formatting, naming and style; detekt owns none of those.** Two linters with opinions about the
+// same lines produce advice that contradicts itself, and no edit satisfies both. What detekt adds
+// is the three things ktlint cannot see: how complex a function is, whether a construct is a latent
+// defect, and whether coroutines are being used unstructured. `config/detekt/detekt.yml` disables
+// the overlapping rule sets explicitly, with the reason recorded next to each.
+//
+// It lands **ratcheted**, like `lint-baseline.xml` and the coverage ratchet before it. A linter
+// switched on against an existing codebase reports its whole backlog at once, and the honest
+// outcome of a wall of findings blocking every build is that someone deletes the stage. Today's
+// findings are frozen into `config/detekt/baseline-debug.xml`; only *new* ones fail. That baseline is
+// visible debt — its size is recorded in `backlog/docs/reference/11-verify-loop.md` — to be worked
+// down as its own effort, not inside the task that introduced the gate.
+//
+// **The gate is `detektDebug`, not `detekt`.** The bare `detekt` task runs without a classpath, and
+// roughly half the potential-bugs set — `UnsafeCallOnNullableType`,
+// `ElseCaseInsteadOfExhaustiveWhen`, `UnnecessarySafeCall`, `HasPlatformType` — needs type
+// resolution to decide anything, and those 20 findings are all invisible without it. Without it
+// those rules do not report a false negative; they report *nothing*, and a linter finding nothing
+// is indistinguishable from a clean tree. `detektDebug` compiles the debug variant first and hands
+// detekt the real classpath, so those rules actually run. `DetektRuleSetTest` pins that choice.
+detekt {
+  buildUponDefaultConfig = true
+  config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+  // Set as `baseline.xml`, read and written as **`baseline-debug.xml`**: the variant-aware tasks
+  // insert the variant name before the extension so debug and release can hold different
+  // baselines. Naming the file that already has the suffix would produce
+  // `baseline-debug-debug.xml`, which nothing reads — the baseline would silently not apply and
+  // the stage would fail on findings it was supposed to be ignoring. Regenerate with
+  // `./gradlew :app:detektBaselineDebug`.
+  baseline = rootProject.file("config/detekt/baseline.xml")
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+  // 1.23.x otherwise defaults to the JVM target of whichever daemon happens to be running, so a
+  // daemon on a different JDK would change which rules can resolve types — the same analysis
+  // giving different answers on different machines.
+  jvmTarget = "17"
+  reports {
+    xml.required.set(true)
+    html.required.set(true)
+    sarif.required.set(false)
+    md.required.set(false)
+    txt.required.set(false)
+  }
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
+  jvmTarget = "17"
 }
 
 jacoco {

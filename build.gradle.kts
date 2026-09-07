@@ -3,6 +3,7 @@ plugins {
   alias(libs.plugins.kotlin.android) apply false
 
   alias(libs.plugins.ktlint)
+  alias(libs.plugins.detekt)
 }
 
 allprojects {
@@ -23,6 +24,11 @@ buildscript {
 ktlint {
   android.set(true)
 }
+
+// detekt is declared here only so `:app` can `alias` it — it is *configured* in
+// `app/build.gradle.kts`, where the sources and the compiled classpath are. Half its rules need
+// type resolution, and type resolution needs the variant's classpath, which only the module that
+// owns the Android variants has.
 
 tasks.register<Copy>("installGitHook") {
   from(rootProject.file("pre-commit"))

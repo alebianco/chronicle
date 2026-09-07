@@ -1,0 +1,204 @@
+# detekt configuration — Chronicle Unabridged
+#
+# This file is an *override* on top of detekt's shipped defaults (`buildUponDefaultConfig = true`
+# in the root build.gradle.kts). Anything not named here keeps its default; anything named here
+# wins.
+#
+# ---------------------------------------------------------------------------------------------
+# Scope: three rule sets, and only three.
+# ---------------------------------------------------------------------------------------------
+#
+# ENABLED
+#   complexity     — the review that found cu-173 and cu-174 measured cyclomatic complexity by
+#                    hand. detekt does it on every build.
+#   potential-bugs — the set that catches defects rather than opinions.
+#   coroutines     — mechanically enforces the `GlobalScope` ban that convention 4 states in prose
+#                    and `CachedFileManagerScopeTest` checks by reading one file's source text.
+#
+# DISABLED, and this is the point of the file
+#   formatting, style, naming, comments — **ktlint owns these.** Two linters with opinions about
+#   the same lines produce contradictory advice: ktlint's rule says wrap here, detekt's says do
+#   not, and no edit satisfies both. Formatting is settled by `ktlintCheck` (stage 3 of
+#   `verify.sh`) and `format-kotlin.sh` runs `ktlintFormat` after every Kotlin edit, so these
+#   concerns are already gated — enabling them here would only add a second, disagreeing voice.
+#
+#   empty-blocks, exceptions, performance — off for now, not on principle. They are real rule sets
+#   that would each add findings to the baseline without being what this task set out to gate.
+#   Turning one on is a small, separate change with its own baseline delta.
+#
+# `DetektRuleSetTest` asserts these on/off states, so the division of labour cannot rot silently.
+
+build:
+  # A ratcheted gate: existing findings live in `baseline.xml` and do not count, so the number of
+  # findings that reach this threshold is the number of *new* ones. Zero tolerance is the whole
+  # design — one new complexity violation or one new `GlobalScope.launch` fails the build.
+  maxIssues: 0
+
+config:
+  # Fail fast if this file names a rule detekt does not have. Without it a typo in a rule id is
+  # silently ignored and the rule quietly does nothing — a gate that is not a gate.
+  validation: true
+  warningsAsErrors: false
+
+# ---------------------------------------------------------------------------------------------
+# Disabled rule sets — ktlint's territory
+# ---------------------------------------------------------------------------------------------
+
+# `formatting` is deliberately **absent** rather than set to `active: false`. It is not part of
+# detekt-core at all — it ships in the separate `detekt-formatting` plugin, which wraps ktlint's own
+# rules. That plugin is simply not on the classpath, which is a stronger guarantee than disabling
+# it, and naming it here would fail config validation ("Property 'formatting' does not exist").
+
+style:
+  active: false
+
+naming:
+  active: false
+
+comments:
+  active: false
+
+# ---------------------------------------------------------------------------------------------
+# Disabled rule sets — out of scope for this gate, not judged worthless
+# ---------------------------------------------------------------------------------------------
+
+empty-blocks:
+  active: false
+
+exceptions:
+  active: false
+
+performance:
+  active: false
+
+# ---------------------------------------------------------------------------------------------
+# Complexity
+# ---------------------------------------------------------------------------------------------
+
+complexity:
+  active: true
+
+  # detekt's defaults, kept as they ship. They are not tuned to this codebase by ear: the baseline
+  # absorbs everything that exceeds them today, so the thresholds only have to be defensible for
+  # *new* code — and the shipped defaults are exactly that, a widely used community judgement
+  # rather than a number invented here.
+  ComplexCondition:
+    active: true
+  CyclomaticComplexMethod:
+    active: true
+  LabeledExpression:
+    active: false
+  LargeClass:
+    active: true
+  LongMethod:
+    active: true
+  LongParameterList:
+    # Off: every ViewModel and every Dagger-injected class in this codebase takes its collaborators
+    # through the constructor, which is the pattern the project wants. A rule that fires on
+    # correct constructor injection trains people to ignore detekt.
+    active: false
+  MethodOverloading:
+    active: false
+  NestedBlockDepth:
+    active: true
+  ReplaceSafeCallChainWithRun:
+    active: false
+  StringLiteralDuplication:
+    active: false
+  TooManyFunctions:
+    # Off: it counts functions without judging them, so it fires hardest on DAOs and Compose files
+    # that are long because the screen is, not because anything is wrong.
+    active: false
+
+# ---------------------------------------------------------------------------------------------
+# Potential bugs — the set that catches defects rather than opinions
+# ---------------------------------------------------------------------------------------------
+
+potential-bugs:
+  active: true
+
+  IgnoredReturnValue:
+    # On, but note what it actually does before relying on it. cu-215 expected this to fire on the
+    # deliberate `tryEmit` calls in `SleepTimerBus` and `PlaybackErrorBus`; it does **not**, and
+    # that is by design rather than a misconfiguration. The rule defaults to `restrictToConfig:
+    # true`, meaning it only reports functions annotated `@CheckReturnValue` (or matching
+    # `returnValueAnnotations`), and `MutableSharedFlow.tryEmit` carries no such annotation.
+    # Widening it to every ignored return would report the whole codebase's fluent-API usage.
+    # Left on so an annotated API is caught the day one arrives; it currently reports nothing.
+    active: true
+  UnsafeCallOnNullableType:
+    active: true
+  UnreachableCode:
+    # OFF — the rule is **broken** on this codebase, not merely noisy. Under 1.23.x it flags the
+    # right-hand side of every elvis-return: `val x = foo() ?: return null` reports "unreachable
+    # code" on the `return null`, which is the one branch that certainly is reachable. It produced
+    # 34 findings here and every one was that shape. A rule whose findings are all wrong teaches
+    # people to ignore the linter, and baselining 34 false positives would hide the debt figure
+    # behind noise. Revisit if detekt 2.x fixes the analysis.
+    active: false
+  UnconditionalJumpStatementInLoop:
+    active: true
+  ImplicitDefaultLocale:
+    active: true
+  ExplicitGarbageCollectionCall:
+    active: true
+  LateinitUsage:
+    # Off: Android's lifecycle hands objects back after construction, and `lateinit` is the
+    # idiomatic answer. This rule is a design opinion, not a bug detector.
+    active: false
+  UnnecessaryNotNullOperator:
+    active: true
+  UnnecessarySafeCall:
+    active: true
+  CastToNullableType:
+    active: true
+  DontDowncastCollectionTypes:
+    active: true
+  ElseCaseInsteadOfExhaustiveWhen:
+    active: true
+  EqualsAlwaysReturnsTrueOrFalse:
+    active: true
+  ExitOutsideMain:
+    active: true
+  HasPlatformType:
+    active: true
+  MissingPackageDeclaration:
+    active: true
+  NullableToStringCall:
+    # OFF — correct findings, but not defects. All 34 it reported were log lines interpolating a
+    # nullable: `Timber.e("failed: ${e.message}")`. "null" appearing in a log message is the
+    # honest rendering of a null, not a bug, and this is a diagnostic string rather than anything a
+    # user sees. Left on, it would fire on every future log line for no caught defect — the exact
+    # ratio that gets a gate switched off. `TokenLoggingTest` and `CollectionLoggingTest` already
+    # police what logs may contain, on grounds that matter.
+    active: false
+  WrongEqualsTypeParameter:
+    active: true
+
+# ---------------------------------------------------------------------------------------------
+# Coroutines
+# ---------------------------------------------------------------------------------------------
+
+coroutines:
+  active: true
+
+  GlobalCoroutineUsage:
+    # The reason this rule set is in scope at all. Convention 4 bans `GlobalScope` in prose;
+    # `CachedFileManagerScopeTest` enforces it by reading **one file's** source text, which says
+    # nothing about the other few hundred. This rule covers all of them, on every build.
+    active: true
+  SuspendFunWithFlowReturnType:
+    active: true
+  SuspendFunWithCoroutineScopeReceiver:
+    active: true
+  InjectDispatcher:
+    # Off here, not because it is wrong but because it is already enforced better: `DispatcherProvider`
+    # plus `WorkerDispatcherTest` is a stricter, project-specific version of the same rule, and two
+    # enforcements of one convention drift apart.
+    active: false
+  RedundantSuspendModifier:
+    # Needs type resolution to be accurate; without a compiled classpath it reports on incomplete
+    # information. Left off rather than baselining false positives.
+    active: false
+  SleepInsteadOfDelay:
+    active: true

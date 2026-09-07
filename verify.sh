@@ -7,7 +7,7 @@
 # a forge-level required check is a convenience, never the source of truth.
 #
 # Usage:
-#   ./verify.sh              full gate: ktlint, unit tests, debug APK, lint
+#   ./verify.sh              full gate: ktlint, unit tests, debug APK, detekt, lint
 #   ./verify.sh --quick      inner loop: ktlint + unit tests only
 #   ./verify.sh --format     run ktlintFormat first, then the full gate
 #   ./verify.sh --no-coverage  skip the JaCoCo report + ratchet
@@ -90,6 +90,25 @@ fi
 
 stage "assembleDebug — debug APK"
 "$GRADLE" assembleDebug
+
+# detekt: complexity, potential bugs and coroutine misuse. Not formatting, style or naming —
+# `ktlintCheck` above owns those, and two linters arguing about the same lines produce a build no
+# edit satisfies. See app/build.gradle.kts and config/detekt/detekt.yml.
+#
+# **`detektDebug`, not `detekt`.** The bare task analyses without a classpath, and the rules worth
+# having here — `UnsafeCallOnNullableType`, `ElseCaseInsteadOfExhaustiveWhen` — need type
+# resolution to decide anything at all. Measured on this tree: 31 findings without it, 120 with.
+# A rule that cannot resolve a type does not report a false negative, it reports nothing, and a
+# linter finding nothing looks exactly like a clean tree.
+#
+# **Full gate, not `--quick`.** Measured at ~12s of analysis on top of an already-compiled debug
+# variant — and it needs that compile, which `--quick` deliberately does not do. Placed after
+# `assembleDebug` so it reuses that compilation rather than forcing its own.
+#
+# Ratcheted: `config/detekt/baseline-debug.xml` holds today's findings, so this fails on *new* ones
+# only.
+stage "detektDebug — complexity, potential bugs, coroutines"
+"$GRADLE" :app:detektDebug
 
 stage "lintDebug — Android lint"
 "$GRADLE" lintDebug
