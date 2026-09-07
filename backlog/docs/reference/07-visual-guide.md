@@ -328,7 +328,7 @@ flowchart TD
 | Modify book data            | `data/local/BookRepository.kt`          |
 | Change Plex API calls       | `data/sources/plex/PlexService.kt`      |
 | Modify playback logic       | `features/player/MediaPlayerService.kt` |
-| Add a setting               | `features/settings/SettingsList.kt` (+ `SharedPreferencesPrefsRepo.kt`) |
+| Add a setting               | `features/settings/SettingsViewModel.kt` (`settingsRows`) + `SharedPreferencesPrefsRepo.kt` |
 | Change UI layout            | `features/*/compose/`                   |
 | Add dependency injection    | `injection/` (Hilt modules)              |
 | Modify navigation           | `navigation/Destination.kt` (routes) + `navigation/compose/ChronicleNavHost.kt` (graph) |

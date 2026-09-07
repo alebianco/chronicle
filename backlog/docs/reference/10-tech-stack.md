@@ -99,7 +99,7 @@ the live Plex work is in `PlexMediaRepository`.
 
 ## Tests
 
-- **1644 unit tests** (`app/src/test/...`), including `RoomMigrationTest`, which drives the
+- **1651 unit tests** (`app/src/test/...`), including `RoomMigrationTest`, which drives the
   historical migration chains through real SQLite via **Robolectric** (Room's
   `MigrationTestHelper` is instrumented-only).
 - **10 instrumented tests** on two managed emulators, which also run on an Automotive image.

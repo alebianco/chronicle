@@ -23,9 +23,10 @@ import timber.log.Timber
  * re-implementing route discovery, which is exactly the hand-rolling decision-19 admits the SDK to
  * avoid.
  *
- * This is the whole of the View island. `CastMenu` — the `Menu`-based equivalent that this
- * replaces — went with `audiobook_details_menu.xml`; `MediaRouteButtonFactory` has a public
- * overload taking a bare [MediaRouteButton], so no `Menu` is involved.
+ * This is the whole of the View island. `MediaRouteButtonFactory` has a public overload taking a
+ * bare [MediaRouteButton], so no `Menu` is involved — which is what let the `Menu`-based `CastMenu`
+ * and `audiobook_details_menu.xml` go. (Both actually survived cu-206 as dead code: this KDoc
+ * claimed they were deleted a commit before anything deleted them. They are gone now.)
  *
  * ### It still degrades to absent
  *

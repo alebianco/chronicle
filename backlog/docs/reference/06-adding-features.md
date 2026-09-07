@@ -225,7 +225,8 @@ pattern and navigation silently does nothing.
 ### Adding a Setting
 
 **There is no settings preference XML.** `res/xml/` holds only the Auto, backup and network-security
-configs; the settings screen is built in Kotlin from `features/settings/SettingsList.kt`.
+configs; the settings screen is built in Kotlin — `SettingsViewModel.settingsRows` emits a
+`List<SettingsRow>` that `compose/SettingsScreen.kt` renders.
 
 1. **Add to `PrefsRepo`** — an *interface* in `data/local/SharedPreferencesPrefsRepo.kt`, with
    `SharedPreferencesPrefsRepo` as the implementation:
@@ -246,8 +247,8 @@ override var newSetting: Boolean
     set(value) = sharedPreferences.edit { putBoolean(PREF_NEW_SETTING, value) }
 ```
 
-2. **Add a row** to `SettingsList.kt` (a `PreferenceModel`), with title and summary as string
-   resources.
+2. **Add a row** in `SettingsViewModel.settingsRows` (a `PreferenceModel`), with title and summary
+   as string resources. `SettingsList.kt` was the View-era builder and is gone.
 
 3. **Decide whether it is backed up.** If the setting should survive a restore, add its key to
    `BACKUP_SETTING_KEYS`. Two rules: never enumerate `sharedPreferences.all` into an export — the
