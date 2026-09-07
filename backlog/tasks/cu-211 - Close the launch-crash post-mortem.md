@@ -122,7 +122,7 @@ instance is already guarded.
       below
 - [x] Anything found is fixed, or has a recorded reason it is legitimate — the two hits are both
       legitimate, reasoned below
-- [ ] `./verify.sh` green, and `--instrumented` green at least once locally
+- [x] `./verify.sh` green, and `--instrumented` green locally — 9 stages, after cu-221
 
 ## The audit result (2026-09-07)
 

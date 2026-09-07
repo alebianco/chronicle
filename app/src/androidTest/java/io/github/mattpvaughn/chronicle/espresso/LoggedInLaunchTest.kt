@@ -1,8 +1,10 @@
 package io.github.mattpvaughn.chronicle.espresso
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import io.github.mattpvaughn.chronicle.application.MainActivity
@@ -61,7 +63,9 @@ class LoggedInLaunchTest {
    */
   @Test
   fun launchesIntoTheAppWhenAlreadySignedIn() {
-    composeRule.onNodeWithContentDescription("Home").assertIsDisplayed()
+    awaitHomeShelf()
+
+    composeRule.onNode(homeTab).assertIsDisplayed()
   }
 
   /**
@@ -72,8 +76,64 @@ class LoggedInLaunchTest {
    */
   @Test
   fun survivesRecreation() {
+    // Wait for the first composition before recreating: recreating an activity that has not yet
+    // navigated to Home restores a back stack that does not contain it, and the assertion then
+    // fails for a reason that has nothing to do with recreation.
+    awaitHomeShelf()
+
     composeRule.activityRule.scenario.recreate()
 
-    composeRule.onNodeWithContentDescription("Home").assertIsDisplayed()
+    awaitHomeShelf()
+    composeRule.onNode(homeTab).assertIsDisplayed()
+  }
+
+  /**
+   * Waits until the bottom nav exists, which is the app shell having replaced onboarding.
+   *
+   * **Compose's automatic idling cannot cover this.** It synchronises on recomposition and pending
+   * animations, but the thing being waited for is a `StateFlow` emission: `MainActivity` collects
+   * `isLoggedIn`, and `MockPlexMode.enable` seeds prefs then calls `determineLoginState()`, which
+   * publishes asynchronously. Measured on a real device, `LOGGED_IN_FULLY` arrived **2.4 seconds
+   * after the first test started** — so the suite was asserting against onboarding and reporting
+   * "the component with ContentDescription 'Home' is not displayed", which reads like a broken
+   * fixture rather than a race.
+   *
+   * `waitUntil` polls the semantics tree, so it costs nothing when the state is already correct and
+   * only spends time when the app genuinely has not settled.
+   */
+  private fun awaitHomeShelf() {
+    composeRule.waitUntil(timeoutMillis = LOGIN_SETTLE_TIMEOUT_MS) {
+      composeRule.onAllNodes(homeTab).fetchSemanticsNodes().isNotEmpty()
+    }
+  }
+
+  /**
+   * The Home tab, matched by **either** its content description or its visible label.
+   *
+   * Not a redundant `or`. `NavigationBarItem` is set `alwaysShowLabel = false`, so the *selected*
+   * tab renders a `Text` label that Compose merges into the item's semantics — and that merged text
+   * replaces the icon's `contentDescription`. Home is the launch destination, so it is always the
+   * selected one, and a content-description-only matcher finds `Library`, `Search` and `Settings`
+   * but never `Home`. Confirmed with a `uiautomator` dump: `content-desc` listed the other three
+   * while "Home" appeared only under `text`.
+   *
+   * That is an accessibility defect in its own right — see the task filed alongside this — and this
+   * matcher is deliberately tolerant of both spellings so fixing it there does not break the test
+   * here.
+   *
+   * `hasClickAction()` narrows it to the tab itself: "Home" also appears as a heading inside the
+   * shelf, and without this the matcher found two nodes and failed on the ambiguity rather than on
+   * anything real.
+   */
+  private val homeTab =
+    (hasContentDescription("Home") or hasText("Home")) and hasClickAction()
+
+  private companion object {
+    /**
+     * Generous on purpose. The wait ends as soon as the shelf appears, so a high ceiling costs
+     * nothing on a fast device and stops a slow emulator — a cold CI runner boots one — from
+     * failing for being slow rather than wrong.
+     */
+    const val LOGIN_SETTLE_TIMEOUT_MS = 30_000L
   }
 }

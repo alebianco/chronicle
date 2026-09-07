@@ -1,7 +1,7 @@
 ---
 id: cu-221
 title: "The instrumented suite regressed while nothing was running it"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -16,47 +16,53 @@ priority: high
 
 ## Description
 
-**`LoggedInLaunchTest` is red, and has been for about six days.** Two of its three tests fail on the
-managed `api35` device and on the owner's tablet, with the same assertion:
+**Resolved.** `LoggedInLaunchTest` failed two of three tests on every device for about six days. It
+now passes on the `api35` managed device and on the owner's tablet.
 
-```
-Assert failed: The component with ContentDescription = 'Home' is not displayed!
-  LoggedInLaunchTest > launchesIntoTheAppWhenAlreadySignedIn  FAILED
-  LoggedInLaunchTest > survivesRecreation                     FAILED
-```
+**The cause was not what this ticket first said, twice over.** Both wrong diagnoses are kept, because
+each was stated confidently and the correction is the useful part:
 
-`mockPlexModeIsActive` passes, so the fixture server is up. The app starts — there is no crash. It
-simply is not logged in, so it renders onboarding, which has no bottom nav.
+1. *"Nothing seeds a login state."* **False.** `MockPlexMode.enable` seeds the account token, server
+   and library, then calls `determineLoginState()` — and logcat confirmed
+   `Login event changed to LOGGED_IN_FULLY`, with books syncing from the fixture. The session was
+   fine all along. That claim came from grepping `androidTest/` for `authToken` and finding nothing,
+   without checking that the seeding lived in `debug/` instead.
+2. *"It is a race."* **Also false, though it looked compelling** — `LOGGED_IN_FULLY` genuinely
+   arrived 2.4 s after the first test started. But an explicit `waitUntil` then timed out after
+   **30 seconds**, which disproved it: the node was never going to appear.
 
-**The cause, as far as it was measured.** `ChronicleTestRunner` calls `DebugHooks.setMockPlexEnabled`,
-and that function sets exactly one boolean — `KEY_MOCK_PLEX` — and seeds nothing else. Nothing
-anywhere under `app/src/androidTest/` writes an auth token or a login state (`grep` for
-`LOGGED_IN_FULLY` and `authToken` returns nothing). The test's own KDoc says it depends on "a seeded
-session", and calls that "the precondition every other case rests on" — but the seeding it describes
-is not there. Whether it was lost or never existed outside a fixture that has since changed is the
-first thing to establish.
+**What it actually was.** A `uiautomator` dump of the running app showed `content-desc` listing
+`Library`, `Search` and `Settings` — and no `Home`. The selected tab exposes its label as `text`
+instead. `NavigationBarItem` with `alwaysShowLabel = false` renders a `Text` for the selected item
+only, and Compose merges that into the item's semantics, replacing the icon's `contentDescription`.
+Home is the launch destination, so it is always selected, so its description is always gone.
 
-**It was green on 2026-09-01**, in `c6dac579 "get the instrumented suite running green on a managed
-device"`. Between then and now the whole Ktor migration landed — including `30fdfecf`, the launch
-crash fix, which changed how `PlexConfig` and the login repo are wired. That is the window.
+The test had been right when written and broke when the app started landing on Home. **Dumping the
+screen would have found this in minutes; reading code found two plausible wrong answers first.**
 
-**This is cu-211's thesis, demonstrated.** The suite rotted *because* nothing ran it. Wiring the gate
-without fixing this means the first PR after cu-211 lands goes red for a reason that predates it.
+## What changed
+
+- `LoggedInLaunchTest` matches the tab by content description **or** visible text, narrowed with
+  `hasClickAction()` because "Home" also appears as a shelf heading.
+- `awaitHomeShelf()` waits for the shell before asserting. The race was not the cause, but it is
+  real — 2.4 s on a warm tablet, and a cold CI emulator is slower.
+- The underlying accessibility defect is **cu-223**. This matcher is a workaround for it.
 
 ## Acceptance Criteria
 
-- [ ] The cause is measured, not guessed — what seeded the login state when this was green, and what
-      stopped doing so
-- [ ] `LoggedInLaunchTest` passes on the `api35` managed device
-- [ ] It also passes on `api27`, the minSdk floor, or the reason it cannot is recorded
-- [ ] Whatever seeds the session lives beside `setMockPlexEnabled` rather than being duplicated in
-      the test, so it cannot drift silently — the same argument that KDoc already makes for the mock
-      flag
-- [ ] **Sabotage-verified**: with the seeding removed, the test fails again
-- [ ] `AutoBrowseTreeTest` is run too, and its state recorded — it is in the same suite and has had
-      the same amount of nothing running it
-- [ ] `./verify.sh --instrumented` green
-- [ ] If the fix is not small, it is split and this task tracks the split
+- [x] The cause is measured, not guessed — found by dumping the screen after two code-reading
+      diagnoses proved wrong
+- [x] `LoggedInLaunchTest` passes on the `api35` managed device — 3/3
+- [x] It also passes on `api27`, or the reason it cannot is recorded — api27 cannot start on a CI
+      runner at all (cu-222); locally it is covered by `instrumentedCheckGroup`
+- [x] Whatever seeds the session lives beside `setMockPlexEnabled` — it already did, in
+      `MockPlexMode.enable`; this criterion was written on a false premise
+- [x] **Sabotage-verified**: reverting the matcher to content-description-only fails on api35;
+      restored in a separate call and green again
+- [x] `AutoBrowseTreeTest` is run too — it is in the 10 that pass on api35 in CI, so it was never
+      broken
+- [x] `./verify.sh --instrumented` green
+- [x] The fix was small; the underlying accessibility defect is split out as cu-223
 
 ## Notes
 
