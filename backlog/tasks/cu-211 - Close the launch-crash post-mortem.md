@@ -143,19 +143,23 @@ statement from "we did not look", and only one of them is worth anything later.
 
 Run **34139943502**, four attempts in, on `feature/agentic-dev`.
 
+Measured again on run **34144373853**, the first fully green one, which is the honest number:
+
 | Job | Result | Wall clock |
 |---|---|---|
-| `Verify` | ✅ success | 8m 48s |
-| `Instrumented (api35)` | ❌ 2 of 10 failed | **4m 23s** |
+| `Verify` | ✅ success | 9m 08s |
+| `Instrumented (api35)` | ✅ **10/10** | 11m 18s, of which **4m 13s is the suite itself** |
 | `CodeQL` | ✅ success | ~4m |
 
-They run in parallel, so the instrumented gate adds **nothing** to the critical path today — `verify`
-is the slower job. That is the number the ruling deserves attached to it: on current timings, putting
-this on every PR costs no extra wall-clock at all.
+The gap is cache *saving*, which happens only after a job succeeds — so it had never run before and
+will not repeat now the caches exist. Expect the instrumented job to settle near 5 minutes.
 
-**The emulator demonstrably ran**: `Starting 10 tests on api35` … `10/10 completed. (0 skipped) (2
-failed)`, and the assert-results step passed against real XML. The two failures are cu-221,
-reproducing the local result exactly.
+They run in parallel, so on steady-state timings the instrumented gate adds **little or nothing** to
+the critical path: `verify` is comparable. That is the number the ruling deserves attached to it.
+
+**The emulator demonstrably ran**: `Starting 10 tests on api35`, and the assert-results step reported
+`found 1 result file(s)` / `tests="10"`. The two failures seen on the first runs were cu-221, now
+fixed — the gate is green end to end.
 
 **Three CI-only defects had to be fixed to get here**, none of which could be seen from a green local
 gate — recorded because that is the whole argument for having CI at all:
