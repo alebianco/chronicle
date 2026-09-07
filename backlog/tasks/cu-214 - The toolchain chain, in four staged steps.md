@@ -228,6 +228,52 @@ was `tail` sorting lexically, not numerically. The plugin is *actively maintaine
 Removing the plugin proves it is the only thing left: with it out, configuration proceeds past every
 other error.
 
+### Second attempt: Pitest skipped as instructed, blocked further on
+
+The owner chose "keep PIT, drop the Android wrapper". Doing that got AGP 9 **configuring** — the
+plugin is unapplied with its configuration kept dormant in `app/build.gradle.kts`, and
+`verify.sh --mutation` now says why rather than dying on a missing task. `writePitestScope` and
+`PitestScopeTest` still run, so cu-213's derivation guard survives intact.
+
+Two further blockers then appeared, and the second is the one that stops this:
+
+- **Ktorfit 2.7.5 had to go back to 2.6.5.** Step 2 raised it believing the Kotlin bump lifted its
+  stdlib-2.4.0 requirement. Under AGP 8 that held. Under AGP 9 it does not: **AGP 9's built-in Kotlin
+  compiles at metadata version 2.2.0 regardless of the catalog's `kotlin = 2.3.21`**, so stdlib 2.4.0
+  is rejected — reported as `Unresolved reference 'mutableListOf'` in generated Room code, which
+  points nowhere near the cause. A comment already in the build file predicted this exact trap; step
+  2's conclusion that Ktorfit was free was wrong, it was merely not yet failing.
+- **`kotlin-parcelize` silently stops working.** It applies without error and the annotation does not
+  resolve: `Unresolved reference 'Parcelize'`, and the one model using it fails to implement
+  `Parcelable`. `org.jetbrains.kotlin.plugin.parcelize` behaves the same;
+  `com.android.kotlin.parcelize` does not exist. Same shape as Pitest — a plugin that applies and
+  no-ops under AGP 9's built-in Kotlin.
+
+**Stopped here on this ticket's own instruction:** *"If step 3 needs changes beyond build files — a
+source change forced by a DSL removal, say — stop and split it out."* Only one file uses
+`@Parcelize`, so the workaround is small, but it is app source and it is a different piece of work.
+
+Stashed as `cu-214 step 3 WIP #2: AGP 9.4.0 + Gradle 9.7.1 + compileSdk 37 + Hilt 2.60.1, pitest
+dormant, blocked on kotlin-parcelize`.
+
+### What AGP 9 costs, now that it is measured
+
+Five separate incompatibilities, three of them silent (a plugin that applies and does nothing is
+worse than one that fails):
+
+| | Kind |
+|---|---|
+| `kotlin.android` plugin | hard error, fix documented by AGP |
+| Hilt < 2.60.1 | hard error |
+| `assets.srcDir` | deprecated to error |
+| Pitest / `applicationVariants` | **no fix available** |
+| `kotlin-parcelize` | **applies, silently does nothing** |
+| Ktorfit 2.7.5 / stdlib 2.4.0 | must revert; AGP 9 pins Kotlin metadata at 2.2.0 |
+
+That last row is the one worth arguing about before continuing: **AGP 9's built-in Kotlin appears to
+cap the language version below what the catalog asks for.** If that is right, AGP 9 costs the Kotlin
+2.3.21 that step 2 just landed, which inverts the reason for doing this at all.
+
 ### Two things that need the owner
 
 **1. This step cannot keep its own "no other library moves" rule.** Hilt must go 2.57.2 → 2.60.1 for
