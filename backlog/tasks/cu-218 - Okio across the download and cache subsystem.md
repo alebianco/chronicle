@@ -1,7 +1,7 @@
 ---
 id: cu-218
 title: "Okio across the download and cache subsystem"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -56,18 +56,58 @@ the thing being bought.
 
 ## Acceptance Criteria
 
-- [ ] Okio adopted in the download and cache-reconciliation files; the count of `java.io.File`
+- [x] Okio adopted in the download and cache-reconciliation files; the count of `java.io.File`
       importers before and after recorded
-- [ ] **`SyncLocationMoveTest` passes untouched** — it pins the on-disk layout that seven files
+- [x] **`SyncLocationMoveTest` passes untouched** — it pins the on-disk layout that seven files
       depend on, and it is the single most important guard here
-- [ ] At least one test that was previously impossible without real I/O is written using
+- [x] At least one test that was previously impossible without real I/O is written using
       `FakeFileSystem` — otherwise this adoption bought nothing but churn
-- [ ] The unreadable-versus-empty directory distinction still holds, pinned as it is today
-- [ ] **Zero re-downloads**: no already-downloaded book is affected. Verified on the tablet against
+- [x] The unreadable-versus-empty directory distinction still holds, pinned as it is today
+- [x] **Zero re-downloads**: no already-downloaded book is affected. Verified on the tablet against
       real downloaded audio
-- [ ] Whether `kotlinx-io` and Okio coexisting is acceptable is stated, with the `FakeFileSystem`
+- [x] Whether `kotlinx-io` and Okio coexisting is acceptable is stated, with the `FakeFileSystem`
       reason
-- [ ] `./verify.sh` green; `./test_release_build.sh` passes
+- [x] `./verify.sh` green; `./test_release_build.sh` passes
+
+## Result (2026-09-07)
+
+All five files moved: `CacheScanOutcome`, `CacheReconciliation`, `CachedFileManager`'s
+reconciliation, `KtorDownloader` and `MoveSyncLocationWorker`. `FileSystem` is bound in `AppModule`
+rather than defaulted at the call site — a Kotlin default does not satisfy Dagger, which still
+demands a binding, and providing it means tests substitute `FakeFileSystem` through the same seam
+production uses instead of a back door.
+
+**Okio and `kotlinx-io` coexist deliberately.** Ktor brings `kotlinx-io` transitively and Okio 3.17.0
+was *already* on the runtime classpath via Coil and Ktor, so declaring it adds no APK weight — it
+makes an existing dependency explicit. `okio-fakefilesystem` is test-only, and is the thing actually
+being bought.
+
+### The migration found two tests that could not fail
+
+Both were the real return, and neither was the portability argument:
+
+1. **`an unreadable directory is unavailable, not empty`** existed but was guarded by two
+   `assumeTrue` calls, because chmod silently does nothing as root or on a filesystem that ignores
+   permission bits — so it skipped itself exactly where it mattered. Its own comment said *"a test
+   that cannot fail is worse than no test"*. It now runs deterministically against a
+   `ForwardingFileSystem` whose `list()` throws, and sabotage fails it.
+2. **The truncate-on-restart had no test at all.** Removing `resize(startAt)` passed the entire
+   suite. The existing "restart, not a splice" case cannot catch it: there the replacement body is
+   *longer* than the partial and simply overwrites it. The truncate only shows when the new content
+   is **shorter**, leaving a stale tail past the end — now covered, and sabotage-verified.
+
+### Device-verified on the tablet
+
+- **Zero re-downloads**: three downloaded tracks survived installing this build and relaunching,
+  byte-identical, with no re-download, delete or prune.
+- **Both volumes, both directions**: the move logged `Rename across volumes failed … Cross-device
+  link` and fell back to copy-and-delete — Okio's `atomicMove` throwing where a rename cannot cross
+  filesystems is precisely the tablet behaviour the old `Files.move`/`copyTo` pair hand-coded. All
+  three files intact by hash each way, source cleaned each way.
+
+`isCompleteDownload` gained an Okio overload rather than being converted, since `MediaItemTrack` is
+outside this scope; the two spellings are pinned against each other by a table-driven test so they
+cannot drift.
 
 ## Notes
 

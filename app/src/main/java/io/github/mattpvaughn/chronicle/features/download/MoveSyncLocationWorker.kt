@@ -16,10 +16,12 @@ import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import kotlinx.coroutines.*
+import okio.FileSystem
+import okio.IOException
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import timber.log.Timber
 import java.io.File
-import java.io.IOException
-import java.nio.file.Files
 import kotlin.math.roundToInt
 
 /**
@@ -38,6 +40,7 @@ class MoveSyncLocationWorker
     @Assisted parameters: WorkerParameters,
     private val prefsRepo: PrefsRepo,
     private val externalDeviceDirs: List<@JvmSuppressWildcards File>,
+    private val fileSystem: FileSystem,
   ) : CoroutineWorker(context, parameters) {
     private val notificationManager = NotificationManagerCompat.from(applicationContext)
 
@@ -55,7 +58,7 @@ class MoveSyncLocationWorker
 
         val fileMoveFailures =
           inactiveSyncLocations.flatMap { inactiveDir ->
-            moveFilesBetweenDirectories(inactiveDir, activeDownloadDir)
+            moveFilesBetweenDirectories(inactiveDir.toOkioPath(), activeDownloadDir.toOkioPath())
           }.filter { it.isFailure }
 
         notificationManager.cancelAll()
@@ -102,17 +105,24 @@ class MoveSyncLocationWorker
     }
 
     private fun moveFilesBetweenDirectories(
-      from: File,
-      to: File,
+      from: Path,
+      to: Path,
     ): List<kotlin.Result<Unit>> {
+      // Unavailable is not empty: if the source cannot be listed there is nothing to move, and
+      // reporting zero successes is honest — quietly treating it as "done" would let the caller
+      // record a move that never happened.
       val toMove =
-        from.listFiles { cachedFile ->
-          MediaItemTrack.cachedFilePattern.matches(cachedFile.name)
-        } ?: emptyArray<File>()
+        when (val outcome = scanCachedMediaDir(from, fileSystem) { MediaItemTrack.cachedFilePattern.matches(it.name) }) {
+          is CacheScanOutcome.Unavailable -> {
+            Timber.w("Cannot list the source directory, nothing moved: ${outcome.reason}")
+            return emptyList()
+          }
+          is CacheScanOutcome.Scanned -> outcome.files
+        }
       return toMove.mapIndexed { i, cachedFile ->
         showFileTransferNotification(i, toMove.size)
-        val destFile = File(to, cachedFile.name)
-        Timber.i("Moving file ${cachedFile.absolutePath} to ${destFile.absolutePath}")
+        val destFile = to / cachedFile.name
+        Timber.i("Moving file $cachedFile to $destFile")
         try {
           moveFile(cachedFile, destFile)
           kotlin.Result.success(Unit)
@@ -123,22 +133,32 @@ class MoveSyncLocationWorker
       }
     }
 
+    /**
+     * Moves one cached file, falling back to copy-and-delete when a rename cannot cross the two
+     * volumes.
+     *
+     * This is the tablet's real behaviour: internal storage and the SD card are different
+     * filesystems, so a rename fails and the bytes have to be copied. Okio's [FileSystem.atomicMove]
+     * throws in that case, and the `catch` is the fallback — the same two branches the previous
+     * `Files.move` / `copyTo` pair expressed, minus the SDK check, since Okio provides both on
+     * every level this app supports (minSdk 27).
+     *
+     * The delete only happens once the copy is on disk. Reversing that order is how a move loses a
+     * user's download when the destination volume is full.
+     */
     private fun moveFile(
-      cachedFile: File,
-      destFile: File,
+      cachedFile: Path,
+      destFile: Path,
     ) {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        Files.move(cachedFile.toPath(), destFile.toPath())
-      } else {
-        val copied =
-          cachedFile.copyTo(
-            destFile,
-            overwrite = true,
-          )
-        if (copied.exists()) {
-          cachedFile.delete()
+      try {
+        fileSystem.atomicMove(cachedFile, destFile)
+      } catch (e: IOException) {
+        Timber.i("Rename across volumes failed for ${cachedFile.name}, copying instead: ${e.message}")
+        fileSystem.copy(cachedFile, destFile)
+        if (fileSystem.exists(destFile)) {
+          fileSystem.delete(cachedFile)
         }
-        Timber.i("Moved file ${cachedFile.name}? ${copied.exists()}")
+        Timber.i("Moved file ${cachedFile.name}? ${fileSystem.exists(destFile)}")
       }
     }
 

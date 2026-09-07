@@ -17,13 +17,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
+import okio.Path
+import okio.Path.Companion.toPath
+import okio.fakefilesystem.FakeFileSystem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 
 /**
  * The download engine's resume behaviour, which is where silent corruption would live.
@@ -39,8 +39,16 @@ import java.io.File
  * garbage partway through — no error, no short file, nothing a size check would catch.
  */
 class KtorDownloaderTest {
-  @get:Rule
-  val tmp = TemporaryFolder()
+  /**
+   * In-memory, not a temp directory.
+   *
+   * These tests are about what bytes end up in the file after a 200, a 206, a 416 and a server that
+   * ignores `Range` — pure filesystem outcomes with no reason to touch disk. It also lets a partial
+   * be staged at an exact length without writing one.
+   */
+  private val fs = FakeFileSystem()
+
+  private val downloadDir = "/downloads".toPath().also { }
 
   private val requestedRanges = mutableListOf<String?>()
 
@@ -62,7 +70,13 @@ class KtorDownloaderTest {
       client = HttpClient(engine),
       dispatchers = RealDispatcherProvider,
       scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+      fileSystem = fs,
     )
+
+  private fun trackPath(): Path {
+    fs.createDirectories(downloadDir)
+    return downloadDir / "track-1.mp3"
+  }
 
   /** Records the `Range` header of every request, then answers with [handler]. */
   private fun engine(handler: (range: String?) -> Pair<HttpStatusCode, String>) =
@@ -81,33 +95,33 @@ class KtorDownloaderTest {
       }
     }
 
-  private fun request(dest: File) =
+  private fun request(dest: Path) =
     DownloadRequest(
       trackId = "track-1",
       bookId = "book-1",
       bookTitle = "A Book",
       url = "http://localhost/track-1.mp3",
-      destinationPath = dest.absolutePath,
+      destinationPath = dest.toString(),
     )
 
   @Test
   fun `a fresh download writes the whole body and sends no Range`() =
     runBlocking {
-      val dest = File(tmp.root, "track-1.mp3")
+      val dest = trackPath()
       val d = downloader(engine { HttpStatusCode.OK to WHOLE })
 
       d.enqueue(listOf(request(dest)))
       d.awaitIdle()
 
-      assertEquals(WHOLE, dest.readText())
+      assertEquals(WHOLE, fs.read(dest) { readUtf8() })
       assertNull("a fresh download must not ask for a range", requestedRanges.single())
     }
 
   @Test
   fun `an existing partial is resumed with a Range header and appended to`() =
     runBlocking {
-      val dest = File(tmp.root, "track-1.mp3")
-      dest.writeText(HEAD)
+      val dest = trackPath()
+      fs.write(dest) { writeUtf8(HEAD) }
       val d = downloader(engine { HttpStatusCode.PartialContent to TAIL })
 
       d.enqueue(listOf(request(dest)))
@@ -117,7 +131,39 @@ class KtorDownloaderTest {
       assertEquals(
         "a resumed download must append, not restart",
         WHOLE,
-        dest.readText(),
+        fs.read(dest) { readUtf8() },
+      )
+    }
+
+  /**
+   * The truncate, isolated.
+   *
+   * The restart-not-splice test above passes with or without `resize(startAt)`, because there the
+   * replacement body is *longer* than the partial and simply overwrites it — sabotaging the
+   * truncate did not fail a single test, which is how this gap was found. The truncate only shows
+   * when the new content is **shorter**: without it the tail of the old file survives past the end
+   * of the new one, leaving a file that is too long and ends in stale bytes.
+   */
+  @Test
+  fun `a restart shorter than the partial truncates the leftover tail`() =
+    runBlocking {
+      val dest = trackPath()
+      // 10 bytes on disk; the server ignores the range and answers 200 with 5.
+      fs.write(dest) { writeUtf8(WHOLE) }
+      val d = downloader(engine { HttpStatusCode.OK to HEAD })
+
+      d.enqueue(listOf(request(dest)))
+      d.awaitIdle()
+
+      assertEquals(
+        "the leftover tail of the longer partial must be truncated away",
+        HEAD,
+        fs.read(dest) { readUtf8() },
+      )
+      assertEquals(
+        "and the file must be exactly the new length",
+        HEAD.length.toLong(),
+        fs.metadataOrNull(dest)?.size,
       )
     }
 
@@ -127,8 +173,8 @@ class KtorDownloaderTest {
       // The silent-corruption case. The partial is 5 bytes; the server ignores the range and
       // answers 200 with all 10. Appending would give 15 bytes of "HELLOHELLOWORLD" — right-ish
       // length, wrong contents, and nothing downstream would notice.
-      val dest = File(tmp.root, "track-1.mp3")
-      dest.writeText(HEAD)
+      val dest = trackPath()
+      fs.write(dest) { writeUtf8(HEAD) }
       val d = downloader(engine { HttpStatusCode.OK to WHOLE })
 
       d.enqueue(listOf(request(dest)))
@@ -138,12 +184,12 @@ class KtorDownloaderTest {
       assertEquals(
         "a 200 answer to a ranged request must truncate and restart",
         WHOLE,
-        dest.readText(),
+        fs.read(dest) { readUtf8() },
       )
       assertEquals(
         "the file must be exactly the body length, not partial + body",
         WHOLE.length.toLong(),
-        dest.length(),
+        (fs.metadataOrNull(dest)?.size ?: 0L),
       )
     }
 
@@ -153,8 +199,8 @@ class KtorDownloaderTest {
       // The server says the requested range is past the end, so the local file is at or beyond the
       // full length. That is success, not an error — reporting it as failed would make a finished
       // book look broken and invite a re-download.
-      val dest = File(tmp.root, "track-1.mp3")
-      dest.writeText(WHOLE)
+      val dest = trackPath()
+      fs.write(dest) { writeUtf8(WHOLE) }
       val events = mutableListOf<DownloadEvent>()
       val d = downloader(engine { HttpStatusCode.RequestedRangeNotSatisfiable to "" })
       val collector = collectEvents(d, events)
@@ -165,7 +211,7 @@ class KtorDownloaderTest {
         it is DownloadEvent.Completed
       }
 
-      assertEquals("the complete file must be left untouched", WHOLE, dest.readText())
+      assertEquals("the complete file must be left untouched", WHOLE, fs.read(dest) { readUtf8() })
     }
 
   @Test
@@ -173,8 +219,8 @@ class KtorDownloaderTest {
     runBlocking {
       // Deliberate: deleting the partial on failure is how a flaky connection turns into an
       // infinite re-download of a 293 MB book. The bytes are the whole point of resuming.
-      val dest = File(tmp.root, "track-1.mp3")
-      dest.writeText(HEAD)
+      val dest = trackPath()
+      fs.write(dest) { writeUtf8(HEAD) }
       val events = mutableListOf<DownloadEvent>()
       val d = downloader(engine { HttpStatusCode.InternalServerError to "" })
       val collector = collectEvents(d, events)
@@ -183,7 +229,7 @@ class KtorDownloaderTest {
       d.awaitIdle()
       awaitEvent(events, collector, "the failure must be reported") { it is DownloadEvent.Failed }
 
-      assertEquals("a failure must not discard the partial", HEAD, dest.readText())
+      assertEquals("a failure must not discard the partial", HEAD, fs.read(dest) { readUtf8() })
     }
 
   @Test
@@ -191,7 +237,7 @@ class KtorDownloaderTest {
     runBlocking {
       // Two coroutines appending to one file is how a download corrupts itself, and re-enqueueing
       // is easy to trigger — a retry on regained network over a queue that has not drained.
-      val dest = File(tmp.root, "track-1.mp3")
+      val dest = trackPath()
       // The engine blocks until released, so the first download is *provably* still in flight when
       // the duplicate is enqueued. Without this the test raced its own subject: a job removes
       // itself from `jobs` when it finishes, so if the first completed first the map was empty, the
@@ -218,13 +264,13 @@ class KtorDownloaderTest {
         1,
         requestedRanges.size,
       )
-      assertEquals(WHOLE, dest.readText())
+      assertEquals(WHOLE, fs.read(dest) { readUtf8() })
     }
 
   @Test
   fun `a completed download reports the track and book it finished`() =
     runBlocking {
-      val dest = File(tmp.root, "track-1.mp3")
+      val dest = trackPath()
       val events = mutableListOf<DownloadEvent>()
       val d = downloader(engine { HttpStatusCode.OK to WHOLE })
       val collector = collectEvents(d, events)

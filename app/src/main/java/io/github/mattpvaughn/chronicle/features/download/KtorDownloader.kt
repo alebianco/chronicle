@@ -22,9 +22,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toPath
 import timber.log.Timber
-import java.io.File
-import java.io.RandomAccessFile
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -76,6 +77,12 @@ class KtorDownloader
     // rest of the book.
     @ApplicationScope
     private val scope: CoroutineScope,
+    // Bound in AppModule rather than defaulted. A Kotlin default does not satisfy Dagger — it
+    // still demands a binding for the parameter — so the default that was tried here produced
+    // "okio.FileSystem cannot be provided without an @Provides-annotated method". Providing it
+    // has the better property anyway: a test can substitute FakeFileSystem through the same seam
+    // production uses, rather than through a back door only tests know about.
+    private val fileSystem: FileSystem,
   ) : Downloader {
     private val _events =
       MutableSharedFlow<DownloadEvent>(
@@ -128,9 +135,9 @@ class KtorDownloader
 
     private suspend fun download(request: DownloadRequest) =
       withContext(dispatchers.io) {
-        val file = File(request.destinationPath)
-        file.parentFile?.mkdirs()
-        val alreadyHave = if (file.exists()) file.length() else 0L
+        val file = request.destinationPath.toPath()
+        file.parent?.let { fileSystem.createDirectories(it) }
+        val alreadyHave = fileSystem.metadataOrNull(file)?.size ?: 0L
 
         client
           .prepareGet(request.url) {
@@ -181,29 +188,29 @@ class KtorDownloader
     /**
      * Streams [channel] into [file] starting at [startAt], emitting progress as it goes.
      *
-     * `RandomAccessFile` with an explicit seek rather than `FileOutputStream(append = true)`: the
-     * append flag cannot express "truncate to 0 and start over", which is exactly what the
-     * range-ignored case above needs.
+     * An Okio `FileHandle` with an explicit position rather than an appending sink: appending
+     * cannot express "truncate to 0 and start over", which is exactly what the range-ignored case
+     * above needs. `resize` then `write(position)` is the same pair `RandomAccessFile.setLength`
+     * and `seek` provided before.
      */
     private suspend fun writeChannel(
       channel: ByteReadChannel,
-      file: File,
+      file: Path,
       startAt: Long,
       request: DownloadRequest,
       expectedTotal: Long?,
     ) {
       var written = startAt
       var lastReported = startAt
-      RandomAccessFile(file, "rw").use { out ->
+      fileSystem.openReadWrite(file).use { out ->
         // Truncates when restarting, and is a no-op when resuming at the current length.
-        out.setLength(startAt)
-        out.seek(startAt)
+        out.resize(startAt)
 
         val buffer = ByteArray(DEFAULT_BUFFER_BYTES)
         while (true) {
           val read = channel.readAvailable(buffer)
           if (read <= 0) break
-          out.write(buffer, 0, read)
+          out.write(written, buffer, 0, read)
           written += read
 
           // Throttled by bytes rather than by time: a progress event per 8 KB read would be
@@ -255,9 +262,9 @@ class KtorDownloader
       cancelBook(bookId)
       withContext(dispatchers.io) {
         doomed.values.forEach { tracked ->
-          val file = File(tracked.request.destinationPath)
-          if (file.exists() && !file.delete()) {
-            Timber.w("Could not delete ${file.absolutePath}")
+          val file = tracked.request.destinationPath.toPath()
+          if (fileSystem.exists(file) && !runCatching { fileSystem.delete(file) }.isSuccess) {
+            Timber.w("Could not delete $file")
           }
         }
       }

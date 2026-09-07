@@ -10,6 +10,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexMediaService
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexSyncScrobbleWorker
 import io.mockk.mockk
+import okio.fakefilesystem.FakeFileSystem
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,6 +59,7 @@ class ChronicleWorkerFactoryTest {
         parameters = params,
         prefsRepo = mockk<PrefsRepo>(relaxed = true),
         externalDeviceDirs = listOf(File("/storage/emulated/0/Android/data/files")),
+        fileSystem = FakeFileSystem(),
       )
 
     assertNotNull(worker)

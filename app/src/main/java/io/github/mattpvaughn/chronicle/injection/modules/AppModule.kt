@@ -36,6 +36,7 @@ import io.ktor.client.plugins.logging.Logging
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import okio.FileSystem
 import timber.log.Timber
 import java.io.File
 import javax.inject.Named
@@ -93,6 +94,18 @@ object AppModule {
   fun provideContext(
     @ApplicationContext context: Context,
   ): Context = context
+
+  /**
+   * The real filesystem, for the download and cache-reconciliation paths.
+   *
+   * Bound rather than defaulted at the call site so a test can substitute `FakeFileSystem` through
+   * the same seam production uses. Those paths are where a mistake deletes a user's audio, and the
+   * cases worth testing — an unreadable directory, a partial at an exact length, a move that falls
+   * back to copy-and-delete — are all awkward or impossible to stage with real temp directories.
+   */
+  @Provides
+  @Singleton
+  fun provideFileSystem(): FileSystem = FileSystem.SYSTEM
 
   /**
    * The credentials file, separate from settings.
