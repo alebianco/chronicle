@@ -28,6 +28,7 @@ ktor = "3.2.1"
 # The version Ktor 3.2.1 resolves to on its own. Kept in step with `ktor` deliberately: the
 # converter and the runtime are one boundary, and a newer serializer under an older Ktor is the
 # kind of mismatch that shows up as a parse failure rather than a build error.
+okio = "3.17.0"
 serialization = "1.8.1"
 ktorfit = "2.7.5"
 browserx = "1.8.0"
@@ -145,6 +146,11 @@ coroutines = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-andro
 # than changing it — the same rule the androidx entries above follow. It is the *serializer* now,
 # not just a transitive of the transport, so it is named explicitly.
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+# Okio: already on the runtime classpath transitively via Coil and Ktor, so declaring it adds no
+# APK weight — it makes an existing dependency explicit. `okio-fakefilesystem` is test-only and is
+# the thing actually being bought: an in-memory filesystem for the download and cache paths.
+okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
+okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }

@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okio.Path.Companion.toOkioPath
 import timber.log.Timber
 import java.io.File
 import java.io.FileFilter
@@ -154,7 +155,7 @@ class CachedFileManager
     private fun pruneAbandonedPartials(
       incompleteOnDisk: List<String>,
       reportedCached: List<String>,
-      idToFileMap: Map<String, File>,
+      idToFileMap: Map<String, okio.Path>,
     ) {
       if (incompleteOnDisk.isEmpty()) {
         return
@@ -470,7 +471,7 @@ class CachedFileManager
      * for downloaded files which no longer exist on the file system
      */
     override suspend fun refreshTrackDownloadedStatus() {
-      val idToFileMap = HashMap<String, File>()
+      val idToFileMap = HashMap<String, okio.Path>()
 
       // "Cannot read the directory" is not "the directory is empty". This used to be
       // `listFiles(...) ?: emptyList()`, so an unmounted SD card or a moved sync directory made
@@ -479,8 +480,8 @@ class CachedFileManager
       val filesOnDisk =
         when (
           val outcome =
-            scanCachedMediaDir(prefsRepo.cachedMediaDir) { file ->
-              MediaItemTrack.cachedFilePattern.matches(file.name)
+            scanCachedMediaDir(prefsRepo.cachedMediaDir.toOkioPath()) { path ->
+              MediaItemTrack.cachedFilePattern.matches(path.name)
             }
         ) {
           is CacheScanOutcome.Unavailable -> {
@@ -503,8 +504,9 @@ class CachedFileManager
           val id = MediaItemTrack.getTrackIdFromFileName(file.name)
           val expectedSize = trackRepository.getTrackAsync(id)?.size ?: 0L
           if (!isCompleteDownload(file, expectedSize)) {
+            val actual = okio.FileSystem.SYSTEM.metadataOrNull(file)?.size ?: 0L
             Timber.i(
-              "Ignoring incomplete download for track $id: ${file.length()} of $expectedSize bytes",
+              "Ignoring incomplete download for track $id: $actual of $expectedSize bytes",
             )
             incompleteOnDisk.add(id)
             idToFileMap[id] = file

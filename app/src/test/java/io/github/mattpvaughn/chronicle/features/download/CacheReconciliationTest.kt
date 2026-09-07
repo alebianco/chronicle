@@ -1,5 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.download
 
+import okio.Path.Companion.toPath
+import okio.fakefilesystem.FakeFileSystem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -222,17 +224,32 @@ class CacheReconciliationTest {
   @get:Rule
   val pruneFolder = TemporaryFolder()
 
+  /**
+   * An in-memory partial, not a real one.
+   *
+   * These tests are pure filesystem logic — delete this, keep that, sum the sizes — and had no
+   * reason to touch disk beyond `File` being the only API available. `FakeFileSystem` also makes
+   * the delete-failure branch reachable, which `File.delete()` returning false never was here.
+   */
+  private val fs = FakeFileSystem()
+
   private fun partialFile(
     name: String,
     bytes: Int,
-  ): java.io.File = pruneFolder.newFile(name).apply { writeBytes(ByteArray(bytes)) }
+  ): okio.Path =
+    ("/downloads".toPath() / name).also {
+      fs.createDirectories(it.parent!!)
+      fs.write(it) { write(ByteArray(bytes)) }
+    }
+
+  private fun okio.Path.exists() = fs.exists(this)
 
   /** The whole point: the bytes are gone and the space is reported. */
   @Test
   fun `pruning deletes the file and reports the bytes reclaimed`() {
     val file = partialFile("2001.mp3", 1024)
 
-    val outcome = prunePartialFiles(listOf("2001"), mapOf("2001" to file))
+    val outcome = prunePartialFiles(listOf("2001"), mapOf("2001" to file), fs)
 
     assertEquals(1, outcome.deleted)
     assertEquals(1024L, outcome.reclaimedBytes)
@@ -249,7 +266,7 @@ class CacheReconciliationTest {
     val doomed = partialFile("2001.mp3", 512)
     val keep = partialFile("2002.mp3", 2048)
 
-    prunePartialFiles(listOf("2001"), mapOf("2001" to doomed, "2002" to keep))
+    prunePartialFiles(listOf("2001"), mapOf("2001" to doomed, "2002" to keep), fs)
 
     assertFalse(doomed.exists())
     assertTrue("an unchosen file must survive", keep.exists())
@@ -257,7 +274,7 @@ class CacheReconciliationTest {
 
   @Test
   fun `an id with no file is skipped rather than failing`() {
-    val outcome = prunePartialFiles(listOf("missing"), emptyMap())
+    val outcome = prunePartialFiles(listOf("missing"), emptyMap(), fs)
 
     assertEquals(0, outcome.deleted)
     assertEquals(emptyList<String>(), outcome.failedIds)
@@ -267,7 +284,7 @@ class CacheReconciliationTest {
   fun `pruning nothing reports nothing`() {
     val keep = partialFile("2001.mp3", 128)
 
-    val outcome = prunePartialFiles(emptyList(), mapOf("2001" to keep))
+    val outcome = prunePartialFiles(emptyList(), mapOf("2001" to keep), fs)
 
     assertEquals(0, outcome.deleted)
     assertEquals(0L, outcome.reclaimedBytes)
@@ -279,7 +296,7 @@ class CacheReconciliationTest {
     val a = partialFile("2001.mp3", 100)
     val b = partialFile("2002.mp3", 200)
 
-    val outcome = prunePartialFiles(listOf("2001", "2002"), mapOf("2001" to a, "2002" to b))
+    val outcome = prunePartialFiles(listOf("2001", "2002"), mapOf("2001" to a, "2002" to b), fs)
 
     assertEquals(2, outcome.deleted)
     assertEquals(300L, outcome.reclaimedBytes)

@@ -188,6 +188,8 @@ dependencies {
   debugImplementation(libs.compose.ui.tooling)
   implementation(libs.coil.compose)
 
+  testImplementation(libs.okio.fakefilesystem)
+
   testImplementation(platform(libs.compose.bom))
   testImplementation(libs.compose.ui.test.junit4)
   // Supplies the empty activity `createComposeRule` launches into — the Compose equivalent of
@@ -242,6 +244,9 @@ dependencies {
   implementation(libs.ktor.client.content.negotiation)
   implementation(libs.ktor.client.logging)
   implementation(libs.ktorfit.lib)
+  // Okio for the download and cache-reconciliation paths. Already arrives transitively
+  // via Coil and Ktor, so this declares what is already there rather than adding weight.
+  implementation(libs.okio)
   ksp(libs.ktorfit.ksp)
 
   // kotlinx-serialization is the serializer, replacing Moshi. Moshi was JVM-only and

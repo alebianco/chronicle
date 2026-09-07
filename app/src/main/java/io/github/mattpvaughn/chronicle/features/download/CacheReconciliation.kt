@@ -96,18 +96,24 @@ fun partialsSafeToPrune(
  */
 fun prunePartialFiles(
   prunable: Collection<String>,
-  idToFile: Map<String, java.io.File>,
+  idToFile: Map<String, okio.Path>,
+  fileSystem: okio.FileSystem = okio.FileSystem.SYSTEM,
 ): PruneOutcome {
   var deleted = 0
   var reclaimedBytes = 0L
   val failed = mutableListOf<String>()
   prunable.forEach { id ->
-    val file = idToFile[id] ?: return@forEach
-    val size = file.length()
-    if (file.delete()) {
+    val path = idToFile[id] ?: return@forEach
+    // Size before deleting, and only count it if the delete actually happened. Okio's `delete`
+    // throws where `File.delete()` returned false, so the outcome is the same shape by a
+    // different route — a file that could not be removed is reported, never silently counted as
+    // reclaimed.
+    val size = fileSystem.metadataOrNull(path)?.size ?: 0L
+    try {
+      fileSystem.delete(path)
       deleted++
       reclaimedBytes += size
-    } else {
+    } catch (e: okio.IOException) {
       failed += id
     }
   }

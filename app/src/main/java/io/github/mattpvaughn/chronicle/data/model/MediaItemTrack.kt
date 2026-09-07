@@ -435,3 +435,20 @@ fun isCompleteDownload(
   val actual = file.length()
   return if (expectedSize > 0L) actual == expectedSize else actual > 0L
 }
+
+/**
+ * The same rule over an Okio [okio.Path], for the download and cache paths that moved to Okio.
+ *
+ * An overload rather than a replacement: this file is not in that migration's scope, and the nine
+ * other `java.io.File` callers have nothing to do with downloads. Both spellings delegate to the
+ * same comparison, so the rule cannot drift between them — which is the risk an overload normally
+ * carries.
+ */
+fun isCompleteDownload(
+  path: okio.Path,
+  expectedSize: Long,
+  fileSystem: okio.FileSystem = okio.FileSystem.SYSTEM,
+): Boolean {
+  val size = fileSystem.metadataOrNull(path)?.size ?: return false
+  return if (expectedSize > 0L) size == expectedSize else size > 0L
+}
