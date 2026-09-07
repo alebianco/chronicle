@@ -2,7 +2,6 @@ package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -15,6 +14,7 @@ import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.model.EMPTY_AUDIOBOOK
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.features.player.SleepTimerBus
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
@@ -66,7 +66,7 @@ class PlayerControlsTest {
     CurrentlyPlayingViewModel(
       bookRepository = mockk<IBookRepository>(relaxed = true),
       trackRepository = mockk<ITrackRepository>(relaxed = true),
-      localBroadcastManager = mockk<LocalBroadcastManager>(relaxed = true),
+      sleepTimerBus = SleepTimerBus(),
       mediaServiceConnection = mockk<MediaServiceConnection>(relaxed = true),
       prefsRepo = prefsRepo,
       plexConfig = mockk<PlexConfig>(relaxed = true),

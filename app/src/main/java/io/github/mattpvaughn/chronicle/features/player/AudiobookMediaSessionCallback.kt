@@ -9,7 +9,6 @@ import android.text.format.DateUtils
 import android.view.KeyEvent
 import android.view.KeyEvent.*
 import androidx.core.content.IntentCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -28,10 +27,8 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLEX_STATE_STOPPED
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.injection.qualifiers.PlayerServiceScope
@@ -67,6 +64,7 @@ class AudiobookMediaSessionCallback
     private val dispatchers: DispatcherProvider,
     private val exceptionHandler: CoroutineExceptionHandler,
     private val playbackSession: PlaybackSession,
+    private val playbackErrorBus: PlaybackErrorBus,
   ) : MediaSessionCompat.Callback() {
     // Default to ExoPlayer to prevent having a nullable field
     var currentPlayer: Player = defaultPlayer
@@ -568,13 +566,11 @@ class AudiobookMediaSessionCallback
     }
 
     /**
-     * Sends a playback failure to [MainActivity] over the channel it already listens on, so the
-     * user is told instead of watching a player that never starts.
+     * Reports a playback failure on the channel the activity listens on, so the user is told
+     * instead of watching a player that never starts.
      */
     private fun broadcastPlaybackError(message: String) {
-      LocalBroadcastManager.getInstance(appContext).sendBroadcast(
-        Intent(ACTION_PLAYBACK_ERROR).putExtra(PLAYBACK_ERROR_MESSAGE, message),
-      )
+      playbackErrorBus.report(message)
     }
 
     private fun calculateRewindDuration(book: Audiobook?): Long {

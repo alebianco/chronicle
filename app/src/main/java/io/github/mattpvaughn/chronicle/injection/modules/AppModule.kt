@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import androidx.core.content.ContextCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
 import com.squareup.moshi.Moshi
 import com.tonyodev.fetch2.Fetch
@@ -455,16 +454,8 @@ object AppModule {
     return conn
   }
 
-  /**
-   * The in-process broadcast bus.
-   *
-   * Moved out of `ActivityModule`: it is `getInstance`-backed and process-wide, so
-   * activity scope was never meaningful — and the player service and a `@HiltViewModel` both need
-   * it, which an activity-scoped binding cannot serve.
-   */
-  @Provides
-  @Singleton
-  fun provideBroadcastManager(
-    @ApplicationContext context: Context,
-  ): LocalBroadcastManager = LocalBroadcastManager.getInstance(context)
+  // `provideBroadcastManager` is gone with LocalBroadcastManager. Its replacements —
+  // `SleepTimerBus` and `PlaybackErrorBus` — are @Singleton classes with @Inject constructors, so
+  // they need no provider: there is nothing to construct them *from*, which is the point of
+  // replacing a `getInstance`-backed singleton with an ordinary injectable one.
 }

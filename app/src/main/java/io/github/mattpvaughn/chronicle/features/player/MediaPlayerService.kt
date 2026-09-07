@@ -3,11 +3,8 @@ package io.github.mattpvaughn.chronicle.features.player
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
@@ -19,7 +16,6 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.view.KeyEvent
 import android.view.KeyEvent.KEYCODE_MEDIA_STOP
 import androidx.core.content.IntentCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -43,8 +39,6 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.IPlexLoginRepo.LoginState.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.getDuration
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
-import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_ACTION
-import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_DURATION_MILLIS
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.PackageValidator
@@ -141,10 +135,6 @@ class MediaPlayerService :
     const val PLEX_STATE_STOPPED = "stopped"
     const val PLEX_STATE_PAUSED = "paused"
 
-    /** Strings used to indicate playback errors */
-    const val ACTION_PLAYBACK_ERROR = "playback error action intent"
-    const val PLAYBACK_ERROR_MESSAGE = "playback error message"
-
     /**
      * Key indicating playback start time offset relative to the start of the track being
      * played (only use for, m4b chapters, as mp3 durations are generally too imprecise)
@@ -210,7 +200,10 @@ class MediaPlayerService :
   lateinit var mediaSource: PlexMediaRepository
 
   @Inject
-  lateinit var localBroadcastManager: LocalBroadcastManager
+  lateinit var sleepTimerBus: SleepTimerBus
+
+  @Inject
+  lateinit var playbackErrorBus: PlaybackErrorBus
 
   var currentPlayer: Player? = null
 
@@ -285,10 +278,17 @@ class MediaPlayerService :
       postNotificationWithArtwork()
     }
 
-    localBroadcastManager.registerReceiver(
-      sleepTimerBroadcastReceiver,
-      IntentFilter(SleepTimer.ACTION_SLEEP_TIMER_CHANGE),
-    )
+    // Commands only. The timer's own ticks go out on `sleepTimerBus.updates`, a different flow
+    // that nothing here collects — so a tick can no longer arrive as a command. That used to need
+    // an explicit `action != UPDATE` filter in the receiver; see `SleepTimerBus`.
+    //
+    // Collected on `serviceScope`, so it ends when `serviceJob` is cancelled in `onDestroy` and
+    // there is no receiver left to unregister.
+    serviceScope.launch(exceptionHandler) {
+      sleepTimerBus.commands.collect { command ->
+        sleepTimer.handleAction(command.action, command.durationMillis)
+      }
+    }
 
     invalidatePlaybackParams()
     observeBookSpeedOverride()
@@ -366,41 +366,13 @@ class MediaPlayerService :
     durationMillis: Long,
     isActive: Boolean,
   ) {
-    val broadcastIntent =
-      Intent(SleepTimer.ACTION_SLEEP_TIMER_CHANGE).apply {
-        putExtra(ARG_SLEEP_TIMER_ACTION, sleepTimerAction)
-        putExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, durationMillis)
-        putExtra(SleepTimer.ARG_SLEEP_TIMER_IS_ACTIVE, isActive)
-      }
-    localBroadcastManager.sendBroadcast(broadcastIntent)
+    // `sleepTimerAction` is unused, and is a constant at the only call site: `SimpleSleepTimer`'s
+    // `publish` always passes UPDATE. It stays only because `SleepTimerBroadcaster` is the
+    // interface that call goes through. Distinguishing a cancel from an expiry would mean the
+    // *emitter* starting to pass different actions, so removing the parameter is a change to
+    // `SleepTimerBroadcaster` rather than something this override can decide.
+    sleepTimerBus.publish(SleepTimerUpdate(remainingMillis = durationMillis, isActive = isActive))
   }
-
-  private val sleepTimerBroadcastReceiver =
-    object : BroadcastReceiver() {
-      override fun onReceive(
-        context: Context?,
-        intent: Intent?,
-      ) {
-        if (intent != null) {
-          val durationMillis = intent.getLongExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, 0L)
-          val action =
-            IntentCompat.getSerializableExtra(
-              intent,
-              ARG_SLEEP_TIMER_ACTION,
-              SleepTimerAction::class.java,
-            )
-          // UPDATE travels the *other* way: it is what the timer publishes to the UI, on this same
-          // action. Feeding it back into the timer is a loop — harmless while `update` only
-          // reassigned a Long to itself, but it silently overwrote the timer's mode once the state
-          // carried one, turning an end-of-chapter timer into a zero-length countdown that expired
-          // on the next tick. The timer is told what to do by the UI; it is never told
-          // what it just said.
-          if (action != null && action != SleepTimerAction.UPDATE) {
-            sleepTimer.handleAction(action, durationMillis)
-          }
-        }
-      }
-    }
 
   private val prefsListener =
     SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -609,7 +581,6 @@ class MediaPlayerService :
     castPlayerProvider = null
 
     prefsRepo.unregisterPrefsListener(prefsListener)
-    localBroadcastManager.unregisterReceiver(sleepTimerBroadcastReceiver)
     sleepTimer.cancel()
 
     mediaSession.run {
@@ -826,9 +797,7 @@ class MediaPlayerService :
         // the message alone is what made a mid-listen stall undiagnosable from a log dump.
         val diagnosis = describePlaybackError(error)
         Timber.e(error, "Exoplayer playback error: $diagnosis")
-        val errorIntent = Intent(ACTION_PLAYBACK_ERROR)
-        errorIntent.putExtra(PLAYBACK_ERROR_MESSAGE, diagnosis)
-        localBroadcastManager.sendBroadcast(errorIntent)
+        playbackErrorBus.report(diagnosis)
         setSessionCustomErrorMessage(diagnosis)
         updateSessionPlaybackState()
       }

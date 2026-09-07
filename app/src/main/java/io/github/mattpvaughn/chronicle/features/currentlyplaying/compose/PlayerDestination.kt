@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying.compose
 
-import android.content.IntentFilter
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,7 +9,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,14 +20,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.model.chapterRows
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingViewModel
-import io.github.mattpvaughn.chronicle.features.player.SleepTimer
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
+import io.github.mattpvaughn.chronicle.util.compose.CollectEffect
 import io.github.mattpvaughn.chronicle.util.compose.EventEffect
 import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 import io.github.mattpvaughn.chronicle.views.compose.BookmarkList
@@ -52,9 +49,11 @@ import io.github.mattpvaughn.chronicle.views.compose.SpeedChooserSheet
  * `collectWhileStarted` after showing it, because the sheet held no repository of its own. All of
  * that is `if (showX)` here.
  *
- * The sleep-timer receiver keeps its STARTED-scoped registration in a `DisposableEffect`, which is
- * what `onStart`/`onStop` did. It matters: `ACTION_SLEEP_TIMER_CHANGE` is bidirectional, and a
- * receiver left registered would keep hearing the timer's own ticks.
+ * The sleep-timer collection is STARTED-scoped. Note this is **not** what the `DisposableEffect`
+ * it replaced did — that was keyed on `context`, so it was composition-scoped and outlived
+ * `onStop`. The Fragment's original `onStart`/`onStop` pair was STARTED; the Compose port had
+ * quietly widened it, and this restores it. It no longer guards a bidirectional channel either:
+ * `SleepTimerBus` splits commands from reports, so this side only ever receives.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,14 +87,13 @@ fun PlayerDestination(
   EventEffect(viewModel.bookmarkAdded) { bookmark -> editingBookmark = bookmark }
   EventEffect(viewModel.showModalBottomSheetSpeedChooser) { showSpeedChooser = true }
 
-  DisposableEffect(context) {
-    val broadcasts = LocalBroadcastManager.getInstance(context)
-    broadcasts.registerReceiver(
-      viewModel.onUpdateSleepTimer,
-      IntentFilter(SleepTimer.ACTION_SLEEP_TIMER_CHANGE),
-    )
-    onDispose { broadcasts.unregisterReceiver(viewModel.onUpdateSleepTimer) }
-  }
+  // STARTED-scoped, which is a deliberate *tightening*: the `DisposableEffect` this replaces was
+  // keyed on `context`, so it was composition-scoped and kept the receiver registered across
+  // `onStop` for as long as this destination stayed composed. A backgrounded player now stops
+  // applying ticks. `SleepTimerBus.updates` replays its latest value, so re-expanding the sheet
+  // inherits the current timer state rather than an empty one — which an end-of-chapter timer
+  // depends on, since it publishes only when armed and when the chapter ends.
+  CollectEffect(viewModel.sleepTimerUpdates, viewModel::onSleepTimerUpdate)
 
   Box(modifier = modifier.fillMaxSize()) {
     PlayerScreen(

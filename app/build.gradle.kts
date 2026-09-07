@@ -184,10 +184,6 @@ dependencies {
   implementation(libs.androidx.coordinatorlayout)
   implementation(libs.androidx.interpolator)
   implementation(libs.androidx.sqlite)
-  // Declared explicitly: it used to arrive transitively via Material, which
-  // dropped it in 1.14. 19 usages depend on it, so relying on the transitive
-  // was fragile regardless.
-  implementation(libs.localbroadcastmanager)
   // Declared explicitly: asLiveData/viewModelScope/ViewModel were previously
   // only reaching the classpath transitively through the Google-IAP billing
   // library, so removing that took them with it.

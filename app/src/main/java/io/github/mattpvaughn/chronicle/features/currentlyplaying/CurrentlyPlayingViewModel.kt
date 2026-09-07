@@ -1,8 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.support.v4.media.session.PlaybackStateCompat
@@ -11,7 +9,6 @@ import android.text.format.DateUtils
 import android.view.Gravity
 import android.widget.Toast
 import androidx.lifecycle.*
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.R
@@ -36,9 +33,6 @@ import io.github.mattpvaughn.chronicle.features.player.*
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_SEEK_TO_TRACK_WITH_ID
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.KEY_START_TIME_TRACK_OFFSET
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
-import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_ACTION
-import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_DURATION_MILLIS
-import io.github.mattpvaughn.chronicle.features.player.SleepTimer.Companion.ARG_SLEEP_TIMER_IS_ACTIVE
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction.*
 import io.github.mattpvaughn.chronicle.util.*
@@ -121,7 +115,7 @@ class CurrentlyPlayingViewModel
   constructor(
     private val bookRepository: IBookRepository,
     private val trackRepository: ITrackRepository,
-    private val localBroadcastManager: LocalBroadcastManager,
+    private val sleepTimerBus: SleepTimerBus,
     private val mediaServiceConnection: MediaServiceConnection,
     private val prefsRepo: PrefsRepo,
     private val plexConfig: PlexConfig,
@@ -957,12 +951,13 @@ class CurrentlyPlayingViewModel
                 )
               }
             hideSleepTimerChooser()
-            val sleepTimerIntent =
-              Intent(SleepTimer.ACTION_SLEEP_TIMER_CHANGE).apply {
-                putExtra(ARG_SLEEP_TIMER_ACTION, actionPair.first)
-                putExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, actionPair.second)
-              }
-            localBroadcastManager.sendBroadcast(sleepTimerIntent)
+            // Suspending, so it runs in the ViewModel's scope rather than the listener callback.
+            // A command must not be dropped: the user pressed cancel and expects the timer gone.
+            viewModelScope.launch(exceptionHandler) {
+              sleepTimerBus.command(
+                SleepTimerCommand(actionPair.first, actionPair.second),
+              )
+            }
           }
 
           override fun onChooserClosed(wasBackgroundClicked: Boolean) {
@@ -1195,31 +1190,33 @@ class CurrentlyPlayingViewModel
         )
     }
 
-    val onUpdateSleepTimer =
-      object : BroadcastReceiver() {
-        override fun onReceive(
-          context: Context?,
-          intent: Intent?,
-        ) {
-          if (intent == null || !intent.hasExtra(ARG_SLEEP_TIMER_DURATION_MILLIS)) {
-            return
-          }
-          val timeLeftMillis = intent.getLongExtra(ARG_SLEEP_TIMER_DURATION_MILLIS, 0L)
-          // Read, not inferred from the duration: an end-of-chapter timer is active with 0
-          // remaining. The fallback keeps an older sender working.
-          val isActive =
-            intent.getBooleanExtra(ARG_SLEEP_TIMER_IS_ACTIVE, timeLeftMillis > 0L)
-          // A BroadcastReceiver callback, so this may not be the main thread — which is why it was a
-          // `postValue`. A `MutableStateFlow` assignment is thread-safe and lands immediately.
-          _isSleepTimerActive.value = isActive
-          sleepTimerTimeRemaining.value = timeLeftMillis
+    /**
+     * The sleep timer's reports, for the destination to collect while STARTED.
+     *
+     * Exposed rather than collected here so the collection is lifecycle-scoped: a ViewModel
+     * outlives a backgrounded screen, and applying ticks into state nobody is drawing was what the
+     * receiver's `onStop` unregister existed to stop.
+     */
+    val sleepTimerUpdates: Flow<SleepTimerUpdate> = sleepTimerBus.updates
 
-          // Three cases, not two. An end-of-chapter timer is active with nothing to count down, so
-          // naming a remaining time is impossible and falling back to the generic title would say
-          // "Sleep timer" while the menu below it offers a cancel.
-          setSleepTimerTitle(sleepTimerTitle(isActive, timeLeftMillis))
-        }
-      }
+    /**
+     * Applies a report from the sleep timer.
+     *
+     * Was a `BroadcastReceiver` the destination registered and unregistered around STARTED. Now an
+     * ordinary function the destination calls while collecting [SleepTimerBus.updates] — the
+     * lifecycle scoping moves to the collection, and the "may not be the main thread" caution the
+     * receiver carried no longer applies, though the `MutableStateFlow` writes below were already
+     * thread-safe.
+     */
+    fun onSleepTimerUpdate(update: SleepTimerUpdate) {
+      _isSleepTimerActive.value = update.isActive
+      sleepTimerTimeRemaining.value = update.remainingMillis
+
+      // Three cases, not two. An end-of-chapter timer is active with nothing to count down, so
+      // naming a remaining time is impossible and falling back to the generic title would say
+      // "Sleep timer" while the menu below it offers a cancel.
+      setSleepTimerTitle(sleepTimerTitle(update.isActive, update.remainingMillis))
+    }
 
     /**
      * The chooser's title for a given timer state.

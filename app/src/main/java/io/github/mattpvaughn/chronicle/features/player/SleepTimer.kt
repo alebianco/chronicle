@@ -50,22 +50,6 @@ interface SleepTimer {
     durationMillis: Long,
   )
 
-  companion object {
-    const val ACTION_SLEEP_TIMER_CHANGE = "action sleep timer change"
-    const val ARG_SLEEP_TIMER_ACTION = "arg sleep timer action"
-    const val ARG_SLEEP_TIMER_DURATION_MILLIS = "sleep_timer_duration"
-
-    /**
-     * Whether a timer is counting.
-     *
-     * Sent explicitly because the UI used to infer it from the duration being above zero — which
-     * is wrong for an end-of-chapter timer, since that has no countdown and publishes 0. Inferring
-     * it would show an active timer as inactive: the button unlit, and the chooser offering
-     * durations instead of a cancel.
-     */
-    const val ARG_SLEEP_TIMER_IS_ACTIVE = "sleep_timer_is_active"
-  }
-
   enum class SleepTimerAction {
     BEGIN,
 
@@ -173,8 +157,10 @@ class SimpleSleepTimer
       durationMillis: Long,
     ) {
       when (action) {
-        // Outbound-only; the service filters it before it reaches here. Handled for exhaustiveness,
-        // and because accepting it would let the timer's own broadcast reset its state.
+        // Outbound-only, and now genuinely unreachable from production: `SleepTimerCommand`
+        // refuses to carry UPDATE, so nothing on the command flow can deliver one. Kept for
+        // exhaustiveness, and as the last line of defence — accepting an UPDATE here would let a
+        // tick reset the timer's own state, which is the bug the two-flow split removed.
         UPDATE -> Timber.w("Ignoring an inbound UPDATE: it is what this timer publishes")
         EXTEND -> extend(durationMillis)
         CANCEL -> cancel()

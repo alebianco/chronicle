@@ -43,6 +43,32 @@ fun <T> EventEffect(
   }
 }
 
+/**
+ * Collects [flow] while the screen is at least STARTED, running [onEach] for each value.
+ *
+ * The plain-value counterpart of [EventEffect], and the Compose equivalent of
+ * `LifecycleOwner.collectWhileStarted`. It exists for the reason `FlowCollect.kt` gives for its
+ * own helpers: the correct form is
+ * `LaunchedEffect { lifecycle.repeatOnLifecycle(STARTED) { flow.collect { … } } }`, and the
+ * plausible wrong forms are subtly broken rather than obviously so — a `LaunchedEffect(Unit)` with
+ * a bare `collect` never stops when the screen is backgrounded, and `launchWhenStarted` buffers
+ * instead of cancelling and then delivers a burst of stale values.
+ *
+ * Keyed on [flow] only, so a recomposition does not re-subscribe.
+ */
+@Composable
+fun <T> CollectEffect(
+  flow: Flow<T>,
+  onEach: (T) -> Unit,
+) {
+  val lifecycleOwner = LocalLifecycleOwner.current
+  LaunchedEffect(flow, lifecycleOwner) {
+    lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+      flow.collect(onEach)
+    }
+  }
+}
+
 /** Shows each event's text as a short `Toast`. */
 @Composable
 fun ToastEffect(events: Flow<Event<String>?>) {

@@ -159,6 +159,7 @@ class PauseFlushesProgressTest {
       dispatchers = TestDispatcherProvider(),
       exceptionHandler = testExceptionHandler(),
       playbackSession = mockk(relaxed = true),
+      playbackErrorBus = PlaybackErrorBus(),
     )
   }
 }

@@ -204,6 +204,7 @@ class PlayBookGuardsTest {
       dispatchers = TestDispatcherProvider(),
       exceptionHandler = testExceptionHandler(),
       playbackSession = mockk(relaxed = true),
+      playbackErrorBus = PlaybackErrorBus(),
     )
   }
 }

@@ -272,16 +272,21 @@ class SleepTimerLogicTest {
   /**
    * The bug that shipped for a second, found on device.
    *
-   * `ACTION_SLEEP_TIMER_CHANGE` carries commands *into* the timer and its ticks *out* of it, and
+   * `ACTION_SLEEP_TIMER_CHANGE` carried commands *into* the timer and its ticks *out* of it, and
    * the service listened to the same action it broadcast on. So the timer's own `UPDATE(0)` came
    * straight back as a command. That was invisible while `update` only reassigned a Long to
    * itself; once the state carried a *mode*, the loop rewrote an end-of-chapter timer as a
    * zero-length countdown, which expired one tick later — the timer fired a second after being
    * set, mid-chapter.
    *
-   * The service now filters `UPDATE`. This pins the shape of the damage so a future change that
-   * reopens the loop fails here rather than on a device: a zero-duration fixed timer expires
-   * immediately, so nothing may ever construct one from a tick.
+   * The shared action is **gone**: `SleepTimerBus` splits commands from reports onto two flows, so
+   * there is no longer a channel on which a tick could be mistaken for a command, and the
+   * `UPDATE` filter that used to guard it retired with the broadcast. `SleepTimerBusTest` pins
+   * that separation.
+   *
+   * This still pins the shape of the *damage*, which is the part worth keeping regardless of
+   * transport: a zero-duration fixed timer expires immediately, so nothing may ever construct one
+   * from a tick.
    */
   @Test
   fun `a zero-length fixed timer expires at once, so nothing may create one from a tick`() {

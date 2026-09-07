@@ -46,7 +46,6 @@ androidx-transition = "1.6.0"
 androidx-coordinatorlayout = "1.1.0"
 androidx-interpolator = "1.0.0"
 androidx-sqlite = "2.6.1"
-localbroadcastmanager = "1.1.0"
 lifecycle = "2.10.0"
 annotation = "1.10.0"
 ktlint = "12.1.2"
@@ -131,7 +130,6 @@ androidx-transition = { group = "androidx.transition", name = "transition", vers
 androidx-coordinatorlayout = { group = "androidx.coordinatorlayout", name = "coordinatorlayout", version.ref = "androidx-coordinatorlayout" }
 androidx-interpolator = { group = "androidx.interpolator", name = "interpolator", version.ref = "androidx-interpolator" }
 androidx-sqlite = { group = "androidx.sqlite", name = "sqlite", version.ref = "androidx-sqlite" }
-localbroadcastmanager = { group = "androidx.localbroadcastmanager", name = "localbroadcastmanager", version.ref = "localbroadcastmanager" }
 lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycle" }
 lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }

@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.text.format.DateUtils
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -20,6 +19,7 @@ import io.github.mattpvaughn.chronicle.data.model.EMPTY_TRACK
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.features.player.SleepTimerBus
 import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
@@ -411,7 +411,7 @@ class CurrentlyPlayingViewModelTest {
     CurrentlyPlayingViewModel(
       bookRepository = bookRepository,
       trackRepository = trackRepository,
-      localBroadcastManager = mockk<LocalBroadcastManager>(relaxed = true),
+      sleepTimerBus = SleepTimerBus(),
       mediaServiceConnection = mockk<MediaServiceConnection>(relaxed = true),
       prefsRepo = mockk<PrefsRepo>(relaxed = true),
       plexConfig = mockk<PlexConfig>(relaxed = true),

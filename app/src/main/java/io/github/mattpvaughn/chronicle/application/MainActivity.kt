@@ -1,10 +1,7 @@
 package io.github.mattpvaughn.chronicle.application
 
 import android.app.SearchManager
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -22,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -46,15 +42,17 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexPrefsRepo
 import io.github.mattpvaughn.chronicle.debug.DebugHooks
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingViewModel
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.PlayerDestination
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.ACTION_PLAYBACK_ERROR
-import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.PLAYBACK_ERROR_MESSAGE
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.features.player.PlaybackErrorBus
+import io.github.mattpvaughn.chronicle.features.player.PlaybackErrorExplanation
+import io.github.mattpvaughn.chronicle.features.player.explainPlaybackError
 import io.github.mattpvaughn.chronicle.navigation.Destination
 import io.github.mattpvaughn.chronicle.navigation.compose.ChronicleNavHost
 import io.github.mattpvaughn.chronicle.navigation.destinationForLogin
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
+import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -64,7 +62,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
   @Inject
-  lateinit var localBroadcastManager: LocalBroadcastManager
+  lateinit var playbackErrorBus: PlaybackErrorBus
 
   private val viewModel: MainActivityViewModel by viewModels()
 
@@ -154,8 +152,6 @@ class MainActivity : AppCompatActivity() {
     // Debug-only: `--el download_book <id>` starts a download.
     DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
 
-    localBroadcastManager = LocalBroadcastManager.getInstance(this)
-
     // The whole UI is Compose now. This replaces `activity_main.xml` — a
     // `ConstraintLayout` holding a `BottomNavigationView`, a `FragmentContainerView` and a
     // hand-built player sheet moved between three `ConstraintSet`s — along with every write that
@@ -213,6 +209,11 @@ class MainActivity : AppCompatActivity() {
     collectEventsWhileStarted(viewModel.errorMessage) { errorMessage ->
       Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
     }
+
+    // STARTED-scoped, exactly as the `onStart`/`onStop` register/unregister pair was — a failure
+    // raised while the app is backgrounded must not surface over another app. `PlaybackErrorBus`
+    // has no replay, so nothing is redelivered when the activity comes back.
+    collectWhileStarted(playbackErrorBus.errors, ::showPlaybackError)
 
     // If the app is being launched by voice assistant with a query
     val query = intent.getStringExtra(SearchManager.QUERY)
@@ -365,12 +366,10 @@ class MainActivity : AppCompatActivity() {
   override fun onStart() {
     super.onStart()
     Timber.i("MainActivity onStart()")
-    localBroadcastManager.registerReceiver(onPlaybackError, IntentFilter(ACTION_PLAYBACK_ERROR))
   }
 
   override fun onStop() {
     Timber.i("MainActivity onStop()")
-    localBroadcastManager.unregisterReceiver(onPlaybackError)
     super.onStop()
   }
 
@@ -432,38 +431,24 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  private val onPlaybackError =
-    object : BroadcastReceiver() {
-      override fun onReceive(
-        context: Context,
-        intent: Intent,
-      ) {
-        when (intent.action) {
-          ACTION_PLAYBACK_ERROR -> {
-            val errorMessage =
-              intent.getStringExtra(PLAYBACK_ERROR_MESSAGE)
-                ?: getString(R.string.playback_error_unknown)
-            val userMessage =
-              when {
-                errorMessage.contains(
-                  "404",
-                ) -> getString(R.string.playback_error_404)
-                errorMessage.contains(
-                  "503",
-                ) -> getString(R.string.playback_error_503)
-                errorMessage.contains(
-                  "401",
-                ) -> getString(R.string.playback_error_401)
-                else -> errorMessage
-              }
-            viewModel.showUserMessage(userMessage)
-          }
-          else -> throw NoWhenBranchMatchedException(
-            getString(R.string.playback_error_unknown),
-          )
-        }
-      }
-    }
+  /**
+   * Shows a playback failure to the user.
+   *
+   * The mapping from diagnosis to explanation lives in [explainPlaybackError], which is pure and
+   * unit-tested; this only resolves the resource. The `else -> throw
+   * NoWhenBranchMatchedException` the old `BroadcastReceiver` carried is gone with it: a receiver
+   * could be handed an intent for another action, so it had to re-check the one it filtered on. A
+   * flow of diagnoses cannot deliver the wrong kind of thing.
+   */
+  private fun showPlaybackError(diagnosis: String) {
+    val explanation = explainPlaybackError(diagnosis)
+    viewModel.showUserMessage(
+      when (explanation) {
+        is PlaybackErrorExplanation.Resource -> getString(explanation.messageRes)
+        is PlaybackErrorExplanation.Raw -> explanation.diagnosis
+      },
+    )
+  }
 
   companion object {
     const val FLAG_OPEN_ACTIVITY_TO_CURRENTLY_PLAYING = "OPEN_ACTIVITY_TO_AUDIOBOOK"
