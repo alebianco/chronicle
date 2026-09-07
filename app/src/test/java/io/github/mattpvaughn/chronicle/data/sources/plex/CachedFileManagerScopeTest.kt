@@ -14,10 +14,12 @@ import java.io.File
  * the database, so a failed delete or a failed cache-status update was silent —
  * the UI would keep showing a book as downloaded after its files were gone.
  *
- * These assertions are structural rather than behavioural on purpose. Driving the
- * download callbacks needs a real [com.tonyodev.fetch2.Fetch] and a `BroadcastReceiver`,
- * which is instrumented territory; what is cheap and worth pinning here is
- * that the class cannot reach for a global scope again.
+ * These assertions are structural rather than behavioural on purpose, and that reason has
+ * *weakened*: driving the download path used to need a real Fetch2 instance, which was
+ * instrumented territory, but the `Downloader` seam is now mockable and
+ * `CachedFileManagerResumeTest` drives the enqueue path directly. What remains cheap and worth
+ * pinning here is that the class cannot reach for a global scope again — a claim about the
+ * source, which no behavioural test covers.
  */
 class CachedFileManagerScopeTest {
   private val constructorParams

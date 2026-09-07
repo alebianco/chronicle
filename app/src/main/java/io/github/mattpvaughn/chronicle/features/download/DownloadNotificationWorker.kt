@@ -15,24 +15,32 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import androidx.work.NetworkType
-import com.tonyodev.fetch2.*
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.FLAG_OPEN_ACTIVITY_TO_AUDIOBOOK_WITH_ID
 import io.github.mattpvaughn.chronicle.application.MainActivity.Companion.REQUEST_CODE_PREFIX_OPEN_ACTIVITY_TO_AUDIOBOOK_WITH_ID
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
-import kotlin.coroutines.resume
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * A [Worker] responsible for displaying download notifications for all actively
- * downloading books
+ * Renders download progress and completion notifications.
  *
- * TODO: write extension functions to turn fetch calls into suspend functions
+ * **Observes rather than polls.** It used to loop every 500 ms asking Fetch2's queue what was
+ * happening — the engine owned the state, so the only way to render it was to keep asking. The
+ * [Downloader] seam publishes [DownloadEvent]s instead, so this worker accumulates them and
+ * renders on change. That removes the poll, the 10-second "wait for downloads to start" guess, and
+ * the `suspendCancellableCoroutine` bridge that turned Fetch2's callback API into something
+ * awaitable.
+ *
+ * The file's own long-standing TODO — *"write extension functions to turn fetch calls into suspend
+ * functions"* — is resolved by there being no callbacks left to wrap.
  */
 @HiltWorker
 class DownloadNotificationWorker
@@ -40,7 +48,7 @@ class DownloadNotificationWorker
   constructor(
     @Assisted context: Context,
     @Assisted parameters: WorkerParameters,
-    private val fetch: Fetch,
+    private val downloader: Downloader,
   ) : CoroutineWorker(context, parameters) {
     private val notificationManager = NotificationManagerCompat.from(applicationContext)
 
@@ -62,100 +70,131 @@ class DownloadNotificationWorker
         cancelAllPendingIntent,
       ).build()
 
-    private val activeDownloadStatuses =
-      listOf(Status.QUEUED, Status.DOWNLOADING, Status.NONE, Status.ADDED)
+    /** How long to keep rendering after the last event before deciding the batch is done. */
+    private val quietPeriodMs = 3_000L
 
-    private val refreshNotifFrequencyMS = 500L
-    private val maxWaitToStartDurationMs = 10_000L
-
-    /** Adds a download for all tracks in book with [Audiobook.id] == [bookId] */
+    /**
+     * Renders until downloads go quiet, then reports what happened.
+     *
+     * The end condition is the interesting part. Polling could ask "is anything active?"; an event
+     * stream cannot be asked, only listened to. So the worker tracks what is in flight and stops
+     * when nothing is — with a [quietPeriodMs] grace window, because `enqueue` returns before the
+     * first byte arrives and a worker that exited on "nothing in flight yet" would miss the whole
+     * batch. That window replaces a 10-second fixed wait, so the common case is also faster.
+     */
     override suspend fun doWork() =
       withContext(Dispatchers.IO) {
         createNotificationChannelAsNeeded()
 
-        var hasActiveDownloads = false
-        val startedTimeStamp = System.currentTimeMillis()
-        // Wait for at least [maxWaitToStartDurationMs] to ensure downloads have started
-        while (hasActiveDownloads || System.currentTimeMillis() - startedTimeStamp < maxWaitToStartDurationMs) {
-          fetch.getDownloads { allDownloads ->
-            val activeBooks =
-              allDownloads.groupByBookId()
-                .filter { (_, trackDownloads) ->
-                  trackDownloads.any { it.status in activeDownloadStatuses }
-                }
-            hasActiveDownloads = activeBooks.isNotEmpty()
-            updateNotifications(activeBooks)
+        val inFlight = mutableMapOf<String, TrackProgress>()
+        val finished = mutableListOf<TrackDownloadResult>()
+
+        // A timeout around the collection rather than a poll: each event resets the clock, so the
+        // worker lives exactly as long as downloads are talking to it.
+        while (true) {
+          val event =
+            withTimeoutOrNull(quietPeriodMs) {
+              downloader.events.first()
+            } ?: break
+
+          when (event) {
+            is DownloadEvent.Progress -> {
+              inFlight[event.trackId] =
+                TrackProgress(
+                  bookId = event.bookId,
+                  bookTitle = event.bookTitle,
+                  percent =
+                    event.totalBytes
+                      ?.takeIf { it > 0L }
+                      ?.let { total -> ((event.bytesDownloaded * 100) / total).toInt() }
+                      ?: INDETERMINATE,
+                )
+              updateNotifications(inFlight)
+            }
+
+            is DownloadEvent.Completed -> {
+              inFlight.remove(event.trackId)
+              finished += result(event, TrackDownloadResult.TrackStatus.Completed)
+              updateNotifications(inFlight)
+            }
+
+            is DownloadEvent.Failed -> {
+              inFlight.remove(event.trackId)
+              finished += result(event, TrackDownloadResult.TrackStatus.Failed, event.cause)
+              updateNotifications(inFlight)
+            }
+
+            is DownloadEvent.Cancelled -> {
+              inFlight.remove(event.trackId)
+              finished += result(event, TrackDownloadResult.TrackStatus.Cancelled)
+              updateNotifications(inFlight)
+            }
           }
-          delay(refreshNotifFrequencyMS)
         }
 
         notificationManager.cancelAll()
 
-        // Awaited, not fire-and-forget. This used to be
+        // Rendered before returning, not launched. This used to be
         // `fetch.getDownloads { CoroutineScope(coroutineContext).launch { … } }` followed
-        // immediately by the return below — two independent bugs: `getDownloads` is an
-        // async callback that had not necessarily fired yet, and `CoroutineWorker` cancels its
-        // context the moment `doWork` returns, so the launched block raced its own teardown.
-        // The cached-status write that lived here was the visible casualty; the completion
-        // notification was silently at risk too.
-        showDownloadsCompleteNotification(awaitDownloads())
+        // immediately by the return — two independent bugs: the callback had not necessarily
+        // fired, and `CoroutineWorker` cancels its context the moment `doWork` returns, so the
+        // launched block raced its own teardown. Collecting synchronously above removes both.
+        showDownloadsCompleteNotification(finished)
 
         return@withContext Result.success()
       }
 
-    /**
-     * Fetch2's callback API as a suspend function.
-     *
-     * `Fetch.getDownloads` hands its result to a callback on its own thread. Suspending until it
-     * arrives is what lets `doWork` finish its work *before* returning, rather than launching it
-     * into a context that is about to be cancelled.
-     *
-     * Cancellable: if the worker is stopped while waiting, the coroutine resumes with cancellation
-     * rather than leaking a continuation. The file's own header TODO asks for exactly this
-     * ("write extension functions to turn fetch calls into suspend functions").
-     */
-    private suspend fun awaitDownloads(): List<Download> =
-      suspendCancellableCoroutine { continuation ->
-        fetch.getDownloads { downloads ->
-          if (continuation.isActive) {
-            continuation.resume(downloads)
-          }
-        }
-      }
+    /** A track's share of its book's progress bar. */
+    private data class TrackProgress(
+      val bookId: String,
+      val bookTitle: String,
+      val percent: Int,
+    )
+
+    /** A finished track, taking the title straight off the event that reported it. */
+    private fun result(
+      event: DownloadEvent,
+      status: TrackDownloadResult.TrackStatus,
+      error: String? = null,
+    ) = TrackDownloadResult(
+      trackId = event.trackId,
+      bookId = event.bookId,
+      bookTitle = event.bookTitle,
+      status = status,
+      error = error,
+    )
 
     /**
      * Show notifications for completed/failed downloads, allowing the user to retry failed
      * downloads if they wish to
      */
-    private fun showDownloadsCompleteNotification(downloads: List<Download>) {
-      val bookDownloads = downloads.groupByBookId()
-      Timber.i("Downloads: ${bookDownloads.mapValues { (_, forBook) -> forBook.size }}")
+    private fun showDownloadsCompleteNotification(results: List<TrackDownloadResult>) {
       // The decision — which books to report and as what — is pure and lives in
-      // `DownloadOutcomes.kt`, so it can be tested without a worker or a
-      // NotificationManager. This function keeps only the rendering.
-      val bookStatuses = downloads.toOutcomes()
+      // `DownloadOutcomes.kt`, so it can be tested without a worker or a NotificationManager.
+      // This function keeps only the rendering.
+      val bookStatuses = results.toOutcomes()
+      Timber.i("Finished downloads: ${results.size} track(s), ${bookStatuses.size} book(s) to report")
 
-      if (bookStatuses.isNotEmpty()) {
-        val showInGroup = bookStatuses.size > 1
-        bookStatuses.forEach { result ->
-          val notification = makeFinishedNotification(result, showInGroup)
-          if (notification != null) {
-            notificationManager.notify(result.bookName.hashCode(), notification)
-          }
-        }
-        if (showInGroup) {
-          val summary = makeFinishedSummary(bookStatuses)
-          if (summary != null) {
-            notificationManager.notify(DOWNLOADS_FINISHED_NOTIF_SUMMARY_ID, summary)
-          }
-        }
+      if (bookStatuses.isEmpty()) {
+        return
       }
 
-      // Remove all downloads from download manager after completion
-      for ((bookId, _) in bookDownloads) {
-        // Back to Fetch2's Int group, which is the direction downloadGroupId works in.
-        fetch.removeGroup(downloadGroupId(bookId))
+      val showInGroup = bookStatuses.size > 1
+      bookStatuses.forEach { result ->
+        val notification = makeFinishedNotification(result, showInGroup)
+        if (notification != null) {
+          notificationManager.notify(result.bookName.hashCode(), notification)
+        }
       }
+      if (showInGroup) {
+        val summary = makeFinishedSummary(bookStatuses)
+        if (summary != null) {
+          notificationManager.notify(DOWNLOADS_FINISHED_NOTIF_SUMMARY_ID, summary)
+        }
+      }
+      // No `removeGroup` equivalent: Fetch2 kept a queue that had to be emptied or the next run
+      // would re-report the same finished downloads. There is no engine-side queue now — the
+      // events are consumed as they arrive, so there is nothing to clean up.
     }
 
     /** Creates a notification channel if required by the given version of Android SDK */
@@ -176,8 +215,8 @@ class DownloadNotificationWorker
 
     /** Make a group summary for all completed downloads */
     private fun makeFinishedSummary(bookStatuses: List<DownloadOutcome>): Notification? {
-      val failCount = bookStatuses.count { it.status == Status.FAILED }
-      val successCount = bookStatuses.count { it.status == Status.COMPLETED }
+      val failCount = bookStatuses.count { it.status == BookDownloadStatus.Failed }
+      val successCount = bookStatuses.count { it.status == BookDownloadStatus.Completed }
       if (failCount + successCount == 0) {
         // Don't make a notification for zero book statuses
         return null
@@ -185,7 +224,7 @@ class DownloadNotificationWorker
 
       // For one download, show name + status
       val res = applicationContext.resources
-      val downloadFailed = bookStatuses.any { it.status == Status.FAILED }
+      val downloadFailed = bookStatuses.any { it.status == BookDownloadStatus.Failed }
       val finishedTitle =
         if (downloadFailed) {
           res.getString(R.string.download_failed_notification_title)
@@ -195,12 +234,12 @@ class DownloadNotificationWorker
 
       val finishedContent =
         when {
-          bookStatuses.all { it.status == Status.FAILED } ->
+          bookStatuses.all { it.status == BookDownloadStatus.Failed } ->
             res.getQuantityString(
               R.plurals.downloads_failed_summary,
               failCount,
             )
-          bookStatuses.all { it.status == Status.COMPLETED } ->
+          bookStatuses.all { it.status == BookDownloadStatus.Completed } ->
             res.getQuantityString(
               R.plurals.downloads_complete_summary,
               successCount,
@@ -208,8 +247,8 @@ class DownloadNotificationWorker
           else -> {
             applicationContext.getString(
               R.string.downloads_completed_summary_mixed,
-              bookStatuses.count { it.status == Status.COMPLETED },
-              bookStatuses.count { it.status == Status.FAILED },
+              bookStatuses.count { it.status == BookDownloadStatus.Completed },
+              bookStatuses.count { it.status == BookDownloadStatus.Failed },
             )
           }
         }
@@ -217,12 +256,12 @@ class DownloadNotificationWorker
       val downloadSummaries =
         bookStatuses.map { (bookTitle, _, status) ->
           when (status) {
-            Status.COMPLETED ->
+            BookDownloadStatus.Completed ->
               applicationContext.getString(
                 R.string.download_successful_notification_content,
                 bookTitle.take(30),
               )
-            Status.FAILED ->
+            BookDownloadStatus.Failed ->
               applicationContext.getString(
                 R.string.download_failed_notification_content,
                 bookTitle.take(30),
@@ -269,8 +308,8 @@ class DownloadNotificationWorker
       val title =
         applicationContext.getString(
           when (status) {
-            Status.FAILED -> R.string.download_failed_notification_content
-            Status.COMPLETED -> R.string.download_successful_notification_content
+            BookDownloadStatus.Failed -> R.string.download_failed_notification_content
+            BookDownloadStatus.Completed -> R.string.download_successful_notification_content
             else -> return null
           },
           bookName,
@@ -284,8 +323,8 @@ class DownloadNotificationWorker
         }
       val icon =
         when (status) {
-          Status.FAILED -> R.drawable.ic_cloud_download_failed
-          Status.COMPLETED -> R.drawable.ic_cloud_done_white
+          BookDownloadStatus.Failed -> R.drawable.ic_cloud_download_failed
+          BookDownloadStatus.Completed -> R.drawable.ic_cloud_done_white
           else -> return null
         }
 
@@ -301,28 +340,31 @@ class DownloadNotificationWorker
       return builder.build()
     }
 
-    private fun updateNotifications(bookDownloadGroups: Map<String, List<Download>>) {
-      if (bookDownloadGroups.isEmpty()) {
+    private fun updateNotifications(inFlight: Map<String, TrackProgress>) {
+      if (inFlight.isEmpty()) {
+        notificationManager.cancelAll()
         return
       }
 
+      val byBook = inFlight.values.groupBy { it.bookId }
       val bookNotifications =
-        bookDownloadGroups.mapNotNull { (bookId, trackDownloads) ->
-          val bookTitle = trackDownloads.firstOrNull()?.tag ?: return@mapNotNull null
+        byBook.map { (bookId, tracks) ->
+          // Averaged over the book's *in-flight* tracks, as before. A track reporting
+          // INDETERMINATE (no Content-Length) contributes 0 rather than skewing the average
+          // upward — a progress bar that overstates itself and then stalls is worse than one that
+          // catches up.
           val avgCompletion =
-            trackDownloads.sumOf {
-              min(100, max(0, it.progress))
-            } / (trackDownloads.size)
+            tracks.sumOf { min(100, max(0, it.percent.coerceAtLeast(0))) } / tracks.size
 
           bookId to
             createDownloadNotificationForBook(
               bookId = bookId,
-              bookTitle = bookTitle,
+              bookTitle = tracks.first().bookTitle,
               avgCompletion = avgCompletion,
-              showInGroup = bookDownloadGroups.size > 1,
+              showInGroup = byBook.size > 1,
             )
         }
-      val summaryNotification = makeActiveDownloadsSummary(bookDownloadGroups)
+      val summaryNotification = makeActiveDownloadsSummary(byBook)
       showDownloadNotifications(bookNotifications, summaryNotification)
     }
 
@@ -363,15 +405,21 @@ class DownloadNotificationWorker
       )
     }
 
-    private fun makeActiveDownloadsSummary(bookGroups: Map<String, List<Download>>): Notification {
-      // Show up to 5 downloads on legacy devices
+    private fun makeActiveDownloadsSummary(bookGroups: Map<String, List<TrackProgress>>): Notification {
+      // Show up to 5 downloads on legacy devices.
+      //
+      // Ordered by book title rather than by an engine timestamp. Fetch2's records carried
+      // `created`, which this sorted by; an event stream has no equivalent, and inventing one
+      // would mean timestamping arrivals just to order a list of at most five lines. A stable
+      // alphabetical order is better than an arbitrary map order and does not pretend to be
+      // chronological.
       val downloadsToShow =
-        bookGroups.toList().sortedBy { (_, b) ->
-          b.firstOrNull()?.created ?: System.currentTimeMillis()
-        }.take(5).mapNotNull { (_, downloads) ->
-          val bookName = downloads.getOrNull(0)?.tag
-          val progress = min(max(downloads.sumOf { it.progress } / (downloads.size), 0), 100)
-          if (downloads.isNotEmpty() && bookName != null) {
+        bookGroups.toList().sortedBy { (_, tracks) ->
+          tracks.firstOrNull()?.bookTitle.orEmpty()
+        }.take(5).mapNotNull { (_, tracks) ->
+          val bookName = tracks.firstOrNull()?.bookTitle?.takeIf { it.isNotEmpty() }
+          val progress = min(max(tracks.sumOf { it.percent.coerceAtLeast(0) } / tracks.size, 0), 100)
+          if (bookName != null) {
             applicationContext.getString(
               R.string.download_starting,
               bookName.take(30),
@@ -464,6 +512,10 @@ class DownloadNotificationWorker
     companion object {
       const val DOWNLOAD_WORKER_ID: String =
         "io.github.mattpvaughn.chronicle.features.download\$DOWNLOAD_WORKER_ID"
+
+      /** Progress for a download whose total size the server did not declare. */
+      const val INDETERMINATE = 0
+
       const val DOWNLOAD_CHANNEL: String =
         "io.github.mattpvaughn.chronicle.features.download\$DOWNLOAD_CHANNEL"
       const val KEY_BOOK_ID = "KEY_BOOK_ID"

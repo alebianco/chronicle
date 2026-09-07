@@ -11,12 +11,11 @@ dependencyResolutionManagement {
   repositories {
     google()
     mavenCentral()
-    // Vendored Fetch2 (cu-166). Upstream is abandoned — last commit 2024-12-03, and it is served
-    // from JitPack, which builds from source on demand and guarantees nothing about an artifact
-    // staying resolvable. Listed before jitpack so the local copy wins; jitpack stays as a
-    // fallback for a version bump that will probably never come.
-    maven(url = uri("$rootDir/libs/fetch2-mirror"))
-    maven(url = "https://jitpack.io")
+    // No JitPack. It was here only for Fetch2, which decision-24 replaced — along with the
+    // 436 KB vendored mirror of it that lived in `libs/fetch2-mirror/`, added because JitPack
+    // builds from source on demand and guarantees nothing about an artifact staying resolvable.
+    // Every dependency now comes from google() or mavenCentral(), which is the point: nothing in
+    // this build is served by a host that compiles it for us.
   }
 }
 

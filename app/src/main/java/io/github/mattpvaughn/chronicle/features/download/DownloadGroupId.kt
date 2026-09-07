@@ -1,18 +1,24 @@
 package io.github.mattpvaughn.chronicle.features.download
 
 /**
- * Maps a backend-neutral book id to the `Int` group id Fetch2 requires.
+ * Maps a `String` book id to a stable `Int`, for the two Android APIs that insist on one.
  *
- * Fetch2's grouping API is `int` throughout while book ids are `String`, so a non-numeric backend
- * can be represented (decision-11).
+ * **This used to exist for the download engine**, whose grouping API was `int` throughout while
+ * book ids are `String` so a non-numeric backend can be represented (decision-11). That engine is
+ * gone, and with it the `EXTRA_BOOK_ID` round-trip it forced: a hash cannot be reversed, so the
+ * real id had to travel beside it in an extras map and be read back in every listener.
+ * `DownloadRequest` and `DownloadEvent` carry the id in a field.
  *
- * `String.hashCode` because `cancelGroup` may run in a later process than the one that enqueued the
- * download: the mapping must survive a restart, and that hash is specified by the language rather
- * than the JVM. Numeric ids map to themselves so existing Plex downloads keep their group.
+ * What remains needs an `Int` for reasons Android imposes rather than a library:
+ * **notification ids** and **PendingIntent request codes**.
  *
- * Two ids hashing alike would share a group, so cancelling one cancels the other. Negligible at
- * household scale, and the fix — persisting an id↔group table — is a lot of machinery for a
- * subsystem that may be replaced.
+ * `String.hashCode` because a code must survive a restart — a notification posted before a
+ * relaunch has to keep matching its own action — and that hash is specified by the language rather
+ * than by the JVM. Numeric ids map to themselves, which keeps existing notifications stable across
+ * this change.
+ *
+ * Two ids hashing alike would share a notification. Negligible at household scale, and the fix —
+ * persisting an id↔code table — is a lot of machinery for a cosmetic collision.
  */
 fun downloadGroupId(bookId: String): Int {
   val numeric = bookId.toIntOrNull()
@@ -37,25 +43,3 @@ fun requestCodeFor(
   prefix: Int,
   bookId: String,
 ): Int = prefix + downloadGroupId(bookId)
-
-/**
- * Key under which a download request carries its book id in Fetch2's `Extras`.
- *
- * [downloadGroupId] is one-way, but Fetch2's listeners hand back only the `Int` group and the app
- * needs the real id to update the database — so it travels with the request.
- */
-const val EXTRA_BOOK_ID = "chronicle.bookId"
-
-/** The book id a download was enqueued for, or null if the request predates [EXTRA_BOOK_ID]. */
-fun com.tonyodev.fetch2.Download.bookIdOrNull(): String? = extras.getString(EXTRA_BOOK_ID, "").ifEmpty { null }
-
-/**
- * Groups downloads by book, dropping any enqueued before [EXTRA_BOOK_ID] was added.
- *
- * Not `groupBy { it.group }`: that group is a hash, so it cannot be turned back into a book id.
- * Dropped rather than guessed, because a wrong guess marks the wrong book downloaded, while a
- * dropped one is picked up by the next `CachedFileManager.refreshCachedFileStatus`.
- */
-fun List<com.tonyodev.fetch2.Download>.groupByBookId(): Map<String, List<com.tonyodev.fetch2.Download>> =
-  mapNotNull { download -> download.bookIdOrNull()?.let { it to download } }
-    .groupBy({ it.first }, { it.second })

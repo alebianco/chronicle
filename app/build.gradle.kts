@@ -172,8 +172,6 @@ dependencies {
 
   implementation(libs.material)
   implementation(libs.timber)
-  implementation(libs.fetch)
-  implementation(libs.fetch.okhttp)
   implementation(libs.work)
   implementation(libs.result)
   implementation(libs.swiperefresh)

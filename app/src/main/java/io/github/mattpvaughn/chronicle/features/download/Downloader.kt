@@ -88,10 +88,18 @@ data class DownloadRequest(
   val destinationPath: String,
 )
 
-/** Something that happened to a download. */
+/**
+ * Something that happened to a download.
+ *
+ * [bookTitle] rides along on every event because the notification needs it and an event is the
+ * only thing the renderer sees. Carrying it avoided a `bookId -> title` map in the worker that
+ * only got populated by *progress* events — so a track that completed without reporting progress
+ * (a 416 on an already-complete file) would have rendered with a blank title.
+ */
 sealed interface DownloadEvent {
   val trackId: String
   val bookId: String
+  val bookTitle: String
 
   /**
    * Bytes arrived.
@@ -102,6 +110,7 @@ sealed interface DownloadEvent {
   data class Progress(
     override val trackId: String,
     override val bookId: String,
+    override val bookTitle: String,
     val bytesDownloaded: Long,
     val totalBytes: Long?,
   ) : DownloadEvent
@@ -110,6 +119,7 @@ sealed interface DownloadEvent {
   data class Completed(
     override val trackId: String,
     override val bookId: String,
+    override val bookTitle: String,
   ) : DownloadEvent
 
   /**
@@ -121,6 +131,7 @@ sealed interface DownloadEvent {
   data class Failed(
     override val trackId: String,
     override val bookId: String,
+    override val bookTitle: String,
     val cause: String,
   ) : DownloadEvent
 
@@ -128,5 +139,6 @@ sealed interface DownloadEvent {
   data class Cancelled(
     override val trackId: String,
     override val bookId: String,
+    override val bookTitle: String,
   ) : DownloadEvent
 }

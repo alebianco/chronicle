@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.features.download
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.WorkerParameters
-import com.tonyodev.fetch2.Fetch
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -45,7 +44,7 @@ class ChronicleWorkerFactoryTest {
       DownloadNotificationWorker(
         context = context,
         parameters = params,
-        fetch = mockk<Fetch>(relaxed = true),
+        downloader = mockk<Downloader>(relaxed = true),
       )
 
     assertNotNull(worker)

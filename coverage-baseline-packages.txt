@@ -4,7 +4,7 @@ io/github/mattpvaughn/chronicle/data/local 68.69
 io/github/mattpvaughn/chronicle/data/model 95.64
 io/github/mattpvaughn/chronicle/data/sources 86.99
 io/github/mattpvaughn/chronicle/data/sources/local 74.32
-io/github/mattpvaughn/chronicle/data/sources/plex 55.34
+io/github/mattpvaughn/chronicle/data/sources/plex 55.96
 io/github/mattpvaughn/chronicle/data/sources/plex/model 84.20
 io/github/mattpvaughn/chronicle/debug 0.94
 io/github/mattpvaughn/chronicle/debug/compose 0.00
@@ -16,7 +16,7 @@ io/github/mattpvaughn/chronicle/features/collections 75.12
 io/github/mattpvaughn/chronicle/features/collections/compose 45.26
 io/github/mattpvaughn/chronicle/features/currentlyplaying 39.91
 io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 55.38
-io/github/mattpvaughn/chronicle/features/download 42.77
+io/github/mattpvaughn/chronicle/features/download 42.79
 io/github/mattpvaughn/chronicle/features/home 54.51
 io/github/mattpvaughn/chronicle/features/home/compose 36.15
 io/github/mattpvaughn/chronicle/features/library 54.95
@@ -30,7 +30,7 @@ io/github/mattpvaughn/chronicle/features/search/compose 82.59
 io/github/mattpvaughn/chronicle/features/settings 84.43
 io/github/mattpvaughn/chronicle/features/settings/compose 65.50
 io/github/mattpvaughn/chronicle/injection 0.00
-io/github/mattpvaughn/chronicle/injection/modules 13.17
+io/github/mattpvaughn/chronicle/injection/modules 13.61
 io/github/mattpvaughn/chronicle/navigation 87.46
 io/github/mattpvaughn/chronicle/navigation/compose 0.00
 io/github/mattpvaughn/chronicle/ui/theme 85.14

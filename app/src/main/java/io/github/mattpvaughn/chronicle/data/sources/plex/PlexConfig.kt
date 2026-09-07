@@ -6,15 +6,11 @@ import android.net.Uri
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.toBitmap
-import com.tonyodev.fetch2.Request
-import com.tonyodev.fetch2core.Extras
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionResult.Failure
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionResult.Success
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig.ConnectionState.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
-import io.github.mattpvaughn.chronicle.features.download.EXTRA_BOOK_ID
-import io.github.mattpvaughn.chronicle.features.download.downloadGroupId
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.toUri
 import kotlinx.coroutines.*
@@ -171,26 +167,6 @@ class PlexConfig
     fun makeDownloadUrl(trackSource: String): String {
       Timber.i("Preparing download request for: ${Uri.parse(toServerString(trackSource))}")
       return "${toServerString(trackSource)}?download=1"
-    }
-
-    fun makeDownloadRequest(
-      trackSource: String,
-      bookId: String,
-      bookTitle: String,
-      downloadLoc: String,
-    ): Request {
-      Timber.i("Preparing download request for: ${Uri.parse(toServerString(trackSource))}")
-      val token = plexPrefsRepo.server?.accessToken ?: plexPrefsRepo.accountAuthToken
-      val remoteUri = "${toServerString(trackSource)}?download=1"
-      return Request(remoteUri, downloadLoc).apply {
-        tag = bookTitle
-        // Fetch2's grouping API is Int-only, so the book id is hashed for the group id — and
-        // carried verbatim in extras, because the listeners get a groupId back and need the real
-        // id to update the database. A hash cannot be reversed.
-        groupId = downloadGroupId(bookId)
-        extras = Extras(mapOf(EXTRA_BOOK_ID to bookId))
-        addHeader("X-Plex-Token", token)
-      }
     }
 
     fun makeThumbUri(part: String): Uri {

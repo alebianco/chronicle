@@ -120,7 +120,6 @@ class FrameworkFreeCoreTest {
         "data/sources/plex/PlexTokenAuthenticator.kt",
         "data/sources/plex/PlexUtils.kt",
         "data/sources/plex/ProgressReporter.kt",
-        "data/sources/plex/RedactingFetchLogger.kt",
         "data/sources/plex/TagIndexSeeder.kt",
         "data/sources/plex/model/AudnexusTags.kt",
         "data/sources/plex/model/Feature.kt",
@@ -139,8 +138,12 @@ class FrameworkFreeCoreTest {
         "features/download/CacheReconciliation.kt",
         "features/download/CacheScanOutcome.kt",
         "features/download/DownloadGroupId.kt",
-        "features/download/FetchGroupStartFinishListener.kt",
-        "features/download/ResumePlan.kt",
+        // Added by decision-24: the download seam is deliberately framework-free — a
+        // request names a *path*, not a File, and progress is a data class rather than an
+        // engine status. That is the portability claim the ADR makes, so it is pinned here
+        // rather than asserted in prose.
+        "features/download/Downloader.kt",
+        "features/download/DownloadOutcomes.kt",
         "features/player/CastEligibility.kt",
         "features/player/CastMediaItems.kt",
         "features/player/ChapterSeekTarget.kt",

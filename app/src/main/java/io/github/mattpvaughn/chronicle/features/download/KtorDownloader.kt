@@ -114,6 +114,7 @@ class KtorDownloader
                     DownloadEvent.Failed(
                       trackId = request.trackId,
                       bookId = request.bookId,
+                      bookTitle = request.bookTitle,
                       cause = failure.describe(),
                     ),
                   )
@@ -141,7 +142,7 @@ class KtorDownloader
               // The local file is already at or past the server's length. Nothing to fetch.
               response.status == HttpStatusCode.RequestedRangeNotSatisfiable -> {
                 Timber.i("${request.trackId} is already complete (416 for range $alreadyHave-)")
-                _events.tryEmit(DownloadEvent.Completed(request.trackId, request.bookId))
+                _events.tryEmit(DownloadEvent.Completed(request.trackId, request.bookId, request.bookTitle))
                 return@execute
               }
 
@@ -214,6 +215,7 @@ class KtorDownloader
               DownloadEvent.Progress(
                 trackId = request.trackId,
                 bookId = request.bookId,
+                bookTitle = request.bookTitle,
                 bytesDownloaded = written,
                 totalBytes = expectedTotal,
               ),
@@ -223,7 +225,7 @@ class KtorDownloader
       }
 
       Timber.i("Downloaded ${request.trackId}: $written bytes")
-      _events.tryEmit(DownloadEvent.Completed(request.trackId, request.bookId))
+      _events.tryEmit(DownloadEvent.Completed(request.trackId, request.bookId, request.bookTitle))
     }
 
     override suspend fun cancelBook(bookId: String) {
@@ -234,7 +236,7 @@ class KtorDownloader
       cancelling.forEach { (trackId, tracked) ->
         tracked.job.cancelAndJoin()
         lock.withLock { jobs.remove(trackId) }
-        _events.tryEmit(DownloadEvent.Cancelled(trackId, bookId))
+        _events.tryEmit(DownloadEvent.Cancelled(trackId, bookId, cancelling[trackId]?.request?.bookTitle ?: ""))
       }
     }
 
@@ -242,7 +244,7 @@ class KtorDownloader
       val cancelling = lock.withLock { jobs.toMap() }
       cancelling.forEach { (trackId, tracked) ->
         tracked.job.cancelAndJoin()
-        _events.tryEmit(DownloadEvent.Cancelled(trackId, tracked.request.bookId))
+        _events.tryEmit(DownloadEvent.Cancelled(trackId, tracked.request.bookId, tracked.request.bookTitle))
       }
       lock.withLock { jobs.clear() }
     }

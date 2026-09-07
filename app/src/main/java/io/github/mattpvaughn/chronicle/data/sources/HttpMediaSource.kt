@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.data.sources
 
-import com.tonyodev.fetch2.Request
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import okhttp3.ResponseBody
 
@@ -27,8 +26,15 @@ interface HttpMediaSource : MediaSource {
   /** Return true if the media source can currently be accessed, false otherwise */
   suspend fun isReachable(): Boolean
 
-  /** Makes a [Request] with the needed HTTP headers */
-  fun makeDownloadRequest(trackUrl: String): Request
+  /**
+   * The fully-resolved URL to download [trackUrl] from.
+   *
+   * A `String`, not an engine request type. This used to return Fetch2's `Request`, which put a
+   * download library's type on the multi-backend seam — so every future backend would have had to
+   * speak Fetch2 whether or not it downloaded that way. Auth headers are the client's job
+   * (`plexHeadersPlugin`), so a URL is all a source needs to supply.
+   */
+  fun makeDownloadUrl(trackUrl: String): String
 
   /** Makes a [LazyHeaders] with the needed HTTP headers */
   fun makeImageRequestHeaders(): Any?

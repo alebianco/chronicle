@@ -8,9 +8,6 @@ import android.content.SharedPreferences
 import androidx.core.content.ContextCompat
 import androidx.work.WorkManager
 import com.squareup.moshi.Moshi
-import com.tonyodev.fetch2.Fetch
-import com.tonyodev.fetch2.FetchConfiguration
-import com.tonyodev.fetch2okhttp.OkHttpDownloader
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -217,45 +214,18 @@ object AppModule {
     @ApplicationContext context: Context,
   ): WorkManager = WorkManager.getInstance(context)
 
-  @Provides
-  @Singleton
-  fun fetchConfig(
-    appContext: Context,
-    @Named(OKHTTP_CLIENT_DOWNLOADER) okHttpClient: OkHttpClient,
-  ): FetchConfiguration =
-    FetchConfiguration.Builder(appContext)
-      .setDownloadConcurrentLimit(3)
-      .createDownloadFileOnEnqueue(false)
-      .enableAutoStart(false)
-      // Was 1: a single retry meant a Wi-Fi blip mid-download ended it for good, and
-      // nothing re-enqueued it. Fetch2 resumes via HTTP Range, so a retry picks up
-      // where it stopped rather than restarting a 2GB file.
-      .setAutoRetryMaxAttempts(DOWNLOAD_RETRY_ATTEMPTS)
-      // Download through the app's own OkHttp client, so downloads inherit the Plex
-      // interceptor's headers, the 401 re-auth and the connection tiering. This was
-      // commented out with a "broken when I set up Fetch" TODO; the cause was simply that
-      // the fetch2okhttp artifact was never declared, so OkHttpDownloader did not exist.
-      //
-      // Note this is the *downloader* client, not the media one: same interceptors and
-      // authenticator, but never body-level logging, which would buffer a whole audiobook in
-      // memory and OOM the process.
-      .setHttpDownloader(OkHttpDownloader(okHttpClient))
-      // Fetch2 logs whole `DownloadInfo` objects, and that `toString()` includes the headers
-      // map — so plain logging wrote the Plex token to logcat three times before a single byte
-      // transferred, in release builds too, since `enableLogging(true)` was unconditional.
-      // `TokenLoggingTest` could not catch it: it scans our own Timber calls, not a library's
-      // internal logging.
-      //
-      // Redacted rather than switched off. These lines are how the download path is diagnosed —
-      // the OOM inside Fetch2's own thread was found by reading them, and the remaining
-      // download items still need them.
-      .enableLogging(true)
-      .setLogger(RedactingFetchLogger())
-      .build()
-
-  @Provides
-  @Singleton
-  fun fetch(fetchConfig: FetchConfiguration): Fetch = Fetch.Impl.getInstance(fetchConfig)
+  // `fetchConfig` and `fetch` are gone with Fetch2 (decision-24). Two of their settings had
+  // reasons worth keeping on the record, and both are now properties of `KtorDownloader` instead:
+  //
+  // - `setAutoRetryMaxAttempts` was raised from 1 because a single retry meant a Wi-Fi blip mid
+  //   download ended it for good. Retry is WorkManager's job now, and resume is a `Range`
+  //   request, so a blip costs the tail of a file rather than the whole thing.
+  // - `RedactingFetchLogger` existed because Fetch2 logged whole `DownloadInfo` objects, whose
+  //   `toString()` includes the headers map — so plain logging wrote the Plex token to logcat
+  //   three times before a single byte transferred, in release builds too. `TokenLoggingTest`
+  //   could not catch it, because it scans this app's Timber calls and not a library's internals.
+  //   The replacement is `sanitizeHeader` on the download client's `Logging` plugin, which
+  //   `KtorDownloadClientTest` pins with logging forced on.
 
   /**
    * The logging level for **download** traffic.
