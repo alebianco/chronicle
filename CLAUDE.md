@@ -18,7 +18,7 @@ This file is the **entry point**, deliberately short. The durable knowledge live
 | Working on anything | [`reference/00-constitution.md`](backlog/docs/reference/00-constitution.md) — principles, conventions, testing, definition of done, never-touch list |
 | Checking a version or dependency | [`reference/10-tech-stack.md`](backlog/docs/reference/10-tech-stack.md) — and the build files, which are the authority |
 | About to claim work is done | [`reference/11-verify-loop.md`](backlog/docs/reference/11-verify-loop.md) |
-| Wondering whether a rule is enforced | [`reference/09-enforced-rules.md`](backlog/docs/reference/09-enforced-rules.md) — 18 build gates, generated from the tests |
+| Wondering whether a rule is enforced | [`reference/09-enforced-rules.md`](backlog/docs/reference/09-enforced-rules.md) — 30 build gates, generated from the tests |
 | Acting on a memory, or correcting one | [`reference/12-agent-memory.md`](backlog/docs/reference/12-agent-memory.md) — the two stores, promotion, and why memories state only what *was* true |
 | Understanding the code | [`reference/02-architecture.md`](backlog/docs/reference/02-architecture.md), [`05-data-flow.md`](backlog/docs/reference/05-data-flow.md), [`04-key-components.md`](backlog/docs/reference/04-key-components.md) |
 

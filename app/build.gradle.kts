@@ -412,12 +412,12 @@ tasks.register<JacocoReport>("jacocoTestReport") {
   )
 }
 
-// Mutation testing. Deliberately **manual**: not in verify.sh, not in CI, and no score
-// threshold. It answers a different question from the coverage ratchet — "would the tests notice if
-// this code changed?" rather than "was this line executed?" — and it is far too slow for an inner
-// loop.
+// Mutation testing. **Opt-in**: not in `verify.sh`'s default gate and not in `--quick`. It answers
+// a different question from the coverage ratchet — "would the tests notice if this code changed?"
+// rather than "was this line executed?" — and that answer is worth minutes, not seconds.
 //
-//   ./gradlew pitestDebug     report: app/build/reports/pitest/index.html
+//   ./gradlew pitestDebug     report: app/build/reports/pitest/debug/index.html
+//   ./verify.sh --mutation    the same run, reported and never fatal
 //
 // The allowlist is the whole design. Two reasons it is not a wildcard:
 //
@@ -430,6 +430,77 @@ tasks.register<JacocoReport>("jacocoTestReport") {
 //
 // Note the `Kt` suffixes: most of the logic worth mutating lives in top-level functions, which
 // Kotlin compiles into `<FileName>Kt`. Listing only the class names would silently mutate nothing.
+
+/**
+ * Every unit-test class annotated `@RunWith(RobolectricTestRunner::class)`, as JVM binary names.
+ *
+ * **Derived, never maintained.** This was once a hand-written list whose own comment predicted that
+ * forgetting an entry would produce a silent lie. The prediction was right and the comment changed
+ * nothing: 62 Robolectric classes had accumulated against 14 listed, one listed class
+ * (`ChapterBackfillSqlTest`) no longer existed at all, and `pitestDebug` had been failing outright
+ * — "130 tests did not pass without mutation" — for long enough that nobody noticed. A list that
+ * must be updated by hand demonstrably was not, so the shape was wrong, not the entries.
+ *
+ * Nested classes are emitted as `Outer${'$'}Inner`, which PIT matches against the binary name.
+ * `ReauthenticationTest.AgainstTheRealImplementation` is exactly that case — a Robolectric class
+ * inside a plain-JVM outer class — and the old list papered over it with a trailing wildcard that
+ * also swallowed the outer class PIT could legitimately have used.
+ *
+ * Scanning sources rather than compiled classes is deliberate: the value is needed at configuration
+ * time, and reading `build/` would make the exclusion silently *empty* whenever PIT is configured
+ * before the test classes exist — the same failure mode in a new costume.
+ */
+fun robolectricTestClasses(): List<String> {
+  val testRoot = file("src/test/java")
+  if (!testRoot.isDirectory) return emptyList()
+  val runWith = Regex("""@RunWith\(\s*RobolectricTestRunner::class\s*\)""")
+  val classDecl = Regex("""^(\s*)(?:(?:internal|private|abstract|open|sealed|data)\s+)*class\s+(\w+)""")
+
+  return testRoot
+    .walkTopDown()
+    .filter { it.isFile && it.extension == "kt" }
+    .flatMap { source ->
+      val lines = source.readLines()
+      val pkg =
+        lines.firstOrNull { it.startsWith("package ") }?.removePrefix("package ")?.trim()
+          ?: return@flatMap emptySequence<String>()
+      // The enclosing class is tracked by indentation. That is enough structure for test sources
+      // and avoids parsing Kotlin for a build-configuration value.
+      val enclosing = ArrayDeque<Pair<Int, String>>()
+      val found = mutableListOf<String>()
+      var pendingRobolectric = false
+      for (line in lines) {
+        if (runWith.containsMatchIn(line)) {
+          pendingRobolectric = true
+          continue
+        }
+        val match = classDecl.find(line) ?: continue
+        val indent = match.groupValues[1].length
+        val name = match.groupValues[2]
+        while (enclosing.isNotEmpty() && enclosing.last().first >= indent) enclosing.removeLast()
+        val binaryName = (enclosing.map { it.second } + name).joinToString("${'$'}")
+        enclosing.addLast(indent to name)
+        if (pendingRobolectric) {
+          found += "$pkg.$binaryName"
+          pendingRobolectric = false
+        }
+      }
+      found.asSequence()
+    }
+    .sorted()
+    .toList()
+}
+
+/**
+ * The exclusion handed to PIT, derived once so the guard cannot be shown a different list.
+ *
+ * Both `excludedTestClasses` and `writePitestScope` read *this* value rather than calling the
+ * derivation again. Calling it twice would let the configured exclusion and the published one drift
+ * apart, and the guard would then pass against a list PIT never saw — the same class of silent lie
+ * the derivation exists to prevent, one level up.
+ */
+val pitestRobolectricExclusion: List<String> = robolectricTestClasses()
+
 pitest {
   pitestVersion.set(libs.versions.pitestTool)
   // No junit5PluginVersion: this project is on JUnit 4.13.2. Setting it made the coverage
@@ -475,27 +546,27 @@ pitest {
   // class on the test *classpath*, not the test sources — and the coverage minion died
   // (UNKNOWN_ERROR) trying to run them all.
   targetTests.set(listOf("io.github.mattpvaughn.chronicle.*Test"))
-  excludedTestClasses.set(
-    listOf(
-      // Robolectric — see (1) above. Named explicitly so a new Robolectric test that forgets this
-      // list produces a confusing result rather than a silent lie.
-      "io.github.mattpvaughn.chronicle.data.local.RoomSchemaTest",
-      "io.github.mattpvaughn.chronicle.data.local.RoomMigrationTest",
-      "io.github.mattpvaughn.chronicle.data.local.MigrationSupportTest",
-      "io.github.mattpvaughn.chronicle.data.local.ChapterBackfillSqlTest",
-      "io.github.mattpvaughn.chronicle.data.model.TrackSourceUriTest",
-      "io.github.mattpvaughn.chronicle.features.player.ProgressUpdaterTest",
-      "io.github.mattpvaughn.chronicle.features.library.ProgressIndicatorTest",
-      "io.github.mattpvaughn.chronicle.views.ColorContrastTest",
-      "io.github.mattpvaughn.chronicle.data.sources.plex.ReauthenticationTest*",
-      "io.github.mattpvaughn.chronicle.features.bookdetails.AudiobookDetailsPlaybackTest",
-      // Forgetting this did exactly what the note above predicts: PIT refused to
-      // start with "7 tests did not pass without mutation", while ./verify.sh stayed green.
-      "io.github.mattpvaughn.chronicle.util.PackageValidatorTest",
-      // Robolectric because MediaControllerCompat.Callback's constructor needs Binder (DRAFT-72).
-      "io.github.mattpvaughn.chronicle.features.player.NotificationStateMachineTest",
-      "io.github.mattpvaughn.chronicle.features.player.ChapterSessionMetadataTest",
-      "io.github.mattpvaughn.chronicle.features.player.PlayBookGuardsTest",
-    ),
-  )
+  // Robolectric — see (1) above. Derived from the sources on every configuration, so a new
+  // Robolectric test cannot fall out of scope by being forgotten. `PitestScopeTest` fails if this
+  // derivation stops matching the test tree.
+  excludedTestClasses.set(pitestRobolectricExclusion)
 }
+
+// Publishes the exclusion the build **actually configured**, so a plain-JVM test can check it
+// against the test tree. `PitestScopeTest` reads this file; without it the guard would have to
+// re-implement the derivation and would then be asserting against itself, passing happily while
+// the build's real configuration drifted — which is the failure this whole task exists to remove.
+val writePitestScope by
+  tasks.registering {
+    val output = layout.buildDirectory.file("pitest-scope/robolectric-test-classes.txt")
+    val configured = pitestRobolectricExclusion
+    outputs.file(output)
+    inputs.property("robolectricTestClasses", configured)
+    doLast {
+      val file = output.get().asFile
+      file.parentFile.mkdirs()
+      file.writeText(configured.joinToString("\n", postfix = "\n"))
+    }
+  }
+
+tasks.withType<Test>().configureEach { dependsOn(writePitestScope) }

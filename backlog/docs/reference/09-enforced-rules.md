@@ -59,6 +59,7 @@ These enforce a rule too, but by exercising behaviour rather than scanning sourc
 | `SearchReadCostTest` | Re-runs the search projection benchmark in one command. |
 | `ChronicleThemeTest` | The Compose palette matches `colors.xml`. |
 | `AutoBrowseTreeTest` | (instrumented) The Android Auto browse tree loads — the only way to reach `onGetRoot`/`onLoadChildren`. |
+| `PitestScopeTest` | No Robolectric test may enter PIT's scope, and the exclusion stays derived rather than hand-maintained. PIT + Robolectric fails silently, so a stale list makes the mutation report lie. |
 
 ## Adding a gate
 

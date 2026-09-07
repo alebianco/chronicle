@@ -12,6 +12,7 @@
 #   ./verify.sh --format     run ktlintFormat first, then the full gate
 #   ./verify.sh --no-coverage  skip the JaCoCo report + ratchet
 #   ./verify.sh --instrumented add the Espresso suite on two managed emulators
+#   ./verify.sh --mutation   add the PIT mutation score, reported and never fatal
 #
 set -euo pipefail
 
@@ -21,6 +22,7 @@ QUICK=false
 FORMAT=false
 COVERAGE=true
 INSTRUMENTED=false
+MUTATION=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -28,10 +30,20 @@ for arg in "$@"; do
     --format) FORMAT=true ;;
     --no-coverage) COVERAGE=false ;;
     --instrumented) INSTRUMENTED=true ;;
-    -h|--help) sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --mutation) MUTATION=true ;;
+    -h|--help) sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "verify.sh: unknown option '$arg' (try --help)" >&2; exit 2 ;;
   esac
 done
+
+# `--quick` returns before the opt-in stages, so combining it with one would accept the flag and
+# silently do nothing — the shape of failure this project keeps paying for. Refuse instead.
+if [ "$QUICK" = true ] && [ "$MUTATION" = true ]; then
+  echo "verify.sh: --mutation cannot be combined with --quick." >&2
+  echo "  --quick is the inner loop and stops after the unit tests; mutation testing costs about" >&2
+  echo "  a minute and belongs to a full run. Use: ./verify.sh --mutation" >&2
+  exit 2
+fi
 
 GRADLE="./gradlew"
 STAGE_NUM=0
@@ -96,6 +108,45 @@ stage "compileReleaseKotlin — release variant compiles"
 if [ "$INSTRUMENTED" = true ]; then
   stage "instrumentedCheckGroup — Espresso on API 27 and 35"
   "$GRADLE" instrumentedCheckGroupGroupDebugAndroidTest
+fi
+
+# Mutation score. Opt-in and, deliberately, **never fatal**.
+#
+# Not in the default gate because it costs a measured ~60s on top of a full verify, and it answers
+# a different question from the coverage ratchet: "would the tests notice if this code changed?"
+# rather than "was this line executed?". That is worth minutes, not seconds.
+#
+# Not fatal because there is no floor yet. A threshold picked before the first honest measurement is
+# either vacuous or blocks the build on day one, and a gate that blocks on day one gets disabled —
+# which is strictly worse than not having it. The number is printed so a floor can be ratcheted from
+# a real baseline later; until then this stage reports and moves on.
+#
+# The score is only meaningful because no Robolectric test is in PIT's scope: PIT + Robolectric is
+# broken upstream and fails *silently* with false SURVIVED/NO_COVERAGE. `PitestScopeTest` is what
+# keeps that true.
+if [ "$MUTATION" = true ]; then
+  stage "pitestDebug — mutation score (reported, non-blocking)"
+  if "$GRADLE" pitestDebug; then
+    report="app/build/reports/pitest/debug/mutations.xml"
+    if [ -f "$report" ]; then
+      killed=$(grep -c "status='KILLED'" "$report" || true)
+      survived=$(grep -c "status='SURVIVED'" "$report" || true)
+      uncovered=$(grep -c "status='NO_COVERAGE'" "$report" || true)
+      total=$((killed + survived + uncovered))
+      echo ""
+      echo "  mutation score: $killed killed / $total generated"
+      echo "  $survived survived, $uncovered with no coverage"
+      echo "  A surviving mutant is a change to the code no test objected to."
+      echo "  Report: app/build/reports/pitest/debug/index.html"
+    else
+      echo "  pitestDebug reported success but wrote no $report — not failing the gate on it."
+    fi
+  else
+    echo ""
+    echo "  !! pitestDebug FAILED. Not fatal: this stage reports, it does not gate."
+    echo "     It is still worth reading — the last time PIT could not run at all, it stayed"
+    echo "     broken because nothing in the build ever said so."
+  fi
 fi
 
 echo ""

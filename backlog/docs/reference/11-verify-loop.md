@@ -4,7 +4,8 @@
 ./verify.sh            # the full gate
 ./verify.sh --quick    # inner loop while iterating: ktlint + unit tests + coverage
 ./verify.sh --format   # runs ktlintFormat first, then the full gate
-./verify.sh --instrumented   # adds a 7th stage on two managed emulators
+./verify.sh --instrumented   # adds a 9th stage on two managed emulators
+./verify.sh --mutation       # adds the PIT mutation score — reported, never fatal
 ```
 
 **`verify.sh` *is* the definition of "the build is fine"** (D12 rule 6) — not CI, not a forge's
@@ -68,7 +69,7 @@ blanket `-keep`**, which silently exempts code from R8.
 
 ## Instrumented tests
 
-`./verify.sh --instrumented` adds them as a 7th stage; `./gradlew
+`./verify.sh --instrumented` adds them as a 9th stage; `./gradlew
 instrumentedCheckGroupGroupDebugAndroidTest` runs them directly.
 
 Two Gradle Managed Devices: **API 27** (the minSdk floor, which catches a new API called without a
@@ -81,6 +82,42 @@ so **no credentials and no live server**. It is deliberately small; it exists to
 Fragment/Activity/media-session layer reachable at all, not to cover it.
 
 See the `device-verification` skill for the four traps it cost to learn.
+
+## Mutation testing
+
+`./verify.sh --mutation` adds the PIT score; `./gradlew pitestDebug` runs it directly and writes
+`app/build/reports/pitest/debug/index.html`.
+
+It answers a **different question from the coverage ratchet** — "would the tests notice if this code
+changed?" rather than "was this line executed?". A surviving mutant is a change to production code
+that no test objected to, which is how a vacuous test looks from the outside.
+
+**Opt-in and never fatal.** Measured at roughly a minute on top of a full verify, so it is not in
+the default gate and never in `--quick`. It has no score floor either: a threshold picked before the
+first honest measurement is either vacuous or blocks the build on day one, and a gate that blocks on
+day one gets disabled — worse than not having it. The stage prints the numbers so a floor can be
+ratcheted from a real baseline later.
+
+**Baseline at the time it was first made to run:** 472 mutations generated, 185 killed (39%), 122
+survived, 165 with no coverage; test strength 60%, over an 18-class allowlist.
+
+### The Robolectric exclusion is derived, not listed
+
+PIT + Robolectric is broken upstream (koral--/gradle-pitest-plugin#80, open since 2022) and fails
+**silently**, reporting false SURVIVED/NO_COVERAGE. A Robolectric class in PIT's scope therefore
+does not break the run — it makes it lie about which tests are worthless.
+
+The exclusion was once a hand-maintained list guarded only by a comment saying not to forget it. It
+was forgotten: **62** Robolectric classes accumulated against **14** listed, one listed class no
+longer existed, and `pitestDebug` failed outright for long enough that nobody noticed — `verify.sh`
+stayed green throughout, because nothing ran PIT.
+
+`robolectricTestClasses()` in `app/build.gradle.kts` now derives the list from the test sources, and
+`PitestScopeTest` fails if that derivation stops matching the test tree. **Do not replace it with
+literals**; the failure mode of forgetting is what the derivation removes.
+
+`targetClasses` remains a deliberate allowlist — generated code (Room `_Impl`, Dagger factories)
+produces thousands of meaningless mutants. Widening it is a separate judgement, not maintenance.
 
 ## Other measurement scripts
 
