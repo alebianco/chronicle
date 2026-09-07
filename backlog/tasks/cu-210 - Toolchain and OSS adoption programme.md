@@ -82,13 +82,14 @@ Recorded here so cu-194 can cite it rather than re-deriving:
 
 - [x] Every task exists, ordered, with its dependencies set — ten of them, consolidated from a
       first pass of seventeen
-- [ ] cu-211 lands **before any toolchain or library task** — it is the mitigation, and the
+- [x] cu-211 lands **before any toolchain or library task** — it is the mitigation, and the
       programme is unjustifiable if a repeat of this session's blocker can still reach a device.
       Only cu-212 precedes it, because cu-211's CI job needs the branch trigger cu-212 adds
 - [ ] cu-214's four steps are committed and verified **separately**, and its step 3 (AGP 9) is
       device-verified before step 4 stacks on it
-- [ ] No task in this programme is started while cu-195 has open device criteria, except
-      cu-211, cu-212 and cu-213, which do not touch app code
+- [x] No task in this programme is started while cu-195 has open device criteria — cu-211, cu-212
+      and cu-213 ran under the carve-out, and **cu-195 closed Done on 2026-09-07**, so the rest of
+      the programme is unblocked
 - [ ] cu-194 is closed by citing this task rather than repeating its reasoning
 - [ ] The portable-share figure cu-182 inherits is re-measured after cu-217
 

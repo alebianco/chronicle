@@ -1,7 +1,7 @@
 ---
 id: cu-195
 title: Replace Fetch2 with a maintained download stack
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -104,10 +104,10 @@ The honest framing is that this is **less a library swap than a decision about h
 - [x] No Fetch2 import remains; a guard test pins that, in the manner of `ServiceLocatorUsageTest`
 - [x] On-disk layout unchanged — `SyncLocationMoveTest` passes untouched, and no already-downloaded
       book needs re-downloading
-- [ ] Resume over HTTP Range verified against a real interrupted download, not only unit tests
+- [x] Resume over HTTP Range verified against a real interrupted download, not only unit tests
 - [x] Auth headers attached; a token-redaction guard equivalent to `RedactingFetchLogger` is in
       place and `TokenLoggingTest` passes
-- [ ] Verified on the tablet in **both** directions across its two real volumes (internal + physical
+- [x] Verified on the tablet in **both** directions across its two real volumes (internal + physical
       SD card), as cu-153 did — different filesystems, so `Files.move` may fall back to copy+delete
 - [x] `./verify.sh` green; `./test_release_build.sh` passes (download classes are R8-sensitive)
 
@@ -223,17 +223,55 @@ entries. Worth noting it is not a coverage *loss*: Retrofit built services as ru
 there was no bytecode to measure, and Ktorfit generating real classes dropped `data/sources/plex`
 7.7 points without a single test changing.
 
-## Still open — why this is In Review
+## Device verification — done (2026-09-07)
 
-- [ ] Resume over HTTP Range verified against a real interrupted download, not only unit tests
-- [ ] Verified on the tablet in **both** directions across its two real volumes (internal + physical
-      SD card)
+Both remaining criteria are evidence now rather than intent. Tablet HVA067JE over USB, debug build,
+mock-Plex fixture (which serves range-capable audio). `./plex-session.sh status` was checked first
+and the real session backup was untouched throughout.
 
-Range resume is unit-tested against `MockEngine` in four cases including the silent-corruption one
-(a server that ignores `Range` and answers 200 — appending there splices a file's head onto its own
-middle and yields a plausible-length corrupt track). **That is not the same as a real interrupted
-download**, and this task is right to demand one. Device verification is running now; whatever it
-does not cover stays on this list.
+### Range resume against a real interrupted download
+
+A complete download gave the reference: three tracks, 2,880,044 bytes each, md5
+`a11860a0643ca28dc4d5089bca5385de`. Track 2001 was then **truncated to 1,000,000 bytes** — with the
+process confirmed dead first, per the prefs-clobber trap — and 2002/2003 deleted outright, so one
+track resumed and two restarted in the same pass.
+
+```
+CachedFileManager: Resuming partial download for track 2001 at 1000000 bytes
+KtorDownload: -> Range: bytes=1000000-
+MockPlexServer: GET /library/parts/3001/... range=bytes=1000000-
+KtorDownload: RESPONSE: 206
+MockPlexServer: GET /library/parts/3002/... range=null      <- deleted, so a full fetch
+```
+
+**All three files came back byte-identical to the reference.** That is the check that matters. The
+unit tests cover a server that ignores `Range` and answers 200, where appending splices a file's head
+onto its own middle and yields a plausible *length* with corrupt contents — a size check passes that,
+a hash does not.
+
+### Both directions across both volumes
+
+`move_sync_location` internal → SD (`79AF-CD2E`) and back, through the debug hook, which validates
+the path by exact match against `externalDeviceDirs()`.
+
+| Move | Files at destination | Source afterwards |
+|---|---|---|
+| internal → SD | 3, all md5 `a11860a0…` | empty |
+| SD → internal | 3, all md5 `a11860a0…` | empty |
+
+Then **playback from the moved files**, which is the part no hash can show:
+
+```
+MediaMetadataCompatExtKt: Media uri is: file:///storage/emulated/0/Android/data/.../2001.wav
+AudioALSAPlaybackHandlerNormal: +open(), sample_rate = 48000
+```
+
+Screenshotted: the mini player reads *An Unexpected Party / The Hobbit*, with progress on the shelves.
+A move that preserved every byte but broke the stored paths would pass all of the above except this.
+
+Two things visible in that screenshot that are **not** defects of this task: cover art is a
+placeholder (cu-207) and a "Plex login expired" banner shows, which is simply what mock mode looks
+like without a real account.
 
 ## A note for the multiplatform task
 
