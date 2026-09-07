@@ -197,6 +197,54 @@ shape as the launch crash. Room 10 → 10 `_Impl`, Ktorfit 2 → 2, Java 222 →
 `verify.sh` green (8 stages); release build green with 9,219 classes in dex and all 20
 `@Serializable` models surviving R8.
 
+## Step 3 attempt — blocked on the Pitest plugin (2026-09-07)
+
+**Stopped deliberately, one blocker from done.** The work is stashed as
+`cu-214 step 3 WIP: AGP 9.4.0, compileSdk 37, blocked on pitest`; the branch is clean at step 2.
+
+Everything AGP 9 needed was found and fixed, in this order — each error only appears once the
+previous is cleared, so this list is the actual migration path:
+
+| Blocker | Resolution |
+|---|---|
+| `platforms;android-37` not installed | It is published as **`android-37.0`/`37.1`**, not a bare `android-37`. Installed 37.0 |
+| AGP 9.4.0 requires Gradle ≥ 9.6.0 | Wrapper 9.5.1 → **9.7.1** (in this step's scope) |
+| `kotlin.android` plugin is now an error | **AGP 9 has built-in Kotlin.** Removed from both build files; the Kotlin version still comes from the catalog |
+| Hilt 2.57.2: "Android BaseExtension not found" | **Needs 2.60.1.** This breaks the step's "no other library moves" rule — see below |
+| `assets.srcDir` deprecated to an error | `assets.directories.add(...)` |
+| **`pl.droidsonroids.pitest` reads `applicationVariants`** | **No fix available.** AGP 9 removed that API |
+
+### The blocker
+
+```
+Could not get unknown property 'applicationVariants'
+  at pl.droidsonroids.gradle.pitest.PitestPlugin$_apply_closure2$_closure14.doCall(PitestPlugin.groovy:127)
+```
+
+**0.2.27 is the newest release and we are already on it** — an earlier reading of "0.2.9 is newest"
+was `tail` sorting lexically, not numerically. The plugin is *actively maintained* (last push
+2026-09-07, the same day), so AGP 9 support is plausibly coming rather than abandoned.
+
+Removing the plugin proves it is the only thing left: with it out, configuration proceeds past every
+other error.
+
+### Two things that need the owner
+
+**1. This step cannot keep its own "no other library moves" rule.** Hilt must go 2.57.2 → 2.60.1 for
+AGP 9 to configure at all. That rule exists to keep a toolchain major from turning into a dependency
+sweep, and this is one forced bump rather than a sweep — but it is a rule this ticket wrote, so it
+should be broken deliberately, not quietly.
+
+**2. Pitest has no AGP 9 release.** Options, none of which an agent should choose:
+
+- **Wait.** The plugin is maintained and AGP 9.4.0 is recent; this may resolve itself. Costs nothing,
+  and steps 1–2 already stand on their own.
+- **Drop the Android Pitest plugin, keep PIT.** cu-213 wired `verify.sh --mutation` as opt-in and
+  never fatal, so losing it costs a report nobody blocks on. The plain `info.solidsoft.pitest` plugin
+  has no `applicationVariants` dependency but is not Android-aware.
+- **Drop mutation testing.** Honest but wasteful — cu-213 was landed one session ago and its
+  derivation guard is the part with lasting value.
+
 ## Notes
 
 Closing status **In Review**. Steps 3 and 4 both want the owner's eye — one is a toolchain major with
