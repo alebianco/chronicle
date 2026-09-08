@@ -22,6 +22,65 @@ thirteen screens and it takes routing away from Navigation Compose.
 **Latest is `com.slack.circuit:circuit-foundation:0.38.0`** (checked 2026-09-08). Note the `0.x`
 version: this is the least settled dependency in the bundle, and its API has moved between minors.
 
+## BLOCKED — the test-story spike, 2026-09-08
+
+**Not started.** A spike was run first, on the owner's instruction, to answer a question cu-230
+raised before anything irreversible happened. It found **two independent blockers**, and per the
+owner's standing instruction the work stopped rather than routing around them.
+
+Nothing is migrated. No screen was touched, no dependency remains declared, `verify.sh` green.
+
+### Blocker 1 — Circuit is behind the AGP 9.1.0 gate
+
+`checkDebugAarMetadata` fails with Circuit declared:
+
+```
+Dependency 'androidx.lifecycle:lifecycle-runtime-compose-android:2.11.0'
+  requires Android Gradle plugin 9.1.0 or higher.
+  This build currently uses Android Gradle plugin 8.13.2.
+```
+
+This is the **same gate cu-214 measured and skipped** — AGP 9 was found to have five
+incompatibilities, three of them silent, against one gain. Confirmed to be Circuit's doing rather
+than assumed: the gate passes with the dependency removed and fails with it added.
+
+Older versions do not escape it. Circuit 0.38.0, 0.37.1, 0.36.1 all pull lifecycle **2.11.0**;
+0.35.0 pulls `2.11.0-rc01`, 0.34.0 `2.11.0-beta01`. The last version clear of it is **0.31.0**
+(lifecycle 2.9.5), which does pass the gate — seven minors behind, on a `0.x` library whose API
+moves between minors.
+
+### Blocker 2 — a Circuit presenter is not testable off-device, for the same reason Molecule was not
+
+Established on 0.31.0, which is past blocker 1, so this is a separate finding rather than a
+consequence.
+
+A minimal presenter — `Presenter<SpikeState>` with a sealed event hierarchy and an exhaustive
+`when`, no app code — driven by Circuit's own `circuit-test` `.test {}` harness:
+
+- **Plain JVM: fails.** `RuntimeException: Method e in android.util.Log not mocked`, and the stack
+  names `app.cash.molecule.MoleculeKt.launchMolecule`. **`circuit-test` uses Molecule internally**,
+  so Circuit inherits cu-230's blocker exactly.
+- **Under Robolectric: fails differently.** The `Log` crash goes, and then nothing is produced — a
+  3 s Turbine timeout. Same result measured for Molecule's `ContextClock` under Robolectric: the
+  frame clock needs a real choreographer.
+
+So Robolectric is **not** the escape hatch it was assumed to be when cu-230 was declined. There is
+currently no environment in this project where a Circuit presenter's state can be asserted except a
+device.
+
+### What this means for the decision
+
+decision-26 adopts Circuit on the owner's veto, and that ruling stands — this records a cost that
+was not known when it was made, not a disagreement with it. Three things follow:
+
+1. **Circuit is gated behind AGP 9**, which is cu-214's declined step. Adopting Circuit means
+   re-opening that, or pinning Circuit at 0.31.0.
+2. **The exhaustive-`when` property the veto was about is available today without any of this** —
+   a sealed event hierarchy plus `when` is Kotlin, not Circuit. What Circuit adds is the presenter
+   runtime and, at option 1, the router.
+3. **Option 2 in the section below (presenters without the router) does not dodge either blocker.**
+   Both are properties of the presenter runtime, not of routing.
+
 ## The navigation question must be answered before the first screen moves
 
 Circuit's router and Navigation Compose **cannot both own routing**. The surface at stake, measured:
