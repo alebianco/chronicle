@@ -314,6 +314,65 @@ should be broken deliberately, not quietly.
 - **Drop mutation testing.** Honest but wasteful — cu-213 was landed one session ago and its
   derivation guard is the part with lasting value.
 
+## Full AGP 9.4.0 walk-through — 2026-09-08, it works; two gates are the cost
+
+Carried further than the note below, on the owner's instruction to update everything and re-enable
+Pitest. **Nothing from this is committed** — the tree is on AGP 8.13.2 and green at 11 stages.
+
+### The migration itself succeeds
+
+On AGP 9.4.0 + Gradle 9.7.1, with parcelize removed ([[cu-233]]), `kotlin.android` dropped, Hilt at
+2.60.1 and Pitest unapplied:
+
+- `:app:assembleDebug` — **succeeds**
+- `:app:testDebugUnitTest` — **entire suite green**
+- Device-verified on the tablet: library and player render correctly, chapter list, two-colour play
+  button, slider, section-title casing all intact. **None of the four Compose-bump defect classes
+  this ticket warned about appeared.**
+
+And it unlocks the versions step 4 was blocked on, all four building and testing green together:
+**Compose BOM 2026.08.00** (Compose 1.12.0), **lifecycle 2.11.0**, **Coil 3.6.2**, **androidx.core
+1.19.0**.
+
+So step 4 is not blocked by anything except step 3, and step 3 is not blocked by app source.
+
+### The cost is two quality gates, and they differ
+
+**Pitest: no path.** The droidsonroids plugin uses `applicationVariants`, removed in AGP 9. Latest
+is **v0.2.27 (March 2026)**, and there is **no pre-release and no AGP 9 work in flight** — checked
+against the Gradle plugin portal, Maven Central and the upstream repository's releases and issues.
+The PIT *engine* is a separate artifact and is now current at 1.30.0; that is not the blocker.
+
+**detekt: there is a path, and it is an alpha.** `detektDebug` does not exist under AGP 9 with
+detekt 1.23.8, and the bare `detekt` task analyses **without type resolution** — this ticket's own
+measurement is 31 findings against 120, and a rule that cannot resolve a type reports nothing rather
+than a false negative.
+
+**detekt 2.0.0-alpha.6 fixes it.** Measured: it is built against AGP 9.3.1, and under AGP 9 it
+restores the full variant-aware task set — `detektDebug`, described by the plugin itself as *"Run
+detekt analysis for debug classes **with type resolution**"*. It is a rewrite, so migrating costs:
+
+- plugin id `io.gitlab.arturbosch.detekt` → **`dev.detekt`**
+- task class `io.gitlab.arturbosch.detekt.Detekt` → **`dev.detekt.gradle.Detekt`**
+- the reports DSL changed (`xml`/`html`/`md`/`txt` no longer resolve as before)
+- **`build: maxIssues: 0` is gone** from the config schema. Behaviour is preserved without it —
+  measured: 2.x fails the build on any finding by default — but the key must be deleted or the run
+  aborts with "Property 'build' is misspelled or does not exist"
+- the baseline is not picked up as-is and needs regenerating
+
+### What this leaves the owner
+
+The question is no longer "does AGP 9 work" — it does, on device. It is **what mutation testing is
+worth**, since AGP 9 and Pitest are mutually exclusive until upstream moves:
+
+- **Stay on AGP 8** — keeps Pitest and detekt 1.23.8; forgoes Compose 1.12/Coil/core, and keeps
+  [[cu-231]] (Circuit) gated.
+- **Take AGP 9** — everything updates and Circuit unblocks; Pitest goes dormant (cu-213 already made
+  `verify.sh --mutation` opt-in and never fatal), and detekt moves to a 2.x alpha to keep its teeth.
+
+Not decided here. Recorded so the decision is made on measurements rather than on the older,
+gloomier reading.
+
 ## Re-measured on AGP 9.4.0 — 2026-09-08, two of the five blockers are gone
 
 Prompted by the owner asking whether 9.4 might solve what 9.1 did not. **The earlier run was already
