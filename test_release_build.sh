@@ -142,19 +142,31 @@ if (( MISSING > 0 )); then
 fi
 print "${GREEN}✅ All reflection-dependent classes survived R8${NC}"
 
-if ! adb devices | grep -q "device$"; then
-  print "${YELLOW}⚠️  No device connected. Skipping installation.${NC}"
-  print "${YELLOW}Manual testing required.${NC}"
-  exit 0
+# Step 3 used to `adb install` this APK, which **cannot work and never did**: there is no release
+# signing config (signing is owner-only, per CLAUDE.md's never-touch list), so AGP emits
+# `app-release-unsigned.apk`, and Android rejects an unsigned package with
+# INSTALL_PARSE_FAILED_NO_CERTIFICATES. The script therefore exited 1 on every machine with a
+# device attached — and exited 0 everywhere else, because the no-device guard above returned
+# first. So it passed on CI and failed only for the person doing device work.
+#
+# Nothing is lost by not installing here. What this script exists for is step 2b — asserting that
+# reflection-dependent classes survive R8, which has broken before — and that has already run and
+# passed by this point. Installing a release build is a manual step a human does deliberately,
+# with a signed APK; the checklist below is that step's instructions, and it is printed whether or
+# not a device is plugged in.
+#
+# The alternative considered and rejected: building a debug-signed release variant purely to make
+# the install work. That installs a *different artifact* from the one being tested, which makes the
+# check weaker while looking stronger.
+if adb devices 2>/dev/null | grep -q "device$"; then
+  print "${YELLOW}Step 3: Skipping install — the release APK is unsigned.${NC}"
+  print "  ${APK_PATH:t} has no signature (there is no release signing config, and adding one is"
+  print "  owner-only), so \`adb install\` would fail with INSTALL_PARSE_FAILED_NO_CERTIFICATES."
+  print "  The R8 assertions above are what this script verifies; install a signed build by hand."
+else
+  print "${YELLOW}Step 3: Skipping install — no device connected.${NC}"
 fi
 
-print "${YELLOW}Step 3: Installing release APK...${NC}"
-adb install -r "${APK_PATH}" || {
-  print "${RED}❌ Installation FAILED${NC}"
-  exit 1
-}
-
-print "${GREEN}✅ APK installed successfully${NC}"
 print "\n========================================="
 print "Manual Testing Checklist:"
 print "========================================="
@@ -168,4 +180,8 @@ print "7. [ ] Settings accessible"
 print "8. [ ] No crashes in logcat"
 print "\nMonitor logcat with:"
 print "  adb logcat | grep Chronicle"
+
+# Explicit, rather than inheriting the last `print`'s status. The exit code is the point of this
+# fix: it has to be usable by anything that wants to know whether the release build is sound.
+exit 0
 

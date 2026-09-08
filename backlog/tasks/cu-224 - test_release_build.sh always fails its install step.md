@@ -1,7 +1,7 @@
 ---
 id: cu-224
 title: "test_release_build.sh always fails its install step"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -46,19 +46,35 @@ by anything else while this is true.
 
 ## Acceptance Criteria
 
-- [ ] `./test_release_build.sh` exits 0 on a machine with a device attached, when the release build
-      and the R8 assertions pass
-- [ ] It does **not** acquire a signing config, a keystore, or anything else on the never-touch list
-- [ ] Whatever it does instead is stated in the script: skip the install with a clear message, build
-      a debug-signed release variant for installability, or drop step 3 and keep the checklist
-- [ ] The R8 assertion in step 2b still runs and still fails the script when a class is missing —
-      sabotage-verify by removing one from the list it checks
-- [ ] `./verify.sh` green
+- [x] `./test_release_build.sh` exits 0 on a machine with a device attached, when the release build
+      and the R8 assertions pass — **verified with the tablet attached: exit 0**, 9,382 classes in
+      dex, 23 `@Serializable` models checked
+- [x] It does **not** acquire a signing config, a keystore, or anything else on the never-touch list
+- [x] Whatever it does instead is stated in the script: it **skips the install with a message naming
+      the reason** (the APK is unsigned and there is no release signing config), and prints the
+      manual checklist either way
+- [x] The R8 assertion in step 2b still runs and still fails the script when a class is missing —
+      **sabotage-verified**: adding one absent class made it exit **1** with two `❌` lines, and the
+      sabotage was reverted in a separate step
+- [x] `./verify.sh` green
+
+## What it does now, and why not the alternatives
+
+Step 3 skips, and says why. The two other options in the criterion were considered and rejected:
+
+- **Building a debug-signed release variant** so the install works would install a *different
+  artifact* from the one under test — a weaker check that looks stronger.
+- **Dropping step 3 entirely** loses the message. A reader who expects an install wants to know why
+  there is not one, and "the release APK is unsigned" is that answer.
+
+The valuable half was always step 2b, and it is untouched: it runs before this point and is what
+gives the script its exit code.
 
 ## Notes
 
-Closing status **Done** if the fix is mechanical; **In Review** if it changes what the script builds,
-since that is a judgement about what "test the release build" should mean.
+Closed **In Review**: the fix is mechanical in code but it is a judgement about what "test the
+release build" should mean — the script no longer attempts an install at all, which is a scope
+decision rather than a fact a test settles.
 
 Worth deciding whether step 3 belongs at all. The checklist it prints is manual work a human does
 anyway, and `capture-screens.sh` plus the instrumented suite now cover more than they did when this
