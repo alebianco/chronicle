@@ -7,6 +7,68 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 
 /*
+ * ## Which to reach for: these helpers, or Turbine
+ *
+ * Both are declared and both stay. They answer **different questions**, and picking by habit rather
+ * than by question is how a test ends up longer and less clear than what it replaced.
+ *
+ * | the question | reach for |
+ * |---|---|
+ * | "what value did this settle on?" | [settledValue] / [settledValues] |
+ * | "did these events arrive, in this order, and then nothing else?" | Turbine |
+ * | "keep this `WhileSubscribed` flow hot while I assert" | [keepCollected] |
+ *
+ * A `StateFlow` conflates, so asking it for a *sequence* is usually asking the wrong question —
+ * intermediate values may never be observable, and a Turbine assertion over one tends to be longer
+ * and more brittle than a `settledValue`. Conversely a `SharedFlow` command bus is genuinely a
+ * sequence, and expressing "and then nothing else" as an assertion over an accumulated list is what
+ * these helpers do awkwardly. `SleepTimerBusTest` is the worked example: it carried 33 lines of
+ * hand-rolled recorder to say what `testIn` / `awaitItem` / `expectNoEvents` say directly.
+ *
+ * ## Turbine's own trap: `expectNoEvents()` means "not yet", not "never"
+ *
+ * Measured, because it is the assertion a "this must never arrive" test reaches for and it is
+ * weaker than it reads. A probe emitted an event behind a `delay` and then called
+ * `expectNoEvents()`: **it passed**, with the emission still pending. `advanceUntilIdle()` before
+ * it does not help either — it does not drain the emission into Turbine's channel.
+ *
+ * So a negative assertion needs a **barrier**: await something that must arrive *after* the thing
+ * being excluded would have, then assert the absence. `SleepTimerBusTest`'s two feedback-loop tests
+ * do this — they drain the flow the event legitimately belongs on before asserting it did not also
+ * reach the other one, so the absence is a statement about a delivery that has happened rather than
+ * one that has not been given the chance.
+ *
+ * Without that barrier the old accumulated-list comparison was, on this one point, the **stronger**
+ * check — it kept accumulating after a `yield`, where `expectNoEvents()` reads a channel once and
+ * returns. So use it only where the emission it excludes would have been synchronous, or put a
+ * barrier in front of it. Sabotage-verified either way: reinstating the leak fails the barriered
+ * test.
+ *
+ * ## What Turbine does and does not change about the traps below
+ *
+ * Measured on 2026-09-08 rather than assumed, because both traps are properties of the coroutine
+ * test machinery rather than of these helpers:
+ *
+ * - **Trap 1 still applies, and it is not only about collectors.** A `backgroundScope` *collector*
+ *   of a `SharedFlow` is still not resumed by `advanceUntilIdle` — measured again: the list was
+ *   empty after `advanceUntilIdle` and held one item after `yield()`. Turbine's `awaitItem()`
+ *   suspends properly and returns the value with neither, so on the reading side the trap is
+ *   avoided rather than fixed.
+ *
+ *   **A *producer* parked on a `SharedFlow` hits it identically**, and that half is easy to miss
+ *   because there is no collector in sight to blame. A sender launched on the default
+ *   `StandardTestDispatcher` and then `advanceUntilIdle`-ed simply never runs, so a counter it
+ *   increments reads 0 — which looks exactly like "the bus blocked the sender" and is really "the
+ *   sender was never scheduled". This cost a wrong test and a wrong finding in `SleepTimerBusTest`,
+ *   recorded in three documents before it was caught. Measured: the same nine sends give
+ *   `sent = 0` under `StandardTestDispatcher`, and `sent = 9` under `UnconfinedTestDispatcher`
+ *   **or** a real dispatcher. **If a test's subject is what a producer does, do not run it on the
+ *   test dispatcher.**
+ * - **Trap 2 still applies, in full, inside a `turbineScope`.** A `turbineScope` collecting an
+ *   endless flow inside `runBlocking` **hangs** exactly as before — verified by a probe that had to
+ *   be killed at a 240 s timeout. `withTimeoutOrNull` does not rescue it either, because
+ *   `runBlocking` blocks the very thread the timeout needs. Use `runTest`, and `testIn(backgroundScope)`.
+ *
  * ## Two traps these helpers do not cover
  *
  * Both were found the hard way, and both read as a broken production class when the defect is in

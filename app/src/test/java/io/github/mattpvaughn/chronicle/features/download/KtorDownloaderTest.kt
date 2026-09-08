@@ -297,6 +297,21 @@ class KtorDownloaderTest {
   /**
    * Waits for an event matching [predicate], then cancels [collector].
    *
+   * **Deliberately not Turbine**, though Turbine is declared and `SleepTimerBusTest` uses it. Two
+   * reasons, both properties of this suite rather than preferences:
+   *
+   * - These tests run on **real dispatchers with real file I/O**, so the arrival order of events is
+   *   not deterministic. The assertion here is "an event matching this predicate eventually
+   *   arrived"; Turbine's `awaitItem()` asserts the *next* item, which is a stronger claim than this
+   *   suite can honestly make and would convert a correct test into a flaky one.
+   * - They are `runBlocking`, not `runTest` — a `turbineScope` collecting an endless flow inside
+   *   `runBlocking` hangs rather than failing (measured: a probe had to be killed at 240 s, and
+   *   `withTimeoutOrNull` does not rescue it because `runBlocking` blocks the thread the timeout
+   *   needs). See `FlowTestExt`'s trap 2.
+   *
+   * So this stays. A conversion that makes an assertion weaker or an harness hang is evidence the
+   * existing helper was the right tool.
+   *
    * **`awaitIdle()` alone is not enough, and CI proved it.** It joins the download *job*, but the
    * event reaches `into` on a separate collector coroutine — so on a loaded machine the job can
    * finish, the assertion can read an empty list, and the emission can arrive afterwards. Two tests

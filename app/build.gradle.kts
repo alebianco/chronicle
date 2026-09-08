@@ -342,6 +342,7 @@ dependencies {
   testImplementation(libs.mockk)
   testImplementation(libs.hamcrest)
   testImplementation(libs.coroutines.test)
+  testImplementation(libs.turbine)
   testImplementation(libs.androidx.arch.core.testing)
 
   // Robolectric drives real SQLite in a JVM test, which lets the Room migration

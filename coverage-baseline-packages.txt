@@ -1,5 +1,5 @@
 io/github/mattpvaughn/chronicle/application 20.45
-io/github/mattpvaughn/chronicle/application/compose 60.08
+io/github/mattpvaughn/chronicle/application/compose 61.63
 io/github/mattpvaughn/chronicle/data 100.00
 io/github/mattpvaughn/chronicle/data/local 68.93
 io/github/mattpvaughn/chronicle/data/model 95.49

@@ -1,14 +1,12 @@
 package io.github.mattpvaughn.chronicle.features.player
 
+import app.cash.turbine.testIn
+import app.cash.turbine.turbineScope
 import io.github.mattpvaughn.chronicle.features.player.SleepTimer.SleepTimerAction
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.onSubscription
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -30,71 +28,48 @@ import org.junit.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SleepTimerBusTest {
-  /**
-   * Subscribes to [flow] and returns a live view of what it receives.
-   *
-   * Two traps here, both measured rather than guessed, and both of the "green for the wrong
-   * reason" kind this project keeps hitting.
-   *
-   * **1. Subscribe before emitting.** Both buses use `replay = 0`, so anything published before a
-   * collector exists is dropped. `onSubscription` makes the subscription a fact; without the await,
-   * three tests in this file failed outright and — far worse — the two "never arrives" assertions
-   * passed **vacuously** on an empty list. They would have stayed green with the feedback
-   * loop fully reinstated.
-   *
-   * **2. `advanceUntilIdle()` does not deliver.** A `backgroundScope` collector of a `SharedFlow`
-   * is not resumed by `advanceUntilIdle` — the emission sits in the buffer and the list stays
-   * empty. `yield()` does resume it. Measured directly: after `publish`, `advanceUntilIdle` left
-   * the list empty and the next `yield` produced the value. So [settle] is what tests call after
-   * emitting, never `advanceUntilIdle`.
-   *
-   * This is also why the buses expose `SharedFlow` rather than `Flow`: `onSubscription` is a
-   * `SharedFlow` extension, and testing a `replay = 0` channel honestly depends on it.
-   */
-  private suspend fun <T> TestScope.record(flow: SharedFlow<T>): List<T> {
-    val seen = mutableListOf<T>()
-    val subscribed = CompletableDeferred<Unit>()
-    backgroundScope.launch {
-      flow.onSubscription { subscribed.complete(Unit) }.collect { seen.add(it) }
-    }
-    subscribed.await()
-    return seen
-  }
-
-  /** Lets a `backgroundScope` collector run. See [record] — `advanceUntilIdle` will not do. */
-  private suspend fun settle() = yield()
-
   @Test
   fun `a published update never arrives on the command flow`() =
     runTest {
-      val bus = SleepTimerBus()
-      val commands = record(bus.commands)
+      turbineScope {
+        val bus = SleepTimerBus()
+        val commands = bus.commands.testIn(backgroundScope)
+        val updates = bus.updates.testIn(backgroundScope)
 
-      // What the timer does every second.
-      repeat(3) { bus.publish(SleepTimerUpdate(remainingMillis = 0L, isActive = true)) }
-      settle()
+        // What the timer does every second.
+        repeat(3) { bus.publish(SleepTimerUpdate(remainingMillis = 0L, isActive = true)) }
 
-      assertEquals(
-        "a tick reached the command flow — the feedback loop is back",
-        emptyList<SleepTimerCommand>(),
-        commands,
-      )
+        // Drain the ticks on the flow they *should* reach. `expectNoEvents` means "nothing has
+        // arrived **yet**", not "nothing ever will" — measured: it passes with an emission still
+        // pending behind a delay. So without this barrier the assertion below could pass merely by
+        // running before a leak rather than because there is none. Once all three updates have
+        // landed, any command the same `publish` calls might have leaked has had its chance.
+        //
+        // `replay = 1` on updates means the first `awaitItem` may return the replayed value, so
+        // this drains by count rather than asserting a specific one.
+        repeat(3) { updates.awaitItem() }
+
+        commands.expectNoEvents()
+      }
     }
 
   @Test
   fun `a command never arrives on the update flow`() =
     runTest {
-      val bus = SleepTimerBus()
-      val updates = record(bus.updates)
+      turbineScope {
+        val bus = SleepTimerBus()
+        val commands = bus.commands.testIn(backgroundScope)
+        val updates = bus.updates.testIn(backgroundScope)
 
-      bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
-      settle()
+        bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
 
-      assertEquals(
-        "a command reached the update flow, so the UI would render a request as a report",
-        emptyList<SleepTimerUpdate>(),
-        updates,
-      )
+        // The same barrier as above, in the other direction: await the command on its own flow
+        // first, so "no update arrived" is a statement about a delivery that has happened rather
+        // than one that has not been given the chance.
+        commands.awaitItem()
+
+        updates.expectNoEvents()
+      }
     }
 
   @Test
@@ -115,24 +90,27 @@ class SleepTimerBusTest {
   @Test
   fun `every real command is allowed through unchanged`() =
     runTest {
-      val bus = SleepTimerBus()
-      val real =
-        SleepTimerAction.entries.filter { it != SleepTimerAction.UPDATE }
+      turbineScope {
+        val bus = SleepTimerBus()
+        val real = SleepTimerAction.entries.filter { it != SleepTimerAction.UPDATE }
+        val commands = bus.commands.testIn(backgroundScope)
 
-      val commands = record(bus.commands)
+        real.forEach { bus.command(SleepTimerCommand(it, durationMillis = 60_000L)) }
 
-      real.forEach { bus.command(SleepTimerCommand(it, durationMillis = 60_000L)) }
-      settle()
-
-      assertEquals(
-        "the guard must block only UPDATE, not narrow the channel",
-        real,
-        commands.map { it.action },
-      )
-      assertTrue(
-        "the duration must survive the trip",
-        commands.all { it.durationMillis == 60_000L },
-      )
+        // `awaitItem` per action asserts the **order** as well as the contents, which the old
+        // list comparison did only incidentally.
+        val received = real.map { commands.awaitItem() }
+        assertEquals(
+          "the guard must block only UPDATE, not narrow the channel",
+          real,
+          received.map { it.action },
+        )
+        assertTrue(
+          "the duration must survive the trip",
+          received.all { it.durationMillis == 60_000L },
+        )
+        commands.expectNoEvents()
+      }
     }
 
   @Test
@@ -141,29 +119,36 @@ class SleepTimerBusTest {
       // The distinction the old channel carried in an extra and the UI used to infer wrongly: an
       // end-of-chapter timer is active with 0 remaining, so inferring `isActive` from the duration
       // showed it as off — the button unlit, the chooser offering durations instead of a cancel.
-      val bus = SleepTimerBus()
+      turbineScope {
+        val bus = SleepTimerBus()
+        val updates = bus.updates.testIn(backgroundScope)
 
-      val updates = record(bus.updates)
+        bus.publish(SleepTimerUpdate(remainingMillis = 0L, isActive = true))
 
-      bus.publish(SleepTimerUpdate(remainingMillis = 0L, isActive = true))
-      settle()
-
-      assertEquals(listOf(SleepTimerUpdate(0L, isActive = true)), updates)
+        assertEquals(SleepTimerUpdate(0L, isActive = true), updates.awaitItem())
+        // Kept for parity with the neighbouring tests: the old assertion compared a whole list, so
+        // dropping this would make the converted version strictly weaker than what it replaced.
+        updates.expectNoEvents()
+      }
     }
 
   @Test
   fun `two identical commands both arrive`() =
     runTest {
       // Why this is a SharedFlow and not a StateFlow: a second CANCEL must not be conflated away.
-      val bus = SleepTimerBus()
+      turbineScope {
+        val bus = SleepTimerBus()
+        val commands = bus.commands.testIn(backgroundScope)
 
-      val commands = record(bus.commands)
+        bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
+        bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
 
-      bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
-      bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
-      settle()
-
-      assertEquals(2, commands.size)
+        // Both, in order, and nothing else — the conflation this would suffer as a `StateFlow` is
+        // now asserted rather than inferred from a count.
+        assertEquals(SleepTimerAction.CANCEL, commands.awaitItem().action)
+        assertEquals(SleepTimerAction.CANCEL, commands.awaitItem().action)
+        commands.expectNoEvents()
+      }
     }
 
   @Test
@@ -171,17 +156,14 @@ class SleepTimerBusTest {
     runTest {
       // Commands are events. A screen returning to the foreground must not re-issue a CANCEL the
       // user pressed before it went away, which is what the receiver's unregister used to ensure.
-      val bus = SleepTimerBus()
-      bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
+      turbineScope {
+        val bus = SleepTimerBus()
+        bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
 
-      val commands = record(bus.commands)
-      settle()
+        val commands = bus.commands.testIn(backgroundScope)
 
-      assertEquals(
-        "a returning screen replayed a command",
-        emptyList<SleepTimerCommand>(),
-        commands,
-      )
+        commands.expectNoEvents()
+      }
     }
 
   @Test
@@ -192,17 +174,19 @@ class SleepTimerBusTest {
       // `None` for it every intervening second. A subscriber arriving in between — the sheet
       // re-expanded, or the activity recreated, which resets the ViewModel's active flag — would
       // otherwise receive nothing and draw an armed timer as off.
-      val bus = SleepTimerBus()
-      bus.publish(SleepTimerUpdate(remainingMillis = 0L, isActive = true))
+      turbineScope {
+        val bus = SleepTimerBus()
+        bus.publish(SleepTimerUpdate(remainingMillis = 0L, isActive = true))
 
-      val updates = record(bus.updates)
-      settle()
+        val updates = bus.updates.testIn(backgroundScope)
 
-      assertEquals(
-        "a late subscriber must inherit the armed state, not an empty screen",
-        listOf(SleepTimerUpdate(remainingMillis = 0L, isActive = true)),
-        updates,
-      )
+        assertEquals(
+          "a late subscriber must inherit the armed state, not an empty screen",
+          SleepTimerUpdate(remainingMillis = 0L, isActive = true),
+          updates.awaitItem(),
+        )
+        updates.expectNoEvents()
+      }
     }
 
   @Test
@@ -210,17 +194,107 @@ class SleepTimerBusTest {
     runTest {
       // Replay is 1, so a subscriber inherits where the timer *is*, not a burst of stale ticks —
       // the failure mode `launchWhenStarted` has and the reason `collectWhileStarted` exists.
-      val bus = SleepTimerBus()
-      (5 downTo 1).forEach {
-        bus.publish(SleepTimerUpdate(remainingMillis = it * 1000L, isActive = true))
+      turbineScope {
+        val bus = SleepTimerBus()
+        (5 downTo 1).forEach {
+          bus.publish(SleepTimerUpdate(remainingMillis = it * 1000L, isActive = true))
+        }
+
+        val updates = bus.updates.testIn(backgroundScope)
+
+        assertEquals(
+          SleepTimerUpdate(remainingMillis = 1000L, isActive = true),
+          updates.awaitItem(),
+        )
+        // The four stale ticks must **not** follow. The old assertion compared against a
+        // single-element list, which said the same thing only because the list happened to be
+        // complete when it was read; this states it.
+        updates.expectNoEvents()
+      }
+    }
+
+  /**
+   * **A command sent with no subscriber is silently dropped**, and `command` returns rather than
+   * suspending.
+   *
+   * This is the behaviour `SleepTimerBus.command`'s own KDoc describes — `emit` on a `replay = 0`
+   * `SharedFlow` with no subscriber discards the value and returns; it suspends only for a *slow*
+   * subscriber with a full buffer. It is parity with the `LocalBroadcastManager.sendBroadcast` this
+   * replaced, and it is safe today only because `MediaPlayerService.onCreate` subscribes before the
+   * sleep-timer chooser is reachable.
+   *
+   * It is pinned here because the KDoc names a live hazard: **a new entry point that could set a
+   * timer with the service down — Android Auto, a widget, a shortcut — would silently drop the
+   * command.** Nothing asserted the shape of that failure, so a later "fix" that made `command`
+   * suspend instead (a `subscriptionCount` guard, say) would deadlock those callers with no test
+   * objecting.
+   *
+   * **Run on a real dispatcher on purpose.** Under `runTest`'s `StandardTestDispatcher` this
+   * measures nothing: a sender parked on a `SharedFlow` is not resumed by `advanceUntilIdle` —
+   * trap 1 in `FlowTestExt` — so `sent` stays 0 whether the bus drops *or* blocks, and the
+   * assertion cannot fail. An earlier draft of this test made exactly that mistake and recorded
+   * "the first emit suspends" as a finding; it is false. Measured three ways: `StandardTestDispatcher`
+   * gives `sent = 0` with the job never completing, while `UnconfinedTestDispatcher` and a real
+   * dispatcher both give **`sent = 9`, completing immediately**.
+   */
+  @Test
+  fun `a command sent with no subscriber is dropped rather than blocking the caller`() {
+    val bus = SleepTimerBus()
+    var sent = 0
+
+    val finished =
+      runBlocking {
+        withTimeoutOrNull(TIMEOUT_MS) {
+          repeat(BUFFER_CAPACITY + 1) {
+            bus.command(SleepTimerCommand(SleepTimerAction.CANCEL))
+            sent++
+          }
+          true
+        }
       }
 
-      val updates = record(bus.updates)
-      settle()
+    assertEquals(
+      "every command must return rather than block a caller that has no service listening — " +
+        "making this suspend would deadlock Android Auto or a widget setting a timer cold",
+      BUFFER_CAPACITY + 1,
+      sent,
+    )
+    assertTrue("the sends must complete well inside $TIMEOUT_MS ms", finished == true)
+  }
 
-      assertEquals(
-        listOf(SleepTimerUpdate(remainingMillis = 1000L, isActive = true)),
-        updates,
-      )
+  /**
+   * And the counterpart: updates **do** drop rather than suspend, which is the opposite choice and
+   * equally deliberate.
+   *
+   * `publish` is called from a `Handler` on the main looper every second and is non-suspending for
+   * that reason — blocking there would jank playback. A dropped tick is invisible because the next
+   * one is a second away and carries the whole state rather than a delta, which is exactly why
+   * `_updates` can afford `DROP_OLDEST` where `_commands` cannot.
+   */
+  @Test
+  fun `publishing many updates with no subscriber neither suspends nor throws`() =
+    runTest {
+      val bus = SleepTimerBus()
+
+      repeat(100) { bus.publish(SleepTimerUpdate(remainingMillis = it * 1000L, isActive = true)) }
+
+      turbineScope {
+        val updates = bus.updates.testIn(backgroundScope)
+
+        // Only the latest survives, and `publish` never blocked the caller to achieve it.
+        assertEquals(
+          SleepTimerUpdate(remainingMillis = 99_000L, isActive = true),
+          updates.awaitItem(),
+        )
+        updates.expectNoEvents()
+      }
     }
+
+  private companion object {
+    /** `SleepTimerBus._commands`' `extraBufferCapacity`. Named so the two buffer tests say why 9. */
+    const val BUFFER_CAPACITY = 8
+
+    /** Generous: the sends should return instantly, so this only bounds a hang. */
+    const val TIMEOUT_MS = 3_000L
+  }
 }
