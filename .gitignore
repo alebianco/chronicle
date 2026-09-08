@@ -69,3 +69,13 @@ ChronicleAuth.xml
 Chronicle.xml
 chronicle_debug.xml
 .chronicle-session-backup/
+
+# Machine-local Gradle JDK pin: holds an absolute java.home path, so it cannot be shared.
+# Studio reads it via gradleJvm=#GRADLE_LOCAL_JAVA_HOME; the portable half of the pin is
+# .tool-versions, which is committed.
+gradle/config.properties
+
+# JVM crash dumps. PIT deliberately runs mutants that can kill a minion JVM, so a mutation run
+# can leave these behind; they are diagnostics for a crash that is expected, not build output.
+hs_err_pid*.log
+replay_pid*.log
