@@ -3,7 +3,6 @@ package io.github.mattpvaughn.chronicle.espresso
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
@@ -108,25 +107,29 @@ class LoggedInLaunchTest {
   }
 
   /**
-   * The Home tab, matched by **either** its content description or its visible label.
+   * The Home tab, matched by its content description.
    *
-   * Not a redundant `or`. `NavigationBarItem` is set `alwaysShowLabel = false`, so the *selected*
-   * tab renders a `Text` label that Compose merges into the item's semantics — and that merged text
-   * replaces the icon's `contentDescription`. Home is the launch destination, so it is always the
-   * selected one, and a content-description-only matcher finds `Library`, `Search` and `Settings`
-   * but never `Home`. Confirmed with a `uiautomator` dump: `content-desc` listed the other three
-   * while "Home" appeared only under `text`.
+   * This read `hasContentDescription("Home") or hasText("Home")`, and the `or` was a **workaround
+   * for a real accessibility defect** rather than tolerance for two spellings. With
+   * `alwaysShowLabel = false` the selected tab was the only one rendering a `Text` label, and
+   * `NavigationBarItem` merged that text over the icon's `contentDescription` — so Home, the launch
+   * destination and therefore always selected, was the one tab with no description at all. A
+   * description-only matcher found `Library` and `Settings` but never `Home`, which cost **six days
+   * of red CI**, diagnosed first as a missing login fixture and then as a race, before a
+   * `uiautomator` dump showed the node was simply absent.
    *
-   * That is an accessibility defect in its own right — see the task filed alongside this — and this
-   * matcher is deliberately tolerant of both spellings so fixing it there does not break the test
-   * here.
+   * The description now sits on the item rather than the icon, so every tab exposes one whether
+   * selected or not (`BottomBarSemanticsTest`, plus a `uiautomator` dump on the tablet showing all
+   * of Home, Library and Settings under `content-desc` on two different tabs). The `or hasText` arm
+   * is therefore **removed rather than kept**: leaving it would let the defect return silently,
+   * since the label is present exactly when the description used to be missing.
    *
    * `hasClickAction()` narrows it to the tab itself: "Home" also appears as a heading inside the
    * shelf, and without this the matcher found two nodes and failed on the ambiguity rather than on
    * anything real.
    */
   private val homeTab =
-    (hasContentDescription("Home") or hasText("Home")) and hasClickAction()
+    hasContentDescription("Home") and hasClickAction()
 
   private companion object {
     /**

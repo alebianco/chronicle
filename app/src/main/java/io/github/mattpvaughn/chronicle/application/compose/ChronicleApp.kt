@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -209,16 +211,34 @@ private fun ChronicleBottomBar(
     windowInsets = WindowInsets.navigationBars,
   ) {
     visibleTabs.forEach { tab ->
+      val label = stringResource(tab.labelRes)
       NavigationBarItem(
+        // The description is set on the **item**, not left to the icon inside it.
+        //
+        // `NavigationBarItem` merges its descendants' semantics, and with
+        // `alwaysShowLabel = false` the selected item is the only one that also renders a `Text`.
+        // That text won the merge and replaced the icon's `contentDescription`, so the selected
+        // tab — and only that one — exposed none at all: three tabs announced normally while the
+        // tab the user was actually on did not. It also broke `LoggedInLaunchTest` for six days
+        // once Home became the launch destination, diagnosed twice as something else before a
+        // `uiautomator` dump showed the node was simply absent.
+        //
+        // Setting it here puts one description on the merged node whether or not a label is
+        // rendered, which is the node a screen reader actually reads. Clearing the label's
+        // semantics instead was tried and does **not** work: it removes the label's text without
+        // promoting the icon's description, so the selected item stayed unlabelled.
+        modifier = Modifier.semantics { contentDescription = label },
         selected = currentRoute == tab.destination.route,
         onClick = { onTabSelected(tab.destination) },
         icon = {
           Icon(
             painter = painterResource(tab.iconRes),
-            contentDescription = stringResource(tab.labelRes),
+            // Null, not the label: the item above carries it, and a description on both would be
+            // read twice.
+            contentDescription = null,
           )
         },
-        label = { Text(stringResource(tab.labelRes)) },
+        label = { Text(label) },
         // `labelVisibilityMode="selected"` in the XML menu.
         alwaysShowLabel = false,
         colors =

@@ -60,6 +60,35 @@ That reframes the fix: it is about how AGP resolves a device's ABI at setup time
 image being unusual. It also means **the cache stays off** until this is understood — a 40 s download
 against a gate that does not run is not a saving.
 
+## api27 is also *flaky* once it does run — measured 2026-09-08
+
+Separate from the setup failure, and found while device-verifying cu-223. With the emulator image
+already installed locally, `:app:api27DebugAndroidTest` was run six times against code that differed
+only in a test matcher:
+
+| run | result |
+|---|---|
+| warm | 10/10 pass |
+| warm | 10/10 pass |
+| warm | 10/10 pass |
+| `--rerun-tasks` | **4 failures** |
+| `--rerun-tasks` | 10/10 pass |
+| `--rerun-tasks` | 10/10 pass |
+
+The failing set was not stable between failures — one run failed `AutoBrowseTreeTest` plus
+`LoggedInLaunchTest`, another a different pair — and it included Auto browse-tree assertions that
+the change under test could not reach. The two `LoggedInLaunchTest` failures were both
+`ComposeTimeoutException` after 30 s waiting for the login state to settle, which is the race
+`awaitHomeShelf` already documents at 2.4 s on a real device; api35 passed 10/10 every time.
+
+So the failures correlate with a **cold emulator start** rather than with any code. That matters for
+this task twice over: it is a second reason api27 cannot simply be switched back on in CI, where
+every run is cold by definition, and it is a caution against reading a single red api27 run as a
+real regression — that mistake was made once during this measurement before the six runs settled it.
+
+Worth checking whether the login-settle timeout is simply too short for a cold API 27 image before
+concluding anything about AGP.
+
 ## Why it matters
 
 The minSdk floor is not decoration. `api27` was chosen because *"a new API called without a version
