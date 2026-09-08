@@ -9,10 +9,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.mattpvaughn.chronicle.data.local.BookRepository
+import io.github.mattpvaughn.chronicle.data.local.DataStorePrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
-import io.github.mattpvaughn.chronicle.data.local.SharedPreferencesPrefsRepo
 import io.github.mattpvaughn.chronicle.data.local.TrackRepository
 import io.github.mattpvaughn.chronicle.data.sources.plex.APP_NAME
 import io.github.mattpvaughn.chronicle.data.sources.plex.CachedFileManager
@@ -40,7 +40,7 @@ import javax.inject.Singleton
 object RepositoryModule {
   @Provides
   @Singleton
-  fun providePrefsRepo(prefsImpl: SharedPreferencesPrefsRepo): PrefsRepo = prefsImpl
+  fun providePrefsRepo(prefsImpl: DataStorePrefsRepo): PrefsRepo = prefsImpl
 
   @Provides
   @Singleton

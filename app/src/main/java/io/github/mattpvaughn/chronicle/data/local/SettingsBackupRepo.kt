@@ -1,8 +1,11 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.ContentResolver
-import android.content.SharedPreferences
 import android.net.Uri
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.mattpvaughn.chronicle.data.ChronicleJson
 import io.github.mattpvaughn.chronicle.data.ChronicleJsonPretty
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
@@ -26,7 +29,7 @@ import javax.inject.Singleton
 class SettingsBackupRepo
   @Inject
   constructor(
-    private val sharedPreferences: SharedPreferences,
+    private val settings: SettingsDataStore,
     private val contentResolver: ContentResolver,
     private val dispatchers: DispatcherProvider,
     private val bookmarkRepository: IBookmarkRepository,
@@ -42,7 +45,7 @@ class SettingsBackupRepo
       withContext(dispatchers.io) {
         try {
           val backup =
-            exportSettings(sharedPreferences.all).copy(
+            exportSettings(settings.all()).copy(
               // Bookmarks are the user's own writing and the server holds no copy, so they are the
               // part of this file that actually cannot be re-derived (D8).
               bookmarks = bookmarkRepository.getAllAsync().map { it.toBackup() },
@@ -129,22 +132,23 @@ class SettingsBackupRepo
     /**
      * Writes the parsed settings in a single `commit()`.
      *
-     * `commit()` rather than `apply()`: the caller reports success to the user and the settings
-     * screen re-reads the preferences immediately afterwards, and `apply()`'s write is only
-     * guaranteed in memory — a deferred write that the reader beats is the async-write race that
-     * cost three separate bugs in the first session.
+     * `DataStore.edit` is a suspending transaction, which is the property `commit()` was chosen
+     * for: the caller reports success to the user and the settings screen re-reads immediately
+     * afterwards, so a write the reader can beat is the async-write race that cost three separate
+     * bugs in the first session. `edit` returns only once the write is durable *and* updates the
+     * snapshot, so the re-read cannot lose it.
      */
-    private fun applyParsed(parsed: Map<String, ParsedSetting>) {
-      val editor = sharedPreferences.edit()
-      parsed.forEach { (key, setting) ->
-        when (setting) {
-          is ParsedSetting.BooleanSetting -> editor.putBoolean(key, setting.value)
-          is ParsedSetting.LongSetting -> editor.putLong(key, setting.value)
-          is ParsedSetting.FloatSetting -> editor.putFloat(key, setting.value)
-          is ParsedSetting.StringSetting -> editor.putString(key, setting.value)
+    private suspend fun applyParsed(parsed: Map<String, ParsedSetting>) {
+      settings.edit { prefs ->
+        parsed.forEach { (key, setting) ->
+          when (setting) {
+            is ParsedSetting.BooleanSetting -> prefs[booleanPreferencesKey(key)] = setting.value
+            is ParsedSetting.LongSetting -> prefs[longPreferencesKey(key)] = setting.value
+            is ParsedSetting.FloatSetting -> prefs[floatPreferencesKey(key)] = setting.value
+            is ParsedSetting.StringSetting -> prefs[stringPreferencesKey(key)] = setting.value
+          }
         }
       }
-      editor.commit()
     }
 
     /** The outcome of writing a backup. */

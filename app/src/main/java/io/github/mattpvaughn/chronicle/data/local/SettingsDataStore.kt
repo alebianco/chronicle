@@ -99,11 +99,57 @@ class SettingsDataStore(
     key: Preferences.Key<T>,
     value: T,
   ) {
+    val previous = _snapshot.value[key]
     _snapshot.value = _snapshot.value.toMutablePreferences().apply { this[key] = value }
+    if (previous != value) notifyChanged(key.name)
     writeScope.launch {
       runCatching { dataStore.edit { it[key] = value } }
         .onFailure { Timber.e(it, "Could not persist ${key.name}") }
     }
+  }
+
+  /** Every stored setting, keyed by name — the shape `SharedPreferences.all` had. */
+  fun all(): Map<String, Any> = _snapshot.value.asMap().entries.associate { it.key.name to it.value }
+
+  /** True when [key] has ever been written. */
+  fun contains(key: String): Boolean = _snapshot.value.asMap().keys.any { it.name == key }
+
+  /** Removes every setting. Used by the "reset settings" path. */
+  fun clear() {
+    _snapshot.value = emptyPreferences()
+    writeScope.launch {
+      runCatching { dataStore.edit { it.clear() } }
+        .onFailure { Timber.e(it, "Could not clear the settings store") }
+    }
+  }
+
+  /**
+   * Change listeners, in the shape `PrefsRepo` already exposes.
+   *
+   * `PrefsRepo` types this as `SharedPreferences.OnSharedPreferenceChangeListener`, which leaks the
+   * old implementation into its own contract — worth retiring, but not in the same change as the
+   * storage swap, where a listener bug and a storage bug would be indistinguishable. So the
+   * listeners are driven from the snapshot instead: every write diffs the previous preferences
+   * against the new ones and notifies for each key that actually changed.
+   *
+   * The `null` SharedPreferences argument is safe because every call site ignores it and switches
+   * on the key alone — checked across all four before writing this.
+   */
+  private val changeListeners =
+    java.util.Collections.newSetFromMap(
+      java.util.concurrent.ConcurrentHashMap<SharedPreferences.OnSharedPreferenceChangeListener, Boolean>(),
+    )
+
+  fun addChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+    changeListeners.add(listener)
+  }
+
+  fun removeChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+    changeListeners.remove(listener)
+  }
+
+  private fun notifyChanged(key: String) {
+    changeListeners.forEach { runCatching { it.onSharedPreferenceChanged(null, key) } }
   }
 
   /** Applies several writes as one transaction, for the settings import path. */

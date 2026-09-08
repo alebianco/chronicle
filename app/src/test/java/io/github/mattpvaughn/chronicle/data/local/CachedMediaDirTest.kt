@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,8 +39,8 @@ class CachedMediaDirTest {
   private fun repo(
     name: String,
     externalDirs: List<File>,
-  ) = SharedPreferencesPrefsRepo(
-    sharedPreferences = prefs(name),
+  ) = DataStorePrefsRepo(
+    settings = testSettingsDataStore(name),
     appContext = context,
     externalDeviceDirs = externalDirs,
   )
@@ -63,12 +64,21 @@ class CachedMediaDirTest {
   @Test
   fun `a stored location survives its volume disappearing from the device list`() {
     val sdCard = File("/storage/1234-5678/Android/data/files")
-    val repo = repo("unmounted", listOf(File("/storage/emulated/0/Android/data")))
+    // One store, read by both instances: the second stands for a relaunch after the card was
+    // pulled, so it must see what the first persisted. A second `testSettingsDataStore` call
+    // would create a fresh temp file and quietly test nothing.
+    val store = testSettingsDataStore("unmounted")
+    val repo =
+      DataStorePrefsRepo(
+        settings = store,
+        appContext = context,
+        externalDeviceDirs = listOf(File("/storage/emulated/0/Android/data")),
+      )
     repo.cachedMediaDir = sdCard
 
     val afterUnmount =
-      SharedPreferencesPrefsRepo(
-        sharedPreferences = context.getSharedPreferences("unmounted", Context.MODE_PRIVATE),
+      DataStorePrefsRepo(
+        settings = store,
         appContext = context,
         // The card is no longer enumerated.
         externalDeviceDirs = listOf(File("/storage/emulated/0/Android/data")),
@@ -93,14 +103,16 @@ class CachedMediaDirTest {
   fun `the first-run choice is persisted so later reordering cannot move it`() {
     val first = File("/storage/emulated/0/Android/data/files")
     val second = File("/storage/1234-5678/Android/data/files")
-    val sharedPrefs = prefs("persisted")
+    // One store shared by both instances: the point is that the *persisted* choice survives a
+    // change in volume ordering, so they must read the same settings.
+    val shared = testSettingsDataStore("persisted")
 
     val initial =
-      SharedPreferencesPrefsRepo(sharedPrefs, listOf(first, second), context).cachedMediaDir
+      DataStorePrefsRepo(shared, listOf(first, second), context).cachedMediaDir
 
     // The platform now enumerates the volumes the other way round.
     val reordered =
-      SharedPreferencesPrefsRepo(sharedPrefs, listOf(second, first), context).cachedMediaDir
+      DataStorePrefsRepo(shared, listOf(second, first), context).cachedMediaDir
 
     assertEquals(first.absolutePath, initial.absolutePath)
     assertEquals(

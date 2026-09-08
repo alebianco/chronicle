@@ -15,8 +15,10 @@ import dagger.hilt.components.SingletonComponent
 import de.jensklingenberg.ktorfit.Ktorfit
 import io.github.mattpvaughn.chronicle.application.LOG_NETWORK_REQUESTS
 import io.github.mattpvaughn.chronicle.data.local.*
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
+import io.github.mattpvaughn.chronicle.data.sources.plex.APP_NAME
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingSingleton
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService
@@ -106,6 +108,25 @@ object AppModule {
   @Provides
   @Singleton
   fun provideFileSystem(): FileSystem = FileSystem.SYSTEM
+
+  /**
+   * The settings store.
+   *
+   * `SharedPreferencesMigration` moves the existing `Chronicle.xml` across on first read and
+   * deletes it afterwards, so an upgrading user keeps every setting. The file name is reused so the
+   * on-disk identity stays recognisable.
+   *
+   * Deliberately **not** the credentials store: those stay in `ChronicleAuth.xml`, which the Auto
+   * Backup rules exclude by `domain="sharedpref"` and filename. DataStore writes under
+   * `files/datastore/`, a different domain, so moving them would silently stop those rules
+   * matching — `BackupRulesTest` now fails if anyone tries.
+   */
+  @Provides
+  @Singleton
+  fun provideSettingsDataStore(
+    @ApplicationContext context: Context,
+    @ApplicationScope scope: CoroutineScope,
+  ): SettingsDataStore = SettingsDataStore.create(context, scope, APP_NAME)
 
   /**
    * The credentials file, separate from settings.

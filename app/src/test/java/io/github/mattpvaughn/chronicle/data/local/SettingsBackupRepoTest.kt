@@ -1,12 +1,19 @@
 package io.github.mattpvaughn.chronicle.data.local
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.core.net.toUri
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -30,21 +37,29 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 class SettingsBackupRepoTest {
   private lateinit var context: Context
-  private lateinit var prefs: SharedPreferences
   private lateinit var repo: SettingsBackupRepo
+  private lateinit var settings: SettingsDataStore
+  private lateinit var settingsScope: CoroutineScope
   private lateinit var backupFile: File
   private lateinit var bookmarks: FakeBookmarkRepository
 
   @Before
   fun setUp() {
     context = ApplicationProvider.getApplicationContext()
-    prefs = context.getSharedPreferences("SettingsBackupRepoTest", Context.MODE_PRIVATE)
-    prefs.edit().clear().commit()
+    // A real DataStore over a temp file, not a fake: the round-trip is the thing under test, and
+    // the transactional write is the property the import path depends on.
+    settingsScope = CoroutineScope(Job() + UnconfinedTestDispatcher())
+    val storeFile = File.createTempFile("settings", ".preferences_pb").apply { delete() }
+    settings =
+      SettingsDataStore(
+        PreferenceDataStoreFactory.create(scope = settingsScope) { storeFile },
+        settingsScope,
+      )
     backupFile = File.createTempFile("chronicle-backup", ".json")
     bookmarks = FakeBookmarkRepository()
     repo =
       SettingsBackupRepo(
-        sharedPreferences = prefs,
+        settings = settings,
         contentResolver = context.contentResolver,
         dispatchers = TestDispatcherProvider(),
         bookmarkRepository = bookmarks,
@@ -98,21 +113,19 @@ class SettingsBackupRepoTest {
 
   /** The non-default values used across the round-trip tests, one per stored type. */
   private fun writeNonDefaultSettings() {
-    prefs.edit()
-      .putString(PrefsRepo.KEY_BOOK_COVER_STYLE, PrefsRepo.BOOK_COVER_STYLE_RECT)
-      .putBoolean(PrefsRepo.KEY_SKIP_SILENCE, true)
-      .putBoolean(PrefsRepo.KEY_HIDE_PLAYED_AUDIOBOOKS, true)
-      .putLong(PrefsRepo.KEY_JUMP_FORWARD_SECONDS, 45L)
-      .putLong(PrefsRepo.KEY_REFRESH_RATE, 120L)
-      .putFloat(PrefsRepo.KEY_PLAYBACK_SPEED, 1.75f)
-      .commit()
+    settings.set(stringPreferencesKey(PrefsRepo.KEY_BOOK_COVER_STYLE), PrefsRepo.BOOK_COVER_STYLE_RECT)
+    settings.set(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), true)
+    settings.set(booleanPreferencesKey(PrefsRepo.KEY_HIDE_PLAYED_AUDIOBOOKS), true)
+    settings.set(longPreferencesKey(PrefsRepo.KEY_JUMP_FORWARD_SECONDS), 45L)
+    settings.set(longPreferencesKey(PrefsRepo.KEY_REFRESH_RATE), 120L)
+    settings.set(floatPreferencesKey(PrefsRepo.KEY_PLAYBACK_SPEED), 1.75f)
   }
 
   @Test
   fun `a wipe and restore round trip restores every setting`() =
     runTest {
       writeNonDefaultSettings()
-      val before = prefs.all.filterKeys { it in BACKUP_SETTING_KEYS }
+      val before = settings.all().filterKeys { it in BACKUP_SETTING_KEYS }
       assertTrue("the fixture must actually set something", before.isNotEmpty())
 
       val export = repo.exportTo(backupFile.toUri())
@@ -122,8 +135,8 @@ class SettingsBackupRepoTest {
       )
 
       // The wipe: exactly what a reinstall looks like from the prefs' point of view.
-      prefs.edit().clear().commit()
-      assertTrue(prefs.all.filterKeys { it in BACKUP_SETTING_KEYS }.isEmpty())
+      settings.clear()
+      assertTrue(settings.all().filterKeys { it in BACKUP_SETTING_KEYS }.isEmpty())
 
       val import = repo.importFrom(backupFile.toUri())
       assertEquals(
@@ -133,7 +146,7 @@ class SettingsBackupRepoTest {
 
       // Compared key by key, and with types: a Long that came back as a String would
       // satisfy a `toString()` comparison but crash the first `getLong` on it.
-      assertEquals(before, prefs.all.filterKeys { it in BACKUP_SETTING_KEYS })
+      assertEquals(before, settings.all().filterKeys { it in BACKUP_SETTING_KEYS })
     }
 
   @Test
@@ -141,19 +154,19 @@ class SettingsBackupRepoTest {
     runTest {
       writeNonDefaultSettings()
       repo.exportTo(backupFile.toUri())
-      prefs.edit().clear().commit()
+      settings.clear()
       repo.importFrom(backupFile.toUri())
 
       // The real reason the round trip stores types rather than strings: these are the calls
       // PrefsRepo makes, and each throws a ClassCastException on a wrongly-typed entry.
       assertEquals(
         PrefsRepo.BOOK_COVER_STYLE_RECT,
-        prefs.getString(PrefsRepo.KEY_BOOK_COVER_STYLE, ""),
+        settings.get(stringPreferencesKey(PrefsRepo.KEY_BOOK_COVER_STYLE), ""),
       )
-      assertEquals(true, prefs.getBoolean(PrefsRepo.KEY_SKIP_SILENCE, false))
-      assertEquals(45L, prefs.getLong(PrefsRepo.KEY_JUMP_FORWARD_SECONDS, 0L))
-      assertEquals(120L, prefs.getLong(PrefsRepo.KEY_REFRESH_RATE, 0L))
-      assertEquals(1.75f, prefs.getFloat(PrefsRepo.KEY_PLAYBACK_SPEED, 0f), 0.0001f)
+      assertEquals(true, settings.get(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), false))
+      assertEquals(45L, settings.get(longPreferencesKey(PrefsRepo.KEY_JUMP_FORWARD_SECONDS), 0L))
+      assertEquals(120L, settings.get(longPreferencesKey(PrefsRepo.KEY_REFRESH_RATE), 0L))
+      assertEquals(1.75f, settings.get(floatPreferencesKey(PrefsRepo.KEY_PLAYBACK_SPEED), 0f), 0.0001f)
     }
 
   @Test
@@ -161,12 +174,10 @@ class SettingsBackupRepoTest {
     runTest {
       // The security property, asserted against the bytes on disk rather than against the
       // exporter's return value — this is the artifact the user syncs to a cloud folder.
-      prefs.edit()
-        .putString("auth_token", "plex-account-token")
-        .putString("server_token", "plex-server-token")
-        .putString("user", """{"authToken":"nested-token"}""")
-        .putBoolean(PrefsRepo.KEY_SKIP_SILENCE, true)
-        .commit()
+      settings.set(stringPreferencesKey("auth_token"), "plex-account-token")
+      settings.set(stringPreferencesKey("server_token"), "plex-server-token")
+      settings.set(stringPreferencesKey("user"), """{"authToken":"nested-token"}""")
+      settings.set(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), true)
 
       repo.exportTo(backupFile.toUri())
 
@@ -193,7 +204,7 @@ class SettingsBackupRepoTest {
   @Test
   fun `a file from a newer schema is refused and changes nothing`() =
     runTest {
-      prefs.edit().putBoolean(PrefsRepo.KEY_SKIP_SILENCE, false).commit()
+      settings.set(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), false)
       backupFile.writeText(
         """{"version":${BACKUP_SCHEMA_VERSION + 1},"settings":{"key_skip_silence":"true"}}""",
       )
@@ -207,7 +218,7 @@ class SettingsBackupRepoTest {
       assertEquals(
         "a refused file must not half-apply",
         false,
-        prefs.getBoolean(PrefsRepo.KEY_SKIP_SILENCE, false),
+        settings.get(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), false),
       )
     }
 
@@ -293,11 +304,11 @@ class SettingsBackupRepoTest {
         SettingsBackupRepo.ImportResult.Applied(applied = 1, skipped = 1),
         result,
       )
-      assertEquals(true, prefs.getBoolean(PrefsRepo.KEY_SKIP_SILENCE, false))
+      assertEquals(true, settings.get(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), false))
       assertEquals(
         "the malformed key must keep its previous (absent) value",
         0L,
-        prefs.getLong(PrefsRepo.KEY_JUMP_FORWARD_SECONDS, 0L),
+        settings.get(longPreferencesKey(PrefsRepo.KEY_JUMP_FORWARD_SECONDS), 0L),
       )
     }
 
@@ -327,11 +338,11 @@ class SettingsBackupRepoTest {
         SettingsBackupRepo.ImportResult.Applied(applied = 1, skipped = 1),
         result,
       )
-      assertEquals(true, prefs.getBoolean(PrefsRepo.KEY_SKIP_SILENCE, false))
+      assertEquals(true, settings.get(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), false))
       assertEquals(
         "an unknown view style must never reach preferences",
         null,
-        prefs.getString(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, null),
+        settings.all()[PrefsRepo.KEY_LIBRARY_VIEW_STYLE] as String?,
       )
     }
 
@@ -355,7 +366,7 @@ class SettingsBackupRepoTest {
       )
       assertEquals(
         PrefsRepo.VIEW_STYLE_TEXT_LIST,
-        prefs.getString(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, null),
+        settings.all()[PrefsRepo.KEY_LIBRARY_VIEW_STYLE] as String?,
       )
     }
 
@@ -365,7 +376,7 @@ class SettingsBackupRepoTest {
       // "wt" truncation: without it, overwriting a longer file leaves the old tail behind
       // and the result is valid JSON followed by junk.
       backupFile.writeText("x".repeat(8000))
-      prefs.edit().putBoolean(PrefsRepo.KEY_SKIP_SILENCE, true).commit()
+      settings.set(booleanPreferencesKey(PrefsRepo.KEY_SKIP_SILENCE), true)
 
       repo.exportTo(backupFile.toUri())
 
