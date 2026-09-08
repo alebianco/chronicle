@@ -1,15 +1,15 @@
 ---
 id: cu-227
 title: "Delete the dead styles, then decide whether colors.xml can ever be retired"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 updated_date: '2026-09-08'
 labels:
-  - R3
+  - R2
   - debt
   - ui
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: low
 ---
@@ -76,14 +76,22 @@ actually ship.
 
 ## Acceptance Criteria
 
-**Half one**
+**Half one — done 2026-09-08**
 
-- [ ] Every style with zero references deleted, and the `values-land/` pair with them
-- [ ] Whether the three `res/color` selectors and `FilterChip`/`FilterChipGroup` are genuinely dead
-      is **established rather than assumed** — they are theme-inherited, not call-site referenced
-- [ ] `./verify.sh` green, and the app **launched on a device** — a missing theme attribute is a
-      runtime failure, not a compile one
-- [ ] Both orientations screenshotted if anything visible changed; say plainly if nothing did
+- [x] Every style with zero references deleted, and the `values-land/` pair with them —
+      `styles.xml` goes from **15 styles to 1**
+- [x] Whether the three `res/color` selectors and `FilterChip`/`FilterChipGroup` are genuinely dead
+      is **established rather than assumed** — established, and they are dead; see below
+- [x] `./verify.sh` green
+- [x] The app **launched on a device** — installed 2026-09-08 on the tablet (versionName
+      `0.55.0-debug`, `lastUpdateTime` matching the install), launched, `topResumedActivity`
+      confirmed, and logcat clean: no `Resources$NotFoundException`, no `InflateException`, no
+      fatal. The window theme resolves with `chipStyle`/`chipGroupStyle` gone
+- [x] Both orientations screenshotted — home in portrait and landscape, settings and a pushed
+      sub-screen in landscape. **Nothing visible changed**, which is the expected result: the
+      accent cyan, section headers, the text-input outline and the monospace list all render as
+      before, including on the screen whose `material_text_input_layout_outline` selector was
+      deleted
 
 **Half two**
 
@@ -101,3 +109,36 @@ Draft-209 was written expecting a deletion and found a constraint instead. Promo
 "this cannot be retired, here is why" is a **successful** result under cu-194's rule — the same
 standard that made cu-220's decline a valid outcome. What would be wrong is leaving the retirement
 list implying work that nobody can do.
+
+## Half one result (2026-09-08)
+
+**`styles.xml` went from 15 styles to 1.** Only `AppTheme` survives, and its own comment now records
+why it cannot go: `MainActivity` is an `AppCompatActivity` and `AndroidManifest.xml` names the theme
+for the window background before any composable exists.
+
+**The chip chain was deader than the draft thought, and that was worth checking rather than
+assuming.** `FilterChip` showed 6 external references — but every one is
+`androidx.compose.material3.FilterChip`, a different widget that takes no theme attribute from XML.
+So `AppTheme`'s `chipStyle` / `chipGroupStyle`, the `FilterChip` / `FilterChipGroup` styles and all
+three `res/color` selectors went together. `views/ChipGroupExt.kt` went with them — a Material
+`ChipGroup` extension with **zero callers**, left behind by the Compose migration.
+
+**One style the draft's audit missed:** `TextAppearance.Subtitle.Settings`. Its only reference is a
+*comment* in `SettingsScreen.kt` recording that the View style uppercased the text — the comment is
+kept, the style is gone.
+
+Both `values-land/` files went, and with them the two now-orphaned base entries in `values/dimens.xml`
+and `values/integers.xml`. `res/values-land/` and `res/color/` are both empty and no longer exist.
+
+**`FrameworkFreeCoreTest` caught the `ChipGroupExt.kt` deletion**, and correctly — its list is
+committed rather than computed precisely so that a file leaving is visible in a diff and carries a
+reason, and it asserts on *missing* files as well as impure ones. The entry was removed with a
+comment saying it was deleted rather than demoted. A guard behaving exactly as designed, and a
+useful reminder that "delete a dead file" is not always a free action here.
+
+**Release APK: 7,363,728 → 7,309,165 bytes, −54,563.** A real saving, unlike the dependency removal
+in cu-228 which was byte-for-byte identical.
+
+**Half two — the palette question — is untouched and still open.** Nothing here changed `colors.xml`,
+`ChronicleColors` or `ChronicleThemeTest`. The window-theme constraint that makes the answer probably
+"decline" is now written into `styles.xml` itself, where the next reader will find it.

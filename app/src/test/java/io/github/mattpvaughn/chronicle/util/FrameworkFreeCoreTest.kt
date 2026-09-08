@@ -179,7 +179,9 @@ class FrameworkFreeCoreTest {
         "util/FlowCombinators.kt",
         "util/LifecycleExt.kt",
         "util/ListIdentity.kt",
-        "views/ChipGroupExt.kt",
+        // `views/ChipGroupExt.kt` was here until 2026-09-08. Deleted, not demoted: it
+        // extended a Material `ChipGroup` and had zero callers once the last XML layout
+        // went, so it left with the chip styles.
         "views/SpeedChooserState.kt",
       )
   }

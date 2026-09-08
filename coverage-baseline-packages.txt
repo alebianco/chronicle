@@ -38,5 +38,5 @@ io/github/mattpvaughn/chronicle/navigation/compose 0.00
 io/github/mattpvaughn/chronicle/ui/theme 85.14
 io/github/mattpvaughn/chronicle/util 73.15
 io/github/mattpvaughn/chronicle/util/compose 0.00
-io/github/mattpvaughn/chronicle/views 65.69
+io/github/mattpvaughn/chronicle/views 70.69
 io/github/mattpvaughn/chronicle/views/compose 85.77

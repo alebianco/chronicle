@@ -1,107 +1,23 @@
 <resources>
 
-    <!-- Base application theme. -->
+    <!--
+      The window theme, and the only style left in this file.
+
+      It is still required, and is not migration residue: `MainActivity` remains an
+      `AppCompatActivity` (theming, day/night, and `ComposeView` needs a host), and
+      `AndroidManifest.xml` names this theme for the window background and system bars before any
+      composable exists. That is why `colors.xml` cannot be retired while this stands.
+
+      Everything else that used to live here styled View-system widgets and went with the last XML
+      layout. `chipStyle` / `chipGroupStyle` went with them: the only `FilterChip` left in the tree
+      is `androidx.compose.material3.FilterChip`, which is a different widget entirely and takes no
+      theme attribute from here.
+    -->
     <style name="AppTheme" parent="Theme.MaterialComponents.NoActionBar">
-        <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
         <item name="android:fontFamily">@font/lato</item>
-        <item name="chipStyle">@style/FilterChip</item>
-        <item name="chipGroupStyle">@style/FilterChipGroup</item>
-    </style>
-
-    <style name="TextAppearance.Title" parent="TextAppearance.MaterialComponents.Body1">
-        <item name="android:textAllCaps">true</item>
-        <item name="android:textColor">@color/textPrimary</item>
-        <item name="fontFamily">@font/lato_bold</item>
-    </style>
-
-    <style name="TextAppearance.Body1" parent="TextAppearance.MaterialComponents.Body1">
-        <item name="android:textColor">@color/textPrimary</item>
-        <item name="android:fontFamily">@font/lato_bold</item>
-    </style>
-
-    <style name="TextAppearance.Body2" parent="TextAppearance.MaterialComponents.Body2">
-        <item name="android:textColor">@color/textSecondary</item>
-        <item name="android:fontFamily">@font/lato_bold</item>
-    </style>
-
-    <style name="TextAppearance.Button" parent="Widget.AppCompat.Button">
-        <item name="android:textColor">@color/textPrimary</item>
-    </style>
-
-    <style name="FilterChipGroup" parent="Widget.MaterialComponents.ChipGroup">
-        <item name="chipGroupStyle">@style/FilterChip</item>
-        <item name="singleSelection">true</item>
-        <item name="selectionRequired">true</item>
-        <item name="chipSpacingHorizontal">@dimen/margin_small</item>
-        <item name="chipSpacingVertical">@dimen/margin_small</item>
-    </style>
-
-    <style name="FilterChip" parent="Widget.MaterialComponents.Chip.Choice">
-        <item name="chipStartPadding">@dimen/margin_small</item>
-        <item name="chipEndPadding">@dimen/margin_small</item>
-        <item name="chipBackgroundColor">@color/chip_background_color</item>
-        <item name="chipIconEnabled">false</item>
-        <item name="android:textColor">@color/textPrimary</item>
-        <item name="chipMinHeight">36dp</item>
-        <item name="android:textSize">16sp</item>
-    </style>
-
-    <style name="TextAppearance.SectionHeader" parent="TextAppearance.MaterialComponents.Subtitle1">
-        <item name="android:textAllCaps">true</item>
-        <item name="android:textColor">@color/textSecondary</item>
-    </style>
-
-    <style name="TextAppearance.Subtitle.Settings" parent="TextAppearance.MaterialComponents.Subtitle2">
-        <item name="android:textColor">@color/colorAccent</item>
-        <item name="fontFamily">@font/lato_bold</item>
-        <item name="android:textAllCaps">true</item>
-    </style>
-
-    <style name="TextAppearance.RoundedRectInput" parent="Widget.AppCompat.EditText">
-        <item name="android:paddingLeft">@dimen/rounded_input_padding_horizontal</item>
-        <item name="android:paddingRight">@dimen/rounded_input_padding_horizontal</item>
-        <item name="android:paddingTop">@dimen/rounded_input_padding_vertical</item>
-        <item name="android:paddingBottom">@dimen/rounded_input_padding_vertical</item>
-        <item name="android:background">@drawable/rounded_rect_form</item>
-        <item name="android:minEms">15</item>
-    </style>
-
-    <style name="TextAppearance.SleepTimerCountdown" parent="TextAppearance.Title">
-        <item name="android:textSize">32sp</item>
-    </style>
-
-    <style name="ToolbarTheme" parent="ThemeOverlay.AppCompat.Dark.ActionBar">
-        <item name="background">@color/colorPrimary</item>
-        <item name="android:background">@color/colorPrimary</item>
-        <item name="fontWeight">400</item>
-        <item name="fontFamily">@font/lato</item>
-    </style>
-
-    <!-- Progress Slider -->
-    <style name="ProgressSliderTooltip" parent="Widget.MaterialComponents.Tooltip">
-        <item name="backgroundTint">@color/colorAccent</item>
-        <item name="android:textAppearance">@style/ProgressSliderTextAppearance</item>
-
-        <item name="android:background">@color/colorAccent</item>
-        <item name="fontWeight">400</item>
-        <item name="fontFamily">@font/lato</item>
-        <item name="android:textColor">@android:color/white</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-    </style>
-
-    <style name="ProgressSliderTextAppearance" parent="@style/TextAppearance.MaterialComponents.Tooltip">
-        <item name="android:textColor">@android:color/white</item>
-        <item name="fontFamily">@font/lato</item>
-        <item name="fontWeight">600</item>
-    </style>
-
-    <!-- Bottom Navigation -->
-    <style name="Widget.BottomNavigationView" parent="Widget.Design.BottomNavigationView">
-        <item name="fontFamily">@font/lato_bold</item>
-        <item name="android:minHeight">0dp</item> // Fix for BottomNavigationView label above icon → https://stackoverflow.com/questions/70773346/bottomnavigationview-shows-label-over-icon
     </style>
 
 </resources>

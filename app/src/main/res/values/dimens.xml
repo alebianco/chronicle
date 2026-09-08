@@ -65,7 +65,6 @@
 
     <!--  Currently playing screen -->
     <dimen name="currently_playing_artwork_max_size">302dp</dimen>
-    <dimen name="currently_playing_seekbar_margin_top">16dp</dimen>
 
     <!-- Device dependent -->
     <dimen name="screen_horizontal_padding">16dp</dimen>
