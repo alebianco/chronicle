@@ -97,6 +97,7 @@ fun ChronicleApp(
   miniPlayer: @Composable () -> Unit,
   expandedPlayer: @Composable () -> Unit,
   navHost: @Composable (Modifier) -> Unit,
+  accountNotice: @Composable () -> Unit = {},
 ) {
   Surface(modifier = Modifier.fillMaxSize(), color = ChronicleColors.Primary) {
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -162,6 +163,29 @@ fun ChronicleApp(
           onTabSelected = onTabSelected,
           modifier = Modifier.align(Alignment.BottomCenter),
         )
+      }
+
+      // The standing account notice, hosted *here* rather than beside this shell, and anchored to
+      // the bottom rather than the top.
+      //
+      // It used to be a sibling composable placed after `ChronicleApp` with no layout between
+      // them, so its `SnackbarHost` painted at the same top-start origin as `ChronicleScaffold`'s
+      // `TopAppBar` — covering it completely. Every pushed sub-screen lost its title *and its back
+      // arrow*, leaving the system back gesture as the only way out. The semantics tree was
+      // correct and only the pixels were wrong, so no Compose test could see it; it was found by
+      // screenshotting the licences screen.
+      //
+      // Bottom is also where Material puts a Snackbar. It clears the nav bar and the collapsed
+      // mini player by the same measurements those use, so it covers neither.
+      Box(
+        modifier =
+          Modifier
+            .align(Alignment.BottomCenter)
+            .padding(
+              bottom = navBarTotalHeight + if (sheetState == HIDDEN) 0.dp else MiniPlayerHeight,
+            ),
+      ) {
+        accountNotice()
       }
     }
   }

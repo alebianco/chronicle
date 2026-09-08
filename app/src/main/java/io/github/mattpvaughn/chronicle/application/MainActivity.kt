@@ -198,9 +198,13 @@ class MainActivity : AppCompatActivity() {
               modifier = navModifier,
             )
           },
+          // Passed as a slot rather than placed beside `ChronicleApp`: only the shell knows where
+          // the nav bar and mini player sit, and as a sibling this drew over every sub-screen's
+          // toolbar.
+          accountNotice = {
+            AccountRevokedNotice { controller.navigate(Destination.Settings.ROUTE) }
+          },
         )
-
-        AccountRevokedNotice { controller.navigate(Destination.Settings.ROUTE) }
       }
     }
 

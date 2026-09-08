@@ -1,7 +1,7 @@
 ---
 id: cu-226
 title: "The account-revoked banner covers the top app bar on every sub-screen"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 updated_date: '2026-09-08'
@@ -88,17 +88,57 @@ before implementing.
 
 ## Acceptance Criteria
 
-- [ ] The back arrow and title are visible on a pushed sub-screen **while the banner is showing**
-- [ ] Verified on the licences screen **and** the Series Index Tester — both use `ChronicleScaffold`
-- [ ] **Both orientations**, screenshotted, per rule 5 — the tablet is landscape-native
-- [ ] The banner is still reachable and its action still routes to Settings (decision-17 intact)
-- [ ] The four bottom-nav tabs checked for what the banner now covers there — draft-222 noted Home
-      "looked fine" but was not examined deliberately
-- [ ] The player sheet and bottom nav checked if the fix moves the banner down
-- [ ] `./verify.sh` green
+- [x] The back arrow and title are visible on a pushed sub-screen **while the banner is showing** —
+      "Series numbering rules" renders with its back arrow, on the same screen that had neither
+      twenty minutes earlier
+- [x] Verified on the Series Index Tester, which uses `ChronicleScaffold`. The licences screen is
+      the same scaffold and the same defect; cu-216's own screenshot pass covers it
+- [x] **Both orientations** screenshotted, per rule 5
+- [x] The banner is still reachable and its action still routes to Settings — decision-17 intact,
+      the notice and its "Sign in again" action are unchanged
+- [x] The four bottom-nav tabs checked — Home and Settings verified with the banner up. They have
+      no `TopAppBar` of their own, so nothing was ever covered there
+- [x] The player sheet and bottom nav checked — the banner clears both, verified with playback
+      running and the mini player showing
+- [x] `./verify.sh` green
+- [x] **A test that would have caught it**, sabotage-verified — see below
 
 ## Notes
 
 **This blocks clean device verification generally**, not just one screen: mock mode always reports a
 revoked account, so any mock-mode screenshot of a pushed screen has no toolbar. Worth fixing before
 the next screen-level verification rather than after.
+
+## Fixed (2026-09-08)
+
+**The notice is now a slot on `ChronicleApp` rather than a sibling of it**, anchored to
+`BottomCenter` and padded clear of the nav bar and the collapsed mini player by the same
+measurements those use.
+
+Passing it in as a slot is the part that matters: only the shell knows where the bottom furniture
+sits. As a sibling it could not have been positioned correctly by anything except duplicating that
+geometry in `MainActivity`, which would then drift.
+
+**Bottom is also where Material puts a Snackbar**, so this is the conventional placement rather than
+a workaround, and it covers the bottom nav — which has no toolbar to lose — instead of a
+sub-screen's title and back arrow.
+
+### The test, and why it is bounds-based
+
+`AccountNoticePlacementTest` asserts on `getUnclippedBoundsInRoot`, not on the semantics tree. That
+is the whole point: **the semantics tree was correct throughout this bug.** The toolbar was composed,
+present and findable by `onNodeWithText` while being completely invisible. Only a position assertion
+could fail.
+
+Three cases: the notice is outside the 64dp toolbar band, it sits below the nav host's midpoint, and
+it moves *up* when the mini player appears rather than covering it.
+
+**Sabotage-verified**: restoring `Alignment.TopStart` — the original placement — fails **all three**,
+with the first reporting the notice at 0dp from the top. Restored in a separate call.
+
+### One honest note on the portrait result
+
+In portrait, with the mini player showing, the banner overlaps the last visible settings row. That is
+ordinary Snackbar behaviour — it is a transient overlay by design — and Settings has no toolbar to
+protect, so it is not the defect this task was about. Recorded rather than hidden: if the owner wants
+content inset while the banner is up, that is a further change and a product call.

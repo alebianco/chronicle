@@ -1,5 +1,5 @@
 io/github/mattpvaughn/chronicle/application 20.45
-io/github/mattpvaughn/chronicle/application/compose 0.00
+io/github/mattpvaughn/chronicle/application/compose 60.03
 io/github/mattpvaughn/chronicle/data 100.00
 io/github/mattpvaughn/chronicle/data/local 68.93
 io/github/mattpvaughn/chronicle/data/model 95.49
@@ -16,7 +16,7 @@ io/github/mattpvaughn/chronicle/features/browse/compose 49.08
 io/github/mattpvaughn/chronicle/features/collections 75.12
 io/github/mattpvaughn/chronicle/features/collections/compose 45.26
 io/github/mattpvaughn/chronicle/features/currentlyplaying 39.89
-io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 55.38
+io/github/mattpvaughn/chronicle/features/currentlyplaying/compose 55.42
 io/github/mattpvaughn/chronicle/features/download 43.29
 io/github/mattpvaughn/chronicle/features/home 54.51
 io/github/mattpvaughn/chronicle/features/home/compose 36.15
