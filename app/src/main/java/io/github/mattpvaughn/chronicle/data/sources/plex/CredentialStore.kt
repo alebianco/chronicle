@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -107,6 +108,30 @@ class CredentialStore(
 
   /** True when [key] holds a non-empty value. */
   fun contains(key: String): Boolean = get(key).isNotEmpty()
+
+  /**
+   * Reads a one-shot migration marker.
+   *
+   * The markers live here, with the credentials they describe, for the reason the credential split
+   * gave when it put them beside the tokens in `ChronicleAuth.xml`: a marker and the data it must land
+   * together or not at all. When the tokens moved to `no_backup/` the markers had to follow, or
+   * that property would have been quietly lost — and `ChronicleAuth.xml` would be a file named for
+   * contents it no longer holds.
+   */
+  fun flag(key: String): Boolean = snapshot.value[booleanPreferencesKey(key)] ?: false
+
+  /** Sets a one-shot migration marker, durably. */
+  fun setFlag(
+    key: String,
+    value: Boolean,
+  ) {
+    val k = booleanPreferencesKey(key)
+    snapshot.value = snapshot.value.toMutablePreferences().apply { this[k] = value }
+    runBlocking {
+      runCatching { dataStore.edit { it[k] = value } }
+        .onFailure { Timber.e(it, "Could not persist the ${'$'}key marker") }
+    }
+  }
 
   /** Drops every credential. The sign-out path. */
   fun clear() {

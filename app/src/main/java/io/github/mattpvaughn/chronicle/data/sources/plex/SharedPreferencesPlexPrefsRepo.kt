@@ -430,18 +430,21 @@ class SharedPreferencesPlexPrefsRepo
      */
     @SuppressLint("ApplySharedPref")
     private fun migrateCredentialsToAuthPrefs() {
-      if (authPrefs.getBoolean(PREFS_AUTH_MIGRATED, false)) {
+      if (credentials.flag(PREFS_AUTH_MIGRATED)) {
         return
       }
       val toMove = CREDENTIAL_KEYS.filter { prefs.contains(it) }
-      val editor = authPrefs.edit().putBoolean(PREFS_AUTH_MIGRATED, true)
       toMove.forEach { key ->
-        // Every credential is stored as a String; a non-String here would be corruption, and
-        // letting it throw is better than silently dropping a token.
-        editor.putString(key, prefs.getString(key, "") ?: "")
+        // Straight into the credential store, not the auth file. This migration predates that
+        // store: it moved tokens out of the settings file into `ChronicleAuth.xml`, which is no
+        // longer read. Writing there now would strand an older install's tokens in a file
+        // nothing consults, and `SharedPreferencesMigration` has already run by this point, so
+        // nothing would come back for them. Every credential is stored as a String; a non-String
+        // here would be corruption, and letting it throw beats silently dropping a token.
+        credentials.put(key, prefs.getString(key, "") ?: "")
       }
-      editor.commit()
 
+      credentials.setFlag(PREFS_AUTH_MIGRATED, true)
       if (toMove.isNotEmpty()) {
         val settingsEditor = prefs.edit()
         toMove.forEach { settingsEditor.remove(it) }
@@ -459,7 +462,7 @@ class SharedPreferencesPlexPrefsRepo
      */
     @SuppressLint("ApplySharedPref")
     private fun removeOrphanedPremiumKeys() {
-      if (authPrefs.getBoolean(PREFS_PREMIUM_KEYS_REMOVED, false)) {
+      if (credentials.flag(PREFS_PREMIUM_KEYS_REMOVED)) {
         return
       }
       val present = ORPHANED_PREMIUM_KEYS.filter { prefs.contains(it) }
@@ -469,7 +472,7 @@ class SharedPreferencesPlexPrefsRepo
         editor.commit()
         Timber.i("Removed ${present.size} orphaned premium key(s) left by the dropped product flavors")
       }
-      authPrefs.edit().putBoolean(PREFS_PREMIUM_KEYS_REMOVED, true).commit()
+      credentials.setFlag(PREFS_PREMIUM_KEYS_REMOVED, true)
     }
 
     private fun getStringSet(key: String): MutableSet<String> {

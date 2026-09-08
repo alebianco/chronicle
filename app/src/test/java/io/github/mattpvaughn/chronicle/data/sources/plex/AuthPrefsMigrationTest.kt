@@ -76,7 +76,7 @@ class AuthPrefsMigrationTest {
 
     assertEquals("account-token", repo.accountAuthToken)
     assertEquals("user-token", repo.user?.authToken)
-    assertEquals("account-token", auth.getString("auth_token", null))
+    assertEquals("account-token", credentials.get("auth_token"))
     assertFalse(
       "the settings file must no longer hold a token",
       settings.contains("auth_token"),
@@ -106,7 +106,7 @@ class AuthPrefsMigrationTest {
     val third = newRepo()
 
     assertEquals("account-token", third.accountAuthToken)
-    assertEquals("server-access-token", auth.getString("server_token", null))
+    assertEquals("server-access-token", credentials.get("server_token"))
     assertNotNull(third.user)
   }
 
@@ -116,7 +116,7 @@ class AuthPrefsMigrationTest {
 
     assertEquals("", repo.accountAuthToken)
     // The marker is still set, so the check costs nothing on later launches.
-    assertTrue(auth.getBoolean("credentials_migrated", false))
+    assertTrue(credentials.flag("credentials_migrated"))
   }
 
   @Test
@@ -124,7 +124,7 @@ class AuthPrefsMigrationTest {
     writeLegacyCredentials()
     // Simulates a crash *before* the auth file was committed: nothing moved, no marker. The
     // values are still in the settings file, which is exactly why this is survivable.
-    assertFalse(auth.getBoolean("credentials_migrated", false))
+    assertFalse(credentials.flag("credentials_migrated"))
 
     val repo = newRepo()
 
@@ -154,10 +154,10 @@ class AuthPrefsMigrationTest {
     // The case that makes the previous test safe: if the two disagree, the auth file is the
     // authority, or a signed-out account could be resurrected from a leftover value.
     settings.edit().putString("auth_token", "stale-token").commit()
-    auth.edit()
-      .putBoolean("credentials_migrated", true)
-      .putString("auth_token", "current-token")
-      .commit()
+    // Seeded into the credential store, which is what the repo reads now — and the marker with it,
+    // so the migration does not run and overwrite the value this test is about.
+    credentials.setFlag("credentials_migrated", true)
+    credentials.put("auth_token", "current-token")
 
     assertEquals("current-token", newRepo().accountAuthToken)
   }
@@ -219,8 +219,8 @@ class AuthPrefsMigrationTest {
     // The markers live in the auth file alongside the credentials, so a sign-out must not wipe
     // them — otherwise the next launch re-runs a migration against a settings file that no
     // longer has anything to move, and (before the guard existed) could clear a fresh token.
-    assertTrue(auth.getBoolean("credentials_migrated", false))
-    assertTrue(auth.getBoolean("premium_keys_removed", false))
+    assertTrue(credentials.flag("credentials_migrated"))
+    assertTrue(credentials.flag("premium_keys_removed"))
 
     // And a fresh sign-in after the clear still lands in the auth file.
     val next = newRepo()
@@ -249,7 +249,7 @@ class AuthPrefsMigrationTest {
 
   @Test
   fun `premium key removal does not run twice`() {
-    auth.edit().putBoolean("premium_keys_removed", true).commit()
+    credentials.setFlag("premium_keys_removed", true)
     // A key written *after* the removal ran — contrived, but it proves the guard is what stops
     // the removal rather than the keys simply being absent.
     settings.edit().putBoolean("key_is_premium", true).commit()
@@ -263,6 +263,6 @@ class AuthPrefsMigrationTest {
   fun `premium removal is recorded even when there was nothing to remove`() {
     newRepo()
 
-    assertTrue(auth.getBoolean("premium_keys_removed", false))
+    assertTrue(credentials.flag("premium_keys_removed"))
   }
 }

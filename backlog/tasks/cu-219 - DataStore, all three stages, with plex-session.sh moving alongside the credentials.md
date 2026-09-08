@@ -124,6 +124,41 @@ not launched since the migration still has live tokens in that file.
   reachable from this network, which is not a credential question.)
 - Full round-trip `real → mock → real` verified, so device verification tooling is intact.
 
+## Follow-up: the migration markers moved too (2026-09-08)
+
+The owner asked why migration flags lived in a file called `ChronicleAuth.xml`. The answer was that
+they were correct when written and my stage-3 change had made them wrong.
+
+**Why they were there.** The credential split put `credentials_migrated` beside the tokens it
+describes, in the same `commit()`, so a marker and its data land together or not at all. Split them
+across files and a crash between two writes leaves either a marker claiming success with no data, or
+data that gets re-migrated over something newer.
+
+**What stage 3 broke.** Moving the tokens to `no_backup/` left the markers behind — so
+`ChronicleAuth.xml` became a file named for contents it no longer held, and the atomicity argument
+that justified the arrangement was quietly gone.
+
+Both markers now live in `CredentialStore`, restoring the original property. Two consequences that
+needed fixing rather than noting:
+
+- **The legacy migration was writing to a dead store.** `migrateCredentialsToAuthPrefs` copies
+  credentials out of the settings file into `ChronicleAuth.xml` — which nothing reads now, and which
+  `SharedPreferencesMigration` has already consumed by the time it runs. A pre-split install would
+  have had its tokens stranded there. It writes to `CredentialStore` directly.
+- **`ChronicleAuth.xml` is now deleted outright.** With the markers gone it is finally empty, so
+  DataStore removes it — which it could not do while they kept it alive. `plex-session.sh` therefore
+  treats it as *optional*: `backup` failed with "cannot read ChronicleAuth.xml" on a migrated device
+  until the file list distinguished required from optional.
+
+Sabotage-verified: disabling the marker check makes the migration re-run and resurrect a signed-out
+account, which is the failure the guard exists for.
+
+**Device-verified again, because the migration path changed.** Both markers and all three
+credentials are in `no_backup/plex-credentials.preferences_pb`; `shared_prefs/` holds only
+`Chronicle.xml` and the debug flags. The owner's real session — restored from a backup that predates
+all of this — still authenticates to plex.tv and retrieves the ANTARES server. Round-trip
+`real → mock → real` works. No relogin was needed.
+
 ## Notes
 
 Closing status **In Review**, and it is the highest-blast-radius task in cu-210's programme. It

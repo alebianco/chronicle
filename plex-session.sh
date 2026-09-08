@@ -23,10 +23,14 @@ PREFS="/data/data/$PKG/shared_prefs"
 # construction — that is what protects the Plex tokens now, rather than an XML rule naming a file.
 NO_BACKUP="/data/data/$PKG/no_backup"
 CREDENTIAL_STORE="plex-credentials.preferences_pb"
-# Chronicle.xml is still listed: it is where the *settings* live (server name, library) and what
-# is_mock_session inspects. ChronicleAuth.xml is the pre-migration credential file, kept because an
-# install that has not launched since the upgrade still has live tokens in it.
-AUTH_FILES=(Chronicle.xml ChronicleAuth.xml)
+# Chronicle.xml is where the *settings* live (server name, library) and what is_mock_session
+# inspects, so it is required.
+AUTH_FILES=(Chronicle.xml)
+# ChronicleAuth.xml is the pre-migration credential file. Optional, because a device that has
+# launched since the migration no longer has it -- SharedPreferencesMigration deletes it once the
+# tokens and the migration markers have moved into the credential store. Still carried when it is
+# there, since an install that has not launched yet keeps live tokens in it.
+OPTIONAL_FILES=(ChronicleAuth.xml)
 
 adb_() { adb -s "$DEVICE" "$@"; }
 app_running() { [ "$(adb_ shell "ps -A | grep -c $PKG" 2>/dev/null | tr -d '\r')" -gt 0 ]; }
@@ -112,6 +116,10 @@ cmd_backup() {
     runas cat "$PREFS/$f" > "$staging/$f" 2>/dev/null || die "cannot read $f"
     [ -s "$staging/$f" ] || die "$f came back empty; refusing to overwrite the backup"
   done
+  for f in "${OPTIONAL_FILES[@]}"; do
+    runas test -f "$PREFS/$f" 2>/dev/null || continue
+    runas cat "$PREFS/$f" > "$staging/$f" 2>/dev/null || die "cannot read $f"
+  done
   # The credential store, if this install has migrated. Absent on a pre-migration device, which is
   # not an error -- ChronicleAuth.xml still holds the tokens there.
   if runas test -f "$NO_BACKUP/$CREDENTIAL_STORE" 2>/dev/null; then
@@ -143,7 +151,8 @@ cmd_real() {
     && die "the backup itself is a mock session; refusing to restore it as real"
 
   wait_until_stopped
-  for f in "${AUTH_FILES[@]}"; do
+  for f in "${AUTH_FILES[@]}" "${OPTIONAL_FILES[@]}"; do
+    [ -s "$BACKUP_DIR/$f" ] || continue
     adb_ push "$BACKUP_DIR/$f" "/data/local/tmp/$f" >/dev/null
     runas cp "/data/local/tmp/$f" "$PREFS/$f"
     adb_ shell rm -f "/data/local/tmp/$f"
