@@ -51,11 +51,15 @@ three independent `isVisible` assignments that can all be true at once.
 
 ## Version constraints, found by building
 
-- **Compose BOM held at the 2026.06.x line — by AGP, not by compileSdk.** 2026.08.00 pulls Compose
-  1.12.0, whose `material-ripple-android` and ten sibling artifacts each require **AGP 9.1.0 or
-  higher**. Raise the BOM only together with AGP.
-- **`lifecycle-*-compose` reuse the existing 2.10.0 ref.** 2.11.0 requires **AGP 9.1.0** for the
-  same reason.
+- **Compose BOM was held at the 2026.06.x line — by AGP, not by compileSdk.** 2026.08.00 pulls
+  Compose 1.12.0, whose `material-ripple-android` and ten sibling artifacts each require **AGP
+  9.1.0 or higher**.
+- **`lifecycle-*-compose` were held at 2.10.0.** 2.11.0 requires **AGP 9.1.0** for the same reason.
+
+**Both holds are lifted (2026-09-08).** The project moved to **AGP 9.4.0**, and the BOM is now
+2026.08.00 with lifecycle 2.11.0 and navigation-compose 2.10.0, device-verified in both
+orientations. The identification of AGP rather than compileSdk as the gate was correct, and is what
+made the move worth attempting.
 
 **Amended 2026-09-08 (cu-214).** Both notes originally cited `compileSdk 37` as the gate, and the
 lifecycle note added "AGP 8.x cannot take Gradle ≥ 9.6.0". That reasoning is **wrong, and was

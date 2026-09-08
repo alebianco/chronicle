@@ -314,6 +314,53 @@ should be broken deliberately, not quietly.
 - **Drop mutation testing.** Honest but wasteful — cu-213 was landed one session ago and its
   derivation guard is the part with lasting value.
 
+## LANDED — AGP 9.4.0, with both gates intact (2026-09-08)
+
+Steps 3 and 4 are **done**, which this ticket had recorded as skipped. The owner asked whether
+there was another way round the pitest blocker, wanting AGP 9 for Circuit. There was.
+
+**Three problems, each fixed from the build file** rather than waiting on an upstream release:
+
+1. **`applicationVariants` removed** → `android.newDsl=false` restores the pre-9 variant API the
+   pitest plugin is built on. Found in detekt's own AGP 9 alpha notes.
+2. **Unit-test configurations missing** → `android.builtInKotlin=false` plus
+   `beforeVariants { enableUnitTest = true }`; AGP 9 makes unit-test components opt-in per variant.
+3. **`sourceDirs` empty** → set on the task from **inside `afterEvaluate`**. The plugin wires its
+   tasks in its own `afterEvaluate`, so a plain `configureEach` is silently overwritten.
+
+A fourth followed: `RealTitleSortCorpusTest` failed "without mutation" because the plugin adds test
+resources from `intermediates/java_res/...`, a layout that moved in AGP 9, so its corpus file never
+reached the minion classpath.
+
+**The dangerous shape, worth remembering.** Problem 3 made PIT exit with "Missing required
+option(s) [sourceDirs]", print its help text, and return **zero**. `BUILD SUCCESSFUL`, no report, no
+mutations — a gate silently checking nothing. It was caught only by looking for the report, not by
+the exit code.
+
+### Results
+
+| | |
+|---|---|
+| `./verify.sh --mutation` | **green, 11 stages** |
+| mutation score | **200 killed / 483**, against AGP 8's 197/483 |
+| `detektDebug` | still exists **with type resolution** — sabotage-verified: a `!!` on a nullable type was caught by `UnsafeCallOnNullableType`. detekt stays at **1.23.8**; the 2.x alpha turned out not to be needed |
+| device | player and library correct in **both orientations**, tab navigation working |
+
+**Step 4 landed with it**: Compose BOM 2026.08.00, lifecycle 2.11.0, navigation-compose 2.10.0,
+Coil 3.6.2, androidx.core 1.19.0. The stale holds in decision-22, the `android-ui` skill and
+`chronicle-compose-adopted` are corrected in the same change, since two of the three auto-load.
+
+### What this costs, stated plainly
+
+`newDsl=false` and `builtInKotlin=false` are a **deferral, not a fix**. AGP warns the legacy variant
+API is removed in **AGP 10**, so this buys time for the pitest plugin to catch up. Documented in
+`gradle.properties` with that framing.
+
+Also noted: the dependency-analysis plugin warns it is only tested to AGP 9.3.1. It still produces a
+real report — checked, not assumed.
+
+**cu-231 (Circuit) is unblocked**, which was the point.
+
 ## Full AGP 9.4.0 walk-through — 2026-09-08, it works; two gates are the cost
 
 Carried further than the note below, on the owner's instruction to update everything and re-enable
