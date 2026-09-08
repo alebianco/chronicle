@@ -4,7 +4,7 @@
 ./verify.sh            # the full gate
 ./verify.sh --quick    # inner loop while iterating: ktlint + unit tests + coverage
 ./verify.sh --format   # runs ktlintFormat first, then the full gate
-./verify.sh --instrumented   # adds a 10th stage on two managed emulators
+./verify.sh --instrumented   # adds an 11th stage on two managed emulators
 ./verify.sh --mutation       # adds the PIT mutation score — reported, never fatal
 ```
 
@@ -25,8 +25,16 @@ laptop and on any forge.
 | 7 | `:app:detektDebug` — complexity, potential bugs, coroutine misuse |
 | 8 | `lintDebug` — Android lint |
 | 9 | `compileReleaseKotlin` — **the release variant compiles** |
+| 10 | `:app:compileReleaseUnitTestKotlin` — **the release *test* sources compile** |
 
-Nothing less. The last stage exists because the debug and release source sets each provide their own
+**Stage 10 was added by cu-225**, after `:app:compileReleaseUnitTestKotlin` was found never to have
+compiled at all. `app/src/test/` is shared by every variant, so a test reaching a debug-only symbol
+compiles under debug and fails under release — and stage 9 covers only the release *production*
+half. The gap was invisible to this gate and to CI for as long as the debug hook tests existed. It
+is sabotage-verified: re-qualifying the moved `resolveSyncTarget` call reproduces the original
+`Unresolved reference`.
+
+Nothing less. Stage 9 exists because the debug and release source sets each provide their own
 `DebugHooks` object: `DebugHooksContract` makes the compiler check the shape, but only for the
 variant being built — so a drifted release twin used to pass every debug-only check and break the
 first release build.
@@ -118,7 +126,7 @@ blanket `-keep`**, which silently exempts code from R8.
 
 ## Instrumented tests
 
-`./verify.sh --instrumented` adds them as a 10th stage; `./gradlew
+`./verify.sh --instrumented` adds them as an 11th stage; `./gradlew
 instrumentedCheckGroupGroupDebugAndroidTest` runs them directly.
 
 Two Gradle Managed Devices: **API 27** (the minSdk floor, which catches a new API called without a

@@ -20,25 +20,25 @@ class MoveSyncLocationHookTest {
 
   @Test
   fun `a real external dir resolves`() {
-    assertEquals(sdCard, DebugHooks.resolveSyncTarget(sdCard.absolutePath, candidates))
-    assertEquals(internal, DebugHooks.resolveSyncTarget(internal.absolutePath, candidates))
+    assertEquals(sdCard, resolveSyncTarget(sdCard.absolutePath, candidates))
+    assertEquals(internal, resolveSyncTarget(internal.absolutePath, candidates))
   }
 
   @Test
   fun `a path outside the app's external dirs is refused`() {
-    assertNull(DebugHooks.resolveSyncTarget("/sdcard/Music", candidates))
-    assertNull(DebugHooks.resolveSyncTarget("/data/data/pkg/files", candidates))
+    assertNull(resolveSyncTarget("/sdcard/Music", candidates))
+    assertNull(resolveSyncTarget("/data/data/pkg/files", candidates))
   }
 
   /** A prefix of a real dir is not a real dir — this must be an exact match, not `startsWith`. */
   @Test
   fun `a parent of a real external dir is refused`() {
-    assertNull(DebugHooks.resolveSyncTarget("/storage/79AF-CD2E/Android/data/pkg", candidates))
-    assertNull(DebugHooks.resolveSyncTarget("/storage/79AF-CD2E", candidates))
+    assertNull(resolveSyncTarget("/storage/79AF-CD2E/Android/data/pkg", candidates))
+    assertNull(resolveSyncTarget("/storage/79AF-CD2E", candidates))
   }
 
   @Test
   fun `no candidates means nothing resolves`() {
-    assertNull(DebugHooks.resolveSyncTarget(sdCard.absolutePath, emptyList()))
+    assertNull(resolveSyncTarget(sdCard.absolutePath, emptyList()))
   }
 }

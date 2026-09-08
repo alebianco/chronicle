@@ -120,6 +120,14 @@ stage "lintDebug — Android lint"
 stage "compileReleaseKotlin — release variant compiles"
 "$GRADLE" compileReleaseKotlin
 
+# The *test* half of the release variant, which the stage above does not cover. `app/src/test/` is
+# shared by every variant, so a test reaching a debug-only symbol compiles under debug and fails
+# under release. That is not hypothetical: `MoveSyncLocationHookTest` called a `DebugHooks` member
+# the release twin does not declare, and this variant had **never compiled** for as long as the
+# hook tests existed — invisible to this gate and to CI, because nothing built it.
+stage "compileReleaseUnitTestKotlin — release test sources compile"
+"$GRADLE" :app:compileReleaseUnitTestKotlin
+
 # Opt-in, not part of the default gate: it provisions two emulators and takes minutes rather
 # than seconds, which would wreck the inner loop. The unit gate must stay fast enough to run on
 # every edit. Run this before a release, or when touching Activity/Fragment lifecycle, the media

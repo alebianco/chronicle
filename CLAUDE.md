@@ -93,7 +93,7 @@ ktlint gate, and a new worktree fails every Gradle task with "SDK location not f
 
 ## The five rules that fit here
 
-1. **`./verify.sh` is the definition of "the build is fine"** — not CI, 9 stages. Run it before
+1. **`./verify.sh` is the definition of "the build is fine"** — not CI, 10 stages. Run it before
    claiming anything is done. `--quick` for the inner loop.
 2. **`In Review`, not `Done`, whenever the work changed a screen or made a product choice.** `Done`
    is for work a machine proved right.

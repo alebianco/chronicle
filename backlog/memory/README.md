@@ -37,6 +37,7 @@ flag or mechanism, verify it still holds — and see `chronicle-coverage-gate-ac
 - [chronicle-doc-edits-in-worktree](chronicle-doc-edits-in-worktree.md) — Chronicle doc edits (CLAUDE.md, backlog/) must be made inside the task worktree, not the main checkout
 - [chronicle-harness-trailer-conflict](chronicle-harness-trailer-conflict.md) — The harness injects a Claude-Session trailer that Chronicle's CLAUDE.md forbids; strip it before handing work over
 - [chronicle-incidental-coverage](chronicle-incidental-coverage.md) — Coverage that comes from another component's test disappears when that component is deleted; measure the clean tree be
+- [chronicle-no-task-ids-in-code](chronicle-no-task-ids-in-code.md) — Task ids are forbidden in code comments; the gate that enforces it only scans .kt
 - [chronicle-playback-mainthread-cost](chronicle-playback-mainthread-cost.md) — Chronicle's playback main-thread cost is layout/draw, not data work — profiled 2026-09-04, and the named data findings
 - [chronicle-prefs-cache-clobber](chronicle-prefs-cache-clobber.md) — Editing an Android app's SharedPreferences file while the app is running is silently reverted when the process dies
 - [chronicle-profile-before-optimising](chronicle-profile-before-optimising.md) — Chronicle's performance tasks were written from TODOs, not measurements — cu-51's premise did not survive profiling, a

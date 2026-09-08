@@ -484,19 +484,6 @@ object DebugHooks : DebugHooksContract {
   }
 
   /**
-   * The external dir matching [target], or null when it is not one of them.
-   *
-   * Split out as a pure function so the refusal is testable without a device. It matters more than
-   * it looks: `cachedMediaDir` accepts any path, so an unmatched one would point downloads at a
-   * directory the app cannot write, and the failure would surface much later as downloads silently
-   * not working rather than as a bad argument here.
-   */
-  internal fun resolveSyncTarget(
-    target: String,
-    candidates: List<java.io.File>,
-  ): java.io.File? = candidates.firstOrNull { it.absolutePath == target }
-
-  /**
    * A book id from an intent extra, accepting both `--el <name> 123` and `--es <name> <id>`.
    *
    * Both forms because ids are `String` and need not be numeric, while every existing
