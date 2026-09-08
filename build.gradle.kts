@@ -5,6 +5,21 @@ plugins {
   alias(libs.plugins.ktlint)
   alias(libs.plugins.detekt)
   alias(libs.plugins.aboutlibraries) apply false
+
+  // Advisory only, deliberately **not** in verify.sh: `./gradlew buildHealth` is run on demand and
+  // its output needs judgement rather than enforcement. cu-54's `hamcrest-modern` is the standing
+  // example -- correctly declared as a runtime-only test dependency, and reported as unused because
+  // no source file imports it. A gate here would have to be silenced for a correct declaration.
+  alias(libs.plugins.dependency.analysis)
+}
+
+dependencyAnalysis {
+  issues {
+    all {
+      // Report everything; fail nothing. See the note on the plugin alias above.
+      onAny { severity("warn") }
+    }
+  }
 }
 
 allprojects {

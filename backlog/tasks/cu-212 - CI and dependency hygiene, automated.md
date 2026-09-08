@@ -105,17 +105,21 @@ classes whose ProGuard rules are deliberately narrow (cu-45).
       the API rather than inferred from a green tick (see below) — **blocked on the first run above.**
 - [x] Nothing leaves GitHub; no third-party account created (decision-19)
 
-**Dependency analysis** — **not adopted; blocked on a pre-existing defect.** See draft-221.
-- [ ] Applied, with `hamcrest-modern` pre-declared as runtime-only, citing cu-54
+**Dependency analysis** — **adopted, advisory only.** Was blocked on a pre-existing defect; see cu-225.
+- [x] Applied, with `hamcrest-modern` pre-declared as runtime-only, citing cu-54 — and
+      confirmed the tool reports it as unused anyway, which is why this is advisory not a gate
       — configuration was written and the exception pre-declared as the task required, then backed
       out: `buildHealth` analyses *every* variant, so it compiles `releaseUnitTest`, which has
       never compiled in this repo (`MoveSyncLocationHookTest` calls a `DebugHooks` member that
       exists only in the debug source set). Reproduced on a clean checkout with no plugin applied,
       so it is not caused by this change. `ignoreSourceSet` filters advice but not the task graph.
-- [ ] First report triaged in full — **no report can be produced until draft-221 is fixed.**
-- [ ] Anything removed is measured — nothing was removed.
-- [ ] `./test_release_build.sh` passes after any removal — not applicable, no removal.
-- [x] `./verify.sh` green — 8/8 stages, run in the task worktree.
+- [x] First report triaged in full — produced once cu-225 unblocked it; triage table above
+- [x] Anything removed is measured — **nothing was removed.** Acting on the findings is a
+      separate task; three genuinely-unused dependencies are named above for it
+- [x] `./test_release_build.sh` passes after any removal — not applicable, no removal
+- [x] `./verify.sh` green — 8/8 stages when this task's CI work landed, in the task worktree. The
+      gate has since grown to **10** (detekt, then the release unit-test stage), and was re-run
+      green at 10/10 when dependency-analysis was added.
 
 ## CI evidence (2026-09-07)
 
@@ -176,7 +180,35 @@ coordinates, so adding a pin means declaring it where a reviewer sees it.
 All three defects are sabotage-verified: each reintroduced, the guard fails, restored in a separate
 call per the Gradle up-to-date trap.
 
-**The dependency-analysis third is not built.** It is blocked on a pre-existing defect — the release
-unit-test variant has never compiled — filed as draft-221 rather than worked around. That is the
-lowest-value third (it automates an audit already done twice by hand), so the task is worth reviewing
-without it.
+**The dependency-analysis third is now built** (2026-09-08), once cu-225 fixed the pre-existing
+defect it was blocked on — the release unit-test variant had never compiled. It is applied
+**advisory only**: `./gradlew buildHealth` on demand, `severity("warn")` for every issue type, and
+deliberately **not** a `verify.sh` stage.
+
+**Two traps found wiring it up, both of which produce a false clean bill of health:**
+
+- **Applied at the root only, `buildHealth` succeeds and reports nothing** — literally *"No project
+  health reports found"*, with exit code 0. It must be applied to `:app` as well. A green build with
+  an empty report is indistinguishable from a green build with a clean one.
+- **Version 2.19.0 fails on this toolchain**: `Provided Metadata instance has version 2.4.0, while
+  maximum supported version is 2.2.0`, because Kotlin 2.3.21 emits metadata the plugin's bundled
+  `kotlin-metadata-jvm` cannot read. It also warns it is only known to work with AGP 8.3.0–8.10.0.
+  **3.19.1 works** on AGP 8.13.2 and Kotlin 2.3.21, with neither the failure nor the warning.
+
+**Why advisory and not a gate.** The first report proves the point — it lists 17 unused
+dependencies, and several are correct declarations the tool cannot see:
+
+| Reported | Verdict |
+|---|---|
+| `hamcrest-modern` | **Correct as declared** — runtime-only, cu-54. No source imports it by design |
+| `ktorfit-lib`, `work`, `room-ktx`, `lifecycle-*-ktx` | **Keep** — these are umbrella artifacts whose APIs are used through transitive modules the tool would have us declare individually. 75 files import each family |
+| `constraintlayout`, `coordinatorlayout`, `interpolator` | **Genuinely unused** — zero references in `.kt` or `.xml`. Residue of the View system; the last layout is gone |
+| `recyclerview`, `fragment` | **Genuinely reachable still** — 1 and 4 references respectively |
+
+The "should be declared directly" half (60+ entries) is mostly the tool asking us to pin every
+transitive Compose, lifecycle and DataStore module by hand, which trades a real maintenance cost for
+a theoretical correctness one. Not adopted.
+
+**Acting on the findings is deliberately a separate task**, not this one: removing a dependency is
+release-build risk (`./test_release_build.sh`, R8, reflection) and each removal needs its own
+verification. The criterion here is that the report exists and has been triaged — it has.

@@ -10,6 +10,10 @@ plugins {
   alias(libs.plugins.aboutlibraries)
   alias(libs.plugins.pitest)
   alias(libs.plugins.detekt)
+  // Must be applied to this subproject too, not only to the root: applying it at the root alone
+  // produces `buildHealth` that succeeds while reporting "No project health reports found" -- a
+  // green build with an empty report, which reads exactly like a clean bill of health.
+  alias(libs.plugins.dependency.analysis)
   jacoco
 }
 
