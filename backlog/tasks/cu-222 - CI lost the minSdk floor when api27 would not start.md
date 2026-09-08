@@ -60,34 +60,50 @@ That reframes the fix: it is about how AGP resolves a device's ABI at setup time
 image being unusual. It also means **the cache stays off** until this is understood — a 40 s download
 against a gate that does not run is not a saving.
 
-## api27 is also *flaky* once it does run — measured 2026-09-08
+## The suite fails on a **freshly created AVD**, at *both* API levels — measured 2026-09-08
 
-Separate from the setup failure, and found while device-verifying cu-223. With the emulator image
-already installed locally, `:app:api27DebugAndroidTest` was run six times against code that differed
-only in a test matcher:
+Found while device-verifying cu-223, and it changes the shape of this task. First read as flakiness;
+six more runs showed it is not random at all but reproducible on a clear condition.
 
-| run | result |
-|---|---|
-| warm | 10/10 pass |
-| warm | 10/10 pass |
-| warm | 10/10 pass |
-| `--rerun-tasks` | **4 failures** |
-| `--rerun-tasks` | 10/10 pass |
-| `--rerun-tasks` | 10/10 pass |
+| command | api27 | api35 |
+|---|---|---|
+| `:app:apiNNDebugAndroidTest` (reuses the AVD) | **10/10 pass**, repeatedly | **10/10 pass** |
+| `:app:apiNNDebugAndroidTest --rerun-tasks` (recreates it) | **4 failures**, repeatedly | **4 failures** |
 
-The failing set was not stable between failures — one run failed `AutoBrowseTreeTest` plus
-`LoggedInLaunchTest`, another a different pair — and it included Auto browse-tree assertions that
-the change under test could not reach. The two `LoggedInLaunchTest` failures were both
-`ComposeTimeoutException` after 30 s waiting for the login state to settle, which is the race
-`awaitHomeShelf` already documents at 2.4 s on a real device; api35 passed 10/10 every time.
+A passing run and a failing one were taken back to back on identical code, in both directions, so
+this is not timing noise. `--rerun-tasks` reruns `apiNNSetup`, which recreates the emulator; the
+tests fail on a **fresh** AVD and pass on a reused one.
 
-So the failures correlate with a **cold emulator start** rather than with any code. That matters for
-this task twice over: it is a second reason api27 cannot simply be switched back on in CI, where
-every run is cold by definition, and it is a caution against reading a single red api27 run as a
-real regression — that mistake was made once during this measurement before the six runs settled it.
+**It is not about API 27.** api35 fails the same four tests with the same signatures, which is the
+single most useful fact here: the minSdk floor is not what is broken, so switching image source or
+API level cannot fix it. `systemImageSource = "default"` was tried on api27 and made no difference —
+setup succeeded and the same four tests failed.
 
-Worth checking whether the login-settle timeout is simply too short for a cold API 27 image before
-concluding anything about AGP.
+The failures are one root cause with two faces:
+
+```
+AutoBrowseTreeTest.theBrowseRootIsNotTheEmptyRoot   0.1s   "a seeded session must yield a real
+                                                            browse root, got 'empty root'"
+LoggedInLaunchTest.launchesIntoTheAppWhenAlreadySignedIn  30.5s  ComposeTimeoutException
+```
+
+The browse-tree assertions fail *instantly* — nothing to wait for, the session was never seeded —
+and the launch assertions then spend the full 30 s `LOGIN_SETTLE_TIMEOUT_MS` waiting for a login
+state that never arrives. So the thing to investigate is **`MockPlexMode.enable` on a first-boot
+emulator**, not AGP's ABI resolution.
+
+Raising the timeout would not help the 0.01 s failures, so that is ruled out before being tried.
+
+### What this means for the ATD option
+
+**There is no ATD image below API 30.** `sdkmanager --list` offers `aosp_atd`/`google_atd` from
+android-30 upward only, so an ATD substitute at the minSdk floor is impossible — that option is
+closed by fact rather than by budget, and needed no CI pushes to establish.
+
+One more correction to the record above: this machine's installed API 27 image is
+`default/arm64-v8a`, not the `aosp` x86 image the note describes, and API 27 *does* publish an
+arm64-v8a image (`system-images/android-27/default/arm64-v8a`). The original "no arm64 variant"
+claim was specific to `aosp`.
 
 ## Why it matters
 
@@ -101,12 +117,18 @@ than quietly accepted.
 
 ## Acceptance Criteria
 
-- [ ] The cause is established — it affects **both** api27 (fresh install) and api35 (restored from
-      cache), so it is about how AGP resolves a device ABI at setup time rather than anything
-      specific to the API 27 image
-- [ ] `api27` runs in CI again, **or** an alternative gives minSdk coverage (a different image
-      source such as `aosp-atd`, a different API level near the floor, or a lint/API-desugaring
-      check that catches the same defect class)
+- [ ] **Two separate faults, and they must not be conflated.** The `api27Setup` failure ("no value
+      available", after the unspecified-ABI warning) is one. The *suite* failing on a freshly
+      created AVD at **both** API levels is the other, measured 2026-09-08 and reproducible — it is
+      the mock session not seeding on a first-boot emulator, not an ABI question at all. Fixing the
+      setup task alone would leave CI red
+- [ ] `MockPlexMode.enable` investigated on a first-boot emulator, since that is what the second
+      fault points at. The browse-tree assertions fail in **0.01 s** with "got 'empty root'", so a
+      longer `LOGIN_SETTLE_TIMEOUT_MS` is already ruled out as the fix
+- [ ] `api27` runs in CI again, **or** an alternative gives minSdk coverage — noting that
+      **`aosp-atd` is impossible here**: no ATD image is published below API 30, checked against
+      `sdkmanager --list`. That leaves a different API level near the floor, or a
+      lint/API-desugaring check that catches the same defect class
 - [ ] If no fix is found, the decision to run CI at API 35 only is recorded with its reasoning, and
       `ciCheckGroup` keeps its comment explaining the gap
 - [ ] `instrumentedCheckGroup` still runs both levels locally
@@ -116,6 +138,9 @@ than quietly accepted.
 
 Closing status **In Review**: dropping a test target is a judgement about acceptable risk.
 
-Check whether AGP 9 fixes it — its `testedAbi` is the property the warning points at, and cu-214
-stage 3 lands that version. This may resolve itself there, which would make waiting cheaper than
-debugging. If so, close this by citing cu-214 rather than duplicating the work.
+Check whether AGP 9 fixes the **setup** half — its `testedAbi` is the property the warning points
+at. cu-214 measured AGP 9 and **skipped** it (five incompatibilities, three silent), so that escape
+hatch is closed for now rather than merely pending.
+
+It would not address the second fault regardless: a fresh AVD fails the suite on api35 too, where
+setup succeeds and no ABI warning appears.
