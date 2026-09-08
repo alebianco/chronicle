@@ -158,6 +158,18 @@ android {
       // Robolectric needs the merged android resources/manifest on the
       // unit-test classpath.
       isIncludeAndroidResources = true
+
+      // Required by Molecule, and so by Circuit, whose presenters are `@Composable` and run through
+      // Molecule under `circuit-test`. Compose's `Recomposer` reports composition errors through
+      // `android.util.Log.e`; unmocked that **throws**, so the first composition dies and the real
+      // error is replaced by "Method e in android.util.Log not mocked". Molecule's README calls for
+      // this exact setting for JVM unit tests in an Android module.
+      //
+      // The trade-off is real and worth stating: every un-stubbed framework call now returns a
+      // default instead of failing loudly. This project's defence against that is Robolectric for
+      // the 67 test classes that genuinely need Android, plus the rule that a test asserting on
+      // framework behaviour uses Robolectric rather than leaning on the default.
+      isReturnDefaultValues = true
     }
 
     // Gradle Managed Devices: the emulator is declared here and provisioned by Gradle, so
@@ -228,6 +240,7 @@ dependencies {
   // The BOM governs every Compose artifact's version, including the test ones, so they cannot
   // drift apart. `platform(...)` on each configuration that needs it.
   implementation(platform(libs.compose.bom))
+  implementation(libs.circuit.foundation)
   implementation(libs.compose.ui)
   implementation(libs.compose.ui.graphics)
   implementation(libs.compose.ui.tooling.preview)
@@ -346,6 +359,7 @@ dependencies {
   testImplementation(libs.hamcrest)
   testImplementation(libs.coroutines.test)
   testImplementation(libs.turbine)
+  testImplementation(libs.circuit.test)
   testImplementation(libs.androidx.arch.core.testing)
 
   // Robolectric drives real SQLite in a JVM test, which lets the Room migration

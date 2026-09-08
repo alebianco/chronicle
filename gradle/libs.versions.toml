@@ -66,6 +66,8 @@ junit = "4.13.2"
 # events. `util/FlowTestExt.kt` keeps the `StateFlow`-conflation helpers, which answer a different
 # question ("what did this settle on") that Turbine has no better answer for.
 turbine = "1.2.1"
+# 0.x: the least settled dependency here, its API has moved between minors.
+circuit = "0.38.0"
 mockk = "1.14.11"
 robolectric = "4.16.1"
 hamcrest = "1.3"
@@ -164,6 +166,8 @@ okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+circuit-foundation = { group = "com.slack.circuit", name = "circuit-foundation", version.ref = "circuit" }
+circuit-test = { group = "com.slack.circuit", name = "circuit-test", version.ref = "circuit" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
