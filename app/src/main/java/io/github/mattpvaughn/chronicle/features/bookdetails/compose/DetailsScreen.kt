@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.model.Chapter
 import io.github.mattpvaughn.chronicle.data.model.ChapterRow
+import io.github.mattpvaughn.chronicle.features.bookdetails.DetailsProgressText
+import io.github.mattpvaughn.chronicle.features.currentlyplaying.StringResolver
 import io.github.mattpvaughn.chronicle.views.compose.CoverImage
 
 /** What the details header can do. One object rather than seven lambdas. */
@@ -142,19 +144,25 @@ private fun seriesBrowseLabel(book: BookHeader): String = stringResource(R.strin
 /**
  * The progress line.
  *
- * Rendered from a pre-formatted string on purpose: this screen still shows the raw
- * `h:mm:ss/h:mm:ss` pair that was removed from the player, **and the replacement wording
- * is the owner's call, still open**. Porting it verbatim keeps this a rendering change;
- * rewording it here would be an unreviewed product decision inside a migration.
+ * The wording is [DetailsProgressText]'s and the strings are `strings.xml`'s; this only resolves
+ * them and lays the row out. It used to render a pre-formatted string built in the ViewModel —
+ * the raw `h:mm:ss/h:mm:ss` pair §3.1 rule 3 bans — now replaced with three states:
+ * the book's length before it is started, `6h 12m left` once it is, and `Finished` at the end.
  */
 @Composable
 private fun ProgressRow(progress: ProgressLine) {
+  val strings = detailsProgressStrings()
   Row(
     Modifier.fillMaxWidth().padding(top = 8.dp),
     horizontalArrangement = Arrangement.SpaceBetween,
   ) {
     Text(
-      text = progress.text,
+      text =
+        DetailsProgressText.progress(
+          state = progress.state,
+          durationMillis = progress.durationMillis,
+          strings = strings,
+        ),
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -163,6 +171,29 @@ private fun ProgressRow(progress: ProgressLine) {
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+  }
+}
+
+/**
+ * The three format strings [DetailsProgressText] needs, read the Compose way and passed as a
+ * resolver — the same shape `PlayerScreen.playerStrings()` uses, and for the same reason: resolving
+ * them here lets Compose track them, so the row recomposes on a locale or configuration change
+ * while the formatter itself stays a pure function with no `Context`.
+ */
+@Composable
+private fun detailsProgressStrings(): StringResolver {
+  val totalLength = stringResource(R.string.details_total_length)
+  val left = stringResource(R.string.details_left)
+  val finished = stringResource(R.string.details_finished)
+  return { resId, args ->
+    val template =
+      when (resId) {
+        R.string.details_total_length -> totalLength
+        R.string.details_left -> left
+        R.string.details_finished -> finished
+        else -> ""
+      }
+    if (args.isEmpty()) template else String.format(template, *args)
   }
 }
 

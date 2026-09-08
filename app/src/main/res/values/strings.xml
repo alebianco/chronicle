@@ -172,6 +172,17 @@
     <!-- Shown instead of a chapter count when the book reports no chapters. -->
     <string name="player_no_chapters">No chapters</string>
 
+    <!-- Book-details progress line (cu-191). Three states, because this screen is often looked at
+         for a book that has not been started, where "9h 26m left" is a strange way to say the book
+         is 9h 26m long. Unstarted shows the length plainly; once started it matches the player's
+         wording; finished names the state rather than counting down to nothing. -->
+    <!-- e.g. "9h 26m" — a book not yet started, so this is its total length. -->
+    <string name="details_total_length">%1$s</string>
+    <!-- e.g. "6h 12m left" — matches the player's "left in book", shortened for a narrow row. -->
+    <string name="details_left">%1$s left</string>
+    <!-- A book played to the end. -->
+    <string name="details_finished">Finished</string>
+
     <!-- Book detail metadata lines (cu-145). -->
     <string name="book_narrated_by">Narrated by %1$s</string>
     <string name="book_series_browse">Browse the %1$s series</string>

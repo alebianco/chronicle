@@ -28,7 +28,7 @@ around a gate.
 | `TokenLoggingTest` | Auth tokens must never reach logcat. |
 | `DeclaredDependencyTest` | Every AndroidX package the app imports is **declared**, not inherited. |
 | `DetektRuleSetTest` | detekt owns complexity, potential bugs and coroutines — never formatting, style or naming. |
-| `RawDurationFormatTest` | The player must not print a raw duration. |
+| `RawDurationFormatTest` | No progress readout may print a raw duration — the player's, and the book-details screen's. |
 | `WorkerDispatcherTest` | `CoroutineWorker` is the one place `Dispatchers.*` is allowed directly. |
 | ~~`OrphanedAdapterTest`~~ | *Retired* — zero `RecyclerView.Adapter`s remain. |
 | ~~`UnguardedMenuAccessTest`~~ | *Retired* — no Fragments, and no toolbar menus to dereference. |

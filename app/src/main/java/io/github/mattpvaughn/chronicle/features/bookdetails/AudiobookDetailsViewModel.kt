@@ -5,7 +5,6 @@ import android.media.session.MediaController
 import android.media.session.PlaybackState.*
 import android.os.Bundle
 import android.support.v4.media.session.PlaybackStateCompat
-import android.text.format.DateUtils
 import android.view.Gravity
 import android.widget.Toast
 import androidx.annotation.StringRes
@@ -16,6 +15,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.model.*
+import io.github.mattpvaughn.chronicle.data.model.progressState
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager.CacheStatus.*
@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 @ExperimentalCoroutinesApi
 @HiltViewModel
@@ -173,28 +174,61 @@ class AudiobookDetailsViewModel
         isBookActive && currState.isPlaying
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
 
-    val progressString: StateFlow<String> =
-      tracks.map { tracks ->
-        if (tracks.isEmpty()) {
-          return@map "0:00/0:00"
+    /**
+     * How far into the book, and how long it is — the two numbers, not a rendered string.
+     *
+     * This was `progressString`, which built the literal `h:mm:ss/h:mm:ss` pair §3.1 rule 3 bans
+     * The wording now lives in [DetailsProgressText] and the resource, so what crosses
+     * this boundary is arithmetic: the screen cannot render a raw duration because it is never
+     * given one.
+     *
+     * **The tracks when there are any, the book row otherwise.** Both carry the same two numbers,
+     * and which one has them depends on timing: the book row arrives with the library, while the
+     * tracks are fetched lazily the first time a book is opened. Reading only the tracks left the
+     * readout **blank on every book the user had not opened before** — the common case on this
+     * screen, and exactly the state the "not started" wording exists for. Found on the tablet: a
+     * book whose row held `duration=540000, progress=54000` rendered nothing at all.
+     *
+     * Tracks win where both exist, because they are what playback advances; the book row's copy is
+     * updated by sync and can lag mid-listen. Zero for both only when neither has loaded, which the
+     * formatter renders as blank rather than as a zero-length book.
+     */
+    private val bookProgress: StateFlow<ProgressLine> =
+      combineDistinct(tracks, audiobook) { tracks, book ->
+        if (book == null) {
+          ProgressLine()
+        } else {
+          // The tracks' numbers when they have loaded, the book row's otherwise — but the *state*
+          // is always resolved from the book, because `viewCount` lives only there and is what
+          // makes completion an explicit fact rather than a guess at the position (decision-16).
+          val progress = if (tracks.isNotEmpty()) tracks.getProgress().millis else book.progress
+          val duration = if (tracks.isNotEmpty()) tracks.getDuration() else book.duration
+          ProgressLine(
+            state = book.copy(progress = progress, duration = duration).progressState(),
+            progressMillis = progress,
+            durationMillis = duration,
+          )
         }
-        val progressStr =
-          DateUtils.formatElapsedTime(
-            StringBuilder(),
-            tracks.getProgress().millis / 1000L,
-          )
-        val durationStr =
-          DateUtils.formatElapsedTime(
-            StringBuilder(),
-            tracks.getDuration() / 1000L,
-          )
-        return@map "$progressStr/$durationStr"
-      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0:00/0:00")
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProgressLine())
 
+    /**
+     * The percentage, derived from **the same two numbers** the readout beside it uses.
+     *
+     * It read the tracks directly, which was a second independent source for one line of UI. On a
+     * book whose tracks had not been fetched that produced a visible contradiction on the tablet:
+     * `7m left` next to `0%`, the left half falling back to the book row while the right half saw
+     * an empty track list. Deriving both from [bookProgress] makes that state unrepresentable
+     * rather than merely fixed.
+     */
     val progressPercentageString: StateFlow<String> =
-      tracks
-        .map { "${it.getProgressPercentage()}%" }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0%")
+      bookProgress
+        .map { line ->
+          if (line.durationMillis <= 0L) {
+            "0%"
+          } else {
+            "${((line.progressMillis / line.durationMillis.toDouble()) * 100).roundToInt()}%"
+          }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), "0%")
 
     private val _isLoadingTracks = MutableStateFlow(false)
     val isLoadingTracks: StateFlow<Boolean>
@@ -698,8 +732,8 @@ class AudiobookDetailsViewModel
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SummaryState())
 
     private val progressLine: StateFlow<ProgressLine> =
-      combineDistinct(progressString, progressPercentageString) { text, percentage ->
-        ProgressLine(text, percentage)
+      combineDistinct(bookProgress, progressPercentageString) { progress, percentage ->
+        progress.copy(percentage = percentage)
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ProgressLine())
 
     /**

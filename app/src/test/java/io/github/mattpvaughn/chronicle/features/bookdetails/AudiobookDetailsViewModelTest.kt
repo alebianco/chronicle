@@ -8,6 +8,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.BookOffset
+import io.github.mattpvaughn.chronicle.data.model.BookProgressState
 import io.github.mattpvaughn.chronicle.data.model.MediaItemTrack
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -25,6 +26,7 @@ import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -63,6 +65,13 @@ class AudiobookDetailsViewModelTest {
   private val plexConfig =
     mockk<PlexConfig>(relaxed = true) {
       every { isConnected } returns MutableStateFlow(true)
+      // `connectionState` needs a real flow as well, and for a sharper reason than `isConnected`
+      // did: it is one of `uiState`'s four sources, and `combine` emits nothing until **every**
+      // source has produced. A relaxed mock hands back a mocked StateFlow that never emits, so
+      // `uiState` silently stays on its seed — every field default, no error, no failing
+      // assertion unless a test happens to read one. That is what made a wired-up progress line
+      // look like a broken formatter.
+      every { connectionState } returns MutableStateFlow(PlexConfig.ConnectionState.CONNECTED)
     }
 
   /**
@@ -278,6 +287,109 @@ class AudiobookDetailsViewModelTest {
     verify(exactly = 0) { cachedFileManager.downloadTracks(any(), any()) }
     verify(exactly = 0) { cachedFileManager.cancelGroup(any()) }
   }
+
+  /**
+   * The progress line reaches the screen as **millis**, and they are the tracks' real numbers.
+   *
+   * This exists because the unit test for the formatter passed while the screen rendered a blank
+   * length: the formatter was right and what reached it was not. `DetailsProgressTextTest` covers
+   * the wording; this covers the wiring, which is the half that was actually broken.
+   */
+  @Test
+  fun `the progress line carries the tracks own duration and position`() =
+    runTest {
+      val vm = viewModel()
+      tracksFlow.value =
+        listOf(
+          MediaItemTrack(id = "1", parentKey = "1001", index = 1, duration = 3_600_000L, progress = 600_000L),
+          MediaItemTrack(id = "2", parentKey = "1001", index = 2, duration = 3_600_000L),
+        )
+
+      keepCollected(vm.uiState)
+      advanceUntilIdle()
+
+      val progress = vm.uiState.value.progress
+      assertEquals(7_200_000L, progress.durationMillis)
+      assertEquals(600_000L, progress.progressMillis)
+      assertEquals("8%", progress.percentage)
+    }
+
+  /**
+   * The case that was blank on the tablet: a book the user has never opened, so its tracks have not
+   * been fetched, but whose **book row** already carries duration and progress from the library
+   * sync.
+   *
+   * Reading only the tracks made the readout empty on every unopened book — the common case on this
+   * screen, and precisely the state the "not started" wording was added for.
+   */
+  @Test
+  fun `the progress line falls back to the book row while the tracks are unfetched`() =
+    runTest {
+      every { bookRepository.getAudiobook("1001") } returns
+        MutableStateFlow(book.copy(duration = 540_000L, progress = 54_000L))
+      val vm = viewModel()
+
+      keepCollected(vm.uiState)
+      advanceUntilIdle()
+
+      val progress = vm.uiState.value.progress
+      assertEquals(540_000L, progress.durationMillis)
+      assertEquals(54_000L, progress.progressMillis)
+      // And the percentage comes from those same two numbers, rather than from a second read of
+      // the empty track list -- which showed `7m left` beside `0%` on the tablet.
+      assertEquals("10%", progress.percentage)
+    }
+
+  /**
+   * And once the tracks arrive they win, because they are what playback advances — the book row's
+   * copy is written by sync and lags mid-listen.
+   */
+  @Test
+  fun `the tracks take precedence over the book row once they load`() =
+    runTest {
+      every { bookRepository.getAudiobook("1001") } returns
+        MutableStateFlow(book.copy(duration = 540_000L, progress = 54_000L))
+      val vm = viewModel()
+
+      keepCollected(vm.uiState)
+      tracksFlow.value =
+        listOf(MediaItemTrack(id = "1", parentKey = "1001", index = 1, duration = 7_200_000L, progress = 600_000L))
+      advanceUntilIdle()
+
+      val progress = vm.uiState.value.progress
+      assertEquals(7_200_000L, progress.durationMillis)
+      assertEquals(600_000L, progress.progressMillis)
+    }
+
+  /**
+   * The state travels with the numbers, and it comes from the **book** — `viewCount` lives only
+   * there. A book marked as played sits at `progress = 0` on both the tracks and the row, so
+   * deriving the state from position alone rendered it as never-opened (decision-16).
+   */
+  @Test
+  fun `a book marked as played reaches the screen as completed`() =
+    runTest {
+      every { bookRepository.getAudiobook("1001") } returns
+        MutableStateFlow(book.copy(duration = 540_000L, progress = 0L, viewCount = 1L))
+      val vm = viewModel()
+
+      keepCollected(vm.uiState)
+      advanceUntilIdle()
+
+      assertEquals(BookProgressState.Completed, vm.uiState.value.progress.state)
+    }
+
+  /** And an empty book stays at zero, which the formatter renders blank rather than as `0m`. */
+  @Test
+  fun `the progress line is zero while the tracks are empty`() =
+    runTest {
+      val vm = viewModel()
+
+      keepCollected(vm.uiState)
+      advanceUntilIdle()
+
+      assertEquals(0L, vm.uiState.value.progress.durationMillis)
+    }
 
   private fun cacheManager() =
     mockk<ICachedFileManager>(relaxed = true) {

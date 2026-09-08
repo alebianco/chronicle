@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails.compose
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import io.github.mattpvaughn.chronicle.data.model.BookProgressState
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,6 +46,68 @@ class DetailsScreenTest {
     narrator: String? = null,
     series: String? = null,
   ) = BookHeader(title = "The Hobbit", author = "J R R Tolkien", narrator = narrator, series = series)
+
+  /**
+   * The progress row's **rendered words**, in all three states.
+   *
+   * `DetailsProgressTextTest` pins which *resource* each state picks, using a fake resolver — so it
+   * would still pass if `detailsProgressStrings()`'s id-to-template `when` were mis-wired (say
+   * `details_left` mapped to the length template). Only a rendered assertion sees that, which is why
+   * the player has the same pairing: `PlayerScreenTest` asserts "6h 12m left in book" beside
+   * `PlayerTextTest`'s resolver-level checks.
+   *
+   * It also pins the wording the owner chose, which is the half of this that is a product decision
+   * rather than a mechanical one.
+   */
+  @Test
+  fun `an unstarted book renders its length, a started one what is left, a finished one Finished`() {
+    // One `setContent` per rule: calling the helper three times silently keeps the first content
+    // and re-measures it, so the state is driven from inside the composition instead.
+    val state = mutableStateOf(BookProgressState.Unstarted as BookProgressState)
+    compose.setContent {
+      ChronicleTheme {
+        DetailsScreen(
+          state =
+            DetailsUiState(
+              book = book(),
+              progress = ProgressLine(state = state.value, durationMillis = 34_000_000L),
+            ),
+          actions = DetailsActions(),
+          coverUrl = { "http://localhost/$it" },
+        )
+      }
+    }
+
+    compose.onNodeWithText("9h 26m").assertIsDisplayed()
+
+    compose.runOnIdle { state.value = BookProgressState.InProgress(11_680_000L) }
+    compose.onNodeWithText("6h 12m left").assertIsDisplayed()
+
+    compose.runOnIdle { state.value = BookProgressState.Completed }
+    compose.onNodeWithText("Finished").assertIsDisplayed()
+  }
+
+  /** And the raw pair this replaced does not come back. */
+  @Test
+  fun `the progress row renders no raw duration pair`() {
+    setScreen(
+      DetailsUiState(
+        book = book(),
+        progress =
+          ProgressLine(
+            state = BookProgressState.InProgress(11_680_000L),
+            durationMillis = 34_000_000L,
+            percentage = "34%",
+          ),
+      ),
+    )
+
+    assertEquals(
+      "the details screen must not render an h:mm:ss/h:mm:ss pair (RESEARCH_FINDINGS 3.1 rule 3)",
+      0,
+      compose.onAllNodesWithText("/", substring = true).fetchSemanticsNodes().size,
+    )
+  }
 
   @Test
   fun `the title and author always render`() {

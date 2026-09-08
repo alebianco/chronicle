@@ -1,6 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.bookdetails.compose
 
 import androidx.annotation.StringRes
+import io.github.mattpvaughn.chronicle.data.model.BookProgressState
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 
 /**
@@ -32,17 +33,22 @@ data class BookHeader(
 )
 
 /**
- * The progress readout.
+ * The progress readout, as **numbers rather than a rendered string**.
  *
- * **Ported verbatim, not reworded.** This screen still renders the raw
- * `h:mm:ss/h:mm:ss` pair that was removed from the player — and the replacement wording is a
- * product choice the owner has not made ("a book you have not started may want its total length
- * shown plainly"). Rewording it inside a rendering migration would turn a mechanical change into
- * an unreviewed product decision, so the string arrives already formatted and the wording
- * stays open.
+ * It used to carry a pre-formatted `text`, ported verbatim through the Compose migration because
+ * the screen showed the raw `h:mm:ss/h:mm:ss` pair §3.1 rule 3 bans and the replacement wording was
+ * still an open product question. That is now settled — length when unstarted, `6h 12m left` once
+ * started, `Finished` at the end — so the formatting moved to `DetailsProgressText` and this holds
+ * only what it needs.
+ *
+ * Carrying millis instead of a string is what makes the rule enforceable: the screen has no
+ * duration to print raw, and the wording is resolved from `strings.xml` at the point of render
+ * rather than assembled in a ViewModel that cannot see the locale.
  */
 data class ProgressLine(
-  val text: String = "",
+  val state: BookProgressState = BookProgressState.Unstarted,
+  val progressMillis: Long = 0L,
+  val durationMillis: Long = 0L,
   val percentage: String = "",
 )
 
