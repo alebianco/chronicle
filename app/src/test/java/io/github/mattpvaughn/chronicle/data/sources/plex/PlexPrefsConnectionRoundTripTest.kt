@@ -8,6 +8,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.ConnectionTier
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.tier
+import io.github.mattpvaughn.chronicle.testing.testCredentialStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -75,7 +76,7 @@ class PlexPrefsConnectionRoundTripTest {
     prefs.edit().clear().commit()
     authPrefs = context.getSharedPreferences("PlexPrefsConnectionRoundTripTestAuth", Context.MODE_PRIVATE)
     authPrefs.edit().clear().commit()
-    repo = SharedPreferencesPlexPrefsRepo(prefs, authPrefs)
+    repo = SharedPreferencesPlexPrefsRepo(prefs, authPrefs, testCredentialStore())
   }
 
   @Test

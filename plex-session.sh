@@ -19,6 +19,13 @@ DEVICE="${CHRONICLE_DEVICE:-192.168.1.95:5555}"
 PKG="${CHRONICLE_PKG:-io.github.mattpvaughn.chronicle.debug}"
 BACKUP_DIR="${CHRONICLE_BACKUP_DIR:-$HOME/.chronicle-session-backup}"
 PREFS="/data/data/$PKG/shared_prefs"
+# The credential DataStore lives in no_backup/, which Android excludes from Auto Backup by
+# construction — that is what protects the Plex tokens now, rather than an XML rule naming a file.
+NO_BACKUP="/data/data/$PKG/no_backup"
+CREDENTIAL_STORE="plex-credentials.preferences_pb"
+# Chronicle.xml is still listed: it is where the *settings* live (server name, library) and what
+# is_mock_session inspects. ChronicleAuth.xml is the pre-migration credential file, kept because an
+# install that has not launched since the upgrade still has live tokens in it.
 AUTH_FILES=(Chronicle.xml ChronicleAuth.xml)
 
 adb_() { adb -s "$DEVICE" "$@"; }
@@ -69,6 +76,34 @@ read_flag() {
   runas cat "$PREFS/chronicle_debug.xml" 2>/dev/null | grep -o 'value="[a-z]*"' | cut -d'"' -f2
 }
 
+# Pushes the backed-up credential store back, if the backup has one.
+#
+# Absent when the backup predates the DataStore migration: those tokens are in ChronicleAuth.xml,
+# stale real token would otherwise survive into mock mode -- pointing the fixture at a live account.
+clear_credential_store() {
+  runas rm -f "$NO_BACKUP/$CREDENTIAL_STORE" 2>/dev/null || true
+}
+
+# which the loop above already restored, and the app's own migration moves them on next launch.
+restore_credential_store() {
+  # Always clear first. A backup taken before the DataStore migration has no credential store, and
+  # returning early would leave whatever is on the device in place -- which, restoring a real
+  # session after mock mode, is the *mock* store. It wins the fallback read, so the app would come
+  # back "logged in" against fixture tokens while ChronicleAuth.xml held the real ones. Verified on
+  # the tablet: the restore left `mock-account-token` behind before this line existed.
+  clear_credential_store
+  [ -s "$BACKUP_DIR/$CREDENTIAL_STORE" ] || return 0
+  runas mkdir -p "$NO_BACKUP"
+  adb_ push "$BACKUP_DIR/$CREDENTIAL_STORE" "/data/local/tmp/$CREDENTIAL_STORE" >/dev/null
+  runas cp "/data/local/tmp/$CREDENTIAL_STORE" "$NO_BACKUP/$CREDENTIAL_STORE"
+  adb_ shell rm -f "/data/local/tmp/$CREDENTIAL_STORE"
+}
+
+# Removes the credential store so a mock launch cannot read a real token.
+#
+# `cmd_mock` only sets a flag and lets the app seed its own fixture session, which was enough when
+# credentials lived in a file the app rewrote on launch. The DataStore persists independently, so a
+
 cmd_backup() {
   require_device
   mkdir -p "$BACKUP_DIR"; chmod 700 "$BACKUP_DIR"
@@ -77,6 +112,13 @@ cmd_backup() {
     runas cat "$PREFS/$f" > "$staging/$f" 2>/dev/null || die "cannot read $f"
     [ -s "$staging/$f" ] || die "$f came back empty; refusing to overwrite the backup"
   done
+  # The credential store, if this install has migrated. Absent on a pre-migration device, which is
+  # not an error -- ChronicleAuth.xml still holds the tokens there.
+  if runas test -f "$NO_BACKUP/$CREDENTIAL_STORE" 2>/dev/null; then
+    runas cat "$NO_BACKUP/$CREDENTIAL_STORE" > "$staging/$CREDENTIAL_STORE" 2>/dev/null \
+      || die "cannot read the credential store"
+    [ -s "$staging/$CREDENTIAL_STORE" ] || die "credential store came back empty; refusing"
+  fi
   # Never let a mock session overwrite a real backup -- that is the one
   # unrecoverable mistake this whole script exists to prevent.
   if is_mock_session "$staging/Chronicle.xml"; then
@@ -84,7 +126,8 @@ cmd_backup() {
     die "device is in MOCK mode; refusing to back that up over a real session"
   fi
   cp "$staging/"*.xml "$BACKUP_DIR/"
-  chmod 600 "$BACKUP_DIR"/*.xml
+  [ -f "$staging/$CREDENTIAL_STORE" ] && cp "$staging/$CREDENTIAL_STORE" "$BACKUP_DIR/"
+  chmod 600 "$BACKUP_DIR"/*
   rm -rf "$staging"
   echo "backed up real session -> $BACKUP_DIR"
   grep -o 'name="server_name">[^<]*' "$BACKUP_DIR/Chronicle.xml" | sed 's/.*>/  server: /'
@@ -105,6 +148,7 @@ cmd_real() {
     runas cp "/data/local/tmp/$f" "$PREFS/$f"
     adb_ shell rm -f "/data/local/tmp/$f"
   done
+  restore_credential_store
   write_flag false
   echo "restored real session; mock_plex=false. App is stopped -- launch it normally."
 }
@@ -119,6 +163,7 @@ cmd_mock() {
     && die "the backup is a mock session, not a real one; refusing"
 
   wait_until_stopped
+  clear_credential_store
   write_flag true
   echo "mock_plex=true. App is stopped -- next launch seeds the fixture session."
   echo "Return with: $0 real"

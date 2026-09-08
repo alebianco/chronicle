@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.ChronicleJson
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
+import io.github.mattpvaughn.chronicle.testing.testCredentialStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -37,6 +38,7 @@ class AuthPrefsMigrationTest {
 
   @Before
   fun setUp() {
+    credentials = testCredentialStore()
     val context: Context = ApplicationProvider.getApplicationContext()
     settings = context.getSharedPreferences("cu108-settings", Context.MODE_PRIVATE)
     auth = context.getSharedPreferences("cu108-auth", Context.MODE_PRIVATE)
@@ -44,7 +46,16 @@ class AuthPrefsMigrationTest {
     auth.edit().clear().commit()
   }
 
-  private fun newRepo() = SharedPreferencesPlexPrefsRepo(settings, auth)
+  /**
+   * One credential store across every `newRepo()` in a test.
+   *
+   * These tests model relaunches — "the upgrade reads it", "a fresh sign-in after the clear" — so
+   * the instances must share persistent state. A new store per call would give each relaunch an
+   * empty disk and make the fallback assertions vacuous.
+   */
+  private lateinit var credentials: CredentialStore
+
+  private fun newRepo() = SharedPreferencesPlexPrefsRepo(settings, auth, credentials)
 
   /** Writes credentials the legacy way: into the settings file. */
   private fun writeLegacyCredentials() {
@@ -174,7 +185,7 @@ class AuthPrefsMigrationTest {
     repo.clearCredentials()
 
     assertEquals("", repo.accountAuthToken)
-    assertEquals("", auth.getString("auth_token", "MISSING"))
+    assertEquals("the cleared token must be empty in the credential store", "", credentials.get("auth_token"))
     assertFalse(settings.contains("auth_token"))
   }
 
@@ -214,7 +225,7 @@ class AuthPrefsMigrationTest {
     // And a fresh sign-in after the clear still lands in the auth file.
     val next = newRepo()
     next.accountAuthToken = "new-account-token"
-    assertEquals("new-account-token", auth.getString("auth_token", null))
+    assertEquals("new-account-token", credentials.get("auth_token"))
     assertFalse(settings.contains("auth_token"))
   }
 

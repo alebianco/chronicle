@@ -19,6 +19,7 @@ import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.model.asServer
 import io.github.mattpvaughn.chronicle.data.sources.plex.*
 import io.github.mattpvaughn.chronicle.data.sources.plex.APP_NAME
+import io.github.mattpvaughn.chronicle.data.sources.plex.CredentialStore
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlaying
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.CurrentlyPlayingSingleton
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService
@@ -142,6 +143,23 @@ object AppModule {
   fun provideAuthPrefs(
     @ApplicationContext context: Context,
   ): SharedPreferences = context.getSharedPreferences(AUTH_PREFS_NAME, MODE_PRIVATE)
+
+  /**
+   * The Plex credentials, in `no_backup/`.
+   *
+   * Android excludes that directory from Auto Backup and device transfer by construction, so D8's
+   * "tokens stay on the device" no longer rests on two XML rules naming a file — rules that keep
+   * parsing and stop matching the moment the file moves. See [CredentialStore].
+   *
+   * The `@Named(AUTH_PREFS)` binding above stays: it is what the migration reads from, and an
+   * install that has not launched since the upgrade still has credentials in that file.
+   */
+  @Provides
+  @Singleton
+  fun provideCredentialStore(
+    @ApplicationContext context: Context,
+    @ApplicationScope scope: CoroutineScope,
+  ): CredentialStore = CredentialStore.create(context, scope, AUTH_PREFS_NAME)
 
   @Provides
   @Singleton

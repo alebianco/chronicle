@@ -1,7 +1,7 @@
 ---
 id: cu-219
 title: "DataStore, all three stages, with plex-session.sh moving alongside the credentials"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -68,21 +68,61 @@ Also load-bearing at stage 3:
 
 ## Acceptance Criteria
 
-- [ ] Stage 1: non-secret settings on DataStore, with a **migration from the existing prefs** so no
+- [x] Stage 1: non-secret settings on DataStore, with a **migration from the existing prefs** so no
       user loses a setting
-- [ ] Stage 2: the export path still round-trips — `SettingsBackupRepoTest`, `BackupSchemaTest` and
+- [x] Stage 2: the export path still round-trips — `SettingsBackupRepoTest`, `BackupSchemaTest` and
       `BookmarkBackupTest` green, and coordinated with cu-189
-- [ ] Stage 3: credentials moved **and** `plex-session.sh` updated in the same change
-- [ ] `CHRONICLE_DEVICE=<serial> plex-session.sh status|real|mock` verified working against the
+- [x] Stage 3: credentials moved **and** `plex-session.sh` updated in the same change
+- [x] `CHRONICLE_DEVICE=<serial> plex-session.sh status|real|mock` verified working against the
       tablet **after** stage 3, before the task closes. This is the criterion that protects every
       later device check
-- [ ] `BackupRulesTest` still proves the credentials are excluded from Auto Backup, against the new
+- [x] `BackupRulesTest` still proves the credentials are excluded from Auto Backup, against the new
       file locations
-- [ ] No credential is ever written to a location Auto Backup includes, at any point during the
+- [x] No credential is ever written to a location Auto Backup includes, at any point during the
       migration
-- [ ] `PreferenceFlow.kt` either retired or its continued purpose recorded
-- [ ] Device-verified: log in works, a restart keeps the session, mock mode still swaps
-- [ ] `./verify.sh` green
+- [x] `PreferenceFlow.kt` either retired or its continued purpose recorded
+- [x] Device-verified: log in works, a restart keeps the session, mock mode still swaps
+- [x] `./verify.sh` green
+
+## Result (2026-09-08)
+
+All three stages landed. **The approach changed at stage 3**, with the owner's latitude: rather than
+moving credentials to DataStore's default `files/datastore/` location and rewriting the Auto Backup
+rules to match, they moved to **`Context.noBackupFilesDir`**.
+
+That is the difference between a rule and a property. The old protection was two XML files excluding
+`domain="sharedpref" path="ChronicleAuth.xml"` — correct, but fragile in one specific way: an
+exclusion is scoped to a domain, so the moment the file moves the rules keep parsing, keep passing
+their tests, and quietly stop matching anything. Android excludes `no_backup/` by construction.
+There is no rule left that *could* lapse.
+
+The legacy exclusions stay, and `BackupRulesTest` now asserts both halves: that `CredentialStore`
+writes to `noBackupFilesDir`, and that `ChronicleAuth.xml` is still excluded — an install that has
+not launched since the migration still has live tokens in that file.
+
+### Three defects the work surfaced, each caught by a guard
+
+1. **Empty is a value.** The first `credentialString` used `takeIf { it.isNotEmpty() }`, so an empty
+   credential fell through to a lower layer — resurrecting the token the user had just signed out
+   of. `AuthPrefsMigrationTest` caught it; the fallback now tests *presence* via `hasKey`.
+2. **`plex-session.sh restore` left mock credentials behind.** A backup predating the migration has
+   no credential store, so the restore returned early and left whatever was on the device — which,
+   coming back from mock mode, is the *mock* store. It wins the fallback read, so a "real" session
+   would run on `mock-account-token`. Found on the tablet, not in review. The restore now clears
+   first, unconditionally.
+3. **A regex that ate real documentation.** Collapsing doubled KDoc blocks removed the *existing*
+   docs rather than the new ones. Reverted and redone by hand.
+
+### Device evidence
+
+- Migration: `auth_token`, `server_token` and `uuid` now in
+  `no_backup/plex-credentials.preferences_pb`; `ChronicleAuth.xml` retains only the two migration
+  markers, so no token exists in two places.
+- The app stayed **signed in across the migration** — `LOGGED_IN_FULLY`, no crash.
+- **The owner's real Plex session works**: restored from backup, the app authenticated to plex.tv
+  and retrieved the ANTARES server record. (The connection then failed because that server is not
+  reachable from this network, which is not a credential question.)
+- Full round-trip `real → mock → real` verified, so device verification tooling is intact.
 
 ## Notes
 

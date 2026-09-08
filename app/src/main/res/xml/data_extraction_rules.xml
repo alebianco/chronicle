@@ -31,6 +31,11 @@
     <exclude
       domain="sharedpref"
       path="ChronicleAuth.xml" />
+    <!--
+      Belt and braces. The credentials now live in `no_backup/`, which Android excludes by
+      construction, so this entry is not what protects them any more — it covers the legacy file on
+      an install that has not yet migrated. `BackupRulesTest` asserts both.
+    -->
     <exclude domain="database" />
   </cloud-backup>
 
@@ -38,6 +43,11 @@
     <exclude
       domain="sharedpref"
       path="ChronicleAuth.xml" />
+    <!--
+      Belt and braces. The credentials now live in `no_backup/`, which Android excludes by
+      construction, so this entry is not what protects them any more — it covers the legacy file on
+      an install that has not yet migrated. `BackupRulesTest` asserts both.
+    -->
     <exclude domain="database" />
   </device-transfer>
 </data-extraction-rules>

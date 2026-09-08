@@ -5,7 +5,7 @@ io/github/mattpvaughn/chronicle/data/local 68.79
 io/github/mattpvaughn/chronicle/data/model 95.61
 io/github/mattpvaughn/chronicle/data/sources 86.99
 io/github/mattpvaughn/chronicle/data/sources/local 74.32
-io/github/mattpvaughn/chronicle/data/sources/plex 55.26
+io/github/mattpvaughn/chronicle/data/sources/plex 55.31
 io/github/mattpvaughn/chronicle/data/sources/plex/model 81.72
 io/github/mattpvaughn/chronicle/debug 0.86
 io/github/mattpvaughn/chronicle/debug/compose 0.00

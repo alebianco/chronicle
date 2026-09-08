@@ -69,6 +69,7 @@ class SharedPreferencesPlexPrefsRepo
   constructor(
     private val prefs: SharedPreferences,
     @Named(AppModule.AUTH_PREFS) private val authPrefs: SharedPreferences,
+    private val credentials: CredentialStore,
   ) : PlexPrefsRepo {
     init {
       migrateCredentialsToAuthPrefs()
@@ -153,10 +154,12 @@ class SharedPreferencesPlexPrefsRepo
     override val uuid: String
       @SuppressLint("ApplySharedPref")
       get() {
-        var tempUUID = getString(PREFS_UUID_KEY, "")
+        // The client identifier moves with the tokens: it identifies this install to Plex, and a
+        // backup carrying it would clone one device's identity onto another.
+        var tempUUID = credentialString(PREFS_UUID_KEY)
         if (tempUUID.isEmpty()) {
           val generatedUUID = UUID.randomUUID().toString()
-          prefs.edit().putString(PREFS_UUID_KEY, generatedUUID).commit()
+          putCredential(PREFS_UUID_KEY, generatedUUID)
           tempUUID = generatedUUID
         }
         return tempUUID
@@ -367,6 +370,11 @@ class SharedPreferencesPlexPrefsRepo
      * below be interrupted safely: until it completes, the value is only in the settings file.
      */
     private fun credentialString(key: String): String {
+      // Newest store first: the `no_backup` DataStore, then the auth file, then settings.
+      // Presence, not emptiness — an empty credential is what signing out writes, so falling
+      // through on empty would let a lower layer resurrect the token the user just cleared.
+      // `AuthPrefsMigrationTest` pins that, and caught it when this used `takeIf { isNotEmpty() }`.
+      if (credentials.hasKey(key)) return credentials.get(key)
       authPrefs.getString(key, null)?.let { return it }
       return prefs.getString(key, "") ?: ""
     }
@@ -383,7 +391,12 @@ class SharedPreferencesPlexPrefsRepo
       key: String,
       value: String,
     ) {
-      authPrefs.edit().putString(key, value).commit()
+      credentials.put(key, value)
+      // Both legacy copies go, for the reason above: a value left in a lower layer is one a later
+      // fallback read could resurrect after sign-out.
+      if (authPrefs.contains(key)) {
+        authPrefs.edit().remove(key).commit()
+      }
       if (prefs.contains(key)) {
         prefs.edit().remove(key).commit()
       }
@@ -392,6 +405,7 @@ class SharedPreferencesPlexPrefsRepo
     /** Removes a credential from both files, so a fallback read cannot resurrect it. */
     @SuppressLint("ApplySharedPref")
     private fun removeCredential(key: String) {
+      credentials.remove(key)
       authPrefs.edit().remove(key).commit()
       if (prefs.contains(key)) {
         prefs.edit().remove(key).commit()

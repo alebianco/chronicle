@@ -170,14 +170,29 @@ class BackupRulesTest {
    * here, because the rules cannot be corrected by anyone who does not know they broke.
    */
   @Test
-  fun `the credential store is a sharedpref file, which is what the rules assume`() {
-    val appModule = File(APP_MODULE).readText()
+  fun `the credentials live in no_backup, which Android excludes by construction`() {
+    // Replaces an assertion that the credential store was still a SharedPreferences file. That
+    // guard was right while the XML rules were the only protection, and it did its job: it failed
+    // the moment the store moved, which forced this to be a deliberate change rather than a silent
+    // one. `noBackupFilesDir` is excluded by Android itself, so there is no longer a rule to keep
+    // in sync across two files and two API levels — and therefore none that can quietly lapse.
+    val store = File(CREDENTIAL_STORE).readText()
 
     assertTrue(
-      "provideAuthPrefs no longer calls getSharedPreferences(AUTH_PREFS_NAME). If the credential " +
-        "store moved, `domain=\"sharedpref\"` in both rules files is now matching nothing — the " +
-        "exclusion must move with it, or Auto Backup will take the tokens (D8).",
-      appModule.contains("getSharedPreferences(AUTH_PREFS_NAME"),
+      "CredentialStore no longer writes to noBackupFilesDir. That directory is what keeps the " +
+        "Plex tokens out of Auto Backup (D8); moving the store elsewhere removes the protection, " +
+        "and no XML rule is covering it any more.",
+      store.contains("context.noBackupFilesDir"),
+    )
+  }
+
+  @Test
+  fun `the legacy credentials file is still excluded`() {
+    // An install that has not launched since the migration still has ChronicleAuth.xml on disk
+    // with live tokens in it. Dropping this entry early would back up exactly those users.
+    assertTrue(
+      "an unmigrated install still has ChronicleAuth.xml with real tokens in it",
+      extractionRules.contains(AUTH_PREFS_FILE) && legacyRules.contains(AUTH_PREFS_FILE),
     )
   }
 
@@ -186,7 +201,8 @@ class BackupRulesTest {
     const val EXTRACTION_RULES = "src/main/res/xml/data_extraction_rules.xml"
     const val LEGACY_RULES = "src/main/res/xml/backup_rules.xml"
     const val MANIFEST = "src/main/AndroidManifest.xml"
-    const val APP_MODULE = "src/main/java/io/github/mattpvaughn/chronicle/injection/modules/AppModule.kt"
+    const val CREDENTIAL_STORE =
+      "src/main/java/io/github/mattpvaughn/chronicle/data/sources/plex/CredentialStore.kt"
 
     /** `APP_NAME` is "Chronicle", so the settings file on disk is Chronicle.xml. */
     const val SETTINGS_PREFS_FILE = "Chronicle.xml"
