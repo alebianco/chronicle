@@ -314,6 +314,61 @@ should be broken deliberately, not quietly.
 - **Drop mutation testing.** Honest but wasteful — cu-213 was landed one session ago and its
   derivation guard is the part with lasting value.
 
+## Re-measured on AGP 9.4.0 — 2026-09-08, two of the five blockers are gone
+
+Prompted by the owner asking whether 9.4 might solve what 9.1 did not. **The earlier run was already
+on 9.4.0**, so that is not the difference; what changed is that two of the five were re-tested rather
+than assumed, and both fall.
+
+`verify.sh` green on AGP 8.13.2 after the spike; nothing below is committed.
+
+### `kotlin-parcelize` — **not a blocker.** It is dead code.
+
+`PlexUser` is the only `Parcelable` in the codebase, and **nothing ever parcels it**: no `putExtra`,
+no `Bundle`, no nav argument, and no other `: Parcelable` in `app/src/main`. It is residue from the
+Fragment era the Compose migration removed.
+
+Deleting the annotation, the import and the `kotlin-parcelize` plugin leaves **`verify.sh` green at
+all 10 stages on AGP 8.13.2** — so this is a cleanup worth doing on its own merits, independent of
+any AGP decision. What was recorded as *"applies, silently does nothing"* is really *"applies to
+something nothing uses"*.
+
+### Ktorfit 2.7.5 / Kotlin metadata — **no longer reproduces**
+
+This was the row flagged as *"the one worth arguing about … if that is right, AGP 9 costs the Kotlin
+2.3.21 that step 2 just landed"*. It does not: with parcelize removed, `:app:compileDebugKotlin`
+**succeeds on AGP 9.4.0 with Ktorfit at 2.7.5 and `kotlin = 2.3.21` unchanged**, and Ktorfit's KSP
+codegen runs — `_PlexLoginServiceImpl.kt` is generated for both variants.
+
+Neither Ktorfit nor KSP has published anything since (2.7.5 and 2.3.11 are still latest), so the
+earlier failure was most likely a consequence of the parcelize/plugin state rather than a metadata
+cap. **The reason for doing this is therefore not inverted.**
+
+### What still blocks, re-confirmed by walking it
+
+| | Status on 9.4.0 |
+|---|---|
+| `kotlin.android` plugin | hard error, one-line fix (drop the alias; AGP 9 has it built in) |
+| Hilt < 2.60.1 | hard error, one-line bump — still needs owner sign-off, it breaks this step's own "no other library moves" rule |
+| Pitest / `applicationVariants` | still no AGP 9 release; unapplying it clears configuration, per the owner's earlier "keep PIT, drop the Android wrapper" |
+| **detekt** | **new, not previously recorded** — `:app:detektDebug` does not exist under AGP 9, so `verify.sh` stage fails. detekt's Android variant tasks need whatever its AGP 9 support is |
+| `assets.srcDir` | not re-reached |
+
+So the chain now gets **all the way to a successful `compileDebugKotlin`** — further than either
+earlier attempt — and stops at the verify gate on detekt rather than on anything in app source.
+
+### Where that leaves the decision
+
+The count is no longer "five, three silent". It is **three mechanical build-file changes plus one
+open question (detekt's AGP 9 story)**, with Pitest already settled by a prior owner decision. That
+is a materially cheaper migration than the one this ticket declined.
+
+It matters beyond this ticket: **cu-231 (Circuit) is gated on AGP 9.1.0+**, so the cost of AGP 9 is
+now the cost of the Circuit adoption the owner vetoed into existence in [[decision-26]].
+
+**Not resumed on this ticket.** It is closed, the work is a fresh unit, and the Hilt bump and detekt
+question both need the owner. Recorded here because this is where the AGP 9 evidence lives.
+
 ## AGP 9 is skipped, and what that actually costs (2026-09-07)
 
 **compileSdk 37 landed on AGP 8.13.2. It never needed AGP 9.** That was the question worth asking

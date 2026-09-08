@@ -66,6 +66,13 @@ three silent. That is this project's own call and can be revisited. So the hones
 - **Adopt Circuit at 0.38.0** → re-open the AGP 9 decision (cu-214), on a now-stable 9.4.0.
 - **Adopt Circuit at 0.31.0** → stay on AGP 8.13.2, seven minors back on a `0.x` API.
 
+**AGP 9 was re-measured on 2026-09-08 and is cheaper than cu-214 concluded** — see that ticket. Two
+of its five blockers fall: `kotlin-parcelize` is dead code (now [[cu-233]]), and the Ktorfit/Kotlin
+metadata problem, the one flagged as inverting the whole rationale, does not reproduce — Ktorfit
+2.7.5 compiles on AGP 9.4.0 with `kotlin = 2.3.21` and its KSP codegen runs. What remains is three
+mechanical build-file edits plus one new open question (detekt has no `:app:detektDebug` under AGP
+9). The chain reaches a successful `compileDebugKotlin`, further than either earlier attempt.
+
 Both are live options. Neither is blocked by anything outside this repository.
 
 ### What still needs the owner
