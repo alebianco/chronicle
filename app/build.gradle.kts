@@ -1,7 +1,6 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
-  id("kotlin-parcelize")
   alias(libs.plugins.ksp)
   alias(libs.plugins.ktorfit)
   alias(libs.plugins.hilt)
@@ -74,6 +73,10 @@ aboutLibraries {
 android {
   namespace = "io.github.mattpvaughn.chronicle"
   compileSdk = 37
+  // Pinned rather than defaulted. AGP 8.13.2's built-in default is 35.0.0, which does not track
+  // compileSdk -- so "which build-tools this project needs" was invisible here and silently
+  // changed with every AGP bump. Naming it keeps one version installed across projects.
+  buildToolsVersion = "37.0.0"
 
   lint {
     // Fatal, so `verify.sh`'s lint stage means what it claims. With `abortOnError = false` the

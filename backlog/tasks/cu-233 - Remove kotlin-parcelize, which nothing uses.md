@@ -1,7 +1,7 @@
 ---
 id: cu-233
 title: "Remove kotlin-parcelize, which nothing uses"
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-08'
 labels:
@@ -39,14 +39,14 @@ the value is in what stops being carried, not in bytes saved.
 
 ## Acceptance Criteria
 
-- [ ] `@Parcelize`, the `kotlinx.parcelize` import and `: Parcelable` removed from `PlexUser`
-- [ ] The `id("kotlin-parcelize")` plugin removed from `app/build.gradle.kts`
-- [ ] **Re-confirm nothing parcels it** rather than trusting this ticket — grep for `putExtra`,
-      `Bundle`, `getParcelable` and `: Parcelable` across `app/src/`, including `androidTest`, which
-      was not part of the original scan
-- [ ] `./verify.sh` green
-- [ ] `./test_release_build.sh` passes — `PlexUser` is `@Serializable` and reflection-adjacent, so
-      the R8 assertions are the check that matters here
+- [x] `@Parcelize`, the `kotlinx.parcelize` import and `: Parcelable` removed from `PlexUser`
+- [x] The `id("kotlin-parcelize")` plugin removed from `app/build.gradle.kts`
+- [x] **Re-confirmed across all of `app/src/`**, `androidTest` included: no `putExtra`,
+      `getParcelable` or `Bundle` mentions `PlexUser`, and it held the only `: Parcelable` in the
+      tree
+- [x] `./verify.sh` green, 10 stages
+- [x] `./test_release_build.sh` **exit 0** — 9,402 classes in dex, 24 `@Serializable` models checked,
+      all reflection-dependent classes survived R8
 
 ## Notes
 
