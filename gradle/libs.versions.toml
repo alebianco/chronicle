@@ -3,17 +3,16 @@ agp = "9.4.0"
 # Compose is pinned by a BOM (composeBom); the compiler ships with Kotlin 2.x itself
 # (org.jetbrains.kotlin.plugin.compose), so there is no separate compiler version to keep in step.
 #
-# Held at the 2026.06.x line deliberately: BOM 2026.08.00 pulls Compose 1.12.0, whose
-# `material-ripple-android` and ten sibling artifacts each require **AGP 9.1.0 or higher**.
-# Raise this only together with AGP, not with compileSdk -- compileSdk is already 37 and it
-# made no difference. Measured 2026-09-08; see decision-22's amendment.
-composeBom = "2026.06.01"
+# 2026.08.00 pulls Compose 1.12.0, whose `material-ripple-android` and ten sibling artifacts each
+# require AGP 9.1.0. That hold is lifted: this project is on AGP 9.4.0. Note it was never
+# compileSdk -- 37 landed under AGP 8 and lifted nothing.
+composeBom = "2026.08.00"
 kotlin = "2.3.21"
 coroutines = "1.11.0"
 material = "1.14.0"
 room = "2.8.4"
 ksp = "2.3.11"
-coil = "3.3.0"
+coil = "3.6.2"
 timber = "5.0.1"
 dagger = "2.60.1"
 media3 = "1.11.0"
@@ -44,12 +43,12 @@ appcompat = "1.8.0"
 # leaving the catalog behind would state a version the build does not use. In 1.10+ `onNewIntent`
 # takes a non-null Intent -- a real signature change, fixed at the override in MainActivity.
 androidx-activity = "1.13.0"
-androidx-core = "1.16.0"
+androidx-core = "1.19.0"
 androidx-recyclerview = "1.3.0"
 androidx-fragment = "1.9.0"
 androidx-transition = "1.6.0"
 androidx-sqlite = "2.7.0"
-lifecycle = "2.10.0"
+lifecycle = "2.11.0"
 annotation = "1.10.0"
 ktlint = "12.1.2"
 # Held on the 1.23.x line deliberately. detekt 2.x is a rewrite: rule ids move, the config schema
@@ -95,10 +94,9 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.r
 hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.3.0" }
 hilt-work-compiler = { group = "androidx.hilt", name = "hilt-compiler", version = "1.3.0" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version = "1.3.0" }
-# Navigation Compose. Held at 2.9.x for the same reason as the Compose BOM and
-# lifecycle: 2.10.0 requires **AGP 9.1.0**, and pulls lifecycle 2.11.0 (same gate) with it.
-# Raise it with AGP. Measured 2026-09-08; see decision-22's amendment.
-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version = "2.9.0" }
+# Navigation Compose. Was held at 2.9.x because 2.10.0 requires AGP 9.1.0 and pulls lifecycle
+# 2.11.0 with it -- both gates are cleared now that this project is on AGP 9.4.0.
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version = "2.10.0" }
 # Buildscript-only: pins JavaPoet above the 1.10.0 AGP puts on the same classpath, which Hilt's
 # Gradle plugin cannot run against. See the note in the root build.gradle.kts.
 javapoet = { group = "com.squareup", name = "javapoet", version = "1.13.0" }
