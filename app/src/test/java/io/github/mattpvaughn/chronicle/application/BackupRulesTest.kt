@@ -1,5 +1,6 @@
 package io.github.mattpvaughn.chronicle.application
 
+import io.github.mattpvaughn.chronicle.data.sources.plex.AUTH_PREFS_NAME
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -130,11 +131,62 @@ class BackupRulesTest {
       .toSet()
   }
 
+  /**
+   * The excluded path must name where the credentials **actually** live.
+   *
+   * Every other test here compares the two rules files to each other, which cannot notice if both
+   * are wrong in the same way. That gap is not hypothetical: an Auto Backup exclusion is scoped to
+   * a *domain* — `sharedpref` — and a filename, so moving the credential store to DataStore (which
+   * writes under `files/datastore/`, the `file` domain) makes both rules match nothing while every
+   * existing assertion here keeps passing, and tokens begin going to the user's Drive.
+   *
+   * So this reads the production constant. `AUTH_PREFS_NAME` is what `AppModule.provideAuthPrefs`
+   * hands `getSharedPreferences`, and Android appends `.xml` — if the store ever stops being a
+   * `SharedPreferences` file, this fails and the rules have to be rewritten deliberately rather
+   * than silently becoming decorative.
+   */
+  @Test
+  fun `the excluded path is where the credentials are actually stored`() {
+    val storedAs = "$AUTH_PREFS_NAME.xml"
+
+    assertEquals(
+      "the exclusion names a file the app no longer writes — check whether the credential store " +
+        "moved (DataStore lives in the `file` domain, not `sharedpref`, so a `sharedpref` " +
+        "exclusion silently stops matching)",
+      storedAs,
+      AUTH_PREFS_FILE,
+    )
+    assertTrue(
+      "and both rules files must exclude that exact path",
+      extractionRules.contains(storedAs) && legacyRules.contains(storedAs),
+    )
+  }
+
+  /**
+   * The credential store is still a `SharedPreferences` file.
+   *
+   * Paired with the test above: that one proves the *name* matches, this proves the *mechanism*
+   * still is what the `domain="sharedpref"` rules assume. A migration to DataStore has to fail
+   * here, because the rules cannot be corrected by anyone who does not know they broke.
+   */
+  @Test
+  fun `the credential store is a sharedpref file, which is what the rules assume`() {
+    val appModule = File(APP_MODULE).readText()
+
+    assertTrue(
+      "provideAuthPrefs no longer calls getSharedPreferences(AUTH_PREFS_NAME). If the credential " +
+        "store moved, `domain=\"sharedpref\"` in both rules files is now matching nothing — the " +
+        "exclusion must move with it, or Auto Backup will take the tokens (D8).",
+      appModule.contains("getSharedPreferences(AUTH_PREFS_NAME"),
+    )
+  }
+
   private companion object {
     /** Relative to the `app` module dir, the unit tests' working directory. */
     const val EXTRACTION_RULES = "src/main/res/xml/data_extraction_rules.xml"
     const val LEGACY_RULES = "src/main/res/xml/backup_rules.xml"
     const val MANIFEST = "src/main/AndroidManifest.xml"
+    const val APP_MODULE = "src/main/java/io/github/mattpvaughn/chronicle/injection/modules/AppModule.kt"
 
     /** `APP_NAME` is "Chronicle", so the settings file on disk is Chronicle.xml. */
     const val SETTINGS_PREFS_FILE = "Chronicle.xml"
