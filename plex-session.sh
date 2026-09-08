@@ -23,14 +23,18 @@ PREFS="/data/data/$PKG/shared_prefs"
 # construction — that is what protects the Plex tokens now, rather than an XML rule naming a file.
 NO_BACKUP="/data/data/$PKG/no_backup"
 CREDENTIAL_STORE="plex-credentials.preferences_pb"
-# Chronicle.xml is where the *settings* live (server name, library) and what is_mock_session
-# inspects, so it is required.
-AUTH_FILES=(Chronicle.xml)
+# The settings store, which now holds the server and library selection as well as the user's
+# settings. Chronicle.xml is gone on a migrated device, so this is what `status` inspects.
+SETTINGS_DIR="/data/data/$PKG/files/datastore"
+SETTINGS_STORE="Chronicle.preferences_pb"
+# Nothing in shared_prefs/ is required any more: the settings, the server and the library moved to
+# the DataStore, and a migrated device has no Chronicle.xml at all.
+AUTH_FILES=()
 # ChronicleAuth.xml is the pre-migration credential file. Optional, because a device that has
 # launched since the migration no longer has it -- SharedPreferencesMigration deletes it once the
 # tokens and the migration markers have moved into the credential store. Still carried when it is
 # there, since an install that has not launched yet keeps live tokens in it.
-OPTIONAL_FILES=(ChronicleAuth.xml)
+OPTIONAL_FILES=(Chronicle.xml ChronicleAuth.xml)
 
 adb_() { adb -s "$DEVICE" "$@"; }
 app_running() { [ "$(adb_ shell "ps -A | grep -c $PKG" 2>/dev/null | tr -d '\r')" -gt 0 ]; }
@@ -89,6 +93,21 @@ clear_credential_store() {
 }
 
 # which the loop above already restored, and the app's own migration moves them on next launch.
+# Pushes the backed-up settings store back: server, library and the user's settings.
+restore_settings_store() {
+  # Always clear first, for the same reason the credential store does: a backup predating the
+  # migration has no settings store, and leaving whatever is on the device means the *mock* server
+  # selection survives a "restore real session". The credentials would be real and the server
+  # "Mock Plex Server" — verified on the tablet before this line existed. Clearing lets the app's
+  # own SharedPreferencesMigration repopulate it from the restored Chronicle.xml.
+  runas rm -f "$SETTINGS_DIR/$SETTINGS_STORE" 2>/dev/null || true
+  [ -s "$BACKUP_DIR/$SETTINGS_STORE" ] || return 0
+  runas mkdir -p "$SETTINGS_DIR"
+  adb_ push "$BACKUP_DIR/$SETTINGS_STORE" "/data/local/tmp/$SETTINGS_STORE" >/dev/null
+  runas cp "/data/local/tmp/$SETTINGS_STORE" "$SETTINGS_DIR/$SETTINGS_STORE"
+  adb_ shell rm -f "/data/local/tmp/$SETTINGS_STORE"
+}
+
 restore_credential_store() {
   # Always clear first. A backup taken before the DataStore migration has no credential store, and
   # returning early would leave whatever is on the device in place -- which, restoring a real
@@ -120,6 +139,11 @@ cmd_backup() {
     runas test -f "$PREFS/$f" 2>/dev/null || continue
     runas cat "$PREFS/$f" > "$staging/$f" 2>/dev/null || die "cannot read $f"
   done
+  # The settings store: server and library selection, plus the user's settings. Required, since
+  # this is what a restore needs to put the session back.
+  runas cat "$SETTINGS_DIR/$SETTINGS_STORE" > "$staging/$SETTINGS_STORE" 2>/dev/null \
+    || die "cannot read the settings store"
+  [ -s "$staging/$SETTINGS_STORE" ] || die "settings store came back empty; refusing"
   # The credential store, if this install has migrated. Absent on a pre-migration device, which is
   # not an error -- ChronicleAuth.xml still holds the tokens there.
   if runas test -f "$NO_BACKUP/$CREDENTIAL_STORE" 2>/dev/null; then
@@ -129,7 +153,7 @@ cmd_backup() {
   fi
   # Never let a mock session overwrite a real backup -- that is the one
   # unrecoverable mistake this whole script exists to prevent.
-  if is_mock_session "$staging/Chronicle.xml"; then
+  if is_mock_session "$staging/Chronicle.xml" || is_mock_session "$staging/$SETTINGS_STORE"; then
     rm -rf "$staging"
     die "device is in MOCK mode; refusing to back that up over a real session"
   fi
@@ -144,10 +168,12 @@ cmd_backup() {
 
 cmd_real() {
   require_device
-  for f in "${AUTH_FILES[@]}"; do
-    [ -s "$BACKUP_DIR/$f" ] || die "no backup at $BACKUP_DIR/$f -- run 'backup' while logged in"
-  done
-  is_mock_session "$BACKUP_DIR/Chronicle.xml" \
+  # Either store will do. A backup taken before the DataStore migration has Chronicle.xml and no
+  # settings store; the app's own migration moves it on the next launch. Requiring the new file
+  # would make every pre-migration backup unrestorable, which is the opposite of the point.
+  [ -s "$BACKUP_DIR/$SETTINGS_STORE" ] || [ -s "$BACKUP_DIR/Chronicle.xml" ] \
+    || die "no session backup found -- run 'backup' while logged in"
+  { is_mock_session "$BACKUP_DIR/$SETTINGS_STORE" || is_mock_session "$BACKUP_DIR/Chronicle.xml"; } \
     && die "the backup itself is a mock session; refusing to restore it as real"
 
   wait_until_stopped
@@ -157,6 +183,7 @@ cmd_real() {
     runas cp "/data/local/tmp/$f" "$PREFS/$f"
     adb_ shell rm -f "/data/local/tmp/$f"
   done
+  restore_settings_store
   restore_credential_store
   write_flag false
   echo "restored real session; mock_plex=false. App is stopped -- launch it normally."
@@ -165,14 +192,14 @@ cmd_real() {
 cmd_mock() {
   require_device
   # Refuse unless a real session is safely on disk, so mock is always reversible.
-  for f in "${AUTH_FILES[@]}"; do
-    [ -s "$BACKUP_DIR/$f" ] || die "no backup at $BACKUP_DIR/$f -- run 'backup' first; mock would be a one-way door"
-  done
-  is_mock_session "$BACKUP_DIR/Chronicle.xml" \
+  [ -s "$BACKUP_DIR/$SETTINGS_STORE" ] || [ -s "$BACKUP_DIR/Chronicle.xml" ] \
+    || die "no session backup found -- run 'backup' first; mock would be a one-way door"
+  { is_mock_session "$BACKUP_DIR/$SETTINGS_STORE" || is_mock_session "$BACKUP_DIR/Chronicle.xml"; } \
     && die "the backup is a mock session, not a real one; refusing"
 
   wait_until_stopped
   clear_credential_store
+  runas rm -f "$SETTINGS_DIR/$SETTINGS_STORE" 2>/dev/null || true
   write_flag true
   echo "mock_plex=true. App is stopped -- next launch seeds the fixture session."
   echo "Return with: $0 real"
@@ -183,16 +210,22 @@ cmd_status() {
   local flag staging
   flag="$(read_flag || true)"
   staging="$(mktemp -d)"
-  runas cat "$PREFS/Chronicle.xml" > "$staging/Chronicle.xml" 2>/dev/null || true
+  # The settings store first: Chronicle.xml no longer exists on a migrated device, and reading only
+  # it reported "<no prefs on device>" for a perfectly good session. The XML is still consulted as
+  # a fallback for an install that has not launched since the migration.
+  runas cat "$SETTINGS_DIR/$SETTINGS_STORE" > "$staging/settings" 2>/dev/null || true
+  [ -s "$staging/settings" ] || runas cat "$PREFS/Chronicle.xml" > "$staging/settings" 2>/dev/null || true
   echo "device:   $DEVICE ($PKG)"
   echo "mock_plex flag: ${flag:-<unset>}"
-  if [ -s "$staging/Chronicle.xml" ]; then
-    if is_mock_session "$staging/Chronicle.xml"; then
+  if [ -s "$staging/settings" ]; then
+    if is_mock_session "$staging/settings"; then
       echo "session:  MOCK (fixture server)"
     else
       echo "session:  REAL"
-      grep -o 'name="server_name">[^<]*' "$staging/Chronicle.xml" | sed 's/.*>/  server: /'
-      grep -o 'name="library_name">[^<]*' "$staging/Chronicle.xml" | sed 's/.*>/  library: /'
+      # `strings` because the store is a protobuf: the values are plain text inside it, and the
+      # name follows its key. Falls back cleanly on the XML, where the same greps still match.
+      strings "$staging/settings" 2>/dev/null | grep -A1 '^server_name$' | tail -1 | sed 's/^/  server: /'
+      strings "$staging/settings" 2>/dev/null | grep -A1 '^library_name$' | tail -1 | sed 's/^/  library: /'
     fi
   else
     echo "session:  <no prefs on device>"

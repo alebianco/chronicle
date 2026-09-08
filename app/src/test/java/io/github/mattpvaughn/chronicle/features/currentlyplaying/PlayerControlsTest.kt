@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.work.WorkManager
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -16,6 +15,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.SleepTimerBus
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.testExceptionHandler
 import io.mockk.coEvery
@@ -73,7 +73,7 @@ class PlayerControlsTest {
       currentlyPlaying = currentlyPlaying,
       workManager = mockk<WorkManager>(relaxed = true),
       bookmarkRepository = bookmarkRepository,
-      sharedPrefs = mockk<SharedPreferences>(relaxed = true),
+      settings = testSettingsDataStore(),
       exceptionHandler = testExceptionHandler(),
       appContext = mockk<Context>(relaxed = true),
     )

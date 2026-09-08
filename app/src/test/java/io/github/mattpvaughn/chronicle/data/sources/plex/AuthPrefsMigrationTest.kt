@@ -4,8 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import io.github.mattpvaughn.chronicle.data.ChronicleJson
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.testing.testCredentialStore
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -39,6 +41,7 @@ class AuthPrefsMigrationTest {
   @Before
   fun setUp() {
     credentials = testCredentialStore()
+    settingsDataStore = testSettingsDataStore()
     val context: Context = ApplicationProvider.getApplicationContext()
     settings = context.getSharedPreferences("cu108-settings", Context.MODE_PRIVATE)
     auth = context.getSharedPreferences("cu108-auth", Context.MODE_PRIVATE)
@@ -54,8 +57,9 @@ class AuthPrefsMigrationTest {
    * empty disk and make the fallback assertions vacuous.
    */
   private lateinit var credentials: CredentialStore
+  private lateinit var settingsDataStore: SettingsDataStore
 
-  private fun newRepo() = SharedPreferencesPlexPrefsRepo(settings, auth, credentials)
+  private fun newRepo() = SharedPreferencesPlexPrefsRepo(settings, auth, credentials, settingsDataStore)
 
   /** Writes credentials the legacy way: into the settings file. */
   private fun writeLegacyCredentials() {

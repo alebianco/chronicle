@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.features.download
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -29,7 +30,7 @@ class DownloadIntentStoreTest {
   @Before
   fun setUp() {
     val context = ApplicationProvider.getApplicationContext<Context>()
-    store = DownloadIntentStore(context.getSharedPreferences("test-download-intent", Context.MODE_PRIVATE))
+    store = DownloadIntentStore(testSettingsDataStore("download-intent"))
   }
 
   @Test
@@ -73,14 +74,16 @@ class DownloadIntentStoreTest {
     // because `pending() + trackIds` already builds a new set; verified by sabotage rather than
     // assumed. The aliasing hazard is real in general, but it is the callers' set arithmetic that
     // rules it out here, not the copy.
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    val prefs = context.getSharedPreferences("aliasing-check", Context.MODE_PRIVATE)
-    val first = DownloadIntentStore(prefs)
+    // One store, two readers: the point is that the *second add* reached storage, so both
+    // instances must be looking at the same one. Two `testSettingsDataStore()` calls would create
+    // separate temp files and the assertion would pass or fail for the wrong reason.
+    val shared = testSettingsDataStore("aliasing-check")
+    val first = DownloadIntentStore(shared)
 
     first.add(listOf("2001"))
     first.add(listOf("2002"))
 
-    val second = DownloadIntentStore(prefs)
+    val second = DownloadIntentStore(shared)
     assertEquals(
       "the second add must have persisted; if this fails, getStringSet was mutated in place",
       setOf("2001", "2002"),

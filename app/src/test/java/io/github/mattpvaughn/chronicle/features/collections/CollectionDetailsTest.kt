@@ -8,6 +8,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.every
@@ -67,7 +68,7 @@ class CollectionDetailsTest {
       bookRepo = bookRepo,
       collectionRepo = collectionRepo,
       prefsRepo = mockk<PrefsRepo>(relaxed = true) { every { libraryBookViewStyle } returns "COVER_GRID" },
-      sharedPreferences = prefs,
+      settings = testSettingsDataStore(),
       savedStateHandle =
         SavedStateHandle(
           mapOf(CollectionDetailsViewModel.ARG_COLLECTION_ID to collectionId),

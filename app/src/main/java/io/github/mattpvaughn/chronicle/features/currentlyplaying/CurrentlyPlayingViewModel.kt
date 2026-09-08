@@ -19,6 +19,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookmarkRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository.Companion.TRACK_NOT_FOUND
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.model.*
 import io.github.mattpvaughn.chronicle.data.model.Bookmark
 import io.github.mattpvaughn.chronicle.data.sources.plex.PlexConfig
@@ -122,7 +123,7 @@ class CurrentlyPlayingViewModel
     private val currentlyPlaying: CurrentlyPlaying,
     private val workManager: WorkManager,
     private val bookmarkRepository: IBookmarkRepository,
-    sharedPrefs: SharedPreferences,
+    settings: SettingsDataStore,
     private val exceptionHandler: CoroutineExceptionHandler,
     private val appContext: Context,
   ) : ViewModel() {
@@ -185,7 +186,7 @@ class CurrentlyPlayingViewModel
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     val speed: StateFlow<Float> =
-      sharedPrefs
+      settings
         .floatFlow(PrefsRepo.KEY_PLAYBACK_SPEED, PLAYBACK_SPEED_DEFAULT)
         .map {
           Timber.i("Speed: %.2f", it)
@@ -1094,7 +1095,7 @@ class CurrentlyPlayingViewModel
     val speedChooserState: StateFlow<SpeedChooserState> =
       combineDistinct(
         currentlyPlaying.book,
-        sharedPrefs.floatFlow(PrefsRepo.KEY_PLAYBACK_SPEED, prefsRepo.playbackSpeed),
+        settings.floatFlow(PrefsRepo.KEY_PLAYBACK_SPEED, prefsRepo.playbackSpeed),
       ) { book, globalSpeed ->
         SpeedChooserState.of(book, globalSpeed)
       }.stateIn(
@@ -1105,7 +1106,7 @@ class CurrentlyPlayingViewModel
 
     /** Whether silence-skipping is on. */
     val skipSilence: StateFlow<Boolean> =
-      sharedPrefs
+      settings
         .booleanFlow(PrefsRepo.KEY_SKIP_SILENCE, prefsRepo.skipSilence)
         .stateIn(
           viewModelScope,

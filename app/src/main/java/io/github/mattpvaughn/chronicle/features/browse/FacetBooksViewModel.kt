@@ -1,11 +1,11 @@
 package io.github.mattpvaughn.chronicle.features.browse
 
-import android.content.SharedPreferences
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.FacetKind
 import io.github.mattpvaughn.chronicle.data.model.booksInFacet
@@ -29,7 +29,7 @@ class FacetBooksViewModel
   @Inject
   constructor(
     bookRepository: IBookRepository,
-    sharedPreferences: SharedPreferences,
+    settings: SettingsDataStore,
     savedStateHandle: SavedStateHandle,
   ) : ViewModel() {
     /**
@@ -50,7 +50,7 @@ class FacetBooksViewModel
     private val value: String = savedStateHandle.get<String>(ARG_VALUE).orEmpty()
 
     val viewStyle =
-      sharedPreferences.stringFlow(
+      settings.stringFlow(
         PrefsRepo.KEY_LIBRARY_VIEW_STYLE,
         PrefsRepo.VIEW_STYLE_COVER_GRID,
       )

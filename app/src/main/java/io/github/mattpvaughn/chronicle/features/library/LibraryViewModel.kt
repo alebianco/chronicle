@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.library
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.text.format.Formatter
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,6 +15,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_HIDE_P
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_IS_LIBRARY_SORT_DESCENDING
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_LIBRARY_VIEW_STYLE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_OFFLINE_MODE
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.local.ViewStyleKind
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_AUTHOR
@@ -69,7 +69,7 @@ class LibraryViewModel
     private val prefsRepo: PrefsRepo,
     private val cachedFileManager: ICachedFileManager,
     private val librarySyncRepository: LibrarySyncRepository,
-    sharedPreferences: SharedPreferences,
+    settings: SettingsDataStore,
     private val exceptionHandler: CoroutineExceptionHandler,
     private val appContext: Context,
     private val dispatchers: DispatcherProvider,
@@ -86,7 +86,7 @@ class LibraryViewModel
       get() = _isSearchActive
 
     val viewStyle =
-      sharedPreferences.stringFlow(
+      settings.stringFlow(
         KEY_LIBRARY_VIEW_STYLE,
         prefsRepo.libraryBookViewStyle,
       )
@@ -96,13 +96,13 @@ class LibraryViewModel
       get() = _isFilterShown
 
     val isSortDescending =
-      sharedPreferences.booleanFlow(
+      settings.booleanFlow(
         KEY_IS_LIBRARY_SORT_DESCENDING,
         true,
       )
 
     val arePlayedAudiobooksHidden =
-      sharedPreferences.booleanFlow(
+      settings.booleanFlow(
         KEY_HIDE_PLAYED_AUDIOBOOKS,
         false,
       )
@@ -115,8 +115,8 @@ class LibraryViewModel
      * observable — the chip would show whatever was stored when the sheet opened and never move.
      */
     val sortKey =
-      sharedPreferences.stringFlow(KEY_BOOK_SORT_BY, SORT_KEY_TITLE)
-    val isOffline = sharedPreferences.booleanFlow(KEY_OFFLINE_MODE, false)
+      settings.stringFlow(KEY_BOOK_SORT_BY, SORT_KEY_TITLE)
+    val isOffline = settings.booleanFlow(KEY_OFFLINE_MODE, false)
 
     // Deduped at the source: this is the *whole library*, and Room re-emits it on every write to
     // the Audiobook table — once a second during playback. Without this the sort and filter below

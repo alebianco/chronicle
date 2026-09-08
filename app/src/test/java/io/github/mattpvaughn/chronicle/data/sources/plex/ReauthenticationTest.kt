@@ -7,6 +7,7 @@ import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.MediaType
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.testing.testCredentialStore
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -131,7 +132,7 @@ class ReauthenticationTest {
         context.getSharedPreferences("reauth-test-${System.nanoTime()}", android.content.Context.MODE_PRIVATE)
       val authPrefs =
         context.getSharedPreferences("reauth-auth-${System.nanoTime()}", android.content.Context.MODE_PRIVATE)
-      return SharedPreferencesPlexPrefsRepo(prefs, authPrefs, testCredentialStore()).apply {
+      return SharedPreferencesPlexPrefsRepo(prefs, authPrefs, testCredentialStore(), testSettingsDataStore()).apply {
         accountAuthToken = "account-token"
         // A real connection, not emptyList(): the production getter returns null for a server
         // with no connections, so an empty one is indistinguishable from an absent one and the

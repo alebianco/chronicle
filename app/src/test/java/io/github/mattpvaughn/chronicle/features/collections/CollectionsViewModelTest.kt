@@ -1,6 +1,8 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
 import android.content.SharedPreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.mattpvaughn.chronicle.data.local.BookRepository
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
@@ -8,6 +10,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Collection
 import io.github.mattpvaughn.chronicle.features.collections.compose.CollectionsContent
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.github.mattpvaughn.chronicle.util.keepCollected
@@ -122,7 +125,14 @@ class CollectionsViewModelTest {
     override fun edit(): SharedPreferences.Editor = throw UnsupportedOperationException()
   }
 
-  private val prefs = FakePrefs()
+  /**
+   * The real settings store, not a hand-written `SharedPreferences` fake.
+   *
+   * The fake existed because these ViewModels observed preferences directly; they read
+   * `SettingsDataStore` now, so a fake would be asserting against a reimplementation of the thing
+   * under test — and the ViewModel would read an empty store while the test wrote to the fake.
+   */
+  private val prefs = testSettingsDataStore("library-vm")
 
   private fun collection(
     id: String,
@@ -146,7 +156,7 @@ class CollectionsViewModelTest {
       prefsRepo = prefsRepo,
       librarySyncRepository = syncRepository,
       collectionsRepository = collectionsRepository,
-      sharedPreferences = prefs,
+      settings = prefs,
       bookRepository = bookRepository,
       exceptionHandler = CoroutineExceptionHandler { _, _ -> },
       dispatchers = TestDispatcherProvider(mainDispatcherRule.testDispatcher.scheduler),
@@ -171,7 +181,7 @@ class CollectionsViewModelTest {
   @Test
   fun `reverses the order when the sort direction is flipped`() =
     runTest {
-      prefs.put(PrefsRepo.KEY_IS_LIBRARY_SORT_DESCENDING, false)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_IS_LIBRARY_SORT_DESCENDING), false)
       collectionsFlow.value =
         listOf(
           collection("1", "Dune"),
@@ -246,7 +256,7 @@ class CollectionsViewModelTest {
   fun `an empty library online is Empty, not OfflineEmpty`() =
     runTest {
       collectionsFlow.value = emptyList()
-      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, false)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_OFFLINE_MODE), false)
 
       val vm = viewModel()
       keepCollected(vm.uiState)
@@ -262,7 +272,7 @@ class CollectionsViewModelTest {
   fun `an empty library offline says so, and can offer a way out`() =
     runTest {
       collectionsFlow.value = emptyList()
-      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, true)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_OFFLINE_MODE), true)
 
       val vm = viewModel()
       keepCollected(vm.uiState)
@@ -278,7 +288,7 @@ class CollectionsViewModelTest {
   fun `collections are shown even when offline`() =
     runTest {
       collectionsFlow.value = listOf(collection("1", "Dune"))
-      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, true)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_OFFLINE_MODE), true)
 
       val vm = viewModel()
       keepCollected(vm.uiState)
@@ -294,13 +304,13 @@ class CollectionsViewModelTest {
   fun `the view style decides the grid flag`() =
     runTest {
       collectionsFlow.value = listOf(collection("1", "Dune"))
-      prefs.put(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, PrefsRepo.VIEW_STYLE_DETAILS_LIST)
+      prefs.set(stringPreferencesKey(PrefsRepo.KEY_LIBRARY_VIEW_STYLE), PrefsRepo.VIEW_STYLE_DETAILS_LIST)
 
       val listVm = viewModel()
       keepCollected(listVm.uiState)
       assertEquals(false, settledValue(listVm.uiState).isGrid)
 
-      prefs.put(PrefsRepo.KEY_LIBRARY_VIEW_STYLE, PrefsRepo.VIEW_STYLE_COVER_GRID)
+      prefs.set(stringPreferencesKey(PrefsRepo.KEY_LIBRARY_VIEW_STYLE), PrefsRepo.VIEW_STYLE_COVER_GRID)
 
       val gridVm = viewModel()
       keepCollected(gridVm.uiState)

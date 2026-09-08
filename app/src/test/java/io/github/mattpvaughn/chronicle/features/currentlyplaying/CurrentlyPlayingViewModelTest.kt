@@ -22,6 +22,7 @@ import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.SleepTimerBus
 import io.github.mattpvaughn.chronicle.testing.MultiTrackBook
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.settledValue
 import io.github.mattpvaughn.chronicle.util.settledValues
@@ -418,7 +419,7 @@ class CurrentlyPlayingViewModelTest {
       currentlyPlaying = playing,
       workManager = workManager,
       bookmarkRepository = bookmarkRepository,
-      sharedPrefs = sharedPrefs,
+      settings = testSettingsDataStore(),
       exceptionHandler = testExceptionHandler(),
       appContext = mockk<Context>(relaxed = true),
     )

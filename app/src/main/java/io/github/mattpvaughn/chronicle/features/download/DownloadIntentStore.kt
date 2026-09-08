@@ -1,7 +1,7 @@
 package io.github.mattpvaughn.chronicle.features.download
 
-import android.content.SharedPreferences
-import androidx.core.content.edit
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,10 +37,10 @@ import javax.inject.Singleton
 class DownloadIntentStore
   @Inject
   constructor(
-    private val prefs: SharedPreferences,
+    private val settings: SettingsDataStore,
   ) {
     /** The track ids currently wanted on disk. */
-    fun pending(): Set<String> = prefs.getStringSet(KEY, emptySet()).orEmpty()
+    fun pending(): Set<String> = settings.get(stringSetPreferencesKey(KEY), emptySet())
 
     fun add(trackIds: Collection<String>) {
       if (trackIds.isEmpty()) return
@@ -69,7 +69,7 @@ class DownloadIntentStore
      * It stays because it makes the ownership explicit at the one point that writes.
      */
     private fun write(ids: Set<String>) {
-      prefs.edit { putStringSet(KEY, HashSet(ids)) }
+      settings.set(stringSetPreferencesKey(KEY), HashSet(ids))
     }
 
     private companion object {

@@ -2,7 +2,11 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.mattpvaughn.chronicle.data.ChronicleJson
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.model.PlexLibrary
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
@@ -70,6 +74,7 @@ class SharedPreferencesPlexPrefsRepo
     private val prefs: SharedPreferences,
     @Named(AppModule.AUTH_PREFS) private val authPrefs: SharedPreferences,
     private val credentials: CredentialStore,
+    private val settings: SettingsDataStore,
   ) : PlexPrefsRepo {
     init {
       migrateCredentialsToAuthPrefs()
@@ -213,14 +218,12 @@ class SharedPreferencesPlexPrefsRepo
       @SuppressLint("ApplySharedPref")
       set(value) {
         if (value == null) {
-          prefs.edit()
-            .remove(PREFS_LIBRARY_ID_KEY)
-            .remove(PREFS_LIBRARY_NAME_KEY).commit()
+          settings.remove(PREFS_LIBRARY_ID_KEY)
+          settings.remove(PREFS_LIBRARY_NAME_KEY)
           return
         }
-        prefs.edit()
-          .putString(PREFS_LIBRARY_NAME_KEY, value.name)
-          .putString(PREFS_LIBRARY_ID_KEY, value.id).commit()
+        settings.set(stringPreferencesKey(PREFS_LIBRARY_NAME_KEY), value.name)
+        settings.set(stringPreferencesKey(PREFS_LIBRARY_ID_KEY), value.id)
       }
 
     override var server: ServerModel?
@@ -228,7 +231,7 @@ class SharedPreferencesPlexPrefsRepo
         val name = getString(PREFS_SERVER_NAME_KEY)
         val id = getString(PREFS_SERVER_ID_KEY)
         val token: String = credentialString(PREFS_SERVER_ACCESS_TOKEN)
-        val owned: Boolean = prefs.getBoolean(PREFS_SERVER_IS_OWNED, true)
+        val owned: Boolean = settings.get(booleanPreferencesKey(PREFS_SERVER_IS_OWNED), true)
 
         val connections = getServerConnections()
 
@@ -243,14 +246,17 @@ class SharedPreferencesPlexPrefsRepo
       set(value) {
         if (value == null) {
           removeCredential(PREFS_SERVER_ACCESS_TOKEN)
+          listOf(
+            PREFS_SERVER_ID_KEY,
+            PREFS_SERVER_IS_OWNED,
+            PREFS_SERVER_CONNECTIONS_KEY,
+            PREFS_SERVER_NAME_KEY,
+          ).forEach { settings.remove(it) }
+          // The legacy sets live in the XML, not the settings store — see `putConnections`.
           prefs.edit()
-            .remove(PREFS_SERVER_ID_KEY)
-            .remove(PREFS_SERVER_IS_OWNED)
-            .remove(PREFS_SERVER_CONNECTIONS_KEY)
-            // The legacy keys go too, or a later read would resurrect the old flagless shape.
             .remove(PREFS_LOCAL_SERVER_CONNECTIONS_KEY)
             .remove(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
-            .remove(PREFS_SERVER_NAME_KEY).commit()
+            .commit()
           return
         }
         // The token goes first, deliberately. This was one atomic `commit()` before the files
@@ -260,10 +266,9 @@ class SharedPreferencesPlexPrefsRepo
         // A server with no token looks identical to the user but has *lost a working credential*
         // to get there, so the reverse order is strictly worse.
         putCredential(PREFS_SERVER_ACCESS_TOKEN, value.accessToken)
-        prefs.edit()
-          .putString(PREFS_SERVER_NAME_KEY, value.name)
-          .putString(PREFS_SERVER_ID_KEY, value.serverId)
-          .putBoolean(PREFS_SERVER_IS_OWNED, value.owned).commit()
+        settings.set(stringPreferencesKey(PREFS_SERVER_NAME_KEY), value.name)
+        settings.set(stringPreferencesKey(PREFS_SERVER_ID_KEY), value.serverId)
+        settings.set(booleanPreferencesKey(PREFS_SERVER_IS_OWNED), value.owned)
         putConnections(value.connections)
       }
 
@@ -276,7 +281,7 @@ class SharedPreferencesPlexPrefsRepo
      * exactly as before, until the next `/resources` refresh restores the real flags.
      */
     private fun getServerConnections(): List<Connection> {
-      val serialized = prefs.getString(PREFS_SERVER_CONNECTIONS_KEY, null)
+      val serialized = settings.get(stringPreferencesKey(PREFS_SERVER_CONNECTIONS_KEY), "").ifEmpty { null }
       if (!serialized.isNullOrEmpty()) {
         val parsed =
           try {
@@ -323,11 +328,11 @@ class SharedPreferencesPlexPrefsRepo
 
     // TODO: ensure this is only usable for a certain amount of time
     override var oAuthTempId: Long
-      get() = prefs.getLong(PREFS_TEMP_ID, NO_TEMP_ID_FOUND)
+      get() = settings.get(longPreferencesKey(PREFS_TEMP_ID), NO_TEMP_ID_FOUND)
 
       @SuppressLint("ApplySharedPref")
       set(value) {
-        prefs.edit().putLong(PREFS_TEMP_ID, value).commit()
+        settings.set(longPreferencesKey(PREFS_TEMP_ID), value)
       }
 
     override fun clear() {
@@ -353,14 +358,22 @@ class SharedPreferencesPlexPrefsRepo
      */
     @SuppressLint("ApplySharedPref")
     private fun putConnections(connections: List<Connection>) {
-      prefs.edit()
-        .putString(
-          PREFS_SERVER_CONNECTIONS_KEY,
-          ChronicleJson.encodeToString(connectionsSerializer, connections),
-        )
-        .remove(PREFS_LOCAL_SERVER_CONNECTIONS_KEY)
-        .remove(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
-        .commit()
+      settings.set(
+        stringPreferencesKey(PREFS_SERVER_CONNECTIONS_KEY),
+        ChronicleJson.encodeToString(connectionsSerializer, connections),
+      )
+      // The legacy sets are removed from the **XML**, which is where a legacy install has them —
+      // `legacyServerConnections()` still reads them from there. Removing them from the settings
+      // store instead would leave the real ones on disk, and a later read would resurrect the old
+      // flagless shape. Caught by "writing a server migrates a legacy install off the old keys".
+      if (prefs.contains(PREFS_LOCAL_SERVER_CONNECTIONS_KEY) ||
+        prefs.contains(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
+      ) {
+        prefs.edit()
+          .remove(PREFS_LOCAL_SERVER_CONNECTIONS_KEY)
+          .remove(PREFS_REMOTE_SERVER_CONNECTIONS_KEY)
+          .commit()
+      }
     }
 
     /**
@@ -494,6 +507,8 @@ class SharedPreferencesPlexPrefsRepo
       key: String,
       defaultValue: String = "",
     ): String {
-      return prefs.getString(key, defaultValue) ?: defaultValue
+      // Settings store, not the XML: server and library selection lives beside the user's other
+      // settings so it is restored on a new device, while the tokens stay in `no_backup/`.
+      return settings.get(stringPreferencesKey(key), defaultValue)
     }
   }

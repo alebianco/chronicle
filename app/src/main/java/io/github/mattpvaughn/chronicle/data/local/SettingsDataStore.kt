@@ -54,12 +54,27 @@ class SettingsDataStore(
   val snapshot: StateFlow<Preferences> = _snapshot
 
   init {
+    // Keys the settings store must never hold. `SharedPreferencesMigration` copies a whole prefs
+    // file, so anything that used to share `Chronicle.xml` came across — including `uuid`, the
+    // client identifier that identifies this install to Plex. That belongs with the credentials in
+    // `no_backup/`: this store *is* backed up, so a restore onto a second device would give both
+    // installs the same identity. Stripped on every start, because a stale copy is enough.
+    val notSettings = setOf("uuid", "auth_token", "server_token", "user")
     // Seeded synchronously so the very first read — which happens during Application.onCreate,
     // before any collector has run — sees real values rather than defaults. A first frame drawn
     // from empty preferences is the FirstFrameFlashTest failure mode, one layer down.
     runBlocking {
       runCatching { _snapshot.value = dataStore.data.first() }
         .onFailure { Timber.e(it, "Could not seed the settings snapshot; using defaults") }
+    }
+    scope.launch {
+      runCatching {
+        val present = notSettings.filter { name -> snapshotHasKey(name) }
+        if (present.isNotEmpty()) {
+          Timber.i("Removing ${present.size} credential key(s) that do not belong in the settings store")
+          present.forEach { remove(it) }
+        }
+      }.onFailure { Timber.e(it, "Could not strip credential keys from the settings store") }
     }
     scope.launch {
       dataStore.data
@@ -113,6 +128,20 @@ class SettingsDataStore(
 
   /** True when [key] has ever been written. */
   fun contains(key: String): Boolean = _snapshot.value.asMap().keys.any { it.name == key }
+
+  private fun snapshotHasKey(name: String): Boolean = _snapshot.value.asMap().keys.any { it.name == name }
+
+  /** Removes one setting. */
+  fun remove(key: String) {
+    // The key type does not matter for removal — Preferences keys compare by name — so this takes
+    // a String and lets callers drop a value without knowing which typed key wrote it.
+    val existing = _snapshot.value.asMap().keys.firstOrNull { it.name == key } ?: return
+    _snapshot.value = _snapshot.value.toMutablePreferences().apply { remove(existing) }
+    writeScope.launch {
+      runCatching { dataStore.edit { prefs -> prefs.remove(existing) } }
+        .onFailure { Timber.e(it, "Could not remove $key") }
+    }
+  }
 
   /** Removes every setting. Used by the "reset settings" path. */
   fun clear() {

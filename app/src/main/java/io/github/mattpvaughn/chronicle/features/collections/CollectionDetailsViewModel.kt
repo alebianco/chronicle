@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
-import android.content.SharedPreferences
 import androidx.lifecycle.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.data.local.*
@@ -18,7 +17,7 @@ class CollectionDetailsViewModel
     private val bookRepo: BookRepository,
     private val collectionRepo: CollectionsRepository,
     prefsRepo: PrefsRepo,
-    sharedPreferences: SharedPreferences,
+    settings: SettingsDataStore,
     savedStateHandle: SavedStateHandle,
   ) : ViewModel() {
     /**
@@ -50,7 +49,7 @@ class CollectionDetailsViewModel
     }
 
     val viewStyle =
-      sharedPreferences.stringFlow(
+      settings.stringFlow(
         PrefsRepo.KEY_LIBRARY_VIEW_STYLE,
         prefsRepo.libraryBookViewStyle,
       )

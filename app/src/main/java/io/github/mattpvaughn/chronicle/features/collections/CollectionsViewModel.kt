@@ -1,6 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
-import android.content.SharedPreferences
 import androidx.lifecycle.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.data.local.BookRepository
@@ -12,6 +11,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_HIDE_P
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_IS_LIBRARY_SORT_DESCENDING
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_LIBRARY_VIEW_STYLE
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo.Companion.KEY_OFFLINE_MODE
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.local.viewStyleIsGrid
 import io.github.mattpvaughn.chronicle.data.model.Audiobook.Companion.SORT_KEY_TITLE
 import io.github.mattpvaughn.chronicle.data.model.Collection
@@ -43,7 +43,7 @@ class CollectionsViewModel
     private val prefsRepo: PrefsRepo,
     private val librarySyncRepository: LibrarySyncRepository,
     collectionsRepository: CollectionsRepository,
-    sharedPreferences: SharedPreferences,
+    settings: SettingsDataStore,
     private val bookRepository: BookRepository,
     private val exceptionHandler: CoroutineExceptionHandler,
     private val dispatchers: DispatcherProvider,
@@ -60,31 +60,31 @@ class CollectionsViewModel
       get() = _isSearchActive
 
     val viewStyle =
-      sharedPreferences.stringFlow(
+      settings.stringFlow(
         KEY_LIBRARY_VIEW_STYLE,
         prefsRepo.libraryBookViewStyle,
       )
 
     val isSortDescending =
-      sharedPreferences.booleanFlow(
+      settings.booleanFlow(
         KEY_IS_LIBRARY_SORT_DESCENDING,
         true,
       )
 
     val arePlayedAudiobooksHidden =
-      sharedPreferences.booleanFlow(
+      settings.booleanFlow(
         KEY_HIDE_PLAYED_AUDIOBOOKS,
         false,
       )
 
     private val offlineMode =
-      sharedPreferences.booleanFlow(
+      settings.booleanFlow(
         KEY_OFFLINE_MODE,
         prefsRepo.offlineMode,
       )
 
     private val sortKey =
-      sharedPreferences.stringFlow(
+      settings.stringFlow(
         KEY_BOOK_SORT_BY,
         SORT_KEY_TITLE,
       )

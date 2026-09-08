@@ -1,7 +1,8 @@
 package io.github.mattpvaughn.chronicle.features.library
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.local.LibrarySyncRepository
@@ -9,6 +10,7 @@ import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
 import io.mockk.every
@@ -42,73 +44,14 @@ class LibraryViewModelTest {
   @get:Rule
   val mainDispatcherRule = MainDispatcherRule()
 
-  private class FakePrefs : SharedPreferences {
-    private val booleans = mutableMapOf<String, Boolean>()
-    private val strings = mutableMapOf<String, String>()
-    private val listeners = mutableListOf<SharedPreferences.OnSharedPreferenceChangeListener>()
-
-    fun put(
-      key: String,
-      value: Boolean,
-    ) {
-      booleans[key] = value
-      listeners.toList().forEach { it.onSharedPreferenceChanged(this, key) }
-    }
-
-    fun put(
-      key: String,
-      value: String,
-    ) {
-      strings[key] = value
-      listeners.toList().forEach { it.onSharedPreferenceChanged(this, key) }
-    }
-
-    override fun getBoolean(
-      key: String,
-      defValue: Boolean,
-    ) = booleans[key] ?: defValue
-
-    override fun getString(
-      key: String,
-      defValue: String?,
-    ) = strings[key] ?: defValue
-
-    override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
-      listeners += listener
-    }
-
-    override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
-      listeners -= listener
-    }
-
-    override fun getAll(): MutableMap<String, *> = mutableMapOf<String, Any>()
-
-    override fun getStringSet(
-      key: String,
-      defValues: MutableSet<String>?,
-    ): MutableSet<String>? = defValues
-
-    override fun getInt(
-      key: String,
-      defValue: Int,
-    ) = defValue
-
-    override fun getLong(
-      key: String,
-      defValue: Long,
-    ) = defValue
-
-    override fun getFloat(
-      key: String,
-      defValue: Float,
-    ) = defValue
-
-    override fun contains(key: String) = booleans.containsKey(key) || strings.containsKey(key)
-
-    override fun edit(): SharedPreferences.Editor = throw UnsupportedOperationException()
-  }
-
-  private val prefs = FakePrefs()
+  /**
+   * The real settings store, not a hand-written `SharedPreferences` fake.
+   *
+   * The fake existed because these ViewModels observed preferences directly; they read
+   * `SettingsDataStore` now, so a fake would be asserting against a reimplementation of the thing
+   * under test — and the ViewModel would read an empty store while the test wrote to the fake.
+   */
+  private val prefs = testSettingsDataStore("library-vm")
   private val booksFlow = MutableStateFlow<List<Audiobook>>(emptyList())
 
   private fun book(
@@ -150,7 +93,7 @@ class LibraryViewModelTest {
       bookRepository = bookRepository,
       trackRepository = mockk<ITrackRepository>(relaxed = true),
       prefsRepo = prefsRepo,
-      sharedPreferences = prefs,
+      settings = prefs,
       cachedFileManager = mockk<ICachedFileManager>(relaxed = true),
       librarySyncRepository = syncRepository,
       exceptionHandler = CoroutineExceptionHandler { _, _ -> },
@@ -177,7 +120,7 @@ class LibraryViewModelTest {
   @Test
   fun `flipping the sort direction reverses the order`() =
     runTest {
-      prefs.put(PrefsRepo.KEY_IS_LIBRARY_SORT_DESCENDING, false)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_IS_LIBRARY_SORT_DESCENDING), false)
       booksFlow.value = listOf(book("1", "Alpha"), book("2", "Beta"))
 
       val titles = viewModel().books.first().map { it.title }
@@ -193,7 +136,7 @@ class LibraryViewModelTest {
   @Test
   fun `offline mode hides books that are not downloaded`() =
     runTest {
-      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, true)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_OFFLINE_MODE), true)
       booksFlow.value =
         listOf(
           book("1", "Downloaded", isCached = true),
@@ -224,7 +167,7 @@ class LibraryViewModelTest {
   @Test
   fun `hiding played books filters on view count rather than progress`() =
     runTest {
-      prefs.put(PrefsRepo.KEY_HIDE_PLAYED_AUDIOBOOKS, true)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_HIDE_PLAYED_AUDIOBOOKS), true)
       booksFlow.value =
         listOf(
           book("1", "Finished", viewCount = 1L),
@@ -239,8 +182,8 @@ class LibraryViewModelTest {
   @Test
   fun `the two filters compose`() =
     runTest {
-      prefs.put(PrefsRepo.KEY_OFFLINE_MODE, true)
-      prefs.put(PrefsRepo.KEY_HIDE_PLAYED_AUDIOBOOKS, true)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_OFFLINE_MODE), true)
+      prefs.set(booleanPreferencesKey(PrefsRepo.KEY_HIDE_PLAYED_AUDIOBOOKS), true)
       booksFlow.value =
         listOf(
           book("1", "Keep", isCached = true, viewCount = 0L),
@@ -274,7 +217,7 @@ class LibraryViewModelTest {
         )
 
       Audiobook.SORT_KEYS.forEach { key ->
-        prefs.put(PrefsRepo.KEY_BOOK_SORT_BY, key)
+        prefs.set(stringPreferencesKey(PrefsRepo.KEY_BOOK_SORT_BY), key)
         val sorted = viewModel().books.first()
         assertEquals("sort key '$key' must return every book", 2, sorted.size)
       }

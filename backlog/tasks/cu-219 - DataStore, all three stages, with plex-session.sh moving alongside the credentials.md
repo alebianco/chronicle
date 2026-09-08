@@ -159,6 +159,50 @@ credentials are in `no_backup/plex-credentials.preferences_pb`; `shared_prefs/` 
 all of this — still authenticates to plex.tv and retrieves the ANTARES server. Round-trip
 `real → mock → real` works. No relogin was needed.
 
+## Follow-up: the XML is retired (2026-09-08)
+
+The owner asked what was left in `Chronicle.xml`, and the answer exposed that stage 1 had only moved
+half the problem. `PrefsRepo` wrote to DataStore, but three other things still used the XML — and one
+of them was a live regression.
+
+**The regression.** Five settings were written to DataStore and *observed* on SharedPreferences:
+offline mode, sort order, sort direction, playback speed and skip silence. `PreferenceFlow` built its
+flows on the XML, so a toggle updated the store and left the screen showing the old value.
+`PreferenceFlow` now reads `SettingsDataStore`, which fixes all of them at once, and has direct tests
+for the first time — sabotage-verified.
+
+**The leak.** `SharedPreferencesMigration` copies a whole prefs file, so `uuid` — the client
+identifier that identifies this install to Plex — came across into the settings store, which *is*
+backed up. Restoring onto a second device would have given both installs the same identity, which is
+exactly what moving it to `no_backup/` was meant to prevent. The store now strips credential keys on
+every start.
+
+**What moved.** Server and library selection, and `DownloadIntentStore`, both left the XML for the
+settings store. `Chronicle.xml` no longer exists on a migrated device.
+
+Server/library deliberately stay in the *backed-up* store, per the owner: after a restore you sign in
+once and the server and library are already chosen. That is safe because the tokens are the only
+thing in `no_backup/` — an earlier concern that the stored connection list embedded a server access
+token was **wrong**, checked against what is actually persisted: `Connection` holds a URI and routing
+flags, and the access token goes through `putCredential`.
+
+### Three bugs found by running it rather than reasoning about it
+
+1. **The legacy connection keys were being removed from the wrong store.** `putConnections` cleared
+   them from the settings store while a legacy install has them in the XML, so they would have
+   survived and could resurrect the old flagless shape. Caught by "writing a server migrates a
+   legacy install off the old keys".
+2. **`plex-session.sh status` reported `<no prefs on device>`** for a healthy session, because it
+   inspected a file that no longer exists.
+3. **`restore` left the mock server selection in place.** The credentials came back real and the
+   settings store still said "Mock Plex Server" — the same shape as the credential bug fixed
+   earlier, one store along. `restore_settings_store` now clears before restoring, and the app's
+   own migration repopulates from the restored XML.
+
+Verified end to end on the tablet: `status` reports `REAL` / `server: ANTARES` against the owner's
+real account, and `real → mock → real` round-trips. A backup predating the migration still restores,
+which matters because that is the only backup that exists.
+
 ## Notes
 
 Closing status **In Review**, and it is the highest-blast-radius task in cu-210's programme. It

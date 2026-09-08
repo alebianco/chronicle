@@ -2,13 +2,17 @@ package io.github.mattpvaughn.chronicle.data.sources.plex
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import io.github.mattpvaughn.chronicle.data.model.ServerModel
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.Connection
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.ConnectionTier
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.PlexUser
 import io.github.mattpvaughn.chronicle.data.sources.plex.model.tier
 import io.github.mattpvaughn.chronicle.testing.testCredentialStore
+import io.github.mattpvaughn.chronicle.testing.testSettingsDataStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -35,6 +39,7 @@ import org.robolectric.RobolectricTestRunner
 class PlexPrefsConnectionRoundTripTest {
   private lateinit var prefs: SharedPreferences
   private lateinit var authPrefs: SharedPreferences
+  private lateinit var settingsStore: SettingsDataStore
   private lateinit var repo: SharedPreferencesPlexPrefsRepo
 
   /** Modelled on a real `/api/v2/resources` response, captured from a live sync. */
@@ -75,8 +80,9 @@ class PlexPrefsConnectionRoundTripTest {
     prefs = context.getSharedPreferences("PlexPrefsConnectionRoundTripTest", Context.MODE_PRIVATE)
     prefs.edit().clear().commit()
     authPrefs = context.getSharedPreferences("PlexPrefsConnectionRoundTripTestAuth", Context.MODE_PRIVATE)
+    settingsStore = testSettingsDataStore("plex-round-trip")
     authPrefs.edit().clear().commit()
-    repo = SharedPreferencesPlexPrefsRepo(prefs, authPrefs, testCredentialStore())
+    repo = SharedPreferencesPlexPrefsRepo(prefs, authPrefs, testCredentialStore(), settingsStore)
   }
 
   @Test
@@ -167,11 +173,14 @@ class PlexPrefsConnectionRoundTripTest {
   /** Writes the server the way the legacy code did: bare URIs in two identical string sets. */
   private fun writeLegacyServer(connections: List<Connection>) {
     val uris = connections.map { it.uri }.toSet()
+    // The modern keys go to the settings store, which is where the repo reads them now. The two
+    // legacy connection sets stay in the XML on purpose: that is what a legacy install actually
+    // has, and the fallback that reads them is the thing under test.
+    settingsStore.set(stringPreferencesKey("server_name"), "Test Server")
+    settingsStore.set(stringPreferencesKey("server_id"), "server-id")
+    settingsStore.set(booleanPreferencesKey("server_owned"), true)
     prefs.edit()
-      .putString("server_name", "Test Server")
-      .putString("server_id", "server-id")
       .putString("server_token", "server-token")
-      .putBoolean("server_owned", true)
       // Both keys got the same complete list — the names implied a partition the code never made.
       .putStringSet("local_server_connections", uris)
       .putStringSet("remote_server_connections", uris)
@@ -228,7 +237,7 @@ class PlexPrefsConnectionRoundTripTest {
   fun `unreadable stored connections fall back to the legacy keys`() {
     writeLegacyServer(listOf(lan))
     // A truncated or hand-mangled value must not take the server down with it.
-    prefs.edit().putString("server_connections_v2", "{not json").commit()
+    settingsStore.set(stringPreferencesKey("server_connections_v2"), "{not json")
 
     val restored = repo.server
 
@@ -242,7 +251,7 @@ class PlexPrefsConnectionRoundTripTest {
     // different fact from "nothing has been stored yet". Falling back here would resurrect
     // connections the caller had deliberately replaced with none.
     writeLegacyServer(listOf(lan, wan))
-    prefs.edit().putString("server_connections_v2", "[]").commit()
+    settingsStore.set(stringPreferencesKey("server_connections_v2"), "[]")
 
     assertNull(repo.server)
   }

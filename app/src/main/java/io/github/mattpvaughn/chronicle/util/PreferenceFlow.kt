@@ -1,59 +1,43 @@
 package io.github.mattpvaughn.chronicle.util
 
-import android.content.SharedPreferences
-import kotlinx.coroutines.channels.awaitClose
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.mattpvaughn.chronicle.data.local.SettingsDataStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * A `SharedPreferences` value as a `Flow`, replacing the
- * `Boolean`/`String`/`Float`PreferenceLiveData trio.
+ * A stored setting as a `Flow`.
  *
- * `callbackFlow` is the direct analogue of `LiveData.onActive`/`onInactive`: it registers the
- * listener when collection starts and `awaitClose` unregisters it when collection stops, so the
- * lifetime is tied to the collector rather than to an observer count.
+ * **These read the same store `PrefsRepo` writes.** They used to observe `SharedPreferences`
+ * directly, which was correct until the settings moved to DataStore and quietly stopped being: a
+ * screen watching `KEY_OFFLINE_MODE` on the XML would never see the write that went to DataStore,
+ * so toggling offline mode, the sort order, playback speed or skip silence updated the store and
+ * left the UI showing the old value. One store per concern is what prevents that class of bug, not
+ * a preference about consistency.
  *
- * Two details carried over deliberately:
+ * Two properties carried over from the `SharedPreferences` versions, both load-bearing:
  *
- * - The **current value is emitted first**, before any change arrives. The LiveData versions did
- *   this in `onActive`, and a screen that only learned the value on the next *edit* would render
- *   its default indefinitely — the `FirstFrameFlashTest` failure mode.
- * - `SharedPreferences` fires its listener on whichever thread called `apply()`, which is why the
- *   LiveData versions could not use `value =` safely. A `Flow` has no such constraint: `trySend`
- *   is thread-safe, and the collector resumes on its own dispatcher.
+ * - The **current value is emitted first**. A screen that only learned the value on the next *edit*
+ *   would render its default indefinitely — the `FirstFrameFlashTest` failure mode.
+ * - `distinctUntilChanged`, so a write to any other key does not re-emit this one.
  *
- * `distinctUntilChanged` because `apply()` notifies for every write to the file, not only for
- * writes that changed *this* key.
+ * The callback plumbing is gone: [SettingsDataStore] already exposes its snapshot as a `StateFlow`,
+ * so there is no listener to register or unregister and no thread-confinement caveat to document.
  */
-private fun <T> SharedPreferences.preferenceFlow(
-  key: String,
-  read: SharedPreferences.() -> T,
-): Flow<T> =
-  callbackFlow {
-    trySend(read())
-    val listener =
-      SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
-        if (changed == key) trySend(read())
-      }
-    registerOnSharedPreferenceChangeListener(listener)
-    awaitClose { unregisterOnSharedPreferenceChangeListener(listener) }
-  }.distinctUntilChanged()
-
-/** Exposes a boolean in [SharedPreferences] as a [Flow]. */
-fun SharedPreferences.booleanFlow(
+fun SettingsDataStore.booleanFlow(
   key: String,
   defaultValue: Boolean,
-): Flow<Boolean> = preferenceFlow(key) { getBoolean(key, defaultValue) }
+): Flow<Boolean> = flow(booleanPreferencesKey(key), defaultValue)
 
-/** Exposes a string in [SharedPreferences] as a [Flow]. */
-fun SharedPreferences.stringFlow(
+/** Exposes a string setting as a [Flow]. */
+fun SettingsDataStore.stringFlow(
   key: String,
   defaultValue: String,
-): Flow<String> = preferenceFlow(key) { getString(key, defaultValue) ?: defaultValue }
+): Flow<String> = flow(stringPreferencesKey(key), defaultValue)
 
-/** Exposes a float in [SharedPreferences] as a [Flow]. */
-fun SharedPreferences.floatFlow(
+/** Exposes a float setting as a [Flow]. */
+fun SettingsDataStore.floatFlow(
   key: String,
   defaultValue: Float,
-): Flow<Float> = preferenceFlow(key) { getFloat(key, defaultValue) }
+): Flow<Float> = flow(floatPreferencesKey(key), defaultValue)
