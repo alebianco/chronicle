@@ -45,6 +45,44 @@ not show up in a unit test that only asserts final values:
   Measure it on the ViewModel that drives playback before assuming it is free — playback main-thread
   cost is already 37.7% layout/draw, and the profiling rule applies: profile, do not read.
 
+## CORRECTION, 2026-09-08 — the decline below was **wrong**
+
+The owner asked whether the README's testing note had been read. It had not, and it answers the
+blocker directly. Two mistakes, both mine:
+
+1. **`unitTests.returnDefaultValues = true`** is documented in Molecule's README precisely for JVM
+   unit tests in an Android module. It makes `android.util.Log.e` return a default instead of
+   throwing, which is the entire crash this task was declined over.
+2. **The README's recipe is `moleculeFlow(RecompositionMode.Immediate).test { }`, not
+   `launchMolecule`.** `moleculeFlow` is a *cold* flow — no composition in a constructor, nothing to
+   throw at construction. Every probe below used `launchMolecule`, the hot variant, which is why the
+   constructor was implicated.
+
+Measured after the correction, plain JVM, no Robolectric:
+
+| probe | result |
+|---|---|
+| `moleculeFlow(Immediate)` counter, README shape | **passes** |
+| `moleculeFlow(Immediate)` with a `StateFlow` source, asserting a change propagates | **passes** |
+| the same, without `returnDefaultValues` | fails, as before |
+
+So the finding recorded below — *"`RecompositionMode.Immediate` does not propagate a source
+change"* — is also wrong. It does. The earlier probe read `.value` off a hot `launchMolecule`
+instead of collecting a cold `moleculeFlow`, and never gave the loop a reason to emit.
+
+**What stands from the work below:** the target selection (`CurrentlyPlayingViewModel`, chosen by
+measurement), the `Triple<..., Pair<...>>` as a real pain point, and the device profiling showing no
+regression — 835 jiffies baseline against 699–900 with Molecule.
+
+**What does not stand:** the decline itself, and the claim that 177 plain-JVM test classes force
+Robolectric. They do not; one line of `testOptions` handles it.
+
+This task should be **re-opened and redone** against the README's recipe. It is left `In Review`
+rather than silently reverted so the wrong reasoning stays visible next to the correction — the
+programme's own standard, per cu-229's note about recording a test that was wrong first.
+
+---
+
 ## Outcome: **declined**, and the declaration removed
 
 Molecule was implemented end to end, ran correctly on the tablet, and is **not adopted**. The

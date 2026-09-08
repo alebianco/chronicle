@@ -22,6 +22,64 @@ thirteen screens and it takes routing away from Navigation Compose.
 **Latest is `com.slack.circuit:circuit-foundation:0.38.0`** (checked 2026-09-08). Note the `0.x`
 version: this is the least settled dependency in the bundle, and its API has moved between minors.
 
+## CORRECTION, 2026-09-08 — blocker 2 was wrong, and blocker 1 is a project choice
+
+The owner asked whether the ecosystem is really this broken. It is not. Both blockers below were
+overstated; re-measured after reading Molecule's README:
+
+### Blocker 2 is **withdrawn**. A Circuit presenter *is* JVM-testable.
+
+With `unitTests.returnDefaultValues = true` — documented in Molecule's README for exactly this —
+and the README's `moleculeFlow(RecompositionMode.Immediate).test { }` recipe, a full Circuit
+presenter runs in a **plain JVM** test with no Robolectric:
+
+```kotlin
+moleculeFlow(RecompositionMode.Immediate) { presenter.present() }.test {
+  val first = awaitItem()
+  assertEquals(0, first.count)
+  first.eventSink(SpikeEvent.Increment)   // sealed event, exhaustive `when`
+  assertEquals(1, awaitItem().count)
+}
+```
+
+Narrowed by isolation, each measured: a plain composable returning a state object with a lambda
+passes; a `CircuitUiState` passes; a real `Presenter.present()` passes; a `Presenter` with an
+`eventSink` that mutates state passes.
+
+**Only Circuit's own `Presenter.test { }` helper fails**, with a 3 s timeout. Its signature takes no
+`RecompositionMode` (verified by `javap`: `test-i8z2VEo(Presenter, Duration, String,
+SnapshotMutationPolicy, Function2, Continuation)`), so it picks one internally and that choice does
+not suit a JVM test. Using `moleculeFlow` directly is the workaround, and it is the recipe Molecule
+documents anyway.
+
+The original spike also had a second bug: `awaitItem().eventSink(...)` consumed an extra item, so
+even a working path would have timed out. Both errors were mine.
+
+### Blocker 1 stands as a fact but is **a project decision, not an ecosystem limit**
+
+Circuit 0.38.0 does require AGP 9.1.0+, via lifecycle 2.11.0. But **AGP 9.4.0 is a stable release**
+— 9.4.0 is out, with 9.5.0 in alpha. Nothing about the ecosystem prevents this.
+
+What prevents it here is cu-214, which measured AGP 9 and **skipped** it: five incompatibilities,
+three silent. That is this project's own call and can be revisited. So the honest framing is:
+
+- **Adopt Circuit at 0.38.0** → re-open the AGP 9 decision (cu-214), on a now-stable 9.4.0.
+- **Adopt Circuit at 0.31.0** → stay on AGP 8.13.2, seven minors back on a `0.x` API.
+
+Both are live options. Neither is blocked by anything outside this repository.
+
+### What still needs the owner
+
+The navigation question below is unchanged and still unanswered in code — full routing was chosen,
+and nothing has been migrated. What has changed is that the *test story is no longer a reason not
+to*, and the AGP question is the real decision.
+
+---
+
+## Superseded — the original spike report, 2026-09-08
+
+*Kept for the reasoning trail; blocker 2 is withdrawn above and blocker 1 is reframed.*
+
 ## BLOCKED — the test-story spike, 2026-09-08
 
 **Not started.** A spike was run first, on the owner's instruction, to answer a question cu-230
