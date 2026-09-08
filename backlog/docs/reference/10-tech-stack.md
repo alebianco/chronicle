@@ -168,9 +168,14 @@ Advisory rather than a gate because the tool cannot see runtime-only declaration
 
 ## Known debt
 
-**29 files under `features/` import `data.sources.plex.*` directly** — dominated by
+**25 files under `features/` import `data.sources.plex.*` directly** — dominated by
 `PlexConfig` at 19 (a connection-state holder rather than a fetch API).
 
-That count is **not pinned by any test and has drifted** — it read 27 in the docs until the
-2026-09-06 audit measured 29. A follow-up task is to either ratchet it or stop quoting a number
-nothing maintains.
+That count is now **pinned by `PlexCouplingRatchetTest`** against the committed
+`plex-coupling-baseline.txt`, which lists the files rather than counting them. It may shrink freely;
+a new one fails the build, and a file that leaves must leave the baseline too, so the ratchet
+tightens instead of loosening.
+
+It drifted twice before the guard existed, **in both directions**: documented as 27, measured as 29
+on 2026-09-06, and 25 by the time the ratchet was written on 2026-09-08. That is why the baseline is
+a list — a bare number gives no way to see which file moved.

@@ -1,7 +1,7 @@
 ---
 id: cu-184
 title: Pin the features-to-plex coupling count with a guard
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-06'
 labels:
@@ -35,8 +35,35 @@ trustworthy. Option 2 is the honest fallback if the guard proves noisy.
 
 ## Acceptance Criteria
 
-- [ ] Either a committed guard that fails when the count rises, or the count removed from CLAUDE.md
-- [ ] If a guard: the baseline is a committed file, reviewable in a diff (D12 rule 6)
-- [ ] If a guard: sabotage-verified — adding an import to a `features/` file must fail it
-- [ ] CLAUDE.md's numbers corrected to 29 and 19 either way
-- [ ] `./verify.sh` green
+- [x] **Option 1 taken**: `PlexCouplingRatchetTest` fails when the count rises
+- [x] The baseline is a committed file, reviewable in a diff (D12 rule 6) —
+      `plex-coupling-baseline.txt`, and it **lists the files rather than counting them**
+- [x] Sabotage-verified — adding a `data.sources.plex` import to `SettingsScreen.kt` fails the
+      ratchet, naming the file. Restored in a separate call
+- [x] The documented numbers corrected — **but to 25, not 29.** See below
+- [x] `./verify.sh` green
+
+## Result (2026-09-08)
+
+**Option 1, the ratchet — and the number was wrong again by the time it was written.**
+
+This task recorded a drift from a documented 27 to a measured 29 on 2026-09-06. Measured again on
+2026-09-08: **25**. The count moved *down* by four in two days, presumably as the Compose and Ktor
+work removed direct Plex reaches.
+
+That makes the case for the guard better than the task argued. The concern was a number quietly
+growing; what actually happened is a number moving **in both directions** while three documents
+quoted three different values. A stale figure that flatters the codebase is as misleading as one
+that maligns it.
+
+**The baseline lists the 25 files rather than storing the count**, which the ticket did not specify
+and is the more useful choice: a bare number tells you the ratchet slipped, a list tells you which
+file did it, in a diff, at review time. Same shape as `FrameworkFreeCoreTest`.
+
+**Four tests, two of which guard the guard**: the scan reaches the sources (a wrong root would scan
+nothing and pass), the baseline is present and populated (a missing file would otherwise read as an
+empty set and pass), no file is newly coupled, and no baseline entry is stale — so progress is
+recorded rather than merely tolerated, and the ratchet cannot loosen by accumulating dead entries.
+
+`10-tech-stack.md` corrected to 25 with the guard named. CLAUDE.md no longer quotes the figure at
+all, so there was nothing to correct there.
