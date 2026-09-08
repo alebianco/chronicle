@@ -1,7 +1,7 @@
 ---
 id: cu-210
 title: "Toolchain and OSS adoption programme"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -97,10 +97,29 @@ Recorded here so cu-194 can cite it rather than re-deriving:
 - [x] No task in this programme is started while cu-195 has open device criteria — cu-211, cu-212
       and cu-213 ran under the carve-out, and **cu-195 closed Done on 2026-09-07**, so the rest of
       the programme is unblocked
-- [ ] cu-194 is closed by citing this task rather than repeating its reasoning
+- [x] cu-194 is closed by citing this task rather than repeating its reasoning — ten of its eleven
+      criteria tick by citation. The eleventh, **screenshot testing**, is the one question this
+      programme never answered: cu-194 deferred it until Compose landed, which has now happened, so
+      it is carried to **cu-232** rather than force-closed. Ticking it by citation would have
+      recorded an answer nobody gave
 - [x] The portable-share figure cu-182 inherits is re-measured after cu-217 — **23.7% → 26.0%**
       (+2.3 pts) of `app/src/main`, recorded in `maintainability-review-2026-09.md` beside the
       original so the two are comparable
+
+## Where the programme stands — 2026-09-08
+
+All ten tasks are landed: cu-213, cu-215 and cu-220 closed **Done**; cu-211, cu-212, cu-214, cu-216,
+cu-217, cu-218 and cu-219 sit **In Review**. Every acceptance criterion on this task is met.
+
+Two threads continue past it and are tracked on their own tickets rather than holding this one open:
+
+- **cu-229 / cu-230 / cu-231** — Turbine, Molecule and Circuit, staged per [[decision-26]]. These
+  exist because the owner **vetoed** cu-220's recommended decline, so they are a consequence of this
+  programme rather than part of its original ten.
+- **cu-232** — screenshot testing, the one cu-194 question this programme never answered.
+
+The intended exit point held: cu-216 was the last task after which stopping would have left the
+project strictly better off with no half-migrated state, and everything past it was additive.
 
 ## Notes
 

@@ -272,23 +272,32 @@ HTTP layer is no longer JVM-bound, but the models still are.
 
 ## Acceptance Criteria
 
-- [ ] Each candidate above gets an explicit adopt / decline, with reasoning — and for a decline,
-      what would change the answer
-- [ ] The **DataStore** question is answered rather than left unasked, with the `ChronicleAuth.xml`
-      split, `BACKUP_SETTING_KEYS` and `plex-session.sh` constraints addressed either way
-- [ ] Screenshot testing assessed specifically against the bug class in [[decision-22]] — the four
-      landscape/visibility defects unit tests could not catch
-- [ ] Pitest's status resolved: in the gate, manual, or removed
-- [ ] Anything adopted is checked against licence, [[decision-19]], and the **AGP 9.1.0** pin —
-      not compileSdk, which is already 37
-- [ ] Outcomes recorded as an ADR where a choice is architectural; the task file suffices for a
-      list of declines
-- [ ] For each candidate, the portability delta is recorded — but **no candidate is adopted on
-      multiplatform grounds alone**; each must stand up on Android by itself
-- [ ] `java.io.File` usage measured (15 files today) and the Okio question answered — noting that
-      `FrameworkFreeCoreTest` bans framework imports, not JVM ones, so it is not itself the argument
-- [ ] cu-182's 23.7% portable figure re-measured if anything here is adopted, so it inherits a
-      current number
-- [ ] No `commonMain` source set is created and no KMP plugin applied — cu-182 owns that decision
-- [ ] Any adoption lands as its own task, not inside this one — this task decides, it does not
-      implement
+**Answered by [[cu-210]]**, which turned this survey into a programme of ten tasks rather than
+repeating its reasoning here. One question was not answered and is carried forward rather than
+force-closed — see below.
+
+- [x] Each candidate above gets an explicit adopt / decline, with reasoning — and for a decline,
+      what would change the answer. See cu-210's *"What is declined, and stays declined"* table
+      (SQLDelight, Room 3.0, Kotlin 2.4/Ktorfit 2.7, Paging 3, Tink, `EncryptedSharedPreferences`,
+      Kotest, Mockito, kotlinx-datetime, convention plugins, SaaS quality platforms) and its
+      sequence table for the adoptions
+- [x] The **DataStore** question is answered rather than left unasked — cu-219, three staged steps,
+      with the `ChronicleAuth.xml` split as its own stage
+- [ ] **Screenshot testing** — *not* answered by cu-210, and deliberately not ticked. cu-194
+      deferred it until Compose landed; that has now happened, so it is live rather than resolved.
+      Carried to **cu-232**
+- [x] Pitest's status resolved — cu-213, closed **Done**
+- [x] Anything adopted is checked against licence, [[decision-19]], and the **AGP 9.1.0** pin —
+      cu-216 regenerates the licences page, and cu-214 re-measured the pin as AGP 9.1.0 rather than
+      compileSdk 37, amending [[decision-22]]
+- [x] Outcomes recorded as an ADR where a choice is architectural — [[decision-23]] (Dependabot),
+      [[decision-25]] (Circuit, declined) and [[decision-26]] (Circuit, adopted on the owner's veto)
+- [x] For each candidate, the portability delta is recorded, with none adopted on multiplatform
+      grounds alone — cu-210 records that Room 2.8.3 *is* the KMP path, which is what settled
+      SQLDelight on Android merits rather than portability
+- [x] `java.io.File` usage measured and the Okio question answered — cu-218
+- [x] cu-182's 23.7% portable figure re-measured — **23.7% → 26.0%** (+2.3 pts) after cu-217,
+      recorded beside the original in `maintainability-review-2026-09.md`
+- [x] No `commonMain` source set is created and no KMP plugin applied — none of cu-211…cu-231 does
+- [x] Any adoption lands as its own task — cu-211 through cu-220, then cu-229…cu-231 for the Circuit
+      bundle and cu-232 for the one open question
