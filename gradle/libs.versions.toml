@@ -61,7 +61,7 @@ ktlint = "12.1.2"
 # parse failure would surface as a detekt error rather than a finding.
 detekt = "1.23.8"
 pitest = "0.2.27"
-pitestTool = "1.22.1"
+pitestTool = "1.30.0"
 junit = "4.13.2"
 # Test-only, and deliberately narrow in scope: Turbine is for assertions about a *stream* of
 # events. `util/FlowTestExt.kt` keeps the `StateFlow`-conflation helpers, which answer a different

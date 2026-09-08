@@ -632,6 +632,24 @@ fun robolectricTestClasses(): List<String> {
  */
 val pitestRobolectricExclusion: List<String> = robolectricTestClasses()
 
+// `pitestMockableAndroidJar` builds its input path as `platforms/android-<compileSdk>`, but the
+// SDK installs compileSdk 37 as **`android-37.0`** — a directory naming change that arrived with
+// the platform, not with the plugin. The task then fails with "An input file was expected to be
+// present but it doesn't exist", naming a jar that is genuinely there under the other name.
+//
+// Resolved by pointing the task at whichever `android.jar` actually exists rather than pinning
+// either spelling: a future platform could go back to the unsuffixed form, and a hardcoded
+// `android-37.0` would then fail the same way in the opposite direction.
+tasks.withType<pl.droidsonroids.gradle.pitest.PitestMockableAndroidJarTask>().configureEach {
+  val platforms = File(android.sdkDirectory, "platforms")
+  val sdk = android.compileSdk
+  val candidates = listOf("android-$sdk", "android-$sdk.0")
+  candidates
+    .map { File(platforms, "$it/android.jar") }
+    .firstOrNull { it.isFile }
+    ?.let { inputJar = it }
+}
+
 pitest {
   pitestVersion.set(libs.versions.pitestTool)
   // No junit5PluginVersion: this project is on JUnit 4.13.2. Setting it made the coverage
