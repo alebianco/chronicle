@@ -166,7 +166,12 @@ if [ "$MUTATION" = true ]; then
       echo "  A surviving mutant is a change to the code no test objected to."
       echo "  Report: app/build/reports/pitest/debug/index.html"
     else
-      echo "  pitestDebug reported success but wrote no $report — not failing the gate on it."
+      echo ""
+      echo "  !! pitestDebug reported SUCCESS but wrote no $report."
+      echo "     Treat that as a failure to run, not as a clean result. PIT exits **zero** when it"
+      echo "     cannot start — during the AGP 9 move it printed its help text, wrote nothing, and"
+      echo "     said BUILD SUCCESSFUL, which is a gate silently checking nothing. The exit code is"
+      echo "     not evidence here; this report is. See cu-234."
     fi
   else
     echo ""
