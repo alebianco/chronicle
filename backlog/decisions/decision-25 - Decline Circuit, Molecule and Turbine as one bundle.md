@@ -1,7 +1,7 @@
 ---
 id: decision-25
 title: "Decline Circuit, Molecule and Turbine as one bundle"
-status: accepted
+status: superseded
 created_date: '2026-09-07'
 ---
 
@@ -131,3 +131,37 @@ evidence that the flow-based approach scales here.
 - Convention 2 (`*Screen` + `*Destination`) stands as the screen pattern.
 - The two flow-testing traps cu-220 surfaced are documented in `util/FlowTestExt.kt` regardless of
   this decision — they are real, they cost debugging time, and they are useful without Turbine.
+
+---
+
+## Overturned by the owner (2026-09-08)
+
+**The owner vetoed this decline and directed that Circuit, Molecule and Turbine be adopted.** That
+ruling stands; everything above is kept as the record of what was measured and why the
+recommendation went the other way, not as a live decision.
+
+**What the measurement did and did not settle.** The 6.6% figure is still correct — Circuit removes
+94 of 1,421 `*Destination` lines and relocates the rest. What it measured was *lines*, and lines
+were the wrong yardstick for what the owner is buying. The case that survives the measurement is the
+one recorded above as a real benefit and then discounted:
+
+> A `viewModel::showFacet` becoming `{ eventSink(BrowseEvent.ShowFacet(it)) }` is a sealed event
+> class plus a `when` plus the dispatch — Circuit trades a method reference for a named event type.
+> Real benefits (exhaustiveness, testable event streams), but not fewer lines.
+
+**Exhaustiveness is a correctness property, not a line count.** A sealed event hierarchy with an
+exhaustive `when` makes an unhandled screen interaction a compile error. The current pattern makes it
+a method that nobody calls — which this codebase has shipped before: `download_all` was a fully
+implemented, tested, unreachable feature (cu-208), and `MockPlexMode.disable()` is dead code called
+from nowhere. Neither is a *state* bug of the kind this decision demanded as evidence, and both are
+exactly the shape an event sink would have made impossible.
+
+So the "concrete defect it fixes" test was applied too narrowly here: it looked for a state-management
+bug and did not count the unreachable-handler class the codebase demonstrably has.
+
+**The costs recorded above are unchanged and still real** — chiefly that Navigation Compose was
+settled by cu-188/cu-202/cu-203 and Circuit brings its own router, so navigation gets migrated a
+third time. That is now a cost being accepted, not a reason to decline, and it is the single largest
+risk in the adoption.
+
+The successor decision and the adoption plan live in **[[decision-26]]**.

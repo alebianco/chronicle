@@ -6,10 +6,10 @@ assignee: []
 created_date: '2026-09-07'
 updated_date: '2026-09-08'
 labels:
-  - R3
+  - R2
   - ui
   - bug
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: high
 ---
@@ -53,6 +53,25 @@ Nothing about the toolbar is wrong — it is drawn and then covered.
   the reason rule 5 requires a screenshot rather than a dump.
 - It is worst in the state where the app most needs to look trustworthy — the user has just been
   told their login expired.
+
+## Reproduced on the build under test (2026-09-08)
+
+Confirmed on the tablet in landscape, mock mode, debug build `0.55.0-debug`: the **Series Index
+Tester renders with no toolbar at all** — no title, no back arrow — and the banner occupies exactly
+the band where `ChronicleScaffold`'s `TopAppBar` should be. Screenshot captured.
+
+**Two things the draft could not say, now measured:**
+
+- **The bottom-nav tabs are fine.** Home and Settings both render correctly with the banner up: it
+  sits alongside the search icon rather than over anything, because those screens have no
+  `TopAppBar` of their own. Draft-222 flagged this as unexamined; it is now examined, and the fix
+  does not need to account for a tab regression.
+- **The banner does not scroll away.** It stays pinned over the toolbar band regardless of content
+  position, which rules out "scroll to reveal the toolbar" as an accidental workaround a user might
+  find.
+
+So the defect is exactly as scoped: **pushed sub-screens only**, and it is total rather than partial
+— the toolbar is not clipped, it is entirely covered.
 
 ## Shapes a fix could take
 

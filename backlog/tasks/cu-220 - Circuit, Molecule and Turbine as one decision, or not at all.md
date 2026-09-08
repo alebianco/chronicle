@@ -1,7 +1,7 @@
 ---
 id: cu-220
 title: "Circuit, Molecule and Turbine as one decision, or not at all"
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -129,3 +129,25 @@ becoming a maintenance problem in its own right.
 regardless of the decision — with the distinction that made them confusing: `advanceUntilIdle` is
 correct for the `StateFlow` helpers in that file and useless for a `SharedFlow` collector, which is
 why the same call works in one place and silently produces vacuous assertions in the other.
+
+## Overturned by the owner (2026-09-08)
+
+**The owner vetoed the decline and directed adoption of all three.** Recorded as [[decision-26]],
+which supersedes [[decision-25]].
+
+This task stays **Done**: its job was to measure the boilerplate and force a single decision covering
+all three libraries rather than three separate deferrals, and it did both. The decision it recommended
+was overturned, which is the system working — a recommendation made from the record, surfaced with its
+reasoning, and reversed by the person whose call it is.
+
+**What the measurement got right, and what it weighed wrong.** The 6.6% figure is accurate and
+reproducible. What it could not capture is that the case for Circuit was never a line count: an
+exhaustive `when` over a sealed event type makes an unhandled interaction a *compile error*, where
+the current `viewModel::method` pattern makes it a method nobody calls. This codebase has shipped
+that failure twice — `download_all` (implemented, tested, unreachable, cu-208) and
+`MockPlexMode.disable()` (dead code called from nowhere). Neither is a *state* bug, which is the
+evidence this task demanded, so the test as written could not see the defect class the codebase
+actually has.
+
+The staged adoption is cu-229 (Turbine), cu-230 (Molecule) and cu-231 (Circuit), sequenced so a stall
+leaves nothing half-migrated.

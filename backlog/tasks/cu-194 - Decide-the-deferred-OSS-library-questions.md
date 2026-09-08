@@ -44,12 +44,19 @@ closing open loops, not adopting things. Three standing bars apply to anything a
 
 ## 1. State and presentation
 
-> **Answered by [[decision-25]] (cu-220): Circuit, Molecule and Turbine are all declined, as one
-> bundle.** They were not separable — Circuit without Molecule leaves state derivation as-is, either
-> without Turbine leaves the tests awkward. The deciding measurement: the `*Destination` layer is
-> 1,421 lines, of which only 94 (6.6%) are wiring Circuit removes; the rest relocates. Against that,
-> Circuit's router would mean migrating navigation a third time. The Turbine bullet in §3 below is
-> covered by the same decision.
+> **Answered by [[decision-26]] (2026-09-08): Circuit, Molecule and Turbine are all ADOPTED, as one
+> bundle.** They were never separable — Circuit without Molecule leaves state derivation as-is,
+> either without Turbine leaves the tests awkward.
+>
+> cu-220 measured the boilerplate and recommended declining all three: the `*Destination` layer is
+> 1,421 lines, of which only 94 (6.6%) are wiring Circuit removes, and Circuit's router would mean
+> migrating navigation a third time. That became [[decision-25]], **which the owner vetoed.**
+>
+> The measurement was right and the yardstick was wrong. The case for Circuit is not fewer lines: a
+> sealed event type with an exhaustive `when` makes an unhandled interaction a **compile error**,
+> where `viewModel::method` makes it a method nobody calls — a failure this codebase has shipped
+> twice (`download_all`, `MockPlexMode.disable()`). Staged as cu-229 (Turbine), cu-230 (Molecule),
+> cu-231 (Circuit). The Turbine bullet in §3 below is covered by the same decision.
 
 - **Circuit** (slackhq, Apache-2.0) — deferred by cu-181 as *"Compose-only, so it is a non-starter
   today and a genuine option once screens are Compose."* After cu-188 that precondition is met. Its

@@ -39,7 +39,7 @@ the clearest case — four version bumps that must happen in order, as four stag
 | 7 | **cu-217** kotlinx-serialization | Unpins the models from the JVM |
 | 8 | **cu-218** Okio | **After cu-195** — same files |
 | 9 | **cu-219** DataStore, three stages | Highest blast radius |
-| 10 | **cu-220** Circuit + Molecule + Turbine | Last; a decision task that would replace `*Destination` |
+| 10 | **cu-220** Circuit + Molecule + Turbine | Last; a decision task that would replace `*Destination`. **Recommended decline; owner vetoed and adopted** — see [[decision-26]], staged as cu-229/230/231 |
 
 ## The measurements that set the order
 
