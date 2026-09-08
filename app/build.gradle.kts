@@ -264,10 +264,7 @@ dependencies {
   // debugImplementation rather than testImplementation — Robolectric runs against the debug variant.
   debugImplementation(libs.androidx.fragment.testing)
   implementation(libs.androidx.recyclerview)
-  implementation(libs.androidx.constraintlayout)
   implementation(libs.androidx.transition)
-  implementation(libs.androidx.coordinatorlayout)
-  implementation(libs.androidx.interpolator)
   implementation(libs.androidx.sqlite)
   // Declared explicitly: asLiveData/viewModelScope/ViewModel were previously
   // only reaching the classpath transitively through the Google-IAP billing

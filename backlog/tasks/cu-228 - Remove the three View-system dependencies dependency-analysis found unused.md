@@ -1,14 +1,14 @@
 ---
 id: cu-228
 title: "Remove the three View-system dependencies dependency-analysis found unused"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-08'
 labels:
-  - R3
+  - R2
   - debt
   - build
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-212
 priority: low
@@ -64,18 +64,39 @@ is exactly why cu-212 recorded the findings rather than acting on them.
 
 ## Acceptance Criteria
 
-- [ ] The three dependencies removed from `libs.versions.toml` and `app/build.gradle.kts`
-- [ ] `./verify.sh` green
-- [ ] **`./test_release_build.sh` passes** — the gate that matters here, since R8 is the risk
-- [ ] APK delta recorded, before and after
-- [ ] **Device-verified**: installed and launched, every tab opened, both orientations. A missing
-      resource or theme attribute is a runtime failure — rule 5, and the reason a green suite is
-      not enough
-- [ ] If any removal fails, it is **reverted and the reason recorded** rather than worked around —
-      a transitively-required artifact that nothing imports is a legitimate keep
+- [x] The three dependencies removed from `libs.versions.toml` and `app/build.gradle.kts`
+- [x] `./verify.sh` green
+- [x] `./test_release_build.sh` — release APK builds and R8 leaves the reflection-dependent
+      classes intact
+- [x] APK delta recorded — **byte-identical, 7,363,728 both ways**, and that is the finding
+- [x] **Device-verified**: installed and launched on the tablet 2026-09-08, Home / Library /
+      Settings and a pushed sub-screen opened, both orientations, logcat clean. Verified in the
+      same run as cu-227, which is the change that could actually have broken rendering
+- [x] If any removal fails, it is reverted and the reason recorded — none failed, but see the
+      outcome below: the reason they did not is itself the point
 
 ## Notes
 
 `buildHealth` is advisory (cu-212): it reports, a human judges. This task is the judgement for the
 three clearest entries, not a mandate to apply the whole report — the "declare these transitively"
 half is explicitly not adopted.
+
+## Outcome (2026-09-08)
+
+**Removed, and the APK did not change by a single byte** — 7,363,728 before and after, from a real
+rebuild 14 s apart, not a cached artifact.
+
+That is the honest result, and it is *not* "R8 stripped them". Checking the dex directly rather than
+trusting the byte count: `androidx/constraintlayout` still appears **24 times** and
+`androidx/coordinatorlayout` **once**. `./gradlew :app:dependencies --configuration
+releaseRuntimeClasspath` shows why — all three still resolve **transitively**, at the same versions,
+pulled in by `material` and `appcompat`, which decision-22 says explicitly do not retire.
+
+**So what was removed is three redundant *declarations*, not three libraries.** The catalogue no
+longer claims a direct dependency the code does not have, which is the real (small) win: a version
+ref that nothing governs is a version ref that drifts and misleads.
+
+This is worth recording because the obvious reading of "removed three unused dependencies, APK
+unchanged" is that R8 had already stripped them, and that is false. It also confirms the prediction
+in this task that `androidx.interpolator` was a near-certain transitive requirement — it was, and so
+were the other two.
