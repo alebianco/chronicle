@@ -1,5 +1,5 @@
 [versions]
-agp = "8.13.2"
+agp = "9.4.0"
 # Compose is pinned by a BOM (composeBom); the compiler ships with Kotlin 2.x itself
 # (org.jetbrains.kotlin.plugin.compose), so there is no separate compiler version to keep in step.
 #
@@ -15,7 +15,7 @@ room = "2.8.4"
 ksp = "2.3.11"
 coil = "3.3.0"
 timber = "5.0.1"
-dagger = "2.57.2"
+dagger = "2.60.1"
 media3 = "1.11.0"
 media = "1.7.0"
 kotlinReflect = "2.2.10"

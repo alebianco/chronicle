@@ -651,6 +651,8 @@ tasks.withType<pl.droidsonroids.gradle.pitest.PitestMockableAndroidJarTask>().co
 }
 
 pitest {
+  mainSourceSets.set(listOf(android.sourceSets.getByName("main")))
+  testSourceSets.set(listOf(android.sourceSets.getByName("test")))
   pitestVersion.set(libs.versions.pitestTool)
   // No junit5PluginVersion: this project is on JUnit 4.13.2. Setting it made the coverage
   // minion die with NoClassDefFoundError on PreconditionViolationException, reported only as
@@ -728,4 +730,33 @@ tasks.withType<Test>().configureEach {
   // missing file rather than skipping, because a reconciliation that silently does not run is the
   // very omission it exists to catch, one level up.
   dependsOn("prepareLibraryDefinitionsRelease")
+}
+
+androidComponents {
+  beforeVariants(selector().all()) { variant -> variant.enableUnitTest = true }
+}
+
+// Two things the pitest plugin cannot work out for itself under AGP 9, both set here rather than
+// waiting for an upstream release. `applicationVariants` — the API the plugin is built on — is
+// restored by `android.newDsl=false` in gradle.properties; these two are what remains.
+//
+// **In `afterEvaluate`, and that is load-bearing.** The plugin wires its tasks in its own
+// `afterEvaluate`, so anything set in a plain `configureEach` is overwritten before execution.
+// Measured: the task reported an empty `sourceDirs` at execution time until this moved here.
+afterEvaluate {
+  tasks.withType(pl.droidsonroids.gradle.pitest.PitestTask::class.java).configureEach {
+    val main = android.sourceSets.getByName("main")
+    val test = android.sourceSets.getByName("test")
+    // `sourceDirs` derives from `mainSourceSets`, which the plugin fills only when empty and only
+    // from `android.sourceSets.main` — that yields nothing here, so PIT exited with "Missing
+    // required option(s) [sourceDirs]" **and a zero exit code**, printing its help text and writing
+    // no report. A green build that checked nothing, which is why `verify.sh` asserts the report
+    // exists rather than trusting the exit code.
+    sourceDirs.setFrom(main.java.srcDirs + main.resources.srcDirs)
+    // Test resources. The plugin adds them from `intermediates/java_res/...`, a layout that moved
+    // in AGP 9, so `real-titlesorts.txt` never reached the minion classpath and
+    // `RealTitleSortCorpusTest` failed "without mutation" — which aborts the whole run rather than
+    // reporting a surviving mutant. Adding the source directory is version-independent.
+    additionalClasspath.from(test.resources.srcDirs)
+  }
 }
