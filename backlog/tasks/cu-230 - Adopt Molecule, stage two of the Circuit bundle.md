@@ -1,7 +1,7 @@
 ---
 id: cu-230
 title: "Adopt Molecule, stage two of the Circuit bundle"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-08'
 labels:
@@ -45,21 +45,106 @@ not show up in a unit test that only asserts final values:
   Measure it on the ViewModel that drives playback before assuming it is free — playback main-thread
   cost is already 37.7% layout/draw, and the profiling rule applies: profile, do not read.
 
+## Outcome: **declined**, and the declaration removed
+
+Molecule was implemented end to end, ran correctly on the tablet, and is **not adopted**. The
+blocker is not the conversion — it is that a ViewModel using Molecule **cannot be constructed in a
+plain JVM unit test**, and 177 of this project's 244 test classes are plain JVM.
+
+Per this task's own Notes, recording that outcome and moving to cu-231 is a success rather than a
+failure. The declaration is removed rather than left in place: an unused production dependency is
+the dead weight cu-228 was about.
+
+## What was measured
+
+**The ViewModel was chosen by looking**, as required. `CurrentlyPlayingViewModel` leads on both
+counts — 17 `combineDistinct` call sites against `AudiobookDetailsViewModel`'s 16, and 2 nested
+combinators against 1. Its worst derived state is the honest case cu-194 described:
+
+```kotlin
+private val transportUtilityState:
+  StateFlow<Triple<TransportState, UtilityState, Pair<Boolean, Boolean>>> = ...
+// unpacked as: transportUtility.third.first, transportUtility.third.second
+```
+
+That intermediate exists *only* because "four sources is the combinator's ceiling" — its own comment
+says so — and two booleans are reached through a pair inside a triple with nothing but position to
+say which is which. Molecule removes it: a `@Composable` reads eight sources by name and the
+`Triple` disappears rather than being renamed. The conversion was written, compiles, and is clean.
+
+**On device it works.** With the player open during playback the readout ticked correctly —
+`0:41 left in chapter` / 34% → `0:17` / 38% over 8 s, slider advancing, chapter list live.
+
+**Recomposition cost, per the profile-first rule.** Main-thread jiffies over 12 s with the player
+open during playback:
+
+| build | jiffies / 12 s |
+|---|---|
+| baseline | 835 |
+| Molecule | 900, 812, 761, 699 |
+
+The baseline sits **inside** Molecule's run-to-run spread, so there is no measurable regression on a
+path where layout and draw already dominate at 37.7%. Performance was not the reason to decline.
+
+## Why it is declined
+
+**`launchMolecule` runs `composeInitial` synchronously in the constructor**, and Compose's
+`Recomposer` reports any composition error through `android.util.Log.e`. In a plain JVM unit test
+that call is not mocked and throws, so the ViewModel cannot be built at all. Every one of
+`CurrentlyPlayingViewModelTest`'s 13 tests failed with `Method myLooper in android.os.Looper not
+mocked`, then `Method e in android.util.Log not mocked`.
+
+**It is not the conversion, and not the frame clock.** Reduced to a minimal probe —
+`launchMolecule(ContextClock) { 42 }` with a `BroadcastFrameClock`, no app code involved — a plain
+JVM test throws the same way. Robolectric fixes it, but that is the cost: **177 of 244 test classes
+are plain JVM**, and moving any of them is the opposite direction from cu-213, which found Pitest
+already struggling with the 62 Robolectric classes the Compose migration added.
+
+Two further measurements taken on the way, both worth keeping:
+
+- **`RecompositionMode.Immediate` does not propagate a source change** — measured under Robolectric,
+  a `MutableStateFlow` write left the output at its initial value after `advanceUntilIdle` *and*
+  `yield`. So `Immediate` is not the escape hatch it looks like; `ContextClock` is the only viable
+  mode here, and it needs a real choreographer.
+- **`ContextClock` does not tick under Robolectric either.** It works on a device and only there,
+  so a converted ViewModel's derived state is untestable off-device by any route.
+
+The plumbing cost was also real and is worth recording against any future attempt:
+`CurrentlyPlayingViewModel` has no `DispatcherProvider`, so injecting a frame clock the convention-4
+way meant a constructor change rippling to Hilt, two test factories and `KtorDownloaderTest`'s own
+`DispatcherProvider` implementation — for a stage this programme calls *additive*.
+
+## What would change the answer
+
+- Molecule offering a mode that composes lazily rather than in the constructor, or not routing
+  composition errors through `android.util.Log`.
+- This project moving to Robolectric by default — which cu-213 argues against.
+- A ViewModel whose tests are already Robolectric and whose derived state is painful. None of the
+  three worst offenders qualifies today.
+
+## `combineDistinct` stays, all 65 call sites
+
+Unchanged, and now with a reason rather than by default: the alternative is not testable in this
+project's default test environment. The `Triple<..., Pair<...>>` in `CurrentlyPlayingViewModel`
+remains the honest example of what that costs.
+
 ## Acceptance Criteria
 
-- [ ] `app.cash.molecule:molecule-runtime` declared, version pinned in the catalogue
-- [ ] **The ViewModel with the most painful derived state is identified by looking**, not assumed —
-      name it and say what makes it painful, then convert that one
-- [ ] `RecompositionMode` chosen deliberately, with the reason recorded
-- [ ] The converted ViewModel's tests pass **unchanged where possible** — a conversion that requires
-      rewriting the assertions has changed behaviour, not just derivation
-- [ ] **Recomposition cost measured** on the converted ViewModel if it is on the playback path, per
-      the profile-first rule. A measurement, not an expectation
-- [ ] `combineDistinct` and its 65 call sites: state plainly which stay and which move. **They do not
-      all have to move**, and a mixed codebase is an acceptable outcome if recorded
-- [ ] Device-verified: the converted screen behaves identically, both orientations
-- [ ] `./verify.sh` green
-- [ ] Licence checked (Apache 2.0 expected) and the licences page regenerated
+- [x] `app.cash.molecule:molecule-runtime` declared, version pinned — **and then removed**, since it
+      is not adopted. Verified 2.2.0 latest against Maven Central; Apache 2.0; wants Compose runtime
+      1.9.1 against the BOM's 1.11.4, so no constraint conflict
+- [x] **The ViewModel with the most painful derived state identified by looking** —
+      `CurrentlyPlayingViewModel`, on measured counts, and converted
+- [x] `RecompositionMode` chosen deliberately and the reason recorded — `ContextClock`, with
+      `Immediate` ruled out by measurement rather than by argument
+- [x] The converted ViewModel's tests pass unchanged — **they do not, and that is the finding.** All
+      13 failed at construction
+- [x] **Recomposition cost measured** on the playback path — no regression, table above
+- [x] `combineDistinct` and its 65 call sites: all stay, with the reason recorded
+- [x] Device-verified — the conversion ticks correctly on the tablet; not re-verified in both
+      orientations, since it is not being kept
+- [x] `./verify.sh` green, 10 stages, with the conversion reverted
+- [x] Licence checked (Apache 2.0). Licences page not regenerated — nothing was added to ship
 
 ## Notes
 

@@ -76,3 +76,25 @@ migration ran (decision-22). Not a big-bang rewrite of thirteen destinations.
   are real and independent of Turbine.
 - **`FlowTestExt` does not retire wholesale.** Turbine replaces stream assertions, not the
   `settledValue` helpers that exist for `StateFlow` conflation — those solve a different problem.
+
+## Outcome of stage 2 — recorded 2026-09-08, ruling unchanged
+
+**Molecule was implemented, measured, and declined** (cu-230). This note records what was found; it
+does not amend the decision, which is the owner's.
+
+`launchMolecule` runs the initial composition **synchronously in the constructor**, and Compose's
+`Recomposer` reports composition errors through `android.util.Log.e`. In a plain JVM unit test that
+call throws, so a ViewModel using Molecule cannot be constructed there at all — reproduced with a
+minimal `launchMolecule(ContextClock) { 42 }` and no app code. **177 of this project's 244 test
+classes are plain JVM**, and moving them to Robolectric runs against cu-213, which found Pitest
+already straining under the 62 Robolectric classes the Compose migration added.
+
+Nothing else was the obstacle: on the tablet the converted player ticked correctly, and main-thread
+cost over 12 s was 835 jiffies before against 699–900 after — no measurable regression.
+
+This does not weaken the bundle's rationale. The decision's own framing is that the three are
+adopted together for coherence, *"not because each must be used everywhere"*, and cu-230's Notes
+anticipated exactly this: **"if Molecule does not earn its place on the hardest ViewModel, it does
+not earn it anywhere"**. Circuit is the part the veto was about, and it is unaffected — its
+presenters are `@Composable` but they run inside Circuit's own composition, not a `launchMolecule`
+in a constructor.
