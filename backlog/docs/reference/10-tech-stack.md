@@ -59,8 +59,15 @@ blindly.
 
 ### Compose version pinning
 
-The Compose BOM is held at the **2026.06.x** line and `lifecycle` at **2.10.0**, both because newer
-versions demand compileSdk 37 (we are on 36) and AGP 9.1. **Raise them only with compileSdk.**
+The Compose BOM is held at the **2026.06.x** line, `lifecycle` at **2.10.0** and
+`navigation-compose` at **2.9.0** — all three because their newer versions require **AGP 9.1.0 or
+higher**. **Raise them only with AGP.**
+
+`compileSdk` is **already 37** (cu-214 step 3, on AGP 8.13.2) and raising it changed nothing: the
+holds survived it. Re-measured 2026-09-08 by bumping each ref — `checkDebugAarMetadata` names AGP
+9.1.0 for eleven Compose artifacts, two lifecycle ones and `navigation-compose-android:2.10.0`, and
+mentions compileSdk nowhere. AGP 9 was measured and skipped in cu-214, so these holds lift when that
+is revisited. See decision-22's amendment.
 
 ## The databases
 
@@ -143,11 +150,21 @@ it, every bot PR would open against a branch CI does not test. Related updates a
 with KSP, each AndroidX family), and each deliberate pin is ignored with its reason and the
 condition that lifts it — otherwise a weekly PR per pin trains everyone to ignore the bot.
 
-**Not adopted: the Dependency Analysis Gradle plugin.** `buildHealth` analyses every variant, so it
-compiles `releaseUnitTest`, which has never compiled in this repository — `MoveSyncLocationHookTest`
-calls a `DebugHooks` member that exists only in the debug source set, and nothing in `verify.sh`
-builds that half. See draft-221. The plugin's `ignoreSourceSet` filters advice but not the task
-graph, so it is not a workaround.
+**Adopted, advisory only: the Dependency Analysis Gradle plugin** (`buildHealth`, run on demand,
+never a `verify.sh` stage). It was blocked until the `releaseUnitTest` variant was made to compile
+at all — `buildHealth` analyses every variant, and the plugin's `ignoreSourceSet` filters advice but
+not the task graph, so there was no way round it.
+
+Two traps, both of which look like a clean bill of health:
+
+- **Applied at the root only, it reports nothing** — *"No project health reports found"*, exit 0. It
+  must also be applied to `:app`.
+- **Version 2.19.0 cannot read this toolchain's metadata**: *"Provided Metadata instance has version
+  2.4.0, while maximum supported version is 2.2.0"*. **3.19.1** works on AGP 8.13.2 and Kotlin
+  2.3.21.
+
+Advisory rather than a gate because the tool cannot see runtime-only declarations: it reports
+`hamcrest-modern` as unused, which is a deliberate and correct declaration.
 
 ## Known debt
 

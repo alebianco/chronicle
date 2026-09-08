@@ -51,11 +51,26 @@ three independent `isVisible` assignments that can all be true at once.
 
 ## Version constraints, found by building
 
-- **Compose BOM held at the 2026.06.x line.** 2026.08.00 pulls Compose 1.12.0, whose
-  `material-ripple-android` requires **compileSdk 37**; this project is on 36 (cu-6). Raise the BOM
-  only together with compileSdk.
-- **`lifecycle-*-compose` reuse the existing 2.10.0 ref.** 2.11.0 wants compileSdk 37 *and* AGP
-  9.1.0; AGP 8.x cannot take Gradle ≥ 9.6.0.
+- **Compose BOM held at the 2026.06.x line — by AGP, not by compileSdk.** 2026.08.00 pulls Compose
+  1.12.0, whose `material-ripple-android` and ten sibling artifacts each require **AGP 9.1.0 or
+  higher**. Raise the BOM only together with AGP.
+- **`lifecycle-*-compose` reuse the existing 2.10.0 ref.** 2.11.0 requires **AGP 9.1.0** for the
+  same reason.
+
+**Amended 2026-09-08 (cu-214).** Both notes originally cited `compileSdk 37` as the gate, and the
+lifecycle note added "AGP 8.x cannot take Gradle ≥ 9.6.0". That reasoning is **wrong, and was
+disproved by raising compileSdk**: cu-214 step 3 set `compileSdk = 37` on AGP 8.13.2 as a one-line
+change, and both libraries still refuse. Re-measured on 2026-09-08 by bumping each ref against the
+current tree — `checkDebugAarMetadata` fails with *"requires Android Gradle plugin 9.1.0 or higher.
+This build currently uses Android Gradle plugin 8.13.2"*, naming eleven Compose artifacts and two
+lifecycle ones. **No message mentions compileSdk, and none mentions Gradle 9.6.0.**
+
+The real gate is **AGP 9**, which cu-214 measured and deliberately skipped: five incompatibilities
+(three of them silent — built-in Kotlin making the `kotlin.android` plugin an error,
+`assets.directories`, and `applicationVariants` removal) against one gain. So these two holds are
+**downstream of the AGP 9 decision**, not of an SDK level, and they lift when AGP 9 is taken — not
+before. Recorded because the original reason would otherwise send the next reader to raise an SDK
+that is already raised.
 - **`activity` 1.8.2 → 1.13.0**, because `activity-compose` upgrades it regardless. In 1.10+
   `onNewIntent` takes a non-null `Intent`.
 - **The Compose compiler ships with Kotlin 2.x**, so there is no separate version to keep in step.

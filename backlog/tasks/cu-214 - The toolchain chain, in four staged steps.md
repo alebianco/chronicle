@@ -161,9 +161,14 @@ anyone having to remember. The pins' recorded reason needs correcting first — 
 **Throughout**
 - [x] `./verify.sh` green after **each** step, not only at the end — and CI green after steps 1
       and 2, both jobs including the instrumented suite on a real emulator
-- [ ] **decision-22 needs the owner**: its two "held" notes cite compileSdk 37, but the measured
-      constraint is AGP 9.1.0 — and compileSdk 37 has now landed without lifting either hold. The
-      Dependabot pins carry the corrected reason; the decision record is owner-only
+- [x] **decision-22 amended by the owner (2026-09-08).** Its two "held" notes cited compileSdk 37;
+      the measured constraint is AGP 9.1.0, and compileSdk 37 landed without lifting either hold.
+      Re-measured before amending, by bumping each ref against the current tree:
+      `checkDebugAarMetadata` reports *"requires Android Gradle plugin 9.1.0 or higher. This build
+      currently uses Android Gradle plugin 8.13.2"* for **eleven** Compose artifacts and **two**
+      lifecycle ones, and mentions compileSdk nowhere. `navigation-compose` 2.10.0 was found held by
+      the same gate and its comment was wrong in the same way. Corrected in decision-22, both
+      `libs.versions.toml` comments, `10-tech-stack.md` and cu-194's live constraint list
 
 ## Step 1 result (2026-09-07)
 

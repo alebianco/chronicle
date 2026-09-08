@@ -37,8 +37,10 @@ closing open loops, not adopting things. Three standing bars apply to anything a
 - **Licence** compatible with GPLv3 (Apache-2.0, MIT, BSD, MPL fine — check before adding).
 - **No data extraction** ([[decision-19]]) — no analytics, telemetry, crash reporting or anything
   needing a cloud account, *whatever its licence*.
-- **No forced toolchain jump** — [[decision-22]] pins the Compose BOM at the 2026.06.x line because
-  newer needs compileSdk 37 and AGP 9.1. Anything dragging those is its own task.
+- **No forced toolchain jump** — [[decision-22]] pins the Compose BOM at the 2026.06.x line, and
+  `lifecycle` and `navigation-compose` with it, because newer versions require **AGP 9.1.0**.
+  compileSdk is already 37 and is **not** the constraint (decision-22's original note said it was;
+  amended 2026-09-08 after measuring). Anything dragging AGP 9 is its own task.
 
 ## 1. State and presentation
 
@@ -270,8 +272,8 @@ HTTP layer is no longer JVM-bound, but the models still are.
 - [ ] Screenshot testing assessed specifically against the bug class in [[decision-22]] — the four
       landscape/visibility defects unit tests could not catch
 - [ ] Pitest's status resolved: in the gate, manual, or removed
-- [ ] Anything adopted is checked against licence, [[decision-19]], and the compileSdk 37 / AGP 9.1
-      pin
+- [ ] Anything adopted is checked against licence, [[decision-19]], and the **AGP 9.1.0** pin —
+      not compileSdk, which is already 37
 - [ ] Outcomes recorded as an ADR where a choice is architectural; the task file suffices for a
       list of declines
 - [ ] For each candidate, the portability delta is recorded — but **no candidate is adopted on

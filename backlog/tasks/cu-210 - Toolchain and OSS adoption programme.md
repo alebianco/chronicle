@@ -53,7 +53,11 @@ Each of these was checked rather than assumed, and each one moved an answer:
 - **Room 3.0 exists and is declined.** It is a deliberate breaking major, currently alpha, whose
   headline is JS/WASM. Against five databases, nineteen exported schemas and seven migration tests,
   with no second target yet asked for by cu-182, the risk buys nothing.
-- **AGP 9.4.0 is available**, so decision-22's `compileSdk 37` gate can actually be cleared.
+- **AGP 9.4.0 is available.** This was recorded as the way to clear decision-22's `compileSdk 37`
+  gate — but that gate was misdescribed. compileSdk 37 landed in step 3 on AGP 8.13.2 and lifted
+  nothing; the real constraint on Compose 1.12, lifecycle 2.11 and navigation-compose 2.10 is
+  **AGP 9.1.0** (re-measured 2026-09-08, decision-22 amended). AGP 9 was then measured and
+  **skipped** in cu-214: five incompatibilities, three of them silent, against one gain.
 - **`play-services-oss-licenses` is declared *and* its plugin applied, and nothing uses it.** It is
   dead weight *and* a distribution blocker: decision-1 puts F-Droid first, and F-Droid does not
   accept Play Services dependencies. See cu-216.
@@ -85,13 +89,18 @@ Recorded here so cu-194 can cite it rather than re-deriving:
 - [x] cu-211 lands **before any toolchain or library task** — it is the mitigation, and the
       programme is unjustifiable if a repeat of this session's blocker can still reach a device.
       Only cu-212 precedes it, because cu-211's CI job needs the branch trigger cu-212 adds
-- [ ] cu-214's four steps are committed and verified **separately**, and its step 3 (AGP 9) is
-      device-verified before step 4 stacks on it
+- [x] cu-214's four steps are committed and verified **separately** — each with its own
+      `./verify.sh`, and CI green after steps 1 and 2. Step 3 shipped **compileSdk 37 on AGP
+      8.13.2** and was device-verified on the tablet in both orientations; **AGP 9 itself was
+      measured and skipped**, so nothing stacked on it. Step 4 is consequently recorded as skipped
+      rather than done — Compose 1.12 and lifecycle 2.11 need AGP 9.1.0
 - [x] No task in this programme is started while cu-195 has open device criteria — cu-211, cu-212
       and cu-213 ran under the carve-out, and **cu-195 closed Done on 2026-09-07**, so the rest of
       the programme is unblocked
 - [ ] cu-194 is closed by citing this task rather than repeating its reasoning
-- [ ] The portable-share figure cu-182 inherits is re-measured after cu-217
+- [x] The portable-share figure cu-182 inherits is re-measured after cu-217 — **23.7% → 26.0%**
+      (+2.3 pts) of `app/src/main`, recorded in `maintainability-review-2026-09.md` beside the
+      original so the two are comparable
 
 ## Notes
 

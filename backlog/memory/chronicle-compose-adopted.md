@@ -28,6 +28,8 @@ Screenshot traps: wait for `dumpsys gfxinfo` to report frames rendered (a pre-fi
 a blank window that looks like a broken screen), and confirm a suspicious capture by sampling pixels
 — a 15 KB PNG of a 1920x1200 screen is itself the tell. Related: [[chronicle-tablet-session]].
 
-Version pins that are **not** arbitrary: Compose BOM held at 2026.06.x and `lifecycle` at 2.10.0,
-both because newer releases demand compileSdk 37 (project is on 36) and AGP 9.1. Raise only with
-compileSdk.
+Version pins that are **not** arbitrary: Compose BOM held at 2026.06.x, `lifecycle` at 2.10.0 and
+`navigation-compose` at 2.9.0 — all three because newer releases require **AGP 9.1.0**. Raise only
+with AGP. This memory previously said compileSdk 37 was the gate; that was wrong. compileSdk 37
+shipped on AGP 8.13.2 and lifted nothing, and `checkDebugAarMetadata` names AGP for every held
+artifact and compileSdk for none.

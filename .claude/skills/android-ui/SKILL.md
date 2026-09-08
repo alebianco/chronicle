@@ -41,8 +41,10 @@ migration:
   in stock Material purple: obvious on a device, easy to miss in a test asserting only text.
   `ChronicleThemeTest` pins the palette against `colors.xml`; the duplication is deliberate (a
   preview has no Android theme) and retires with the last XML screen.
-- **The Compose BOM is held at the 2026.06.x line and `lifecycle` at 2.10.0**, both because newer
-  versions demand compileSdk 37 (we are on 36) and AGP 9.1. Raise them only with compileSdk.
+- **The Compose BOM is held at the 2026.06.x line**, with `lifecycle` at 2.10.0 and
+  `navigation-compose` at 2.9.0, all three because newer versions require **AGP 9.1.0**. Raise them
+  only with AGP. **Not compileSdk** — that is already 37, and raising it lifted none of the holds;
+  the earlier note claiming otherwise was measured wrong and decision-22 has been amended.
 
 **Navigation Component for Fragments must not be adopted** — Navigation Compose is the target, and
 the Fragment variant would be migrated twice. Same reason the Hilt migration follows the screens.
