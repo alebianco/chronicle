@@ -1,7 +1,7 @@
 ---
 id: cu-222
 title: "CI lost the minSdk floor when api27 would not start"
-status: Done
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -243,9 +243,11 @@ than quietly accepted.
 - [x] **Fault 1's named escape hatch is closed for good**: `testedAbi` is absent from the
       `ManagedVirtualDevice` DSL interface on **AGP 9.4.0** as well as 8.13.2, verified with
       `javap`. No available AGP version lets the build script set it
-- [x] **Fault 2 fixed** — a lost write in `SettingsDataStore`, not an ABI or a network question.
-      api35 went 3/3 failing to **5/5 passing** on fresh AVDs, and api27 is **3/3 passing**. Guarded
-      by a sabotage-verified unit test
+- [~] **Fault 2 narrowed, not closed.** A real lost write in `SettingsDataStore` was found and
+      fixed (45cc6db5), and it moved the rate a long way: api35 went 3/3 failing to 5/5 passing on
+      fresh AVDs, api27 3/3 passing, guarded by a sabotage-verified unit test. **But it recurred on
+      2026-09-09**, run 34365259771 — four api27 failures with the original signature, on a branch
+      that provably contains the fix. See the section below. Tracked in cu-238
 - [x] **Two separate faults, and they must not be conflated.** The `api27Setup` failure ("no value
       available", after the unspecified-ABI warning) is one. The *suite* failing on a freshly
       created AVD at **both** API levels is the other, measured 2026-09-08 and reproducible — it is
@@ -398,9 +400,49 @@ it is a no-op on arm64 where the image is already 64-bit.
 known to be wrong. Caching ~1.7 GB may be safe now that the emulator is installed up front. Left off
 deliberately, because that is unmeasured and the gate is not worth risking on a guess.
 
+## Fault 2 recurred — run 34365259771, 2026-09-09. This task was closed too confidently.
+
+Found incidentally while benchmarking two CI cache configurations, on
+`experiment/setup-gradle-basic`. Four api27 failures, api35 clean 10/10:
+
+```
+AutoBrowseTreeTest.theBrowseRootIsNotTheEmptyRoot
+  java.lang.AssertionError: a seeded session must yield a real browse root, got 'empty root'
+AutoBrowseTreeTest.theRootOffersEveryCategoryByItsStableId
+LoggedInLaunchTest.launchesIntoTheAppWhenAlreadySignedIn
+LoggedInLaunchTest.survivesRecreation
+```
+
+That is fault 2's original signature exactly, and **not** the AGP setup bug: `api27Setup`
+*succeeded* on this run. `git merge-base --is-ancestor` confirms 45cc6db5 — the `SettingsDataStore`
+fix — is present on the branch that failed, so this is a genuine recurrence rather than a stale
+checkout.
+
+Rate across today's runs: **6 passes, 1 failure (~14%)**, down from the ~40% measured on
+2026-09-09 before the fix. So the fix helped materially and the remaining fault is rarer, but real.
+
+### What went wrong with the record, not just the code
+
+The closing criterion cited "3/3 failing to 5/5 passing" as proof. Five consecutive passes cannot
+establish a fix for a fault this ticket had **already measured at ~2 in 5** — the probability of
+five clean runs on an unfixed ~40% fault is about 8%, which is unlikely but nowhere near excluded.
+This ticket's own earlier correction says it outright: *"A fix therefore cannot be confirmed by one
+green run."* That warning was written here and then not applied to the fix that followed it.
+
+The lesson is about the closing standard, not the diagnosis: a fix for a probabilistic fault needs a
+run count derived from the measured rate, and `Done` should not have been claimed from five.
+
+**What remains true and is not reopened:** fault 1 (the AGP unguarded-provider bug) is genuinely
+fixed and api27 runs on CI — that half is unaffected by this recurrence.
+
 ## Notes
 
-Closing status **In Review**: dropping a test target is a judgement about acceptable risk.
+Closing status **In Review**, revised 2026-09-09: this was briefly `Done`, which was wrong. Fault 1
+is machine-proved (api27 runs on CI, 10/10), but fault 2 recurred after being called fixed — see the
+recurrence section. The remaining work is split out to **cu-238** so this task's fault-1 result is
+not held hostage to it; the owner decides whether to close this on fault 1 alone.
+
+Original note: dropping a test target is a judgement about acceptable risk.
 
 ~~Check whether AGP 9 fixes the setup half — its `testedAbi` is the property the warning points
 at.~~ **Answered 2026-09-09: it does not.** `testedAbi` is absent from the `ManagedVirtualDevice`

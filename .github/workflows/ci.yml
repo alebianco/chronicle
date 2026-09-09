@@ -60,6 +60,18 @@ jobs:
       #
       # Watch the restore/save times if that assumption ever stops holding: this is exactly how the
       # emulator image cache became a net loss.
+      #
+      # **Measured against `gradle/actions/setup-gradle` with `cache-provider: basic`** (the only
+      # MIT-licensed provider; `enhanced` is a 2.3 MB proprietary bundle under gradle.com terms,
+      # a poor fit for GPLv3 + D9). Runs 34365288691 (this) and 34365259771 (basic):
+      #
+      #   this, restoring     671 MiB in ~4 s   32 tasks FROM-CACHE, assembleDebug 1m16s -> 5s
+      #   basic               caches `~/.gradle/caches` wholesale — 2.74 GiB equivalent
+      #
+      # `basic` also sets **no restore-keys at all** (a deliberate choice in cache-service-basic.ts),
+      # so any change matching `**/*.gradle*` is a total miss rather than a partial restore. Its own
+      # docs recommend against hand-rolled caching, and for most projects that is right — the reason
+      # to keep this one is the 76 % smaller archive, which is measured, not assumed.
       - name: Cache Gradle dependencies
         uses: actions/cache@v6
         with:
@@ -173,6 +185,18 @@ jobs:
       #
       # Watch the restore/save times if that assumption ever stops holding: this is exactly how the
       # emulator image cache became a net loss.
+      #
+      # **Measured against `gradle/actions/setup-gradle` with `cache-provider: basic`** (the only
+      # MIT-licensed provider; `enhanced` is a 2.3 MB proprietary bundle under gradle.com terms,
+      # a poor fit for GPLv3 + D9). Runs 34365288691 (this) and 34365259771 (basic):
+      #
+      #   this, restoring     671 MiB in ~4 s   32 tasks FROM-CACHE, assembleDebug 1m16s -> 5s
+      #   basic               caches `~/.gradle/caches` wholesale — 2.74 GiB equivalent
+      #
+      # `basic` also sets **no restore-keys at all** (a deliberate choice in cache-service-basic.ts),
+      # so any change matching `**/*.gradle*` is a total miss rather than a partial restore. Its own
+      # docs recommend against hand-rolled caching, and for most projects that is right — the reason
+      # to keep this one is the 76 % smaller archive, which is measured, not assumed.
       - name: Cache Gradle dependencies
         uses: actions/cache@v6
         with:
