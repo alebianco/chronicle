@@ -115,17 +115,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # No cache for the emulator system images, deliberately.
+      # No cache for the emulator system images. Revisit this only with the note below in mind.
       #
       # Caching them looked free — they live outside ~/.gradle, so each run refetched ~1.7 GB. But a
       # restored system-images directory made `api35Setup` fail with "Cannot query the value of this
-      # property because it has no value available", the same symptom api27 shows, and the run that
-      # first restored the cache is exactly the run that broke. Whatever AGP resolves at install
-      # time is not fully reconstructed by unpacking the directory.
+      # property because it has no value available", and the run that first restored the cache is
+      # exactly the run that broke.
       #
-      # A ~40 s download against a gate that does not run is not a saving.
+      # That was originally read as "AGP resolves something at install time that unpacking a cached
+      # directory does not reconstruct". That reading was **wrong**. It is the same unguarded
+      # `getEmulatorDirectoryProvider().get()` described in the pre-install step below: with the
+      # images already cached, api35 became the *first* device to reach that call, before the
+      # emulator package had been installed. The cache did not corrupt anything — it changed the
+      # ordering.
       #
-      # Do not "revisit under AGP 9" — this project is on AGP 9.4.0 now and `testedAbi` is still
+      # So caching may well be safe now that the emulator is installed up front. It is left off
+      # because that is unmeasured, and a ~40 s download is not worth risking the gate on a guess.
+      #
+      # Do not "revisit under AGP 9" for `testedAbi` — this project is on AGP 9.4.0 and it is still
       # absent from the public DSL, so that escape hatch was never there.
 
       # Gradle Managed Devices boot a real emulator, which needs KVM. The ubuntu-latest image
@@ -151,6 +158,37 @@ jobs:
 
       - name: Grant execute permissions
         run: chmod +x gradlew verify.sh coverage-ratchet.sh
+
+      # Install the emulator package BEFORE Gradle runs. This is what lets api27 exist in
+      # `ciCheckGroup` at all, and it is a workaround for an AGP bug, not a preference.
+      #
+      # `ManagedDeviceInstrumentationTestSetupTask$ManagedDeviceSetupRunnable` guards the *system
+      # image* it resolves (`sdkImageDirectoryProvider(...).isPresent`, with a written-out error
+      # message for the missing case) and then calls `getEmulatorDirectoryProvider().get()` with
+      # **no `isPresent` check** — verified by reading the bytecode of AGP 9.4.0. When the emulator
+      # package is not installed yet, that provider has no value and Gradle throws its generic
+      # "Cannot query the value of this property because it has no value available", naming no
+      # property, which is why the message never mentioned the emulator.
+      #
+      # The runner's timestamps show the race plainly: api27Setup began installing the emulator at
+      # 11:57:17, failed at 11:57:18, and the emulator package only finished at 11:57:23 — five
+      # seconds after the task that needed it had already died. api35 then succeeded on the same
+      # runner *because* it ran second, by which point the package was there.
+      #
+      # It has never reproduced locally for the same reason: a dev machine already has the package.
+      # This also explains the api35Setup failure that the image cache once caused — the cache
+      # changed install ordering, making api35 the first device to hit the same unguarded call.
+      - name: Install the emulator package
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install emulator
+          # Assert the outcome, not the exit code: the whole point is that a missing directory
+          # surfaces later as an unrelated-looking Gradle error inside a setup task.
+          if [ ! -x "$ANDROID_HOME/emulator/emulator" ]; then
+            echo "::error::$ANDROID_HOME/emulator/emulator is missing — api27Setup will fail with 'no value available'."
+            ls -l "$ANDROID_HOME/emulator" || echo "no emulator directory at all"
+            exit 1
+          fi
+          "$ANDROID_HOME/emulator/emulator" -version | head -2
 
       # --instrumented is opt-in locally (it costs minutes and two emulator boots, which would
       # wreck the inner loop) but never optional here.
