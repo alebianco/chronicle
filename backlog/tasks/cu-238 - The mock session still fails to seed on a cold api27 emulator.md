@@ -59,6 +59,64 @@ The `SettingsDataStore` write-in-flight fix addressed one path to that. Candidat
 - Something specific to API 27's slower cold boot that widens whatever window remains; note it has
   never been observed on api35.
 
+## Code reading, 2026-09-09 — a specific remaining race, not yet reproduced
+
+Traced the read path the failing assertion depends on. `MockPlexMode.enable` writes
+`plexPrefs.server`, and `SharedPreferencesPlexPrefsRepo.server`'s getter returns **null** unless
+*all* of name, token and connections read back. Three of those four values go through
+`SettingsDataStore` (`PREFS_SERVER_NAME_KEY`, `..._ID_KEY`, `..._IS_OWNED`,
+`PREFS_SERVER_CONNECTIONS_KEY`); the access token goes to a separate `authPrefs` file via
+`commit()`. So the DataStore is on the critical path, as cu-222 found.
+
+**The gap the 45cc6db5 fix leaves.** `set()` does, in order:
+
+```kotlin
+_snapshot.value = ...updated...              // 1. snapshot moves
+synchronized(pendingLock) { pendingWrites += key }   // 2. key marked in flight
+writeScope.launch { ... }                    // 3. disk write
+```
+
+and the collector does `_snapshot.value = fromDisk.withPendingWrites()`.
+
+Steps 1 and 2 are **not atomic together**. A disk emission that lands between them is re-applied
+using a `pendingWrites` set that does not yet contain this key, so `withPendingWrites()` skips it
+and the fresh snapshot value is overwritten by the older disk value. The window is a few
+instructions, which fits a fault that went from ~40% to ~14% rather than to zero: the fix closed
+the *wide* window (writes already in flight) and left a narrow one.
+
+There is a second, similar hazard in `withPendingWrites()` itself: it reads `_snapshot.value` at
+line 84 *after* taking the `pendingWrites` snapshot at line 82, so a `set()` completing between
+those two reads can be partially observed.
+
+**Why api27 and not api35:** a slower cold boot lengthens the first `dataStore.data` emission's
+arrival, making it likelier to interleave with `MockPlexMode`'s four rapid `set()` calls.
+
+### Reproduced locally, 2026-09-09 — 400/400 with a control
+
+A JVM probe on **real threads** (not `runTest`'s virtual time, which cannot interleave two adjacent
+statements): a `DataStore` whose `updateData` sleeps 2 ms, one `set()` of
+`PREFS_SERVER_NAME_KEY`, and a second thread pushing 60 unrelated disk emissions across it.
+
+```
+with racing emissions:      lost 400 / 400 writes
+without (control, RACE=0):  lost   0 / 400 writes
+```
+
+The control is what makes this evidence rather than a coincidence: the same probe with the racing
+thread disabled loses nothing, so the loss is caused by the interleaving and not by the probe's own
+timing. The existing guard test cannot catch this — it emits *after* `set()` returns, which is the
+wide window the 45cc6db5 fix already closed.
+
+So the mechanism is confirmed: **a disk emission arriving between the snapshot move and the
+pending-mark rolls the write back.** The 400/400 rate is for a deliberately hostile interleaving; on
+a device the window is a few instructions wide, which is consistent with ~14% on a slow cold boot.
+
+**Still to do before a fix lands:** the fix itself, and confirmation at a run count derived from the
+device-observed rate. The candidate is to mark the key pending *before* moving the snapshot and take
+both under `pendingLock`, and to have `withPendingWrites()` read the pending set and the snapshot
+under the same lock — the second hazard noted above. Cheap, but it must be sabotage-verified against
+this probe promoted to a real test, not committed on the strength of the analysis.
+
 ## Acceptance Criteria
 
 - [ ] The failure is **reproduced locally** before any fix — a cold/deleted AVD at api27, and enough
