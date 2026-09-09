@@ -155,6 +155,82 @@ both under `pendingLock`, and to have `withPendingWrites()` read the pending set
 under the same lock — the second hazard noted above. Cheap, but it must be sabotage-verified against
 this probe promoted to a real test, not committed on the strength of the analysis.
 
+## Instrumented, 2026-09-09 — the mechanism is now measured, and the obvious fix does not close it
+
+Third attempt, done the way the retraction above prescribed: instrument every `_snapshot.value`
+assignment with thread + site + value, run until a loss occurs, and **read** the ordering. No
+hypothesis from code shape this time.
+
+### What the trace shows
+
+A loss caught at the natural rate (~1 %, 1/200, control 0/600 across three race-off runs):
+
+```
+Test worker              |set.marked      |server_name=Mock Plex Server
+worker-3 @coroutine#107  |collect.fromDisk|unrelated=false
+worker-3 @coroutine#107  |wpw.live        |server_name          <- guard active, re-applies
+worker-3 @coroutine#107  |collect.applied |unrelated=false,server_name=Mock Plex Server
+worker-2 @coroutine#108  |set.persisted   |...
+worker-2 @coroutine#108  |set.unmarked    |...                  <- key leaves pendingWrites
+worker-2 @coroutine#107  |collect.fromDisk|unrelated=true       <- STALE, read before the write
+worker-2 @coroutine#107  |wpw.live        |                     <- nothing tracked any more
+worker-2 @coroutine#107  |collect.applied |unrelated=true       <- server_name gone
+```
+
+**The real defect, stated precisely:** pending-tracking is keyed on *write completion*, but
+correctness requires it to outlast *every emission that predates the write*. A `dataStore.data`
+emission whose file read began before the write landed can be **delivered after** it. By then
+`pendingWrites` no longer holds the key, and the stale value is applied unopposed.
+
+This is a wider window than either earlier reading guessed. Both previous hypotheses concerned the
+few instructions between the snapshot move and the pending-mark; the measured hole is the entire
+interval between the write landing and the last in-flight emission draining — unbounded, and
+naturally longer on a slow cold boot, which is the api27-only observation.
+
+### The candidate fix, and why it fails
+
+Tried: hold the *intended value* per key (`Map<Key, Intent>` rather than `Set<Key>`), do the mark
+and the snapshot move together under `pendingLock`, read the pending set and the incoming disk
+state under the same lock, and — the actual change — **clear an intent only when an emission
+carries the intended value**, i.e. when disk demonstrably agrees, rather than when
+`dataStore.edit` returns.
+
+It does not work, and the trace says why in one line:
+
+```
+collect.fromDisk|unrelated=false,server_name=Mock Plex Server   <- disk agrees, intent settles
+collect.fromDisk|unrelated=true                                 <- stale, arrives next, undefended
+```
+
+The write's **own** emission satisfies "disk agrees", and it necessarily arrives *before* the stale
+emission still queued behind it. So disk agreement is not evidence of ordering either. Measured
+with the fix applied, four runs of 200 at the natural rate: `93, 0, 0, 0`. The 93 is not noise
+around 1 % — it is the same interleaving, and the spread across identical runs shows this harness's
+rate is dominated by host scheduling and is **not a usable measure of the device fault**.
+
+Reverted. Not committed.
+
+### What the next attempt should and should not do
+
+Ruled out by measurement, do not retry:
+
+- The `set()` mark/move ordering (attempt 2, retracted above).
+- Settling pending writes on disk agreement (this attempt). Any rule of the form "stop defending
+  the key once *some* evidence arrives" fails, because a staler emission can always be behind the
+  evidence.
+
+The shape of a fix that could work: **make staleness detectable rather than inferred.** The
+collector cannot currently tell an emission that predates a write from one that follows it — it
+sees only values. A monotonic write counter stored *in the preferences themselves*, or comparing
+against the `Preferences` instance the write returned rather than against values, would give the
+collector an ordering to test. Alternatively, stop merging disk into the snapshot at all once the
+store has been seeded, and treat `set` as authoritative — the snapshot's purpose is synchronous
+reads of values this process wrote, and nothing else writes this file.
+
+Also note the harness limitation above: **this JVM probe cannot confirm a fix.** Its rate swings
+0–93 per 200 between identical runs. Confirmation has to come from the api27 instrumented job at a
+run count derived from the ~14 % device rate, per the acceptance criteria.
+
 ## Acceptance Criteria
 
 - [ ] The failure is **reproduced locally** before any fix — a cold/deleted AVD at api27, and enough
