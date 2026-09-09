@@ -136,6 +136,49 @@ class SettingsDataStoreTest {
       assertEquals("mock-server", settings.get(style, ""))
     }
 
+  /**
+   * **A write survives a disk emission that predates it but is delivered after it lands.**
+   *
+   * This is the case the test above cannot reach. That one emits while the write is still in
+   * flight, which the `pendingWrites` bookkeeping this replaced already handled.
+   * Here the emission arrives *after* the write has fully completed — a `dataStore.data` read that
+   * began before the write and was delivered behind it, which is ordinary on a slow cold boot.
+   *
+   * No amount of in-flight tracking closes this: by the time the stale emission lands there is
+   * nothing left to mark as pending, and the staleness is not visible in the values, since a
+   * write's own emission is indistinguishable from a staler one queued behind it. Three attempts
+   * established that the hard way. The fix is structural — nothing merges disk into the snapshot
+   * after the synchronous seed, so a late emission has no path to the snapshot at all.
+   *
+   * Reverting that (restoring a `dataStore.data` collector that assigns `_snapshot.value`) fails
+   * this test deterministically; a JVM probe measured 60/60 losses against the old shape.
+   */
+  @Test
+  fun `a write survives a stale emission delivered after it reaches disk`() =
+    runTest {
+      val store = FakeDataStore(mutablePreferencesOf(offline to false))
+      val settings = SettingsDataStore(store, TestScope(StandardTestDispatcher(testScheduler)))
+      advanceUntilIdle()
+
+      // The state a reader of the file would have captured *before* the write below.
+      val asReadBeforeTheWrite = store.state.value
+
+      settings.set(style, "mock-server")
+      advanceUntilIdle()
+      assertEquals("the write must have reached the store", "mock-server", settings.get(style, ""))
+
+      // That earlier read, delivered now. It is faithful — it preserves the keys that were on disk
+      // when it ran — it is simply stale, and it cannot know about a write that came after it.
+      store.state.value = asReadBeforeTheWrite.toMutablePreferences().apply { this[offline] = true }
+      advanceUntilIdle()
+
+      assertEquals(
+        "a disk emission that predates the write must not roll it back, however late it arrives",
+        "mock-server",
+        settings.get(style, ""),
+      )
+    }
+
   @Test
   fun `a read returns the stored value without suspending`() =
     runTest {

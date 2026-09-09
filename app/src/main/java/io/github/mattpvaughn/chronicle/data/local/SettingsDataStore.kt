@@ -14,13 +14,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import okio.IOException
 import timber.log.Timber
 
 /**
@@ -40,6 +38,25 @@ import timber.log.Timber
  * that DataStore's write path is transactional and its errors are observable, where
  * `SharedPreferences.apply()` swallowed both.
  *
+ * **The snapshot is authoritative once seeded; disk is write-only after that.** It is read
+ * exactly once, synchronously, in `init`; from then on only [set], [remove], [clear] and [edit]
+ * move it. There is deliberately no collector re-applying `dataStore.data`.
+ *
+ * That is what a `SharedPreferences`-shaped API requires, and three attempts at the alternative
+ * established it the hard way. While a collector existed, every `dataStore.data` emission replaced
+ * the whole snapshot, so an emission whose file read began *before* a pending write could be
+ * delivered *after* it and roll the write back. Tracking writes in flight narrowed that window but
+ * could not close it: the staleness is not detectable from the values alone, since a write's own
+ * emission is indistinguishable from a staler one queued behind it. It cost roughly two instrumented
+ * runs in five — `MockPlexMode` seeded a server, the snapshot was clobbered mid-seed,
+ * `determineLoginState` read `library = null`, and Android Auto served an empty browse root.
+ *
+ * Merging disk back in was only ever needed if something *else* writes this file. Nothing does:
+ * one `@Singleton` instance over one file (`AppModule.provideSettingsDataStore`), one process, and
+ * Auto Backup restores before the process starts. `SharedPreferencesMigration` runs *inside* the
+ * seeding read, so the seeded value is already the migrated one. If a second writer is ever added,
+ * this invariant breaks and reads go stale — so add it through this class, not beside it.
+ *
  * **One-time migration.** [SharedPreferencesMigration] moves the existing `Chronicle.xml` on first
  * read and deletes it afterwards, so an upgrading user keeps every setting. The credentials file is
  * deliberately untouched here; it is a separate store with separate backup rules.
@@ -53,45 +70,6 @@ class SettingsDataStore(
   /** The current values, readable without suspending. */
   val snapshot: StateFlow<Preferences> = _snapshot
 
-  /**
-   * Keys whose write has been applied to [_snapshot] but has not yet reached disk.
-   *
-   * **This is what stops a slow disk from rolling a write back.** `set` moves the snapshot
-   * immediately and persists on [writeScope]; the collector above replaces the whole snapshot with
-   * each `dataStore.data` emission. Without this set, an emission that predates a pending write —
-   * which is ordinary on a cold device, where the first disk write is slow — restores the *old*
-   * value over the new one, and a synchronous read afterwards sees stale data.
-   *
-   * That is not hypothetical: it cost roughly two instrumented runs in five. `MockPlexMode`
-   * seeded a server and a library, the snapshot was clobbered mid-seed, `determineLoginState` read
-   * `library = null`, and Android Auto served an empty browse root.
-   *
-   * Guarded by [pendingLock] because the collector and the write coroutines are different jobs on
-   * the same scope.
-   *
-   * **Declared above `init` on purpose.** The collector there reads them on its first emission,
-   * which can happen before a property declared further down has been initialised — that reads as
-   * `NullPointerException: Cannot enter synchronized block because "<local6>" is null`, thrown on a
-   * coroutine thread where it surfaces as an unrelated test failing before it starts.
-   */
-  private val pendingWrites = mutableSetOf<Preferences.Key<*>>()
-  private val pendingLock = Any()
-
-  /** Re-applies anything still in flight on top of [this], which came from disk. */
-  private fun Preferences.withPendingWrites(): Preferences {
-    val live = synchronized(pendingLock) { pendingWrites.toList() }
-    if (live.isEmpty()) return this
-    val current = _snapshot.value
-    return toMutablePreferences().apply {
-      live.forEach { key ->
-        @Suppress("UNCHECKED_CAST")
-        val typed = key as Preferences.Key<Any>
-        val value = current[typed]
-        if (value != null) this[typed] = value else remove(typed)
-      }
-    }
-  }
-
   init {
     // Keys the settings store must never hold. `SharedPreferencesMigration` copies a whole prefs
     // file, so anything that used to share `Chronicle.xml` came across — including `uuid`, the
@@ -99,12 +77,19 @@ class SettingsDataStore(
     // `no_backup/`: this store *is* backed up, so a restore onto a second device would give both
     // installs the same identity. Stripped on every start, because a stale copy is enough.
     val notSettings = setOf("uuid", "auth_token", "server_token", "user")
-    // Seeded synchronously so the very first read — which happens during Application.onCreate,
-    // before any collector has run — sees real values rather than defaults. A first frame drawn
-    // from empty preferences is the FirstFrameFlashTest failure mode, one layer down.
+    // Seeded synchronously so the very first read — which happens during Application.onCreate —
+    // sees real values rather than defaults. A first frame drawn from empty preferences is the
+    // FirstFrameFlashTest failure mode, one layer down.
+    //
+    // **This is the only path from disk into [_snapshot], and that is deliberate** — see the class
+    // doc. It also runs `SharedPreferencesMigration`, since the migration happens inside
+    // DataStore's own first read, so the value seeded here is already the migrated one.
+    //
+    // A corrupt file must not take the app down: `runCatching` leaves the snapshot empty, so the
+    // user sees defaults rather than a crash, and the next write repairs the file.
     runBlocking {
       runCatching { _snapshot.value = dataStore.data.first() }
-        .onFailure { Timber.e(it, "Could not seed the settings snapshot; using defaults") }
+        .onFailure { Timber.e(it, "Settings store unreadable; falling back to defaults") }
     }
     scope.launch {
       runCatching {
@@ -114,19 +99,6 @@ class SettingsDataStore(
           present.forEach { remove(it) }
         }
       }.onFailure { Timber.e(it, "Could not strip credential keys from the settings store") }
-    }
-    scope.launch {
-      dataStore.data
-        .catch { cause ->
-          // A corrupt file must not take the app down. Emitting empty preferences means the user
-          // sees defaults rather than a crash, and the next write repairs the file.
-          if (cause is IOException) {
-            Timber.e(cause, "Settings store unreadable; falling back to defaults")
-            emit(emptyPreferences())
-          } else {
-            throw cause
-          }
-        }.collect { fromDisk -> _snapshot.value = fromDisk.withPendingWrites() }
     }
   }
 
@@ -156,11 +128,9 @@ class SettingsDataStore(
     val previous = _snapshot.value[key]
     _snapshot.value = _snapshot.value.toMutablePreferences().apply { this[key] = value }
     if (previous != value) notifyChanged(key.name)
-    synchronized(pendingLock) { pendingWrites += key }
     writeScope.launch {
       runCatching { dataStore.edit { it[key] = value } }
         .onFailure { Timber.e(it, "Could not persist ${key.name}") }
-      synchronized(pendingLock) { pendingWrites -= key }
     }
   }
 
@@ -178,13 +148,9 @@ class SettingsDataStore(
     // a String and lets callers drop a value without knowing which typed key wrote it.
     val existing = _snapshot.value.asMap().keys.firstOrNull { it.name == key } ?: return
     _snapshot.value = _snapshot.value.toMutablePreferences().apply { remove(existing) }
-    // Tracked like a write: a removal still in flight must not be undone by a disk emission that
-    // predates it. `withPendingWrites` reads the absence from the snapshot and re-applies it.
-    synchronized(pendingLock) { pendingWrites += existing }
     writeScope.launch {
       runCatching { dataStore.edit { prefs -> prefs.remove(existing) } }
         .onFailure { Timber.e(it, "Could not remove $key") }
-      synchronized(pendingLock) { pendingWrites -= existing }
     }
   }
 

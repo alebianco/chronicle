@@ -231,6 +231,58 @@ Also note the harness limitation above: **this JVM probe cannot confirm a fix.**
 0–93 per 200 between identical runs. Confirmation has to come from the api27 instrumented job at a
 run count derived from the ~14 % device rate, per the acceptance criteria.
 
+## Fixed, 2026-09-09 — the snapshot is authoritative once seeded
+
+After the third failed patch above, the premise behind every attempt was checked instead of the
+patch: **why is disk merged into the snapshot at all?** It is only needed if something other than
+this class writes the file. Validated that nothing does:
+
+| Premise | Evidence |
+|---|---|
+| One `DataStore` over that file in production | one construction site, `SettingsDataStore.create` |
+| One `SettingsDataStore` instance | `AppModule.provideSettingsDataStore`, `@Provides @Singleton` |
+| One process | no `android:process` in any manifest |
+| Restore cannot race a live snapshot | Auto Backup restores pre-process-start; DataStore writes under `files/datastore/`, and the backup rules name only the `sharedpref` and `database` domains |
+| The transactional import path stays correct | `SettingsBackupRepo` is the only `edit()` caller, same instance, and `edit()` assigns the snapshot itself |
+| Migration does not need the collector | `SharedPreferencesMigration` runs *inside* `dataStore.data.first()`, so the synchronous seed already observes migrated values |
+| No test wanted external-change propagation | the only test pushing an external emission asserts the snapshot must **not** change |
+
+So the collector was removed. `dataStore.data` is read exactly once, synchronously, in `init`;
+after that only `set`, `remove`, `clear` and `edit` move `_snapshot`. A late stale emission now has
+no path to the snapshot at all, rather than being detected and out-raced. Net -64/+30 lines, most
+of the additions documentation.
+
+### Measurements
+
+The JVM probe, unchanged from the instrumented run above:
+
+```
+                                deterministic late emission   natural rate
+before (collector present)              60 / 60               1 / 200
+after  (collector removed)               0 / 60               0 / 1000
+```
+
+**Sabotage-verified**, because a green probe was twice a broken probe on this task. Restoring the
+collector returns the probe to `60/60` and `1/200`, so the harness still detects the fault and the
+zeros are real. Note the sabotage restores the collector *without* the pending-write bookkeeping
+and still only loses 1/200 naturally — confirming the ~1 % natural rate was dominated by this
+mechanism, not by the bookkeeping's ordering hole.
+
+New regression test: `a write survives a stale emission delivered after it reaches disk`. It emits
+*after* the write has fully landed, which is the case the pre-existing stale-re-emission test
+cannot reach. Both tests fail under sabotage with the expected assertion messages.
+
+Coverage fell 57.87 % -> 57.79 % because well-tested code was deleted; baseline lowered
+deliberately via `./coverage-ratchet.sh --update`.
+
+### What is not yet proved
+
+`./verify.sh` passes all 10 stages, but **the device fault itself has not been re-measured**. The
+JVM probe cannot stand in for that: its rate swung 0–93 per 200 between identical runs earlier
+today. The remaining criteria — reproduction on a cold api27 AVD and confirmation at a count
+derived from the ~14 % device rate — still need the instrumented job. This task stays open until
+then; a passing unit suite is what cu-222 mistook for a fix.
+
 ## Acceptance Criteria
 
 - [ ] The failure is **reproduced locally** before any fix — a cold/deleted AVD at api27, and enough
