@@ -74,7 +74,12 @@ Two things were checked rather than taken from documentation:
   **not** for lack of a working option, which is the honest framing.
 - **Paparazzi is ruled out independently**, on three counts: Google publishes a named known issue
   that it is not Gradle 9 compatible; its AGP 9 tracking issue is **open** with a commenter blocked
-  on exactly this; and alpha04 made **Java 21 mandatory** where this project is on Java 17.
+  on exactly this; and alpha04 made **Java 21 mandatory**, which at the time of this decision this
+  project could not meet.
+
+  *Note, 2026-09-09:* the project's build JVM has since moved to **Java 21**, so that third count no
+  longer applies. The decline stands on the two that remain — the named Gradle 9 incompatibility and
+  the open AGP 9 issue — and is unchanged; only the stale premise is corrected here.
 
 AGP's own `com.android.compose.screenshot` (0.0.1-alpha16) is AGP 9-aware and JDK 17+, but renders
 only `@Preview` composables statically — no state driving, no interaction. It cannot reach a
