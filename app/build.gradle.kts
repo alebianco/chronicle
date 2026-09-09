@@ -211,11 +211,21 @@ android {
           targetDevices.add(localDevices["api27"])
           targetDevices.add(localDevices["api35"])
         }
-        // What CI runs. api27 is deliberately absent: on a GitHub runner AGP installs the API 27
-        // AOSP x86 image successfully and then fails `api27Setup` with "Cannot query the value of
-        // this property because it has no value available", having warned that the device's ABI is
-        // unspecified. It does not reproduce locally, because the image is already present and the
-        // failing path never runs.
+        // What CI runs. api27 is back **as an open probe** — revert this to api35-only if the
+        // runner still fails (cu-222).
+        //
+        // History: on a GitHub runner AGP installed the API 27 AOSP x86 image successfully and then
+        // failed `api27Setup` with "Cannot query the value of this property because it has no value
+        // available", having warned that the device's ABI was unspecified. It has never reproduced
+        // locally, because the image is already present here and the failing path never runs.
+        //
+        // That evidence predates two changes that both touch image installation: the emulator image
+        // cache was removed, and AGP went 8.13.2 -> 9.4.0. Nobody has run api27 on a runner since,
+        // so whether the fault survives is unmeasured — and only a CI run can measure it.
+        //
+        // Note this is *not* the fault that made the suite flaky at both API levels; that was a lost
+        // write in `SettingsDataStore`, fixed and unit-guarded. `api27Setup` fails before any test
+        // runs, so that fix neither addresses nor masks it.
         //
         // `testedAbi`, which the warning names, is **not settable from here at any AGP version this
         // project can use**: verified with `javap` on AGP 9.4.0, where
@@ -223,11 +233,8 @@ android {
         // `sdkVersion`, `systemImageSource`, `require64Bit` and `pageAlignment` — and no
         // `testedAbi`. It exists only on AGP's internal implementation class, at 8.13.2 and 9.4.0
         // alike, so the AGP 9 upgrade did not open that door.
-        //
-        // api35 alone still gives the gate its whole point — the launch crash this exists to catch
-        // is API-independent. Losing the minSdk floor on CI is a real gap, tracked rather than
-        // hidden: see cu-222.
         create("ciCheckGroup") {
+          targetDevices.add(localDevices["api27"])
           targetDevices.add(localDevices["api35"])
         }
       }

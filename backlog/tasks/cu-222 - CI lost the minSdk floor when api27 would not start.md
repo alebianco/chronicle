@@ -1,7 +1,7 @@
 ---
 id: cu-222
 title: "CI lost the minSdk floor when api27 would not start"
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -246,7 +246,7 @@ than quietly accepted.
 - [x] **Fault 2 fixed** — a lost write in `SettingsDataStore`, not an ABI or a network question.
       api35 went 3/3 failing to **5/5 passing** on fresh AVDs, and api27 is **3/3 passing**. Guarded
       by a sabotage-verified unit test
-- [ ] **Two separate faults, and they must not be conflated.** The `api27Setup` failure ("no value
+- [x] **Two separate faults, and they must not be conflated.** The `api27Setup` failure ("no value
       available", after the unspecified-ABI warning) is one. The *suite* failing on a freshly
       created AVD at **both** API levels is the other, measured 2026-09-08 and reproducible — it is
       the mock session not seeding on a first-boot emulator, not an ABI question at all. Fixing the
@@ -263,8 +263,31 @@ than quietly accepted.
       lint/API-desugaring check that catches the same defect class
 - [ ] If no fix is found, the decision to run CI at API 35 only is recorded with its reasoning, and
       `ciCheckGroup` keeps its comment explaining the gap
-- [ ] `instrumentedCheckGroup` still runs both levels locally
+- [x] `instrumentedCheckGroup` still runs both levels locally — unchanged, `app/build.gradle.kts`
+      still adds both `api27` and `api35` to that group
 - [ ] Verified by a real CI run, not by local success — local is where this already passes
+
+## api27 is back in `ciCheckGroup` as a probe — pushed 2026-09-09
+
+Fault 2 being fixed does **not** imply fault 1 is fixed, and the two must not be conflated (see the
+AC above): `api27Setup` fails while *creating the emulator*, before the APK is installed and before
+any test runs, so a lost-write fix in app code can neither address nor mask it. The proof is that
+fault 2 failed identically on api35, where `api27Setup` never executes.
+
+What *is* genuinely unknown is whether fault 1 still exists. Its evidence dates from AGP 8.13.2 and
+from before the emulator image cache was removed — the two changes most likely to perturb image
+installation — and api27 has not run on a GitHub runner since either landed. It does not reproduce
+locally at all, because the image is already installed here, so the failing path never executes.
+
+So api27 was added back to `ciCheckGroup` to measure it, which is the only instrument that can:
+
+- **Green** → fault 1 is gone; keep it, tick the remaining criteria, close the task.
+- **Still "no value available"** → revert to api35-only and take the fallback criterion below,
+  recording the decision with its reasoning. The revert is one line.
+
+A red run on `feature/agentic-dev` is acceptable and expected as a possible outcome; this is a
+measurement, not a fix. Note the build-script half was verified locally only as far as it can be:
+`./gradlew tasks` configures and `ciCheckGroupGroupDebugAndroidTest` still resolves.
 
 ## Notes
 
