@@ -91,7 +91,45 @@ those two reads can be partially observed.
 **Why api27 and not api35:** a slower cold boot lengthens the first `dataStore.data` emission's
 arrival, making it likelier to interleave with `MockPlexMode`'s four rapid `set()` calls.
 
-### Reproduced locally, 2026-09-09 — 400/400 with a control
+### RETRACTED: the "400/400 reproduction" below was an artefact of a broken probe
+
+**Correction, 2026-09-09, later the same day.** The 400/400 figure recorded below is wrong, and the
+mechanism it claimed to prove is unproven. Reported here rather than quietly deleted, because the
+next reader would otherwise inherit a confident wrong cause — the exact failure this task exists to
+correct in cu-222.
+
+The probe's emitter did:
+
+```kotlin
+store.state.value = mutablePreferencesOf(other to (n % 2 == 0))
+```
+
+which **replaces the whole store state**, discarding any key already persisted. A real
+`DataStore` emission reflects the file and retains prior keys, so the probe modelled a store that
+destroys its own data. Every "lost write" was the probe deleting the key, not the app losing it.
+
+The control (0/400 with the racing thread disabled) did not catch this, because with no emissions
+nothing overwrote the state — the control only proved emissions were involved, which a destructive
+emitter guarantees trivially.
+
+**With a faithful emitter** (preserving other keys, toggling one), measured 200 attempts per run:
+
+```
+unfixed:  0, 5, 1, 3, 1  per 200   (mean ~2.0, i.e. ~1 %)
+"fixed":  1, 8, 6, 2     per 200   (mean ~4.3)
+```
+
+So a real race exists at roughly 1 % in this harness, but the candidate fix — marking the key
+pending before moving the snapshot, both under one lock, plus reading the pending set and snapshot
+together — **does not improve it and may be worse**. The ranges overlap and the fixed mean is
+higher. That fix has been reverted, not committed.
+
+**Where this leaves cu-238:** the fault is real and still open. The `set()` ordering hypothesis is
+*disproven as the dominant cause*. The next attempt should instrument the actual interleaving —
+which thread writes `_snapshot.value` last, and with what — rather than reason from the code shape,
+since two readings of that shape have now been wrong.
+
+### Superseded: the original claim, kept for the record — 400/400 with a control
 
 A JVM probe on **real threads** (not `runTest`'s virtual time, which cannot interleave two adjacent
 statements): a `DataStore` whose `updateData` sleeps 2 ms, one `set()` of
