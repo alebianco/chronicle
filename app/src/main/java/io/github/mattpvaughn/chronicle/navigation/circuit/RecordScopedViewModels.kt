@@ -83,12 +83,12 @@ fun rememberRecordScopedViewModelStoreOwner(): ViewModelStoreOwner {
 /** A convenience mirroring `hiltViewModel()`, scoped to the Circuit record. */
 @Composable
 inline fun <reified VM : ViewModel> recordViewModel(): VM =
-  androidx.hilt.navigation.compose.hiltViewModel(rememberRecordScopedViewModelStoreOwner())
+  androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(rememberRecordScopedViewModelStoreOwner())
 
 /** A convenience mirroring assisted-injection `hiltViewModel()`, scoped to the Circuit record. */
 @Composable
 inline fun <reified VM : ViewModel, reified VMF> recordViewModel(noinline creationCallback: (VMF) -> VM): VM =
-  androidx.hilt.navigation.compose.hiltViewModel<VM, VMF>(
+  androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel<VM, VMF>(
     viewModelStoreOwner = rememberRecordScopedViewModelStoreOwner(),
     creationCallback = creationCallback,
   )

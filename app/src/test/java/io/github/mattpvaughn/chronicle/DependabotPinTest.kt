@@ -175,7 +175,9 @@ class DependabotPinTest {
         "com.google.devtools.ksp*",
         "androidx.compose:compose-bom",
         "androidx.lifecycle:*",
-        "androidx.navigation:*",
+        // `androidx.navigation:*` was here, holding Navigation Compose below 2.10.0 until
+        // compileSdk 37 landed. Both the hold and the *dependency* are gone: Circuit owns routing
+        // (decision-27), and nothing imports `androidx.navigation` any more.
         "androidx.room:*",
         "org.hamcrest:*",
       )

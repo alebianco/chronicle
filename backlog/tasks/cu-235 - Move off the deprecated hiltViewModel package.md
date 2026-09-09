@@ -1,7 +1,7 @@
 ---
 id: cu-235
 title: "Move off the deprecated hiltViewModel package"
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-09'
 labels:
@@ -36,14 +36,34 @@ dependency rather than adding one.
 
 ## Acceptance Criteria
 
-- [ ] The new artifact declared, version pinned, and the old import replaced at all five call sites
-- [ ] **Checked whether `hilt-navigation-compose` can be dropped entirely** — Circuit owns routing,
-      so its navigation half may be unused. `./gradlew buildHealth` reports this
-- [ ] No deprecation warning remains for `hiltViewModel` in `./gradlew :app:compileDebugKotlin`
-- [ ] `./verify.sh` green, 10 stages
-- [ ] **Device-verified**: a screen with an argument (book details) and one without (home) both
-      still resolve their ViewModel. This is the code path that crashed three times during the
-      Circuit migration and never once failed a unit test
+- [x] `androidx.hilt:hilt-lifecycle-viewmodel-compose:1.3.0` declared and the import replaced at
+      all five call sites
+- [x] **`hilt-navigation-compose` dropped entirely** — `hiltViewModel()` was its only use, so this
+      *removes* a dependency rather than adding one. The new artifact was already on the classpath
+      transitively, so nothing new is resolved
+- [x] **`navigation-compose` dropped too**, which cu-231 should have done and did not: nothing
+      imports `androidx.navigation` any more. Found by grep, confirmed by `buildHealth` — neither
+      artifact appears in its unused list now
+- [x] The stale `androidx.navigation:*` Dependabot ignore removed (a cu-214 hold, already lifted),
+      and `DependabotPinTest` updated — that gate **failed first** and made the removal deliberate
+      rather than silent, which is what it is for
+- [x] `./gradlew :app:compileDebugKotlin` reports **zero** `hiltViewModel` deprecations
+- [x] `./verify.sh` green, 10 stages
+- [x] **Device-verified** on the tablet: book details (argument-carrying, via assisted injection)
+      and home (argument-free) both resolve their ViewModel, no crash. This is the path that
+      crashed three times during cu-231 and never once failed a unit test
+
+## Closing notes, 2026-09-09
+
+**Two dependencies removed, none added.** The expectation in the description — that the new package
+"would have to be added" — was wrong: `hilt-lifecycle-viewmodel-compose` already arrived
+transitively through `hilt-navigation-compose`, so declaring it directly and dropping the old
+artifact is a net removal.
+
+The second removal was not in scope and should have been: **`navigation-compose` had no callers at
+all** after cu-231. One `grep` for `androidx.navigation` across `app/src` returned a single hit, and
+it was a Dependabot pin *string* in a test. That is a gap in the migration commit rather than a
+finding here.
 
 ## Notes
 

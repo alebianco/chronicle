@@ -109,11 +109,6 @@ updates:
       - dependency-name: "androidx.lifecycle:*"
         versions: [">=2.11.0"]
 
-      # Navigation Compose 2.10+ requires compileSdk 37, same as the Compose
-      # BOM and lifecycle. Unblock when: cu-214 stage 3 lands compileSdk 37.
-      - dependency-name: "androidx.navigation:*"
-        versions: [">=2.10.0"]
-
       # Room 3.0 is a breaking major, still alpha, and nothing consumes it.
       # Unblock when: cu-182 names a multiplatform target that needs it.
       - dependency-name: "androidx.room:*"

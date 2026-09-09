@@ -1,7 +1,7 @@
 ---
 id: cu-232
 title: "Decide screenshot testing now that Compose has landed"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-08'
 labels:
@@ -57,17 +57,42 @@ So the defect class is live and recurring, and it is precisely the class this to
 
 ## Acceptance Criteria
 
-- [ ] An explicit adopt or decline, with reasoning, and for a decline what would change the answer
-- [ ] Assessed specifically against the **six** known bugs of this class (cu-19, cu-68, cu-141,
-      cu-142, cu-226, cu-191), naming which ones a screenshot test would actually have caught —
-      cu-191 is a live test of that, since a blank string may or may not be visible in a diff
-- [ ] Weighed against `AccountNoticePlacementTest`'s bounds-assertion approach, which caught one of
-      them with no golden image. If bounds assertions cover the class, that is the honest answer
-- [ ] Golden-image storage and churn addressed if adopted, including who regenerates them and how
-- [ ] Licence checked and compatible with GPLv3, and [[decision-19]] respected (no cloud service,
-      no data leaving the machine)
-- [ ] Rule 5's status stated either way — supplemented or unchanged, never silently weakened
-- [ ] Any adoption lands as its own task; this one decides
+- [x] **Decline**, recorded as [[decision-28]] with the reasoning and three named conditions that
+      would overturn it
+- [x] Assessed against all **six** bugs individually, in a table. The finding that decided it:
+      **three of the six cannot recur** — cu-68, cu-141 and cu-142 are XML/View-era defects
+      (`values-land/integers.xml`, a zero-height `ConstraintLayout`, ViewBinding's lost DataBinding
+      evaluation). Verified: `app/src/main/res/` has **no `layout*` directory and no `-land`
+      qualifier**. The mechanism is gone, not merely unused
+- [x] The other three are already guarded, and cu-191 turned out **not** to be the blank-string
+      edge case this ticket anticipated: it rendered `00:00/9:26:42 0%`, wrong text from a pure
+      function, which `DetailsProgressTextTest` covers directly
+- [x] Weighed against `AccountNoticePlacementTest` explicitly — and it wins on precision, on
+      stating intent in the diff, on having no regeneration ritual, and on cost
+- [x] Golden-image churn: **moot**, nothing adopted. Recorded as a reason rather than skipped —
+      a gate nobody can regenerate cheaply is a gate people disable
+- [x] Licences checked anyway: all three candidates are **Apache-2.0** and none needs a cloud
+      service, so neither GPLv3 nor [[decision-19]] was the blocker. Worth stating, so a future
+      reader does not re-litigate a licence question that was never the issue
+- [x] **Rule 5 unchanged**, stated explicitly in the decision
+- [x] Nothing to land; this one decided
+
+## Closing notes, 2026-09-09
+
+**A working option was found and declined anyway**, which is the honest framing. Roborazzi 1.74.0
+(released 2026-09-08) was probed against this project rather than assessed from documentation: the
+plugin applies under AGP 9.4.0 **with `android.newDsl=false`** — the one interaction research could
+not confirm, since Roborazzi is written against the new variant API while that flag restores the old
+one — and registers all six tasks with `BUILD SUCCESSFUL`. The probe was reverted.
+
+So the decline rests on the six bugs, not on tooling being unavailable.
+
+Two candidates were eliminated on their own merits and are worth recording so they are not
+re-surveyed: **Paparazzi** cannot be used here at all — Google publishes a named Gradle 9
+incompatibility, its AGP 9 tracking issue is still open, and it requires **Java 21** where this
+project is on 17. **AGP's own `com.android.compose.screenshot`** is compatible but renders only
+`@Preview` composables statically, so it cannot reach a presenter-driven screen — which after
+decision-27 is every screen.
 
 ## Notes
 
