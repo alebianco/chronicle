@@ -24,9 +24,22 @@ data class PlayerUiState(
   val slider: SliderState = SliderState(),
   val transport: TransportState = TransportState(),
   val utility: UtilityState = UtilityState(),
-  val isLoadingTracks: Boolean = false,
-  val hasFailedProgressSync: Boolean = false,
 )
+
+/*
+ * `isLoadingTracks` and `hasFailedProgressSync` used to sit here as two loose `Boolean`s — the only
+ * ungrouped fields in this file — and they were **never read**. `PlayerDestination` collects
+ * `viewModel.isLoadingTracks` and `viewModel.hasFailedProgressSync` directly, so the copies on this
+ * state were assembled every emission and dropped.
+ *
+ * They reached it through a `Triple<TransportState, UtilityState, Pair<Boolean, Boolean>>`, read at
+ * the call site as `.third.first` and `.third.second`. That existed only because `combineDistinct`
+ * stopped at four sources; with the five-source overload the two real groups combine directly and
+ * the tuple is gone.
+ *
+ * If a future screen wants them off `uiState` rather than from the flows, add them back as a named
+ * group — never as loose positional booleans.
+ */
 
 /**
  * The cover and the book title.

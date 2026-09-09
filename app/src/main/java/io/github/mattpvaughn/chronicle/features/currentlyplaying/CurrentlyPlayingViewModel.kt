@@ -1356,37 +1356,26 @@ class CurrentlyPlayingViewModel
         )
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SliderState())
 
-    /**
-     * The transport row, the utility tray and the two spinners, folded together only because four
-     * sources is the combinator's ceiling. They are separate fields on [PlayerUiState], which is
-     * what the recomposition boundaries actually follow.
-     */
-    private val transportUtilityState:
-      StateFlow<Triple<TransportState, UtilityState, Pair<Boolean, Boolean>>> =
-      combineDistinct(
-        combineDistinct(isPlaying, isAudioLoading, jumpForwardsIcon, jumpBackwardsIcon) {
-            playing, loading, fwd, back ->
-          TransportState(playing, loading, fwd, back)
-        },
-        combineDistinct(playbackSpeedString, isSleepTimerActive, sleepTimerTimeRemainingString) {
-            speed, timerActive, remaining ->
-          UtilityState(speed, timerActive, remaining)
-        },
-        isLoadingTracks,
-        hasFailedProgressSync,
-      ) { transport, utility, loadingTracks, failedSync ->
-        Triple(transport, utility, loadingTracks to failedSync)
-      }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        Triple(TransportState(), UtilityState(), false to false),
-      )
+    /** The transport row: play/pause, the loading spinner and the two jump icons. */
+    private val transportState: StateFlow<TransportState> =
+      combineDistinct(isPlaying, isAudioLoading, jumpForwardsIcon, jumpBackwardsIcon) {
+          playing, loading, fwd, back ->
+        TransportState(playing, loading, fwd, back)
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), TransportState())
+
+    /** The utility tray: speed, and the sleep timer's state and countdown. */
+    private val utilityState: StateFlow<UtilityState> =
+      combineDistinct(playbackSpeedString, isSleepTimerActive, sleepTimerTimeRemainingString) {
+          speed, timerActive, remaining ->
+        UtilityState(speed, timerActive, remaining)
+      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), UtilityState())
 
     /**
      * The whole player body, as one value.
      *
-     * Assembled in groups rather than one wide combinator — the four-source `combineDistinct` is the
-     * widest available, and more importantly the groups are the recomposition boundaries. Each
+     * Assembled in groups rather than from the raw sources, because the groups **are** the
+     * recomposition boundaries — not, as this comment used to say, because four was the
+     * combinator's ceiling. Each
      * sub-state is `distinctUntilChanged` in its own right, so the text block re-renders once a
      * second while the transport row and the artwork sit still, which is what the Fragment's
      * `setTextIfChanged` / `boundTitle` guards were emulating by hand.
@@ -1399,16 +1388,15 @@ class CurrentlyPlayingViewModel
         artworkState,
         textState,
         sliderState,
-        transportUtilityState,
-      ) { artwork, text, slider, transportUtility ->
+        transportState,
+        utilityState,
+      ) { artwork, text, slider, transport, utility ->
         PlayerUiState(
           artwork = artwork,
           text = text,
           slider = slider,
-          transport = transportUtility.first,
-          utility = transportUtility.second,
-          isLoadingTracks = transportUtility.third.first,
-          hasFailedProgressSync = transportUtility.third.second,
+          transport = transport,
+          utility = utility,
         )
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), PlayerUiState())
 

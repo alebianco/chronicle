@@ -63,6 +63,32 @@ fun <T, K, S, Q, R> combineDistinct(
 ): Flow<R> = combine(source1, source2, source3, source4, combiner).distinctUntilChanged()
 
 /**
+ * Five-source [combineDistinct].
+ *
+ * `combine` has no arity-5 overload with typed parameters, so this goes through the vararg form and
+ * casts positionally — the same shape as the five-source [combineDistinctAsync] below, and
+ * contained here for the same reason: the cast is unchecked, so it lives in one place while the
+ * types at the boundary stay checked by the signature.
+ *
+ * Worth having rather than nesting a fourth source into a `Pair`. `PlayerUiState` was assembled
+ * through a `Triple<TransportState, UtilityState, Pair<Boolean, Boolean>>` purely because four was
+ * the ceiling here, and the consumer read `.third.first` / `.third.second` — two booleans
+ * distinguished only by position, which swap silently.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T, K, S, Q, P, R> combineDistinct(
+  source1: Flow<T>,
+  source2: Flow<K>,
+  source3: Flow<S>,
+  source4: Flow<Q>,
+  source5: Flow<P>,
+  combiner: (T, K, S, Q, P) -> R,
+): Flow<R> =
+  combine(source1, source2, source3, source4, source5) { values ->
+    combiner(values[0] as T, values[1] as K, values[2] as S, values[3] as Q, values[4] as P)
+  }.distinctUntilChanged()
+
+/**
  * Four-source combine whose combiner is suspending and runs off the main thread.
  *
  * Replaces `QuadLiveDataAsync`, which launched into an injected scope and hopped to
