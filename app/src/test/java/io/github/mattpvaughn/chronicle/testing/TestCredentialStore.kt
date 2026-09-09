@@ -19,6 +19,5 @@ fun testCredentialStore(name: String = "test-credentials"): CredentialStore {
   val file = File.createTempFile(name, ".preferences_pb").apply { delete() }
   return CredentialStore(
     PreferenceDataStoreFactory.create(scope = scope) { file },
-    scope,
   )
 }

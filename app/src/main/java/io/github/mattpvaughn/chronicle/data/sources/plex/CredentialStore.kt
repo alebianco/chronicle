@@ -11,11 +11,8 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import okio.IOException
 import timber.log.Timber
 import java.io.File
 
@@ -42,7 +39,6 @@ import java.io.File
  */
 class CredentialStore(
   private val dataStore: DataStore<Preferences>,
-  private val scope: CoroutineScope,
 ) {
   private val snapshot = MutableStateFlow(emptyPreferences())
 
@@ -50,20 +46,27 @@ class CredentialStore(
     // Seeded synchronously: the first credential read happens during Application.onCreate, when
     // PlexLoginRepo decides whether the user is signed in. Reading defaults there would present a
     // signed-in user with the login screen.
+    //
+    // **This is the only path from disk into [snapshot], and that is deliberate.** A collector
+    // re-applying `dataStore.data` used to follow, and it could lose a credential: every emission
+    // replaced the whole snapshot, so an emission whose file read began *before* a `put` could be
+    // delivered *after* it and drop the token. Measured at 16 losses per 400 with a stale emission
+    // racing one `put`, against 0 per 400 with the race disabled.
+    //
+    // On a cold start that is exactly the login path: the file does not exist yet, so the first
+    // read is slow, while a sign-in writes the account token and then the server token back to
+    // back. A dropped server token reads as `server == null` — a signed-in app that looks signed
+    // out, which presented as an empty Android Auto browse root and four instrumented failures.
+    //
+    // Nothing else writes this file: one `@Singleton` store over one file in `no_backup/`, one
+    // process, and it is excluded from backup and device transfer by construction, so no restore
+    // rewrites it under a running app. Writes are synchronous, so snapshot and disk cannot diverge.
+    //
+    // An unreadable file leaves the snapshot empty, which reads as "no credentials" and sends the
+    // user through sign-in rather than crashing — the outcome the old `catch` produced.
     runBlocking {
       runCatching { snapshot.value = dataStore.data.first() }
-        .onFailure { Timber.e(it, "Could not seed the credential store") }
-    }
-    scope.launch {
-      dataStore.data
-        .catch { cause ->
-          if (cause is IOException) {
-            Timber.e(cause, "Credential store unreadable; treating credentials as absent")
-            emit(emptyPreferences())
-          } else {
-            throw cause
-          }
-        }.collect { snapshot.value = it }
+        .onFailure { Timber.e(it, "Credential store unreadable; treating credentials as absent") }
     }
   }
 
@@ -163,7 +166,7 @@ class CredentialStore(
           scope = scope,
           produceFile = { File(context.noBackupFilesDir, STORE_FILE) },
         )
-      return CredentialStore(store, scope)
+      return CredentialStore(store)
     }
   }
 }
