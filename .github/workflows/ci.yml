@@ -115,51 +115,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # Emulator system images live outside ~/.gradle, so without this every run refetches them:
-      # ~32 s for the API 27 x86_64 image and ~16 s for API 35, measured on run 34350392813.
+      # No cache for the emulator system images — **measured, twice, and it loses**.
       #
-      # This cache was removed once, in 50fb9df2, because the first run that restored it is the run
-      # where `api35Setup` began failing with "Cannot query the value of this property because it
-      # has no value available". That was read as the cache corrupting something AGP resolves at
-      # install time. **That reading was wrong.** The cause was the unguarded
-      # `getEmulatorDirectoryProvider().get()` described in the pre-install step below: with images
-      # already present, api35 became the *first* device to reach that call, before the emulator
-      # package existed. The cache changed install *ordering*; it corrupted nothing (cu-222).
+      # It was first dropped in 50fb9df2 for a reason that was wrong: the premise was that a
+      # restored directory corrupts something AGP resolves at install time. It does not. The cache
+      # merely changed install *ordering*, so api35 became the first device to hit AGP's unguarded
+      # `getEmulatorDirectoryProvider().get()` before the emulator package existed (cu-222).
       #
-      # Safe to cache now only because the emulator package is installed before Gradle runs. If that
-      # step is ever removed, this cache will appear to break the gate again — and it will not be
-      # this cache's fault.
+      # Re-added once that was understood, then measured on runs 34352579267 and 34354290782:
       #
-      # Keyed on the *device declarations*, not on the whole build file. The original key hashed
-      # `app/build.gradle.kts`, which discarded 1.7 GB whenever any unrelated line in that 800-line
-      # file changed — including a comment. This greps the apiLevel/systemImageSource/require64Bit
-      # lines out of the managedDevices block instead, so the key moves when a device does and
-      # stays put otherwise. Derived from the build file rather than duplicated in a checked-in
-      # file, which would silently drift out of sync.
-      - name: Compute the emulator image cache key
-        id: avd-key
-        run: |
-          devices=$(grep -E '^\s*(create\("api|apiLevel|systemImageSource|require64Bit|device =)' \
-            app/build.gradle.kts | tr -d ' ' | sort)
-          echo "$devices"
-          # Fail loudly rather than hash an empty string: a rename in the managedDevices block would
-          # otherwise produce one constant key forever, so a device change would silently restore
-          # the wrong images — the kind of fault that looks like a flaky gate.
-          if [ "$(printf '%s' "$devices" | grep -c apiLevel)" -lt 2 ]; then
-            echo "::error::Could not extract both device declarations from app/build.gradle.kts — the cache key would be meaningless. Update the grep in this step."
-            exit 1
-          fi
-          echo "hash=$(printf '%s' "$devices" | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache emulator system images
-        uses: actions/cache@v6
-        with:
-          path: |
-            /usr/local/lib/android/sdk/system-images
-            /usr/local/lib/android/sdk/platforms
-          key: ${{ runner.os }}-avd-images-${{ steps.avd-key.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-avd-images-
+      #   instrumented job, no cache          5m39s
+      #   instrumented job, populating cache  10m43s   (~297 s to save a 2.07 GiB archive)
+      #   instrumented job, cache hit         7m26s    (~58 s to restore)
+      #
+      # against only ~48 s of image downloads saved (~32 s for API 27 x86_64, ~16 s for API 35).
+      # Even the warm case costs more than it saves. The archive is 2.07 GiB because the images and
+      # `platforms` are thousands of small files: the download is 9 s at ~240 MB/s and the *untar*
+      # is the other ~49 s, so compressing less would not help.
+      #
+      # It also adds a failure mode. On a hit the save is still attempted and races the concurrent
+      # CodeQL run for the same key: "Unable to reserve cache with key ..., another job may be
+      # creating this cache".
+      #
+      # So: do not re-add this on the intuition that caching a download must be free. The saving is
+      # capped at ~48 s and the untar alone exceeds it.
 
       # Do not "revisit under AGP 9" for `testedAbi` — this project is on AGP 9.4.0 and it is still
       # absent from the public DSL, so that escape hatch was never there (cu-222).
