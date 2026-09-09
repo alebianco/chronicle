@@ -145,7 +145,53 @@ which is `LOGGED_IN_NO_USER_CHOSEN`. `MockPlexMode.enable` seeds `accountAuthTok
 `user == null` one. So reaching "no user chosen" means `server` or `library` read back **null** at
 that moment, even though `SharedPreferencesPlexPrefsRepo` writes both with `commit()`.
 
-### The likely mechanism, not yet proven
+### FIXED, 2026-09-09 — a lost write in `SettingsDataStore`, not an ABI or a network question
+
+The suspect below was **wrong**, and saying so matters because it was plausible: nothing in
+`setupNetwork` or `connectToServer` touches the prefs, and only Settings and the login flows call
+`clear()`. A full device logcat settled it in one read:
+
+```
+I/DebugHooks : Mock Plex mode is enabled; seeding a fixture-backed session
+I/MockPlexServer : MockPlexServer listening on http://127.0.0.1:57437
+I/PlexLoginRepo : hasAccountToken = true, hasServerToken = true,  library = null
+I/PlexLoginRepo : hasAccountToken = true, hasServerToken = false, library = null
+```
+
+Mock mode started **successfully**. The two `determineLoginState` evaluations are **1 ms apart**,
+before the network callback fires, and `hasServerToken` flips `true → false` between them. The seed
+was not being cleared by anything — the write was being **rolled back**.
+
+**The cause is `SettingsDataStore`.** `set()` moves the in-memory `_snapshot` immediately and
+persists on a coroutine, while the collector in `init` replaces the *whole* snapshot with every
+`dataStore.data` emission. When an emission predates a pending write — ordinary on a cold device,
+where the first disk write is slow — it restores the old value over the new one. `MockPlexMode`
+writes `server` then `library`; both were clobbered mid-seed, `determineLoginState` read
+`library = null`, and Android Auto served an empty browse root.
+
+Fixed by tracking keys with writes in flight and re-applying them on top of each disk emission.
+`remove()` is tracked the same way, since a removal can be rolled back identically.
+
+**Two traps found while fixing it**, both worth recording:
+
+- The declarations must sit **above** `init`. The collector reads them on its first emission, and a
+  property declared below throws `NullPointerException: Cannot enter synchronized block` on a
+  coroutine thread — which surfaced as eight unrelated `SettingsBackupRepoTest` cases failing
+  *before they started*.
+- The existing `FakeDataStore` cannot reproduce this: it applies writes before `updateData` returns.
+  A fake has to genuinely **suspend**, or the write coroutine completes and models nothing.
+
+### Measured after the fix
+
+| | before | after |
+|---|---|---|
+| api35, fresh AVD | 3/3 **failed** | **5/5 pass** |
+| api27, fresh AVD | (not run) | **3/3 pass** |
+
+Unit-level: `a value written while the disk is lagging survives a stale re-emission` in
+`SettingsDataStoreTest`, sabotage-verified — reverting the one-line collector change fails it.
+
+### The original suspect, kept for the record
 
 `ChronicleApplication.setupNetwork` registers a `registerDefaultNetworkCallback` whose `onAvailable`
 calls `connectToServer()` — **asynchronously, on a system thread**. On a first-boot emulator network
@@ -197,15 +243,21 @@ than quietly accepted.
 - [x] **Fault 1's named escape hatch is closed for good**: `testedAbi` is absent from the
       `ManagedVirtualDevice` DSL interface on **AGP 9.4.0** as well as 8.13.2, verified with
       `javap`. No available AGP version lets the build script set it
+- [x] **Fault 2 fixed** — a lost write in `SettingsDataStore`, not an ABI or a network question.
+      api35 went 3/3 failing to **5/5 passing** on fresh AVDs, and api27 is **3/3 passing**. Guarded
+      by a sabotage-verified unit test
 - [ ] **Two separate faults, and they must not be conflated.** The `api27Setup` failure ("no value
       available", after the unspecified-ABI warning) is one. The *suite* failing on a freshly
       created AVD at **both** API levels is the other, measured 2026-09-08 and reproducible — it is
       the mock session not seeding on a first-boot emulator, not an ABI question at all. Fixing the
       setup task alone would leave CI red
-- [ ] `MockPlexMode.enable` investigated on a first-boot emulator, since that is what the second
-      fault points at. The browse-tree assertions fail in **0.01 s** with "got 'empty root'", so a
-      longer `LOGIN_SETTLE_TIMEOUT_MS` is already ruled out as the fix
-- [ ] `api27` runs in CI again, **or** an alternative gives minSdk coverage — noting that
+- [x] `MockPlexMode.enable` investigated on a first-boot emulator, and **cleared**: the logcat shows
+      it seeding correctly every time. The fault was one layer down, in the settings store the seed
+      writes through
+- [ ] `api27` runs in CI again, **or** an alternative gives minSdk coverage. **Still open, and now
+      the only thing between CI and the minSdk floor** — fault 2 was the reason the suite was
+      unreliable even locally, and that is gone. Whether fault 1 still blocks a GitHub runner can
+      only be answered by a CI run; it does not reproduce on this machine — noting that
       **`aosp-atd` is impossible here**: no ATD image is published below API 30, checked against
       `sdkmanager --list`. That leaves a different API level near the floor, or a
       lint/API-desugaring check that catches the same defect class

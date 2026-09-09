@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +52,89 @@ class SettingsDataStoreTest {
       return updated
     }
   }
+
+  /**
+   * A [DataStore] whose writes land late, the way a cold emulator's disk behaves.
+   *
+   * [FakeDataStore] applies a write before `updateData` returns, so the collector in
+   * `SettingsDataStore.init` can never observe a state that predates a pending write. That is the
+   * one condition under which the snapshot can be clobbered, so reproducing it needs a store that
+   * genuinely lags.
+   */
+  private class SlowDataStore(
+    initial: Preferences = emptyPreferences(),
+  ) : DataStore<Preferences> {
+    val state = MutableStateFlow(initial)
+
+    /**
+     * Set true to hold every write until [releaseWrites] is called.
+     *
+     * `updateData` **suspends** while stalled rather than returning early: the caller's coroutine
+     * has to still be in flight, because that is what a slow disk actually looks like. Returning
+     * early would let the write coroutine complete and would model nothing.
+     */
+    var stallWrites = false
+    private val gate = CompletableDeferred<Unit>()
+
+    override val data: Flow<Preferences> get() = state
+
+    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+      if (stallWrites) gate.await()
+      val updated = transform(state.value)
+      state.value = updated
+      return updated
+    }
+
+    /** Lets the held writes through, as the disk eventually would. */
+    fun releaseWrites() {
+      stallWrites = false
+      gate.complete(Unit)
+    }
+  }
+
+  /**
+   * **A pending write is not lost when the store re-emits what is still on disk.**
+   *
+   * This is the bug behind the instrumented suite's cold-boot failures. `set()` moves the in-memory
+   * snapshot immediately and persists on a coroutine; the collector in `init` overwrites the whole
+   * snapshot with each `dataStore.data` emission. If the store emits **before** a pending write has
+   * landed — which is exactly what a cold emulator's slow disk produces — the collector replaces
+   * the just-written value with the stale one, and a synchronous read afterwards sees the old
+   * value.
+   *
+   * On device this cost roughly two runs in five: `MockPlexMode` seeded a server and a library, the
+   * snapshot was clobbered mid-seed, and `determineLoginState` read `library = null` and reported
+   * `LOGGED_IN_NO_USER_CHOSEN`. Android Auto then served an empty browse root and four tests failed.
+   */
+  @Test
+  fun `a value written while the disk is lagging survives a stale re-emission`() =
+    runTest {
+      // The store starts with an unrelated key, so the stale re-emission below is a *different*
+      // Preferences instance — a StateFlow drops an emission equal to what it already holds, and
+      // an empty-to-empty write would silently test nothing.
+      val store = SlowDataStore(mutablePreferencesOf(offline to false))
+      val settings = SettingsDataStore(store, TestScope(StandardTestDispatcher(testScheduler)))
+      advanceUntilIdle()
+
+      store.stallWrites = true
+      settings.set(style, "mock-server")
+      assertEquals("the write must be visible immediately", "mock-server", settings.get(style, ""))
+
+      // The store re-emits its unchanged on-disk state, as DataStore does on any other write or on
+      // a late first read. Nothing has been persisted yet.
+      store.state.value = mutablePreferencesOf(offline to true)
+      advanceUntilIdle()
+
+      assertEquals(
+        "a stale emission must not roll back a write that has not reached disk yet",
+        "mock-server",
+        settings.get(style, ""),
+      )
+
+      store.releaseWrites()
+      advanceUntilIdle()
+      assertEquals("mock-server", settings.get(style, ""))
+    }
 
   @Test
   fun `a read returns the stored value without suspending`() =

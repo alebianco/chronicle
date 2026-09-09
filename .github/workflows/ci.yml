@@ -123,8 +123,10 @@ jobs:
       # first restored the cache is exactly the run that broke. Whatever AGP resolves at install
       # time is not fully reconstructed by unpacking the directory.
       #
-      # A ~40 s download against a gate that does not run is not a saving. Revisit under AGP 9,
-      # which is where the `testedAbi` property the warning names actually exists (cu-222).
+      # A ~40 s download against a gate that does not run is not a saving.
+      #
+      # Do not "revisit under AGP 9" — this project is on AGP 9.4.0 now and `testedAbi` is still
+      # absent from the public DSL, so that escape hatch was never there.
 
       # Gradle Managed Devices boot a real emulator, which needs KVM. The ubuntu-latest image
       # ships /dev/kvm but leaves it root-owned, so without this the devices fail to start —

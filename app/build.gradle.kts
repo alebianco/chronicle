@@ -215,9 +215,14 @@ android {
         // AOSP x86 image successfully and then fails `api27Setup` with "Cannot query the value of
         // this property because it has no value available", having warned that the device's ABI is
         // unspecified. It does not reproduce locally, because the image is already present and the
-        // failing path never runs. `testedAbi`, which the warning names, exists on AGP 8.13.2's
-        // implementation class but not on the DSL interface the build script compiles against, so
-        // it cannot be set from here.
+        // failing path never runs.
+        //
+        // `testedAbi`, which the warning names, is **not settable from here at any AGP version this
+        // project can use**: verified with `javap` on AGP 9.4.0, where
+        // `com.android.build.api.dsl.ManagedVirtualDevice` exposes `device`, `apiLevel`,
+        // `sdkVersion`, `systemImageSource`, `require64Bit` and `pageAlignment` — and no
+        // `testedAbi`. It exists only on AGP's internal implementation class, at 8.13.2 and 9.4.0
+        // alike, so the AGP 9 upgrade did not open that door.
         //
         // api35 alone still gives the gate its whole point — the launch crash this exists to catch
         // is API-independent. Losing the minSdk floor on CI is a real gap, tracked rather than
