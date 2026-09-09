@@ -293,7 +293,8 @@ class NotificationBuilder
       return NotificationCompat.Builder(context, notification).setLargeIcon(art).build()
     }
 
-    private fun shouldCreateChannel() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !nowPlayingChannelExists()
+    // The SDK_INT >= O half of this was always true at minSdk 27, so only the channel check remains.
+    private fun shouldCreateChannel() = !nowPlayingChannelExists()
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun nowPlayingChannelExists() = platformNotificationManager.getNotificationChannel(NOW_PLAYING_CHANNEL) != null

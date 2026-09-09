@@ -1,18 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Marks which image source an ImageView was last bound to, so `bindImageRounded` can skip a
-      redundant Coil load. A view tag needs a stable, unique id; an XML-declared one avoids the
-      key collisions a hardcoded Int invites (cu-110).
+      Nothing here yet.
+
+      This file held three view-tag ids, each a "skip the redundant write" guard for a
+      `RecyclerView` binder: the last-bound image source, a thumb's last aspect ratio, and the last
+      drawable set on an `ImageView`. All three went with the Compose migration — recomposition
+      makes the guards unnecessary, and the helpers that used them were dead code kept alive by
+      their own tests.
+
+      Kept as a file rather than deleted: `ids.xml` is where an XML-declared view tag id belongs,
+      and a hardcoded Int invites key collisions if one is ever needed again.
     -->
-    <item name="tag_bound_image_src" type="id" />
-
-    <!-- The aspect ratio a row's thumb container was last constrained to, so
-         `setSquareAspectRatio` can skip rebuilding the constraint graph on every rebind. -->
-    <item name="tag_thumb_aspect_ratio" type="id" />
-
-    <!-- The drawable resource an ImageView was last set to, so `setImageResourceIfChanged` can
-         skip a redundant `setImageResource` — an unconditional draw-only invalidate, and the
-         play/pause buttons re-set an identical icon on every playback tick (cu-140). -->
-    <item name="tag_last_image_res" type="id" />
 </resources>

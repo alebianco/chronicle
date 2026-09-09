@@ -1,13 +1,9 @@
 package io.github.mattpvaughn.chronicle.application
 
 import android.app.Application
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
-import android.os.Build
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
 import androidx.hilt.work.HiltWorkerFactory
@@ -271,40 +267,29 @@ open class ChronicleApplication :
   private fun setupNetwork(plexPrefs: PlexPrefsRepo) {
     val connectivityManager =
       getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-      connectivityManager.registerDefaultNetworkCallback(
-        object :
-          ConnectivityManager.NetworkCallback() {
-          override fun onAvailable(network: Network) {
-            connectToServer()
-            // The other moment an abandoned download can make progress. Fetch2 ignores
-            // downloads already running, so calling this on every network change is safe.
-            cachedFileManager.resumeInterruptedDownloads()
-            super.onAvailable(network)
-          }
+    connectivityManager.registerDefaultNetworkCallback(
+      object :
+        ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+          connectToServer()
+          // The other moment an abandoned download can make progress. Fetch2 ignores
+          // downloads already running, so calling this on every network change is safe.
+          cachedFileManager.resumeInterruptedDownloads()
+          super.onAvailable(network)
+        }
 
-          override fun onLost(network: Network) {
-            // Prevent from running on ConnectivityThread, because onLost is apparently
-            // called on ConnectivityThread with no warning
-            applicationScope.launch {
-              withContext(dispatchers.main) {
-                plexConfig.connectionHasBeenLost()
-              }
+        override fun onLost(network: Network) {
+          // Prevent from running on ConnectivityThread, because onLost is apparently
+          // called on ConnectivityThread with no warning
+          applicationScope.launch {
+            withContext(dispatchers.main) {
+              plexConfig.connectionHasBeenLost()
             }
-            super.onLost(network)
           }
-        },
-      )
-    } else {
-      // network listener for sdk 24 and below
-      registerReceiver(
-        networkStateListener,
-        IntentFilter().apply {
-          @Suppress("DEPRECATION")
-          addAction(ConnectivityManager.CONNECTIVITY_ACTION)
-        },
-      )
-    }
+          super.onLost(network)
+        }
+      },
+    )
     val server = plexPrefs.server
     if (server != null) {
       plexConfig.setPotentialConnections(server.connections)
@@ -345,21 +330,6 @@ open class ChronicleApplication :
       }
     }
   }
-
-  private val networkStateListener =
-    object : BroadcastReceiver() {
-      override fun onReceive(
-        context: Context?,
-        intent: Intent?,
-      ) {
-        applicationScope.launch {
-          if (context != null && intent != null) {
-            plexConfig.connectionHasBeenLost()
-            connectToServer()
-          }
-        }
-      }
-    }
 
   // Connect to the first connection which can establish a connection
   private fun connectToServer() {

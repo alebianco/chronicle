@@ -6,7 +6,6 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
 import android.content.SharedPreferences
-import android.os.Build
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
@@ -984,18 +983,13 @@ class MediaPlayerService :
   }
 
   private fun stopForegroundCompat(removeNotification: Boolean) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-      val stopMode =
-        if (removeNotification) {
-          Service.STOP_FOREGROUND_REMOVE
-        } else {
-          Service.STOP_FOREGROUND_DETACH
-        }
-      stopForeground(stopMode)
-    } else {
-      @Suppress("DEPRECATION")
-      stopForeground(removeNotification)
-    }
+    val stopMode =
+      if (removeNotification) {
+        Service.STOP_FOREGROUND_REMOVE
+      } else {
+        Service.STOP_FOREGROUND_DETACH
+      }
+    stopForeground(stopMode)
   }
 }
 

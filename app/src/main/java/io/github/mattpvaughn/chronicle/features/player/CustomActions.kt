@@ -1,7 +1,5 @@
 package io.github.mattpvaughn.chronicle.features.player
 
-import android.os.Build
-import android.os.Build.VERSION_CODES.M
 import android.support.v4.media.session.PlaybackStateCompat
 import android.view.KeyEvent.KEYCODE_MEDIA_NEXT
 import android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
@@ -86,7 +84,9 @@ fun makeSkipBackward(prefsRepo: PrefsRepo): PlaybackStateCompat.CustomAction {
   ).build()
 }
 
-val mediaSkipForwardCode = if (Build.VERSION.SDK_INT >= M) KEYCODE_MEDIA_SKIP_FORWARD else 272
-val mediaSkipBackwardCode = if (Build.VERSION.SDK_INT >= M) KEYCODE_MEDIA_SKIP_BACKWARD else 273
-val mediaSkipToNextCode = if (Build.VERSION.SDK_INT >= M) KEYCODE_MEDIA_NEXT else 87
-val mediaSkipToPreviousCode = if (Build.VERSION.SDK_INT >= M) KEYCODE_MEDIA_PREVIOUS else 88
+// The `KEYCODE_MEDIA_*` constants are API 23; minSdk is 27, so the literal fallbacks these used to
+// carry (272, 273, 87, 88) were unreachable and are gone.
+val mediaSkipForwardCode = KEYCODE_MEDIA_SKIP_FORWARD
+val mediaSkipBackwardCode = KEYCODE_MEDIA_SKIP_BACKWARD
+val mediaSkipToNextCode = KEYCODE_MEDIA_NEXT
+val mediaSkipToPreviousCode = KEYCODE_MEDIA_PREVIOUS

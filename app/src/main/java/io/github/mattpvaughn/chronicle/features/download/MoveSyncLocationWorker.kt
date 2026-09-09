@@ -91,17 +91,15 @@ class MoveSyncLocationWorker
     }
 
     private fun createChannel() {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val notificationChannel =
-          NotificationChannel(
-            TRANSFER_CHANNEL,
-            applicationContext.getString(R.string.moving_files_channel_name),
-            NotificationManager.IMPORTANCE_LOW,
-          )
-        notificationChannel.description =
-          applicationContext.getString(R.string.download_channel_description)
-        notificationManager.createNotificationChannel(notificationChannel)
-      }
+      val notificationChannel =
+        NotificationChannel(
+          TRANSFER_CHANNEL,
+          applicationContext.getString(R.string.moving_files_channel_name),
+          NotificationManager.IMPORTANCE_LOW,
+        )
+      notificationChannel.description =
+        applicationContext.getString(R.string.download_channel_description)
+      notificationManager.createNotificationChannel(notificationChannel)
     }
 
     private fun moveFilesBetweenDirectories(

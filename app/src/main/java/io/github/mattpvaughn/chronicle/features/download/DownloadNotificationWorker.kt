@@ -199,18 +199,16 @@ class DownloadNotificationWorker
 
     /** Creates a notification channel if required by the given version of Android SDK */
     private fun createNotificationChannelAsNeeded() {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val notificationChannel =
-          NotificationChannel(
-            DOWNLOAD_CHANNEL,
-            applicationContext.getString(R.string.download_notification_title),
-            NotificationManager.IMPORTANCE_LOW,
-          )
-        notificationChannel.description =
-          applicationContext.getString(R.string.download_channel_description)
+      val notificationChannel =
+        NotificationChannel(
+          DOWNLOAD_CHANNEL,
+          applicationContext.getString(R.string.download_notification_title),
+          NotificationManager.IMPORTANCE_LOW,
+        )
+      notificationChannel.description =
+        applicationContext.getString(R.string.download_channel_description)
 
-        notificationManager.createNotificationChannel(notificationChannel)
-      }
+      notificationManager.createNotificationChannel(notificationChannel)
     }
 
     /** Make a group summary for all completed downloads */
