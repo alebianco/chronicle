@@ -2,6 +2,7 @@ package io.github.mattpvaughn.chronicle.features.currentlyplaying
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -186,6 +187,42 @@ class RawDurationFormatTest {
     assertTrue(!LITERAL_PAIR.containsMatchIn(source.withoutComments()))
   }
 
+  /**
+   * Regression guard for a CI-only failure. The comment stripper used a quantified alternation
+   * whose two branches could match at the same position (the shape is spelled out on
+   * [withoutComments], where it cannot terminate this KDoc early). Java's `Pattern` explores such
+   * a branch recursively, one frame per character, so a real 3 KB source file needed tens of
+   * thousands of frames: it passed on a dev machine and threw `StackOverflowError` on a CI runner,
+   * purely because arm64 macOS gives a thread ~45,000 frames of stack and a runner's smaller stack
+   * gives under half that.
+   *
+   * Asserting on the host's stack size would prove nothing, since the hazard is invisible at the
+   * default size. So the work runs on a thread with an explicitly small stack, reproducing the
+   * runner's constraint on any machine. A reluctant quantifier is constant in stack depth and
+   * passes; the old alternation overflows.
+   */
+  @Test
+  fun `stripping comments does not recurse per character`() {
+    // Comfortably larger than the real files, and star-heavy so a naive pattern backtracks hard.
+    val deep = "/* " + "a*b ".repeat(4_000) + " */ fun f() = formatCoarseDuration(millis)"
+
+    var failure: Throwable? = null
+    // 256 KB is a third of the stack that broke the old pattern, and well under any real runner's.
+    val runner =
+      Thread(null, {
+        try {
+          assertTrue(!LITERAL_PAIR.containsMatchIn(deep.withoutComments()))
+        } catch (t: Throwable) {
+          failure = t
+        }
+      }, "comment-stripper-small-stack", 256L * 1024L)
+
+    runner.start()
+    runner.join()
+
+    assertNull("stripping comments must not exhaust a small stack", failure)
+  }
+
   private companion object {
     /**
      * The player's host. `CurrentlyPlayingFragment` until the Compose migration retired the
@@ -253,9 +290,17 @@ class RawDurationFormatTest {
      * Strips comments, so a file explaining the format it replaced is not flagged by its own
      * documentation — the trap the guard hit when its test matched the comment quoting the
      * old expression.
+     *
+     * The block pattern is `.*?` and **must not** go back to an alternation like
+     * `(?:[^*]|\*(?!/))*`. Both branches of that alternation can match at the same position, so
+     * Java's `Pattern` explores one backtrack frame per character *recursively*: on a 3 KB file it
+     * needs tens of thousands of frames. It survived on a dev machine (~45,000 frames of stack on
+     * arm64 macOS) and threw `StackOverflowError` on a CI runner, whose smaller thread stack gives
+     * under half that. A reluctant quantifier has no alternation to backtrack through and is
+     * constant in stack depth.
      */
     fun String.withoutComments(): String =
-      replace(Regex("""/\*(?:[^*]|\*(?!/))*\*/""", RegexOption.DOT_MATCHES_ALL), "")
+      replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), "")
         .replace(Regex("""//[^\n]*"""), "")
   }
 }
