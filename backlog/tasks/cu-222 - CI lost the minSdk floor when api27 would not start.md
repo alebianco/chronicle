@@ -1,7 +1,7 @@
 ---
 id: cu-222
 title: "CI lost the minSdk floor when api27 would not start"
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -254,7 +254,9 @@ than quietly accepted.
 - [x] `MockPlexMode.enable` investigated on a first-boot emulator, and **cleared**: the logcat shows
       it seeding correctly every time. The fault was one layer down, in the settings store the seed
       writes through
-- [x] `api27` runs in CI again, **or** an alternative gives minSdk coverage. **Resolved to "no",
+- [x] `api27` runs in CI again, **or** an alternative gives minSdk coverage. **Resolved to YES —
+      api27 runs, 10/10 green on run 34350392813.** Superseded the earlier "no" below, which was
+      measured honestly but against the wrong cause. Original note: **resolved to "no",
       measured**: re-added to `ciCheckGroup` and run on AGP 9.4.0 without the image cache (run
       34341471957, 2026-09-09), and `api27Setup` failed identically to the 8.13.2 evidence. Worse,
       it produced *no* androidTest results, so api35 lost coverage too — hence the revert. No
@@ -267,8 +269,9 @@ than quietly accepted.
       **`aosp-atd` is impossible here**: no ATD image is published below API 30, checked against
       `sdkmanager --list`. That leaves a different API level near the floor, or a
       lint/API-desugaring check that catches the same defect class
-- [x] If no fix is found, the decision to run CI at API 35 only is recorded with its reasoning, and
-      `ciCheckGroup` keeps its comment explaining the gap — done: the comment now records the
+- [x] ~~If no fix is found, the decision to run CI at API 35 only is recorded with its reasoning~~
+      — **retired: a fix was found.** `ciCheckGroup` now runs both levels, and the comment records
+      the AGP bug, the run id and why the ABI and cache theories were wrong — done: the comment now records the
       re-measurement, the run id, the reason re-adding api27 is worse than the gap it closes, and an
       explicit "do not re-add expecting a different result"
 - [x] `instrumentedCheckGroup` still runs both levels locally — unchanged, `app/build.gradle.kts`
@@ -326,6 +329,74 @@ run to learn anything.
 predates this probe (the test last changed in 50095985); a runner's smaller default thread stack
 exposes catastrophic backtracking in the guard's regex. **Not part of cu-222** — filed separately,
 since it fails `verify.sh` on CI independently of anything here.
+
+## SOLVED — an unguarded provider in AGP, not the ABI and not the runner. Run 34350392813, 2026-09-09
+
+**api27 runs on CI again: `TEST-api27.xml`, tests=10 failures=0 errors=0**, alongside api35 at
+10/10. That file had never existed in this project's CI history.
+
+Everything this ticket previously recorded as the cause was wrong. Found by reading AGP 9.4.0's
+bytecode, after the ABI hypothesis was eliminated by measurement.
+
+### The mechanism
+
+`ManagedDeviceInstrumentationTestSetupTask$ManagedDeviceSetupRunnable` guards the system image it
+resolves, then does **not** guard the emulator directory:
+
+```
+offset  60: sdkImageDirectoryProvider(...).isPresent   <- checked, and AGP has a written-out
+offset  65: ifne 261                                      error message for the missing case
+            ...else generateSystemImageErrorMessage()
+offset 262: getEmulatorDirectoryProvider()
+offset 265: Provider.get()                             <- bare .get(), no isPresent check
+```
+
+If the `emulator` SDK package is not installed yet, that provider holds no value and **Gradle**
+throws "Cannot query the value of this property because it has no value available" — naming no
+property, which is exactly why two months of notes never suspected the emulator.
+
+The runner's own timestamps prove the race:
+
+```
+11:57:17.025  api27Setup: Preparing "Install Android Emulator v.37.1.11"
+11:57:17.531  api27Setup: x86_64 system image finished
+11:57:18.527  api27Setup FAILED
+11:57:23.732  "Install Android Emulator v.37.1.11" ready     <- 5 s after the task died
+```
+
+### Every earlier observation follows from this
+
+| Observation | Explanation |
+|---|---|
+| Never reproduced locally | A dev machine already has `emulator` installed, so the provider always has a value. **Not** "the image is pre-installed so the failing path is skipped" — that was this ticket's wrong reading. |
+| api35 succeeded on the same runner | It ran **second**, after api27's own attempt had installed the emulator. |
+| The image cache broke api35 | Caching made api35 the **first** device to reach the unguarded call. The cache changed *ordering*; it corrupted nothing. |
+| `require64Bit`/ABI changed nothing | Correct — the ABI was never involved. x86_64 installed cleanly and setup still failed. |
+| `testedAbi` looked like the fix | A red herring throughout. AGP's warning points at an unrelated property. |
+
+### The fix
+
+One CI step, before Gradle runs: `sdkmanager --install emulator`, asserting the binary exists rather
+than trusting the exit code — the failure mode is precisely that a missing directory resurfaces
+later as an unrelated-looking error inside a setup task.
+
+### Corrections to this ticket's own record
+
+Three claims on file here were wrong and are superseded:
+
+1. **"It does not reproduce locally because the image is already installed, so the failing path
+   never executes."** Wrong reason. It is the *emulator package*, not the system image.
+2. **"At API 27 the AOSP image is 32-bit x86 with no arm64 variant."** False.
+   `system-images;android-27;default;x86_64` and `;arm64-v8a` are both published.
+3. **"Not fixable from the build script / accept the API-35-only gap."** False. It was fixable — in
+   CI configuration rather than the build script, which is why searching the DSL never found it.
+
+`require64Bit = true` is kept: forcing a 64-bit image on an x86_64 runner is correct regardless, and
+it is a no-op on arm64 where the image is already 64-bit.
+
+**Follow-up worth measuring, not assumed:** the emulator image cache was removed for a reason now
+known to be wrong. Caching ~1.7 GB may be safe now that the emulator is installed up front. Left off
+deliberately, because that is unmeasured and the gate is not worth risking on a guess.
 
 ## Notes
 

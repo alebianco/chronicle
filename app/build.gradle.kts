@@ -184,17 +184,17 @@ android {
           apiLevel = 27
           // AOSP has no Play Services; nothing here needs them, and the images are smaller.
           systemImageSource = "aosp"
-          // Forces a 64-bit image, which is what makes this device work on an x86_64 CI runner.
+          // Prefer a 64-bit image. Correct on its own terms — a 32-bit x86 emulator is the odd
+          // one out on any current host — but **not** what fixed CI: that was the emulator
+          // pre-install step in the workflow. Tried as a fix first, and setup still failed with
+          // x86_64 installed cleanly, which is what ruled the ABI out.
           //
-          // The previous `false` here was reasoned from a wrong premise — that API 27 offers only
-          // 32-bit x86 off arm64. `sdkmanager --list` says otherwise:
-          // `system-images;android-27;default;x86_64` is published, alongside `x86` and `arm64-v8a`.
+          // Kept because it is a no-op locally (arm64-v8a is already 64-bit) and names the choice
+          // rather than leaving it to a default AGP says will change in 10.0.
           //
-          // With `false`, an x86_64 runner resolved the plain 32-bit `x86` image and `api27Setup`
-          // then failed with "Cannot query the value of this property because it has no value
-          // available". It never reproduced on an Apple-silicon dev machine, which resolves
-          // `arm64-v8a` and never touches the x86 path — the host CPU is the difference, not
-          // whether the image was pre-installed.
+          // The earlier `false` was reasoned from a wrong premise — that API 27 offers only 32-bit
+          // x86 off arm64. `sdkmanager --list` publishes all three:
+          // `system-images;android-27;default;` + `x86`, `x86_64` and `arm64-v8a`.
           require64Bit = true
         }
         // A recent level, close to compileSdk 36. "aosp" rather than "aosp-atd": the plain image
@@ -215,31 +215,25 @@ android {
           targetDevices.add(localDevices["api27"])
           targetDevices.add(localDevices["api35"])
         }
-        // What CI runs. api27 is here on probation, under `require64Bit = true` (see the device
-        // above) — if the runner still fails `api27Setup`, drop this line, not the flag.
+        // What CI runs: both levels, including the minSdk floor. api27 was absent here for months
+        // because `api27Setup` died on a GitHub runner with "Cannot query the value of this
+        // property because it has no value available" — **solved 2026-09-09, run 34350392813**,
+        // api27 now 10/10 green.
         //
-        // History, so the loop is not re-run blindly: `api27Setup` failed on a GitHub runner with
-        // "Cannot query the value of this property because it has no value available", at AGP
-        // 8.13.2 and again — identically — on 9.4.0 with no image cache (run 34341471957). So the
-        // failure is neither a cache nor an AGP-version artefact.
+        // The cause was never in this file. AGP's setup runnable guards the system image it resolves
+        // and then calls `getEmulatorDirectoryProvider().get()` unguarded; with the `emulator`
+        // package not yet installed that provider holds no value, and Gradle's generic error names
+        // no property. The fix is the pre-install step in `.github/workflows/ci.yml`, which is why
+        // no amount of searching this DSL ever found it.
         //
-        // What it *is* attributable to is the host CPU. An x86_64 runner resolved API 27's 32-bit
-        // `x86` image; an Apple-silicon dev machine resolves `arm64-v8a` and never takes that path,
-        // which is why this never reproduced locally. `require64Bit = true` selects the published
-        // `x86_64` image instead. That is the hypothesis under test here, not a proven fix.
+        // Three theories were wrong and are recorded so they are not retried: the image cache (it
+        // only changed install *ordering*, which is why it broke api35 instead), the AGP version
+        // (`testedAbi` is a red herring — absent from the public DSL at 9.4.0, javap-verified), and
+        // the ABI (x86_64 installed cleanly and setup still failed). Full account in cu-222.
         //
-        // The stake is real: when `api27Setup` dies, **no androidTest results are produced at all**,
-        // so api35 loses its coverage too and the gate tests nothing.
-        //
-        // `testedAbi`, which AGP's warning names, is **not settable from here at any AGP version
-        // this project can use**: verified with `javap` on AGP 9.4.0, where
-        // `com.android.build.api.dsl.ManagedVirtualDevice` exposes `device`, `apiLevel`,
-        // `sdkVersion`, `systemImageSource`, `require64Bit` and `pageAlignment` — and no
-        // `testedAbi`. It exists only on AGP's internal implementation class, so the AGP 9 upgrade
-        // did not open that door.
-        //
-        // Note the `SettingsDataStore` lost-write fix is unrelated: `api27Setup` fails before any
-        // test runs, so that fix neither addresses nor masks this. See cu-222.
+        // The stake if api27 ever breaks again: when its setup dies, **no androidTest results are
+        // produced at all**, so api35 loses coverage too and the gate tests nothing. The workflow's
+        // "Confirm tests actually executed" step is what catches that.
         create("ciCheckGroup") {
           targetDevices.add(localDevices["api27"])
           targetDevices.add(localDevices["api35"])
