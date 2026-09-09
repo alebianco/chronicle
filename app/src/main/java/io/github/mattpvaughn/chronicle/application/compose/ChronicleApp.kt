@@ -31,15 +31,18 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.currentBackStackEntryAsState
+import com.slack.circuit.runtime.screen.Screen
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.COLLAPSED
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.EXPANDED
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState.HIDDEN
 import io.github.mattpvaughn.chronicle.features.currentlyplaying.compose.MiniPlayerHeight
-import io.github.mattpvaughn.chronicle.navigation.Destination
+import io.github.mattpvaughn.chronicle.navigation.ChronicleScreen
+import io.github.mattpvaughn.chronicle.navigation.CollectionsScreenKey
+import io.github.mattpvaughn.chronicle.navigation.HomeScreenKey
+import io.github.mattpvaughn.chronicle.navigation.LibraryScreenKey
+import io.github.mattpvaughn.chronicle.navigation.SettingsScreenKey
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleColors
 
 /** The bottom navigation bar's fixed content height — `@dimen/bottom_nav_bar_height`. */
@@ -55,17 +58,17 @@ private const val SHEET_ANIMATION_MS = 400
  * `NavigationBar` builds its items from data rather than inflating a menu.
  */
 private data class Tab(
-  val destination: Destination,
+  val screen: ChronicleScreen,
   val iconRes: Int,
   val labelRes: Int,
 )
 
 private val TABS =
   listOf(
-    Tab(Destination.Home, R.drawable.nav_home, R.string.tab_home),
-    Tab(Destination.Library, R.drawable.nav_library, R.string.tab_library),
-    Tab(Destination.Collections, R.drawable.ic_collections, R.string.tab_collections),
-    Tab(Destination.Settings, R.drawable.nav_settings, R.string.tab_settings),
+    Tab(HomeScreenKey, R.drawable.nav_home, R.string.tab_home),
+    Tab(LibraryScreenKey, R.drawable.nav_library, R.string.tab_library),
+    Tab(CollectionsScreenKey, R.drawable.ic_collections, R.string.tab_collections),
+    Tab(SettingsScreenKey, R.drawable.nav_settings, R.string.tab_settings),
   )
 
 /**
@@ -91,11 +94,11 @@ private val TABS =
  */
 @Composable
 fun ChronicleApp(
-  navController: NavHostController,
+  currentScreen: Screen?,
   isLoggedIn: Boolean,
   showCollectionsTab: Boolean,
   sheetState: BottomSheetState,
-  onTabSelected: (Destination) -> Unit,
+  onTabSelected: (ChronicleScreen) -> Unit,
   miniPlayer: @Composable () -> Unit,
   expandedPlayer: @Composable () -> Unit,
   navHost: @Composable (Modifier) -> Unit,
@@ -159,7 +162,7 @@ fun ChronicleApp(
 
       if (isLoggedIn) {
         ChronicleBottomBar(
-          navController = navController,
+          currentScreen = currentScreen,
           showCollectionsTab = showCollectionsTab,
           bottomInset = bottomInset,
           onTabSelected = onTabSelected,
@@ -195,15 +198,14 @@ fun ChronicleApp(
 
 @Composable
 private fun ChronicleBottomBar(
-  navController: NavHostController,
+  currentScreen: Screen?,
   showCollectionsTab: Boolean,
   bottomInset: Dp,
-  onTabSelected: (Destination) -> Unit,
+  onTabSelected: (ChronicleScreen) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
   val visibleTabs =
-    TABS.filter { it.destination != Destination.Collections || showCollectionsTab }
+    TABS.filter { it.screen != CollectionsScreenKey || showCollectionsTab }
 
   NavigationBar(
     modifier = modifier.fillMaxWidth().height(BottomNavHeight + bottomInset),
@@ -228,8 +230,8 @@ private fun ChronicleBottomBar(
         // semantics instead was tried and does **not** work: it removes the label's text without
         // promoting the icon's description, so the selected item stayed unlabelled.
         modifier = Modifier.semantics { contentDescription = label },
-        selected = currentRoute == tab.destination.route,
-        onClick = { onTabSelected(tab.destination) },
+        selected = currentScreen == tab.screen,
+        onClick = { onTabSelected(tab.screen) },
         icon = {
           Icon(
             painter = painterResource(tab.iconRes),

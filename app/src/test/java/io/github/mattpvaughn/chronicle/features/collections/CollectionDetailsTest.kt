@@ -1,7 +1,6 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
 import android.content.SharedPreferences
-import androidx.lifecycle.SavedStateHandle
 import io.github.mattpvaughn.chronicle.data.local.BookRepository
 import io.github.mattpvaughn.chronicle.data.local.CollectionsRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -69,10 +68,7 @@ class CollectionDetailsTest {
       collectionRepo = collectionRepo,
       prefsRepo = mockk<PrefsRepo>(relaxed = true) { every { libraryBookViewStyle } returns "COVER_GRID" },
       settings = testSettingsDataStore(),
-      savedStateHandle =
-        SavedStateHandle(
-          mapOf(CollectionDetailsViewModel.ARG_COLLECTION_ID to collectionId),
-        ),
+      collectionId = collectionId,
     )
   }
 

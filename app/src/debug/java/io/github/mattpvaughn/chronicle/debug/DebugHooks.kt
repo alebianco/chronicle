@@ -18,7 +18,9 @@ import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Compan
 import io.github.mattpvaughn.chronicle.features.player.MediaPlayerService.Companion.USE_SAVED_TRACK_PROGRESS
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.injection.chronicleGraph
-import io.github.mattpvaughn.chronicle.navigation.Destination
+import io.github.mattpvaughn.chronicle.navigation.BrowseScreenKey
+import io.github.mattpvaughn.chronicle.navigation.ChronicleScreen
+import io.github.mattpvaughn.chronicle.navigation.SettingsScreenKey
 import io.github.mattpvaughn.chronicle.util.collectWhileStarted
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -259,7 +261,7 @@ object DebugHooks : DebugHooksContract {
   override fun onShowBrowseIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigateTo: (String) -> Unit,
+    navigateTo: (ChronicleScreen) -> Unit,
   ) {
     if (intent == null || !intent.getBooleanExtra(EXTRA_SHOW_BROWSE, false)) {
       return
@@ -271,7 +273,7 @@ object DebugHooks : DebugHooksContract {
     Timber.i("Opening the browse screen (show_browse)")
     activity.window.decorView.post {
       if (!activity.isFinishing && !activity.isDestroyed) {
-        navigateTo(Destination.Browse.ROUTE)
+        navigateTo(BrowseScreenKey)
       }
     }
   }
@@ -294,7 +296,7 @@ object DebugHooks : DebugHooksContract {
   override fun onShowSettingsIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigateTo: (String) -> Unit,
+    navigateTo: (ChronicleScreen) -> Unit,
   ) {
     if (intent == null || !intent.getBooleanExtra(EXTRA_SHOW_SETTINGS, false)) {
       return
@@ -302,7 +304,7 @@ object DebugHooks : DebugHooksContract {
     Timber.i("Opening the settings screen (show_settings)")
     activity.window.decorView.post {
       if (!activity.isFinishing && !activity.isDestroyed) {
-        navigateTo(Destination.Settings.ROUTE)
+        navigateTo(SettingsScreenKey)
       }
     }
   }

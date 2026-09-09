@@ -8,6 +8,7 @@ import com.slack.circuit.test.FakeNavigator
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
 import io.github.mattpvaughn.chronicle.features.settings.SeriesIndexTesterViewModel
+import io.github.mattpvaughn.chronicle.navigation.SeriesIndexTesterScreenKey
 import io.github.mattpvaughn.chronicle.testing.TEST_SOURCE
 import io.github.mattpvaughn.chronicle.util.MainDispatcherRule
 import io.github.mattpvaughn.chronicle.util.TestDispatcherProvider
@@ -67,7 +68,8 @@ class SeriesIndexTesterPresenterTest {
   @Test
   fun `typing a title sort runs the rules and reaches the state`() =
     runTest {
-      val presenter = SeriesIndexTesterPresenter(viewModel(), FakeNavigator(SeriesIndexTesterScreenKey))
+      val vm = viewModel()
+      val presenter = SeriesIndexTesterPresenter({ vm }, FakeNavigator(SeriesIndexTesterScreenKey))
 
       moleculeFlow(RecompositionMode.Immediate) { presenter.present() }.test {
         assertEquals("", awaitItem().ui.titleSort)
@@ -95,7 +97,8 @@ class SeriesIndexTesterPresenterTest {
   @Test
   fun `choosing a sample loads it into the input`() =
     runTest {
-      val presenter = SeriesIndexTesterPresenter(viewModel(), FakeNavigator(SeriesIndexTesterScreenKey))
+      val vm = viewModel()
+      val presenter = SeriesIndexTesterPresenter({ vm }, FakeNavigator(SeriesIndexTesterScreenKey))
 
       moleculeFlow(RecompositionMode.Immediate) { presenter.present() }.test {
         awaitItem()
@@ -118,18 +121,19 @@ class SeriesIndexTesterPresenterTest {
   @Test
   fun `the back arrow pops the backstack`() =
     runTest {
+      val vm = viewModel()
       val navigator = FakeNavigator(SeriesIndexTesterScreenKey)
-      val presenter = SeriesIndexTesterPresenter(viewModel(), navigator)
+      val presenter = SeriesIndexTesterPresenter({ vm }, navigator)
 
       moleculeFlow(RecompositionMode.Immediate) { presenter.present() }.test {
-        navigator.expectNoPopEvents()
+        navigator.assertPopIsEmpty()
 
         awaitItem().eventSink(SeriesIndexTesterEvent.NavigateUp)
 
         // Circuit's own FakeNavigator rather than a hand-rolled one: `Navigator` gained members
         // between minors, and a fake written against today's interface is a compile break waiting
         // for the next 0.x bump. `awaitPop` suspends, so this is not the "not yet" trap that
-        // `expectNoEvents` is.
+        // `assertPopIsEmpty` above is — that one only says "no pop *so far*".
         navigator.awaitPop()
         cancel()
       }

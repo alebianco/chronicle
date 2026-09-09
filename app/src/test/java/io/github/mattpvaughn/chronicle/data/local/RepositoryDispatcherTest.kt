@@ -174,15 +174,15 @@ class RepositoryDispatcherTest {
      * dispatcher conversion, an already-closed task. A layer nothing scans is a layer that drifts.
      *
      * The two Fragments here were representative UI files rather than special ones; the Compose
-     * migration replaced them with the destinations below, which is where a hardcoded dispatcher would now
-     * be written.
+     * migration replaced them with destinations, and the Circuit migration replaced those with the
+     * presenter/UI pairs below — which is where a hardcoded dispatcher would now be written.
      */
     val UI_AND_APPLICATION_SOURCES: List<String> =
       listOf(
         "features/settings/SettingsViewModel",
         "features/bookdetails/AudiobookDetailsViewModel",
-        "features/library/compose/LibraryDestination",
-        "features/collections/compose/CollectionsDestination",
+        "features/library/compose/LibraryCircuit",
+        "features/collections/compose/CollectionsCircuit",
         "application/MainActivity",
         "application/ChronicleApplication",
         "data/sources/plex/PlexConfig",

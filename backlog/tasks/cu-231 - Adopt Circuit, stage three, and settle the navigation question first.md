@@ -1,7 +1,7 @@
 ---
 id: cu-231
 title: "Adopt Circuit, stage three, and settle the navigation question first"
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-09-08'
 labels:
@@ -189,21 +189,26 @@ are the honest test of what Circuit actually costs on a simple screen. Do **not*
 
 ## Acceptance Criteria
 
-- [ ] **The navigation question is answered and recorded as a decision before the first screen
-      moves** — options 1/2/3 above, with the reasoning. This amends [[decision-22]] if option 1
-- [ ] Circuit declared, version pinned; the `0.x` API instability noted with what would break
-- [ ] **One small screen converted first** (`BrowseDestination` or `SeriesIndexTesterDestination`),
-      shipped and device-verified on its own before a second is started
-- [ ] Screen events are a **sealed hierarchy with an exhaustive `when`** — this is the property the
-      adoption is *for*; a conversion that keeps method references has not delivered it
-- [ ] Convention 2 in `reference/00-constitution.md` updated: `*Destination` becomes `Ui` +
-      presenter, `*Screen` staying pure is unchanged
-- [ ] Each converted screen device-verified in **both orientations**, per rule 5
-- [ ] `./verify.sh` green after **each** screen, not only at the end
-- [ ] Coverage does not regress — the `*Destination` files currently carry real coverage
-- [ ] `./test_release_build.sh` passes: Circuit uses reflection-adjacent code generation and this is
-      R8-sensitive
-- [ ] Licence checked (Apache 2.0 expected) and the licences page regenerated
+- [x] **The navigation question is answered and recorded as a decision before the first screen
+      moves** — [[decision-27]] records option 1, amending [[decision-22]]
+- [x] Circuit declared, version pinned at **0.38.0**; the `0.x` instability noted and then *met*
+      twice — `Screen` is `CircuitSaveable` rather than `Parcelable` since 0.31.x, and `BackStack`
+      is `NavStack`
+- [x] **`SeriesIndexTesterDestination` converted first**, shipped in its own commit (`98ec3629`)
+      before any other screen moved
+- [x] Screen events are a **sealed hierarchy with an exhaustive `when`** on all thirteen
+- [x] Convention 2 **and convention 9** in `reference/00-constitution.md` updated, plus the
+      `android-ui` skill, CLAUDE.md's map, and the **six** reference docs the deletion invalidated
+      (`02-architecture`, `03-project-structure`, `04-key-components`, `06-adding-features`,
+      `07-visual-guide`, `08-glossary`). `06-adding-features` mattered most: it told an agent to
+      write a `*Destination` against a `Destination.kt` route, which no longer compiles
+- [x] Device-verified in **both orientations** on the tablet: home, library, details, series facet,
+      browse, narrator facet, settings, series tester, back navigation twice, rotation. Zero crashes
+- [x] `./verify.sh` green, 10 stages
+- [x] Coverage **rose**, 56.55% → 57.73%
+- [x] `./test_release_build.sh` **exit 0** — 9,201 classes in dex, 24 `@Serializable` models checked
+- [x] Licence checked: all **9** Circuit modules are **Apache-2.0** in the generated catalogue,
+      release and debug
 
 ## Notes
 
@@ -214,3 +219,65 @@ with two routers live.
 
 **`FlowTestExt` and `combineDistinct` do not all retire even here.** cu-229 and cu-230 record which
 parts stay; this task should not quietly widen into deleting them.
+
+## Closing notes, 2026-09-09
+
+**Landed as one commit after the first screen**, which is a departure from this ticket's own rule of
+"screen by screen, each independently shippable". The rule contradicted the harder one two lines
+below it — *never stop mid-migration with two routers live* — and the owner resolved it: swap the
+router in one commit. So `SeriesIndexTesterCircuit` shipped alone as the honest small test, and the
+remaining twelve plus the router moved together.
+
+### The three things that only a device could find
+
+Every one of these passed `verify.sh` and would have shipped:
+
+1. **`CircuitCompositionLocals` must wrap `rememberSaveableNavStack`.** Building the `Circuit` inside
+   the `navHost` slot means the nav stack has no saver: *"No CircuitSaver provided"*, crash before
+   the first frame.
+2. **`hiltViewModel()` does not work inside a Circuit record.** The record-scoped owner is not
+   `HasDefaultViewModelProviderFactory`, so the call falls through to the **default** factory and
+   throws `Cannot create an instance of class HomeViewModel`. `recordViewModel()` keeps the record's
+   store and borrows the Activity's factory.
+3. **A `Screen` still has to be saveable.** The marker interface is not enough — Compose's
+   `SaveableStateRegistry` rejects a type it cannot bundle. `ScreenKeySaver` serialises the keys as
+   JSON, which keeps `navigation/Screens.kt` framework-free where `@Parcelize` would not have.
+
+Three crashes on three successive launches, each one invisible to 1,815 green tests, because nothing
+off-device composes the real shell. That is rule 5 earning its place again.
+
+A **fourth** arrived after those, and is the worst of the set because it does not look like a crash:
+
+4. **Never call `pop()` to discover whether the back stack can pop.** Circuit's `pop()` at the root
+   delegates to `onBackPressedDispatcher.onBackPressed()`, which re-enters the app's own back
+   handler, which calls `pop()` again — infinite recursion, dying as a `StackOverflowError`
+   thousands of frames deep. On screen it is indistinguishable from the app exiting normally: the
+   process is simply gone. It also made the "back from a non-Home tab returns to Home" branch
+   **unreachable**, because control never returned from `pop()`. Reading `peekBackStack().size`
+   first has no reentrancy, restores that branch, and was device-verified.
+
+The self-review agent found this independently and diagnosed the same cause from the bytecode. It
+also caught a second one no test or screenshot would show: **`resetRoot` defaults every state flag
+to `false`**, so a tab switch dropped the record and cleared its ViewModel where the call it
+replaced carried `saveState`/`restoreState`. `Navigator.StateOptions.SaveAndRestore` for the tab
+switch; the plain default stays right for a login step, where coming back is exactly what
+`inclusive = true` ruled out.
+
+### What the migration removed
+
+- **The route-string encoding problem, entirely.** `encodeArg`/`decodeArg` and the 208-line
+  `DestinationTest` that guarded them are gone: a screen key carries `"Whitfield, June/Nunn"` as a
+  string, so there is no percent-encoding to get wrong and no pattern to silently fail to match.
+- **The enum round trip.** `FacetKind` travelled as a `name` matched back with a
+  `?: FacetKind.Author` fallback, so a mismatch showed the wrong facet rather than failing. It is
+  the enum now.
+- **A real latent bug.** `AudiobookDetailsViewModel` read `ARG_AUDIOBOOK_TITLE` from a
+  `SavedStateHandle` key **nothing ever wrote** — only two tests seeded it — so every production
+  download notification was titled with the empty string. It reads the loaded book's title now.
+
+### What it cost
+
+Three ViewModels moved to Hilt assisted injection, which made their tests *simpler* (a string
+argument instead of a hand-built `SavedStateHandle`). Two AGP-9-era deprecation warnings are now
+visible on `hiltViewModel` — `androidx.hilt.lifecycle.viewmodel.compose` is the new home and the
+dependency is not declared; that is its own change, not one to bury here.

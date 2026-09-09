@@ -7,8 +7,19 @@ description: Use when writing or changing any screen - a Compose destination, th
 
 **The UI is Compose, all of it** (decision-22). **Zero layouts, zero Fragments,
 zero `RecyclerView.Adapter`s, no ViewBinding.** A screen is a `*Screen` composable — a pure
-function of its state — behind a `*Destination` that wires a ViewModel to it. `Navigator` and its
-`FragmentManager` transactions are gone; `ChronicleNavHost` is the graph.
+function of its state — behind a **Circuit presenter and `*Ui`** that wrap a ViewModel (decision-27).
+`Navigator` with its `FragmentManager` transactions and `ChronicleNavHost` with its route strings
+are both gone; the graph is `navigation/circuit/ChronicleCircuit.kt`, keyed on `ChronicleScreen`.
+
+Every interaction is a member of a sealed `*Event` hierarchy, so the presenter's `when` is
+exhaustive: a new interaction that is not wired is a **compile error**, where a forgotten
+`*Destination` lambda used to render a live-looking button that did nothing.
+
+**Two traps the migration cost, both invisible off-device:** resolve ViewModels with
+`recordViewModel()`, never `hiltViewModel()` — Circuit's record-scoped owner is not
+`HasDefaultViewModelProviderFactory`, so the direct call silently falls back to the default factory
+and throws on launch. And `CircuitCompositionLocals` must wrap `rememberSaveableNavStack`, not sit
+inside the nav host, or the back stack has no saver and the app crashes before drawing.
 
 **One View island remains, deliberately**: `CastButton` hosts a real `MediaRouteButton` in an
 `AndroidView`, because the Cast SDK has no Compose surface. It degrades to absent (decision-19),

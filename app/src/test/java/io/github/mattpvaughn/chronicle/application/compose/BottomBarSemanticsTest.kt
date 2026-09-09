@@ -4,11 +4,10 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState
-import io.github.mattpvaughn.chronicle.navigation.Destination
+import io.github.mattpvaughn.chronicle.navigation.ChronicleScreen
+import io.github.mattpvaughn.chronicle.navigation.HomeScreenKey
+import io.github.mattpvaughn.chronicle.navigation.SettingsScreenKey
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import org.junit.Rule
 import org.junit.Test
@@ -48,7 +47,7 @@ class BottomBarSemanticsTest {
 
   @Test
   fun `every tab exposes a content description, selected and unselected alike`() {
-    setShell()
+    setShell(HomeScreenKey)
 
     TAB_LABELS.forEach { label ->
       composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
@@ -56,45 +55,39 @@ class BottomBarSemanticsTest {
   }
 
   /**
-   * And after moving to another tab, so this is not fixed only for the launch destination — which is
-   * the shape the original defect had.
+   * And on another tab, so this is not fixed only for the launch destination — which is the shape
+   * the original defect had.
+   *
+   * Under Navigation Compose this had to build a whole `NavHost` with three registered routes and
+   * then drive `controller.navigate(...)`, because "which tab is selected" was a fact the bar read
+   * out of a `NavController`. Circuit hands the shell the current screen, so the second case is
+   * the same assertion against a different argument.
    */
   @Test
-  fun `every tab still exposes one after navigating to a different tab`() {
-    val controller = setShell()
-
-    composeRule.runOnIdle { controller.navigate(Destination.Settings.route) }
+  fun `every tab still exposes one on a different tab`() {
+    setShell(SettingsScreenKey)
 
     TAB_LABELS.forEach { label ->
       composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
     }
   }
 
-  private fun setShell(): androidx.navigation.NavHostController {
-    lateinit var controller: androidx.navigation.NavHostController
+  private fun setShell(currentScreen: ChronicleScreen) {
     composeRule.setContent {
-      controller = rememberNavController()
       ChronicleTheme {
         ChronicleApp(
-          navController = controller,
+          currentScreen = currentScreen,
           isLoggedIn = true,
           showCollectionsTab = false,
           sheetState = BottomSheetState.HIDDEN,
           onTabSelected = {},
           miniPlayer = {},
           expandedPlayer = {},
-          navHost = {
-            NavHost(controller, startDestination = Destination.Home.route) {
-              composable(Destination.Home.route) { Text("home") }
-              composable(Destination.Library.route) { Text("library") }
-              composable(Destination.Settings.route) { Text("settings") }
-            }
-          },
+          navHost = { Text("content") },
           accountNotice = {},
         )
       }
     }
-    return controller
   }
 
   private companion object {

@@ -10,7 +10,6 @@ import com.slack.circuit.runtime.CircuitUiEvent
 import com.slack.circuit.runtime.CircuitUiState
 import com.slack.circuit.runtime.Navigator
 import com.slack.circuit.runtime.presenter.Presenter
-import com.slack.circuit.runtime.screen.Screen
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.features.settings.SeriesIndexTesterViewModel
 import io.github.mattpvaughn.chronicle.views.compose.ChronicleScaffold
@@ -38,21 +37,8 @@ import io.github.mattpvaughn.chronicle.views.compose.ChronicleScaffold
  * only the `*Destination` layer becomes `Ui` + presenter. And the ViewModel is unchanged: Circuit
  * does not replace it, it wraps it, so the derived-state work and its tests carry over untouched.
  *
- * ### The route key
- *
- * A `data object`, since this screen takes no arguments.
- *
- * Worth recording because the obvious expectation is wrong: Circuit's `Screen` **used to be**
- * `Parcelable`, and still is at 0.31.x. At **0.38.0 it extends `CircuitSaveable`**, a marker
- * interface with no members, so no `@Parcelize` and no hand-written `Parcelable` is needed. An
- * earlier attempt here added both — and `kotlin-parcelize` silently no-ops under AGP 9 anyway
- * under AGP 9, so it failed twice for two unrelated reasons before the actual interface was read.
- *
- * That is the `0.x` risk decision-27 records, in concrete form: the API moved between minors.
+ * Everything the tester renders, plus the sink its UI posts back through.
  */
-data object SeriesIndexTesterScreenKey : Screen
-
-/** Everything the tester renders, plus the sink its UI posts back through. */
 data class SeriesIndexTesterCircuitState(
   val ui: SeriesIndexTesterUiState,
   val eventSink: (SeriesIndexTesterEvent) -> Unit,
@@ -92,11 +78,12 @@ sealed interface SeriesIndexTesterEvent : CircuitUiEvent {
  * upstream when the presenter leaves composition.
  */
 class SeriesIndexTesterPresenter(
-  private val viewModel: SeriesIndexTesterViewModel,
+  private val viewModel: @Composable () -> SeriesIndexTesterViewModel,
   private val navigator: Navigator,
 ) : Presenter<SeriesIndexTesterCircuitState> {
   @Composable
   override fun present(): SeriesIndexTesterCircuitState {
+    val viewModel = viewModel()
     val state by viewModel.uiState.collectAsState()
 
     return SeriesIndexTesterCircuitState(ui = state) { event ->

@@ -1,6 +1,9 @@
 package io.github.mattpvaughn.chronicle.features.collections
 
 import androidx.lifecycle.*
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.data.local.*
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -8,27 +11,30 @@ import io.github.mattpvaughn.chronicle.util.stringFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
+@HiltViewModel(assistedFactory = CollectionDetailsViewModel.Factory::class)
 class CollectionDetailsViewModel
-  @Inject
+  @AssistedInject
   constructor(
     private val bookRepo: BookRepository,
     private val collectionRepo: CollectionsRepository,
     prefsRepo: PrefsRepo,
     settings: SettingsDataStore,
-    savedStateHandle: SavedStateHandle,
-  ) : ViewModel() {
     /**
-     * Which collection, from the navigation arguments rather than a factory field.
+     * Which collection, handed over directly by the Circuit screen key.
      *
-     * The factory held `collectionId` as a nullable `var` the Fragment set before `create` and then
-     * dereferenced with `!!`. That did not survive process death — the system rebuilds the ViewModel
-     * without replaying the write, so the `!!` threw on a restored screen.
+     * Two earlier shapes both lost this value. The Fragment-era factory held it as a nullable `var`
+     * set before `create` and dereferenced with `!!`, which did not survive process death — the
+     * system rebuilds the ViewModel without replaying the write, so the `!!` threw on a restored
+     * screen. Navigation Compose fixed that by routing it through `SavedStateHandle`, at the cost
+     * of encoding it into a URL path segment.
+     *
+     * Circuit removes the round trip: `CollectionDetailsScreenKey` *is* the argument, and the
+     * screen key is saved and restored with the back stack, so this survives process death without
+     * being a string in a route.
      */
-    private val collectionId: String = savedStateHandle.get<String>(ARG_COLLECTION_ID).orEmpty()
-
+    @Assisted private val collectionId: String,
+  ) : ViewModel() {
     private suspend fun getBooksInCollection(): List<Audiobook> {
       val childIds = collectionRepo.getChildIds(collectionId)
       return childIds.mapNotNull {
@@ -54,9 +60,9 @@ class CollectionDetailsViewModel
         prefsRepo.libraryBookViewStyle,
       )
 
-    @Suppress("UNCHECKED_CAST")
-    companion object {
-      /** Navigation argument key, owned here because this is what reads it. */
-      const val ARG_COLLECTION_ID = "collection_id"
+    /** How Circuit's presenter factory builds this, passing the id from the screen key. */
+    @AssistedFactory
+    interface Factory {
+      fun create(collectionId: String): CollectionDetailsViewModel
     }
   }

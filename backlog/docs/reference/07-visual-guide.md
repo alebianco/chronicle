@@ -153,7 +153,7 @@ features/home/
     │   ├─ Renders the shelves (LazyColumn / LazyVerticalGrid, never a RecyclerView adapter)
     │   └─ Emits callbacks for user interactions (onBookClick, etc.)
     │
-    └── HomeDestination.kt
+    └── HomeCircuit.kt
         ├─ Calls hiltViewModel() to get the ViewModel
         ├─ Collects its StateFlow via collectAsStateWithLifecycle()
         └─ Passes state + callbacks into HomeScreen
@@ -331,7 +331,7 @@ flowchart TD
 | Add a setting               | `features/settings/SettingsViewModel.kt` (`settingsRows`) + `SharedPreferencesPrefsRepo.kt` |
 | Change UI layout            | `features/*/compose/`                   |
 | Add dependency injection    | `injection/` (Hilt modules)              |
-| Modify navigation           | `navigation/Destination.kt` (routes) + `navigation/compose/ChronicleNavHost.kt` (graph) |
+| Modify navigation           | `navigation/Screens.kt` (screen keys) + `navigation/circuit/ChronicleCircuit.kt` (graph) |
 | Change app initialization   | `application/ChronicleApplication.kt`   |
 | Add database table/field    | one of **five** DBs in `data/local/` — chapters live in `ChapterDatabase`, bookmarks in `BookmarkDatabase` |
 

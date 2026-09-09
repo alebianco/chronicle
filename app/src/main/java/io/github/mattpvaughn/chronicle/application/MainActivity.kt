@@ -20,8 +20,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
+import com.slack.circuit.foundation.CircuitCompositionLocals
+import com.slack.circuit.foundation.NavigableCircuitContent
+import com.slack.circuit.foundation.navstack.rememberSaveableNavStack
+import com.slack.circuit.foundation.rememberCircuitNavigator
+import com.slack.circuit.runtime.Navigator
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.scopes.ActivityScoped
 import io.github.mattpvaughn.chronicle.R
@@ -46,9 +49,13 @@ import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
 import io.github.mattpvaughn.chronicle.features.player.PlaybackErrorBus
 import io.github.mattpvaughn.chronicle.features.player.PlaybackErrorExplanation
 import io.github.mattpvaughn.chronicle.features.player.explainPlaybackError
-import io.github.mattpvaughn.chronicle.navigation.Destination
-import io.github.mattpvaughn.chronicle.navigation.compose.ChronicleNavHost
-import io.github.mattpvaughn.chronicle.navigation.destinationForLogin
+import io.github.mattpvaughn.chronicle.navigation.BookDetailsScreenKey
+import io.github.mattpvaughn.chronicle.navigation.ChronicleScreen
+import io.github.mattpvaughn.chronicle.navigation.HomeScreenKey
+import io.github.mattpvaughn.chronicle.navigation.SettingsScreenKey
+import io.github.mattpvaughn.chronicle.navigation.circuit.ScreenKeySaver
+import io.github.mattpvaughn.chronicle.navigation.circuit.rememberChronicleCircuit
+import io.github.mattpvaughn.chronicle.navigation.screenForLogin
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import io.github.mattpvaughn.chronicle.util.DispatcherProvider
 import io.github.mattpvaughn.chronicle.util.collectEventsWhileStarted
@@ -83,9 +90,9 @@ class MainActivity : AppCompatActivity() {
    * Set from the composition so the back handler and the notification intent path can reach it.
    *
    * Both run after a frame has been drawn, so neither can observe the null. Cleared in
-   * `onDestroy`, since the controller holds the whole graph.
+   * `onDestroy`, since the navigator holds the whole back stack.
    */
-  private var navController: NavHostController? = null
+  private var circuitNavigator: Navigator? = null
 
   @Inject
   lateinit var plexPrefsRepo: PlexPrefsRepo
@@ -135,8 +142,8 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onFailSyncIntent(intent)
     DebugHooks.onInvalidateServerTokenIntent(intent)
     DebugHooks.onShowPlayerIntent(intent, this, viewModel)
-    DebugHooks.onShowBrowseIntent(intent, this, ::navigateToRoute)
-    DebugHooks.onShowSettingsIntent(intent, this, ::navigateToRoute)
+    DebugHooks.onShowBrowseIntent(intent, this, ::navigateToScreen)
+    DebugHooks.onShowSettingsIntent(intent, this, ::navigateToScreen)
     DebugHooks.onMoveSyncLocationIntent(intent, this)
     // Debug-only: `--el play_book <id>` starts playback once the media service is
     // connected. connect{} is required — transportControls is null until then,
@@ -161,50 +168,64 @@ class MainActivity : AppCompatActivity() {
       val sheetState by viewModel.currentlyPlayingLayoutState.collectAsStateWithLifecycle()
       val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
       val hasCollections by viewModel.hasCollections.collectAsStateWithLifecycle()
-      val controller = rememberNavController()
-      navController = controller
+      val circuit = rememberChronicleCircuit(prefsRepo, plexConfig)
 
-      LoginNavigation(controller)
+      // **`CircuitCompositionLocals` must wrap `rememberSaveableNavStack`, not sit inside the nav
+      // host.** The nav stack reads `LocalCircuitSaver` to restore its records across process
+      // death, and that local is provided here — building the `Circuit` inside the `navHost` slot
+      // instead crashes on launch with "No CircuitSaver provided", which no unit test sees because
+      // no unit test composes the real shell.
+      //
+      // `ScreenKeySaver` rather than the default: the keys are `@Serializable` rather than
+      // `Parcelable`, so that `navigation/Screens.kt` stays framework-free. The default saver
+      // rejects them and crashes on launch.
+      CircuitCompositionLocals(circuit, ScreenKeySaver) {
+        // Circuit's back stack and navigator replace `rememberNavController`. `navStack` is what
+        // the shell reads to highlight a tab and what the back handler pops; `navigator` is what
+        // every presenter is handed.
+        val navStack = rememberSaveableNavStack(root = HomeScreenKey)
+        val navigator = rememberCircuitNavigator(navStack)
+        circuitNavigator = navigator
 
-      ChronicleTheme {
-        ChronicleApp(
-          navController = controller,
-          isLoggedIn = isLoggedIn,
-          showCollectionsTab = hasCollections,
-          sheetState = sheetState,
-          onTabSelected = { destination ->
-            controller.navigate(destination.route) {
-              // Tabs are roots, not a stack. `Navigator` cleared the back stack by hand before
-              // every switch with `while (backStackEntryCount > 0) popBackStackImmediate()`.
-              popUpTo(controller.graph.startDestinationId) { saveState = true }
-              launchSingleTop = true
-              restoreState = true
-            }
-            viewModel.minimizeCurrentlyPlaying()
-          },
-          miniPlayer = { MiniPlayerHost(viewModel, plexConfig) },
-          expandedPlayer = {
-            PlayerDestination(
-              plexConfig = plexConfig,
-              onCollapse = { viewModel.setBottomSheetState(COLLAPSED) },
-              viewModel = currentlyPlayingViewModel,
-            )
-          },
-          navHost = { navModifier ->
-            ChronicleNavHost(
-              navController = controller,
-              prefsRepo = prefsRepo,
-              plexConfig = plexConfig,
-              modifier = navModifier,
-            )
-          },
-          // Passed as a slot rather than placed beside `ChronicleApp`: only the shell knows where
-          // the nav bar and mini player sit, and as a sibling this drew over every sub-screen's
-          // toolbar.
-          accountNotice = {
-            AccountRevokedNotice { controller.navigate(Destination.Settings.ROUTE) }
-          },
-        )
+        LoginNavigation(navigator)
+
+        ChronicleTheme {
+          ChronicleApp(
+            currentScreen = navStack.topRecord?.screen,
+            isLoggedIn = isLoggedIn,
+            showCollectionsTab = hasCollections,
+            sheetState = sheetState,
+            onTabSelected = { screen ->
+              // Tabs are roots, not a stack: `resetRoot` replaces the whole back stack rather than
+              // pushing onto it. That was `popUpTo(startDestination)` under Navigation Compose and,
+              // before that, a `while (backStackEntryCount > 0) popBackStackImmediate()` loop.
+              navigator.resetRoot(screen)
+              viewModel.minimizeCurrentlyPlaying()
+            },
+            miniPlayer = { MiniPlayerHost(viewModel, plexConfig) },
+            expandedPlayer = {
+              PlayerDestination(
+                plexConfig = plexConfig,
+                onCollapse = { viewModel.setBottomSheetState(COLLAPSED) },
+                viewModel = currentlyPlayingViewModel,
+              )
+            },
+            navHost = { navModifier ->
+              NavigableCircuitContent(
+                navigator = navigator,
+                navStack = navStack,
+                circuit = circuit,
+                modifier = navModifier,
+              )
+            },
+            // Passed as a slot rather than placed beside `ChronicleApp`: only the shell knows where
+            // the nav bar and mini player sit, and as a sibling this drew over every sub-screen's
+            // toolbar.
+            accountNotice = {
+              AccountRevokedNotice { navigator.goTo(SettingsScreenKey) }
+            },
+          )
+        }
       }
     }
 
@@ -233,10 +254,10 @@ class MainActivity : AppCompatActivity() {
   /**
    * Navigates by route, for the debug hooks.
    *
-   * They are posted to the next main-loop pass, so [navController] is set by the time this runs.
+   * They are posted to the next main-loop pass, so [circuitNavigator] is set by the time this runs.
    */
-  private fun navigateToRoute(route: String) {
-    navController?.navigate(route)
+  private fun navigateToScreen(screen: ChronicleScreen) {
+    circuitNavigator?.goTo(screen)
   }
 
   /**
@@ -251,16 +272,19 @@ class MainActivity : AppCompatActivity() {
    * the previous session's Room data.
    */
   @Composable
-  private fun LoginNavigation(controller: NavHostController) {
-    LaunchedEffect(controller) {
+  private fun LoginNavigation(navigator: Navigator) {
+    LaunchedEffect(navigator) {
       plexLoginRepo.loginEvent.collect { event ->
         if (event.hasBeenHandled) return@collect
-        val destination = destinationForLogin(event.peekContent()) ?: return@collect
+        val screen = screenForLogin(event.peekContent()) ?: return@collect
         event.getContentIfNotHandled() ?: return@collect
         Timber.i("Login event changed to ${event.peekContent()}")
-        controller.navigate(destination.route) {
-          popUpTo(controller.graph.id) { inclusive = true }
-        }
+        // `resetRoot`, which is what `popUpTo(graph.id) { inclusive = true }` meant: an onboarding
+        // step is never something to come back to with the back button.
+        //
+        // The **default** `StateOptions` here, unlike the tab switch above: saving an onboarding
+        // step's state to restore later is the opposite of what `inclusive = true` asked for.
+        navigator.resetRoot(screen)
       }
     }
   }
@@ -332,23 +356,28 @@ class MainActivity : AppCompatActivity() {
             return
           }
 
-          val controller = navController
-          if (controller == null) {
+          val navigator = circuitNavigator
+          if (navigator == null) {
             leaveApp()
             return
           }
 
-          if (controller.popBackStack()) {
+          // **Ask the back stack whether it can pop; never call `pop()` to find out.**
+          //
+          // `rememberCircuitNavigator` installs its *own* back handler, and Circuit's `pop()` at
+          // the root delegates to `onBackPressedDispatcher.onBackPressed()` — which re-enters this
+          // callback, which calls `pop()` again. That is an infinite recursion that dies as a
+          // `StackOverflowError` several thousand frames deep, and it looks exactly like the app
+          // exiting normally: the process is simply gone. Reading the size first has no such
+          // reentrancy.
+          if (navigator.peekBackStack().size > 1) {
+            navigator.pop()
             return
           }
 
           // Home is the root: from another tab, back goes there rather than leaving the app.
-          val current = controller.currentBackStackEntry?.destination?.route
-          if (current != null && current != Destination.Home.ROUTE) {
-            controller.navigate(Destination.Home.ROUTE) {
-              popUpTo(controller.graph.startDestinationId) { inclusive = true }
-              launchSingleTop = true
-            }
+          if (navigator.peek() != HomeScreenKey) {
+            navigator.resetRoot(HomeScreenKey, Navigator.StateOptions.SaveAndRestore)
             return
           }
 
@@ -378,8 +407,8 @@ class MainActivity : AppCompatActivity() {
   }
 
   override fun onDestroy() {
-    // The controller outlives the composition otherwise, and it holds the whole graph.
-    navController = null
+    // The navigator outlives the composition otherwise, and it holds the whole back stack.
+    circuitNavigator = null
     super.onDestroy()
   }
 
@@ -394,8 +423,8 @@ class MainActivity : AppCompatActivity() {
     DebugHooks.onFailSyncIntent(intent)
     DebugHooks.onInvalidateServerTokenIntent(intent)
     DebugHooks.onShowPlayerIntent(intent, this, viewModel)
-    DebugHooks.onShowBrowseIntent(intent, this, ::navigateToRoute)
-    DebugHooks.onShowSettingsIntent(intent, this, ::navigateToRoute)
+    DebugHooks.onShowBrowseIntent(intent, this, ::navigateToScreen)
+    DebugHooks.onShowSettingsIntent(intent, this, ::navigateToScreen)
     DebugHooks.onMoveSyncLocationIntent(intent, this)
     DebugHooks.onDownloadBookIntent(intent, cachedFileManager, bookRepository, lifecycleScope)
     if (mediaServiceConnection.isConnected.value) {
@@ -429,7 +458,7 @@ class MainActivity : AppCompatActivity() {
             bookRepository.getAudiobookAsync(openAudiobookWithId)
           }
         if (audiobook != null && audiobook != EMPTY_AUDIOBOOK) {
-          navController?.navigate(Destination.BookDetails(audiobook.id).route)
+          circuitNavigator?.goTo(BookDetailsScreenKey(audiobook.id))
         }
       }
     }

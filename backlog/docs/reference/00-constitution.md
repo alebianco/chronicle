@@ -104,8 +104,11 @@ today**; extending it is the implementing task's first job.
 
 1. **DI via constructor `@Inject`/factories**; respect scopes (`@Singleton`, `@ActivityScope`,
    `@ServiceScope`); never instantiate singletons manually.
-2. **UI in Compose — a `*Screen` composable is a pure function of its state, a `*Destination` wires a ViewModel to it; business logic in ViewModels/Repositories; the DB is never
-   accessed from UI.**
+2. **UI in Compose — a `*Screen` composable is a pure function of its state; a Circuit **presenter**
+   wraps the ViewModel and a `*Ui` renders it; business logic in ViewModels/Repositories; the DB is
+   never accessed from UI.** Every interaction is a member of that screen's sealed `*Event`
+   hierarchy, so the presenter's `when` is exhaustive and an unwired interaction is a compile error
+   (decision-27). `*Destination` composables are gone.
 3. **`StateFlow` for UI state, never `LiveData`** — private `MutableStateFlow`, public
    immutable `StateFlow`. See the `android-ui` skill for collection rules and `stateIn` policy.
 4. **Inject `DispatcherProvider`**; never reference `Dispatchers.*` directly. `GlobalScope`
@@ -130,7 +133,13 @@ today**; extending it is the implementing task's first job.
    which are a presentation concern of `features/player`, not properties of a book.
 7. **User-facing text in `res/values/strings.xml`**, always.
 8. **Room schema change ⇒ bump the DB version + write a migration in the same PR.**
-9. **Navigation through `ChronicleNavHost`; a destination is a `Destination` with a route, and an argument travels in the route into the ViewModel's `SavedStateHandle` — **reuse the ViewModel's own argument-name constant**, since a fresh one compiles and reads null**; data via Bundles/args.
+9. **Navigation through Circuit** (decision-27). A destination is a `ChronicleScreen` key in
+   `navigation/Screens.kt`, and an **argument is a field on the key** — not a string in a route, so
+   there is nothing to percent-encode and no pattern to fail to match. A ViewModel that needs one
+   takes it through Hilt **assisted injection** (`@AssistedInject` + `@HiltViewModel(assistedFactory
+   = …)`), because Circuit's record-scoped owner provides no `SavedStateRegistryOwner` and a
+   `SavedStateHandle` reached that way is empty. Resolve ViewModels with `recordViewModel()`, never
+   `hiltViewModel()` directly — see `navigation/circuit/`.
 10. **Playback via `MediaServiceConnection`/`MediaPlayerService`** — never touch ExoPlayer from UI.
 11. **Network endpoints in `PlexService.kt`**; errors handled in repositories; log with Timber
     (`Timber.e(e, "context")`).

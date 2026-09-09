@@ -159,11 +159,11 @@ flow-shaped.
 
 ### Adding a New Screen
 
-Screens are **Compose** ([[decision-22]]), routed by **Navigation Compose** — there are no Fragments
-and no layouts.
+Screens are **Compose** ([[decision-22]]), routed by **Circuit** ([[decision-27]]) — there are no
+Fragments, no layouts, and no route strings.
 
 The split is deliberate and worth keeping: a `*Screen` is a **pure function of its state**, which is
-what makes it testable by asserting on what it renders; a `*Destination` is the only part that knows
+what makes it testable by asserting on what it renders; the presenter is the only part that knows
 about a ViewModel.
 
 1. **Create the feature package**: `features/newfeature/`
@@ -173,50 +173,103 @@ about a ViewModel.
 3. **Create the screen**: `features/newfeature/compose/NewFeatureScreen.kt` — state in, callbacks
    out, no ViewModel reference. Wrap it in `Surface`: `MaterialTheme` *defines*
    `colorScheme.background` but paints nothing, so a bare `Box` lets the window colour through.
-4. **Create the destination**: `features/newfeature/compose/NewFeatureDestination.kt`
+4. **Add the screen key** to `navigation/Screens.kt`. A `data object` when it takes no arguments, a
+   `data class` when it does — **`data`, not `class`**: Circuit compares back-stack records by key,
+   so a plain class pushes a duplicate entry on every navigation and `resetRoot` never recognises
+   the tab it is already on.
 
 ```kotlin
-@Composable
-fun NewFeatureDestination(
-  onNavigateUp: () -> Unit,
-  modifier: Modifier = Modifier,
-  viewModel: NewFeatureViewModel = hiltViewModel(),
-) {
-  val state by viewModel.uiState.collectAsStateWithLifecycle()
+@Serializable
+data object NewFeatureScreenKey : ChronicleScreen
+```
 
+   `@Serializable`, because `ScreenKeySaver` writes the back stack as JSON — that is what keeps
+   `Screens.kt` framework-free while still surviving process death.
+
+5. **Create the Circuit file**: `features/newfeature/compose/NewFeatureCircuit.kt` — state, a sealed
+   event hierarchy, a presenter and a `Ui`.
+
+```kotlin
+data class NewFeatureCircuitState(
+  val ui: NewFeatureUiState,
+  val eventSink: (NewFeatureEvent) -> Unit,
+) : CircuitUiState
+
+sealed interface NewFeatureEvent : CircuitUiEvent {
+  data class SomethingHappened(val value: String) : NewFeatureEvent
+
+  data object NavigateUp : NewFeatureEvent
+}
+
+class NewFeaturePresenter(
+  private val viewModel: @Composable () -> NewFeatureViewModel,
+  private val navigator: Navigator,
+) : Presenter<NewFeatureCircuitState> {
+  @Composable
+  override fun present(): NewFeatureCircuitState {
+    val viewModel = viewModel()
+    val state by viewModel.uiState.collectAsState()
+
+    return NewFeatureCircuitState(ui = state) { event ->
+      when (event) {
+        is NewFeatureEvent.SomethingHappened -> viewModel.onSomething(event.value)
+        NewFeatureEvent.NavigateUp -> navigator.pop()
+      }
+    }
+  }
+}
+
+@Composable
+fun NewFeatureUi(state: NewFeatureCircuitState, modifier: Modifier = Modifier) {
   ChronicleScaffold(
     title = stringResource(R.string.new_feature_title),
-    onNavigateUp = onNavigateUp,
+    onNavigateUp = { state.eventSink(NewFeatureEvent.NavigateUp) },
     modifier = modifier,
   ) {
-    NewFeatureScreen(state = state, onSomething = viewModel::onSomething)
+    NewFeatureScreen(
+      state = state.ui,
+      onSomething = { state.eventSink(NewFeatureEvent.SomethingHappened(it)) },
+    )
   }
 }
 ```
 
-`hiltViewModel()` scopes the ViewModel to the **back-stack entry**: it survives a configuration
-change and is cleared when the entry is popped — the lifetime `by viewModels()` gave a Fragment,
-without needing one.
+   **The sealed event hierarchy is the point**, not ceremony: the `when` is exhaustive, so adding an
+   interaction without wiring it is a **compile error**. The `*Destination` layer this replaced took
+   one lambda per interaction, and a forgotten one rendered a live-looking button that did nothing.
 
-`ChronicleScaffold` supplies the top bar and consumes the status-bar inset. Pass `onNavigateUp =
-null` for a top-level tab, which is what makes the back arrow absent there.
+   **`collectAsState`, not `collectAsStateWithLifecycle`.** The lifecycle variant reads
+   `LocalLifecycleOwner`, which a plain JVM test cannot provide — a presenter using it is testable
+   only under Robolectric, which forfeits the main reason for the migration.
 
-5. **Add the route** to `navigation/Destination.kt`, then register it in
-   `navigation/compose/ChronicleNavHost.kt`:
+   **The ViewModel arrives as a `@Composable` supplier, not an instance.** Circuit's presenter
+   factory is not composable, so it cannot resolve one; the presenter calls the supplier inside
+   `present()`.
+
+6. **Register both halves** in `navigation/circuit/ChronicleCircuit.kt`:
 
 ```kotlin
-composable(Destination.NewFeature.ROUTE) {
-  NewFeatureDestination(onNavigateUp = navController::popBackStack)
-}
+// in presenterFor(...)
+NewFeatureScreenKey -> NewFeaturePresenter({ recordViewModel() }, navigator)
+
+// in uiFor(...)
+NewFeatureScreenKey -> ui<NewFeatureCircuitState> { state, modifier -> NewFeatureUi(state, modifier) }
 ```
 
-**If the destination takes an argument, reuse the ViewModel's own argument-name constant.** A route
-argument lands in the same `SavedStateHandle` the ViewModel reads, so a route declaring `{itemId}`
-against a ViewModel reading `"item_id"` compiles, navigates, and renders an **empty screen** — the
-ViewModel reads null and falls back to its default. `DestinationTest` pins the two together.
+   **`recordViewModel()`, never `hiltViewModel()` directly.** Circuit's record-scoped
+   `ViewModelStoreOwner` is not `HasDefaultViewModelProviderFactory`, so the direct call silently
+   falls back to the default factory and throws `Cannot create an instance of class …ViewModel`
+   **on launch** — a failure no unit test sees, because nothing off-device resolves one.
 
-Arbitrary text in a route must go through `encodeArg`: a raw `/` or `?` makes the path match no
-pattern and navigation silently does nothing.
+**If the screen takes an argument, put it on the key and use assisted injection.** There is no
+`SavedStateHandle` to route it through: Circuit's record owner provides no `SavedStateRegistryOwner`,
+so a handle reached that way is empty. The ViewModel takes `@Assisted` parameters and declares
+`@HiltViewModel(assistedFactory = NewFeatureViewModel.Factory::class)`, and the factory passes the
+value straight off the key. That is compile-checked, where the old string-keyed route argument
+compiled fine and read null.
+
+Nothing needs encoding. A key carries `"Tolkien, J.R.R."` or `"There/Back?"` as a plain string,
+where a route had to percent-encode both and a mistake navigated **nowhere, silently**.
 
 6. **Write the tests.** A `*Screen` is testable with `createComposeRule` and no DI at all — state
    in, assert on what is displayed. Wrap it in `ChronicleTheme`, or it renders in stock Material

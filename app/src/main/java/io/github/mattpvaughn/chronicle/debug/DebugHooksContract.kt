@@ -9,6 +9,7 @@ import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.sources.plex.ICachedFileManager
 import io.github.mattpvaughn.chronicle.data.sources.plex.ProgressApi
 import io.github.mattpvaughn.chronicle.features.player.MediaServiceConnection
+import io.github.mattpvaughn.chronicle.navigation.ChronicleScreen
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -102,7 +103,7 @@ interface DebugHooksContract {
   fun onShowBrowseIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigateTo: (String) -> Unit,
+    navigateTo: (ChronicleScreen) -> Unit,
   )
 
   /**
@@ -113,7 +114,7 @@ interface DebugHooksContract {
   fun onShowSettingsIntent(
     intent: Intent?,
     activity: FragmentActivity,
-    navigateTo: (String) -> Unit,
+    navigateTo: (ChronicleScreen) -> Unit,
   )
 
   /**

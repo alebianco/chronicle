@@ -13,13 +13,13 @@ import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 import io.github.mattpvaughn.chronicle.views.compose.BottomChooser
 
 /**
- * The server picker, as a navigation destination.
+ * The server picker, as a Circuit screen.
  *
  * The three pickers are the same screen with different data, which is what [PickerScreen] and
  * [OnboardingScaffold] between them now say out loud.
  */
 @Composable
-fun ChooseServerDestination(
+fun ChooseServerUi(
   modifier: Modifier = Modifier,
   viewModel: ChooseServerViewModel = hiltViewModel(),
 ) {
@@ -43,14 +43,14 @@ fun ChooseServerDestination(
 }
 
 /**
- * The library picker, as a navigation destination.
+ * The library picker, as a Circuit screen.
  *
  * Its refresh icon is wired here. In `onboarding_plex_choose_library.xml` the icon was present but
  * had **no click listener in Kotlin** — a button that did nothing, next to a server picker whose
  * identical icon worked.
  */
 @Composable
-fun ChooseLibraryDestination(
+fun ChooseLibraryUi(
   modifier: Modifier = Modifier,
   viewModel: ChooseLibraryViewModel = hiltViewModel(),
 ) {

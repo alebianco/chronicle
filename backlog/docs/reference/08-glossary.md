@@ -118,14 +118,19 @@ went earlier.
 
 ### Compose
 Declarative UI toolkit, and **the whole UI** ([[decision-22]]). A screen is a
-`*Screen` composable — a pure function of its state — behind a `*Destination` that wires a ViewModel
-to it with `hiltViewModel()`.
+`*Screen` composable — a pure function of its state — behind a Circuit presenter that wraps a
+ViewModel and a `*Ui` that renders it.
 
-### Navigation Compose
-The navigation library that replaced `Navigator`'s `FragmentManager` transactions. Routes
-are declared in `navigation/Destination.kt` and registered in
-`navigation/compose/ChronicleNavHost.kt`; an argument travels in the route string and arrives in the
-ViewModel's `SavedStateHandle`.
+### Circuit
+Slack's presenter/UI library, and the app's **router** ([[decision-27]]). A destination is a
+`ChronicleScreen` key in `navigation/Screens.kt`, registered in
+`navigation/circuit/ChronicleCircuit.kt`; **an argument is a field on the key** rather than a string
+in a route, and reaches its ViewModel through Hilt assisted injection. It replaced Navigation
+Compose, which had replaced `Navigator`'s `FragmentManager` transactions.
+
+Every interaction is a member of that screen's sealed `*Event` hierarchy, so the presenter's `when`
+is exhaustive — an unwired interaction is a compile error, not a button that renders and does
+nothing.
 
 ### AndroidView
 The Compose escape hatch that hosts a real `View`. Chronicle uses it **once**, deliberately:

@@ -9,6 +9,9 @@ import android.view.Gravity
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.lifecycle.*
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.R
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
@@ -52,13 +55,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import timber.log.Timber
-import javax.inject.Inject
 import kotlin.math.roundToInt
 
 @ExperimentalCoroutinesApi
-@HiltViewModel
+@HiltViewModel(assistedFactory = AudiobookDetailsViewModel.Factory::class)
 class AudiobookDetailsViewModel
-  @Inject
+  @AssistedInject
   constructor(
     private val bookRepository: IBookRepository,
     private val trackRepository: ITrackRepository,
@@ -69,24 +71,8 @@ class AudiobookDetailsViewModel
     currentlyPlaying: CurrentlyPlaying,
     private val appContext: Context,
     private val dispatchers: DispatcherProvider,
-    savedStateHandle: SavedStateHandle,
+    @Assisted private val bookId: String,
   ) : ViewModel() {
-    /**
-     * The book this screen is about, from the navigation arguments.
-     *
-     * Was a whole `Audiobook` held as a **mutable `lateinit` field on the factory**, set by the
-     * Fragment before `create` and guarded by `check(isInitialized)`. It did not survive process
-     * death — the system rebuilds the ViewModel without replaying that write, so the check threw on
-     * a restored screen.
-     *
-     * Only `id` and `title` were ever read from it (15 and 1 use), which the factory's own comment
-     * said: *"Just the skeleton of an audiobook"*. So the two values travel directly, and the
-     * skeleton object is gone rather than reconstructed.
-     */
-    private val bookId: String = savedStateHandle.get<String>(ARG_AUDIOBOOK_ID) ?: NO_AUDIOBOOK_FOUND_ID
-
-    private val bookTitle: String = savedStateHandle.get<String>(ARG_AUDIOBOOK_TITLE).orEmpty()
-
     /**
      * `Eagerly`, not `WhileSubscribed` — five click handlers read `audiobook.value` synchronously.
      *
@@ -366,7 +352,15 @@ class AudiobookDetailsViewModel
           if (!plexConfig.isConnected.value) {
             showUserMessage(FormattableString.from(R.string.unable_to_cache_audiobook))
           } else {
-            cachedFileManager.downloadTracks(bookId, bookTitle)
+            // The title comes from the loaded book, not from a navigation argument.
+            //
+            // It used to read `ARG_AUDIOBOOK_TITLE` out of `SavedStateHandle` — a key **nothing
+            // ever wrote**. The nav graph put only the id into the route, so in every production
+            // build this was the empty string and the download notification was titled with
+            // nothing; only two tests, which seeded the handle by hand, ever saw a real value.
+            // The line directly above already reads the title from `audiobook.value`, which is
+            // where it actually lives.
+            cachedFileManager.downloadTracks(bookId, audiobook.value?.title.orEmpty())
           }
         }
         CACHED -> {
@@ -761,10 +755,9 @@ class AudiobookDetailsViewModel
         )
       }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), DetailsUiState())
 
-    companion object {
-      /** Navigation argument keys, owned here because this is what reads them. */
-      const val ARG_AUDIOBOOK_ID = "audiobook_id"
-      const val ARG_AUDIOBOOK_TITLE = "ARG_AUDIOBOOK_TITLE"
-      const val ARG_IS_AUDIOBOOK_CACHED = "is_audiobook_cached"
+    /** How Circuit's presenter factory builds this, passing the id from the screen key. */
+    @AssistedFactory
+    interface Factory {
+      fun create(bookId: String): AudiobookDetailsViewModel
     }
   }

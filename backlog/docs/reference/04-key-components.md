@@ -41,7 +41,7 @@ This document explains the most important classes in Chronicle and what they do.
   which the mandatory predictive-back gesture at targetSdk 36 never calls)
 
 **Key features**:
-- Hosts the Navigation Compose graph (`ChronicleNavHost`) for all screens
+- Hosts the Circuit graph (`rememberChronicleCircuit`) for all screens
 - Bottom sheet player (expandable mini player), driven by `MainActivityViewModel.BottomSheetState`
 - Connects to MediaPlayerService for playback control
 - Handles search intent from system
@@ -212,7 +212,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 ### HomeScreen & HomeViewModel
 **Location**: `features/home/` (ViewModel), `features/home/compose/` (`HomeScreen.kt` +
-`HomeDestination.kt`)
+`HomeCircuit.kt`)
 
 **What they do**:
 - Home screen with recently added, recently listened, and downloaded books
@@ -222,7 +222,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 ### LibraryScreen & LibraryViewModel
 **Location**: `features/library/` (ViewModel), `features/library/compose/` (`LibraryScreen.kt`,
-`LibraryDestination.kt`, `BookCard.kt`, `BookGrid.kt`, `LibraryFilterSheet.kt`)
+`LibraryCircuit.kt`, `BookCard.kt`, `BookGrid.kt`, `LibraryFilterSheet.kt`)
 
 **What they do**:
 - Complete library view with all audiobooks
@@ -233,7 +233,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 ### DetailsScreen & AudiobookDetailsViewModel
 **Location**: `features/bookdetails/` (ViewModel), `features/bookdetails/compose/`
-(`DetailsScreen.kt`, `DetailsDestination.kt`, `ChapterList.kt`)
+(`DetailsScreen.kt`, `DetailsCircuit.kt`, `ChapterList.kt`)
 
 **What they do**:
 - Show detailed information about an audiobook
@@ -258,7 +258,7 @@ This document explains the most important classes in Chronicle and what they do.
 
 ### SettingsScreen & SettingsViewModel
 **Location**: `features/settings/` (ViewModel), `features/settings/compose/` (`SettingsScreen.kt`,
-`SettingsDestination.kt`)
+`SettingsCircuit.kt`)
 
 **What they do**:
 - User preferences
@@ -296,7 +296,7 @@ this codebase declares. `injection/modules/*.kt` attach providers to them with
 **What it does**:
 - Scoped to `MainActivity` (`@AndroidEntryPoint`)
 - Provides activity-scoped dependencies
-- Every screen's ViewModel is obtained via `hiltViewModel()` in its `<X>Destination.kt`, backed by
+- Every screen's ViewModel is obtained via `recordViewModel()` in its `<X>Circuit.kt`, backed by
   Hilt's generated ViewModel factories — there are no Fragments to inject into
 
 **What it provides**:
@@ -317,30 +317,38 @@ this codebase declares. `injection/modules/*.kt` attach providers to them with
 
 ## Navigation
 
-`Navigator.kt` is deleted. Navigation Compose replaced it with two files:
+`Navigator.kt` is deleted, and so are the Navigation Compose files that replaced it. Circuit owns
+routing ([[decision-27]]):
 
-### Destination
-**Location**: `navigation/Destination.kt`
+### Screens
+**Location**: `navigation/Screens.kt`
 
 **What it does**:
-- Framework-free sealed interface — one entry per screen, each carrying its own route string
-- `encodeArg`/`decodeArg` percent-encode route arguments that can hold arbitrary text (a book
-  title, a facet value), so a raw `/` or `?` cannot silently break route matching
-- `destinationForLogin(state)` — the pure function deciding where a login state should navigate,
+- Framework-free sealed interface — one `ChronicleScreen` key per screen
+- **An argument is a field on the key**, not a string in a route. `encodeArg`/`decodeArg` are gone
+  with the route strings: a key carries `"Tolkien, J.R.R."` as itself, so the whole class of
+  "a raw `/` silently matches no pattern" defect no longer exists
+- `@Serializable`, so `ScreenKeySaver` can persist the back stack without `Parcelable`
+- `screenForLogin(state)` — the pure function deciding where a login state should navigate,
   called from `MainActivity` (the old `Navigator` init block)
 
-**Key entries**: `Home`, `Library`, `Collections`, `Settings`, `Browse`, `SeriesIndexTester`,
-`Login`/`ChooseUser`/`ChooseServer`/`ChooseLibrary`, `BookDetails(bookId)`,
-`CollectionDetails(collectionId)`, `FacetBooks(kind, value)`
+**Key entries**: `HomeScreenKey`, `LibraryScreenKey`, `CollectionsScreenKey`, `SettingsScreenKey`,
+`BrowseScreenKey`, `SeriesIndexTesterScreenKey`, `LicensesScreenKey`,
+`LoginScreenKey`/`ChooseUserScreenKey`/`ChooseServerScreenKey`/`ChooseLibraryScreenKey`,
+`BookDetailsScreenKey(bookId)`, `CollectionDetailsScreenKey(collectionId)`,
+`FacetBooksScreenKey(kind, value)`
 
-### ChronicleNavHost
-**Location**: `navigation/compose/ChronicleNavHost.kt`
+### ChronicleCircuit
+**Location**: `navigation/circuit/ChronicleCircuit.kt`
 
 **What it does**:
-- Builds the `NavHost` graph: one `composable(...)` block per `Destination`, each instantiating
-  that screen's `<X>Destination.kt`
-- Owns the one shared navigation callback, `openBook`, since six different screens navigate to a
-  book the same way
+- Builds the graph: `presenterFor` and `uiFor`, two `when` tables over the screen keys
+- Resolves ViewModels with `recordViewModel()`, and the three argument-carrying screens through
+  Hilt assisted injection with the value read straight off the key
+- Split into two functions purely to stay under detekt's complexity threshold; they are one table
+
+**Supporting seams**: `ScreenKeySaver.kt` (back stack as JSON) and `RecordScopedViewModels.kt`
+(`recordViewModel()`). Both exist because of a specific runtime failure — see `02-architecture.md`.
 
 **Handled instead by the framework** (no longer hand-written methods):
 - Clearing the back stack before a tab switch → `popUpTo(startDestination)`
@@ -401,8 +409,8 @@ on the book.
 ### Example: Playing an Audiobook
 
 1. User taps book in **LibraryScreen**
-2. `onBookClick` (wired in `ChronicleNavHost`) navigates to `Destination.BookDetails(bookId)`,
-   rendering **DetailsScreen**
+2. The tap raises `LibraryEvent.BookOpened`, and `LibraryPresenter` navigates to
+   `BookDetailsScreenKey(bookId)`, rendering **DetailsScreen**
 3. **AudiobookDetailsViewModel** loads book from **BookRepository**
 4. User taps play button
 5. ViewModel calls **MediaServiceConnection** to start playback

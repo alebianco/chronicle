@@ -44,7 +44,7 @@ import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 private const val PIN_LENGTH = 4
 
 /**
- * The user picker and its PIN entry screen, as a navigation destination.
+ * The user picker and its PIN entry screen, as a Circuit screen.
  *
  * ### Back handling moves here, and stops being the Activity's business
  *
@@ -59,7 +59,7 @@ private const val PIN_LENGTH = 4
  * it in both places is how a text field and its state get out of step.
  */
 @Composable
-fun ChooseUserDestination(
+fun ChooseUserUi(
   modifier: Modifier = Modifier,
   viewModel: ChooseUserViewModel = hiltViewModel(),
 ) {

@@ -1,7 +1,9 @@
 package io.github.mattpvaughn.chronicle.features.browse
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.PrefsRepo
@@ -14,7 +16,6 @@ import io.github.mattpvaughn.chronicle.util.stringFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
 
 /**
  * The books under one facet value.
@@ -24,31 +25,28 @@ import javax.inject.Inject
  * narrator's books keep the library's own ordering, because "book 2 then book 10" only means
  * something within a series.
  */
-@HiltViewModel
+@HiltViewModel(assistedFactory = FacetBooksViewModel.Factory::class)
 class FacetBooksViewModel
-  @Inject
+  @AssistedInject
   constructor(
     bookRepository: IBookRepository,
     settings: SettingsDataStore,
-    savedStateHandle: SavedStateHandle,
-  ) : ViewModel() {
     /**
-     * Which facet, read from the navigation arguments rather than a factory field.
+     * Which facet, handed over directly by the Circuit screen key.
      *
-     * The factory carried `kind` and `value` as **mutable properties** the Fragment set before
-     * calling `create`, so they did not survive process death: the system recreates the ViewModel
-     * without replaying those writes, and the screen came back showing the default facet. A
-     * `SavedStateHandle` read is restored with the rest of the saved state.
+     * The Fragment-era factory carried `kind` and `value` as **mutable properties** the Fragment
+     * set before calling `create`, so they did not survive process death: the system recreates the
+     * ViewModel without replaying those writes, and the screen came back showing the default facet.
+     * Navigation Compose fixed that by routing both through `SavedStateHandle`.
      *
-     * By name, not ordinal: an ordinal in a Bundle would silently mean a different facet if the
-     * enum ever gained a member — which is why the argument was always written as a name.
+     * That fix carried a cost this removes. A `Bundle` holds no enums, so `kind` travelled as a
+     * **string name** and was matched back with a `?: FacetKind.Author` fallback — meaning a typo
+     * or a renamed member silently showed the wrong facet rather than failing. Here it is the enum
+     * itself, so there is nothing to parse and no fallback to be wrong.
      */
-    private val kind: FacetKind =
-      FacetKind.entries.firstOrNull { it.name == savedStateHandle.get<String>(ARG_KIND) }
-        ?: FacetKind.Author
-
-    private val value: String = savedStateHandle.get<String>(ARG_VALUE).orEmpty()
-
+    @Assisted private val kind: FacetKind,
+    @Assisted private val value: String,
+  ) : ViewModel() {
     val viewStyle =
       settings.stringFlow(
         PrefsRepo.KEY_LIBRARY_VIEW_STYLE,
@@ -67,9 +65,12 @@ class FacetBooksViewModel
           if (kind == FacetKind.Series) matching.inSeriesOrder() else matching
         }
 
-    companion object {
-      /** Navigation argument keys, owned here because this is what reads them. */
-      const val ARG_KIND = "facet_kind"
-      const val ARG_VALUE = "facet_value"
+    /** How Circuit's presenter factory builds this, passing both values from the screen key. */
+    @AssistedFactory
+    interface Factory {
+      fun create(
+        kind: FacetKind,
+        value: String,
+      ): FacetBooksViewModel
     }
   }

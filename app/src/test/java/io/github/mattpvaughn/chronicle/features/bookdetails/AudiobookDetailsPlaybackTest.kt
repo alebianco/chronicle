@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.lifecycle.SavedStateHandle
 import io.github.mattpvaughn.chronicle.data.local.IBookRepository
 import io.github.mattpvaughn.chronicle.data.local.ITrackRepository
 import io.github.mattpvaughn.chronicle.data.model.Audiobook
@@ -137,14 +136,8 @@ class AudiobookDetailsPlaybackTest {
       currentlyPlaying = mockk<CurrentlyPlaying>(relaxed = true),
       appContext = mockk<Context>(relaxed = true),
       dispatchers = TestDispatcherProvider(),
-      // A real handle, not a mock: it is a plain map, and this is the same path production takes
-      // — the Fragment's navigation arguments.
-      savedStateHandle =
-        SavedStateHandle(
-          mapOf(
-            AudiobookDetailsViewModel.ARG_AUDIOBOOK_ID to book.id,
-            AudiobookDetailsViewModel.ARG_AUDIOBOOK_TITLE to book.title,
-          ),
-        ),
+      // The id travels as an ordinary constructor argument, which is the same path production
+      // takes: Circuit's presenter factory reads it off the screen key and passes it here.
+      bookId = book.id,
     )
 }

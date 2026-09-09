@@ -151,10 +151,11 @@ Agents work in `backlog/tasks/` freely; new ideas go to `backlog/drafts/` for tr
 - `injection/` — Dagger components/modules/scopes
 - `data/local/` — Room DBs and DAOs · `data/sources/plex/` — Plex API, login, `CachedFileManager`
 - `data/sources/MediaSource.kt`, `SourceManager.kt` — multi-backend seam (not yet registered)
-- `features/` — a `compose/` package per feature: `*Screen` (pure, state in) + `*Destination`
-  (wires a ViewModel to it), beside the ViewModel
-- `navigation/Destination.kt` — every route, framework-free · `navigation/compose/ChronicleNavHost.kt`
-  — the graph · `application/compose/ChronicleApp.kt` — the shell (bottom nav, host, player sheet)
+- `features/` — a `compose/` package per feature: `*Screen` (pure, state in) + `*Circuit.kt`
+  (screen key, sealed events, presenter, `*Ui`), beside the ViewModel
+- `navigation/Screens.kt` — every screen key, framework-free ·
+  `navigation/circuit/ChronicleCircuit.kt` — the graph ·
+  `application/compose/ChronicleApp.kt` — the shell (bottom nav, host, player sheet)
 - `backlog/` — all non-code knowledge (D13, "file over app"); `backlog/memory/` holds the shared,
   committed memories, gated by `./check-memory-safe.sh` (stage 1 of `verify.sh`)
 

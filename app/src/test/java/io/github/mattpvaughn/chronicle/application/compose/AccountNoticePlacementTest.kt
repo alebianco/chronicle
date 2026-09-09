@@ -7,8 +7,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.navigation.compose.rememberNavController
 import io.github.mattpvaughn.chronicle.application.MainActivityViewModel.BottomSheetState
+import io.github.mattpvaughn.chronicle.navigation.HomeScreenKey
 import io.github.mattpvaughn.chronicle.ui.theme.ChronicleTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -45,7 +45,7 @@ class AccountNoticePlacementTest {
     composeRule.setContent {
       ChronicleTheme {
         ChronicleApp(
-          navController = rememberNavController(),
+          currentScreen = HomeScreenKey,
           isLoggedIn = true,
           showCollectionsTab = false,
           sheetState = sheetState,
@@ -102,7 +102,7 @@ class AccountNoticePlacementTest {
     composeRule.setContent {
       ChronicleTheme {
         ChronicleApp(
-          navController = rememberNavController(),
+          currentScreen = HomeScreenKey,
           isLoggedIn = true,
           showCollectionsTab = false,
           sheetState = sheetState.value,

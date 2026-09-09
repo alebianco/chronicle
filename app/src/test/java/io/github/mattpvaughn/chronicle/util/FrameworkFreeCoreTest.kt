@@ -173,7 +173,7 @@ class FrameworkFreeCoreTest {
         // a route and parsing one back are pure string work, and a mis-encoded argument matches no
         // pattern and navigates *nowhere, silently* — exactly the failure a test without a NavHost
         // can catch cheaply.
-        "navigation/Destination.kt",
+        "navigation/Screens.kt",
         "util/DispatcherProvider.kt",
         "util/DurationFormat.kt",
         "util/FlowCombinators.kt",

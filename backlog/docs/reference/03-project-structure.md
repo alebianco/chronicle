@@ -92,12 +92,12 @@ features/
 │   ├── HomeViewModel.kt
 │   └── compose/
 │       ├── HomeScreen.kt       # Pure function of state
-│       └── HomeDestination.kt  # Wires hiltViewModel() into HomeScreen
+│       └── HomeCircuit.kt  # Wires hiltViewModel() into HomeScreen
 ├── library/                    # Library/browse screen
 │   ├── LibraryViewModel.kt
 │   └── compose/
 │       ├── LibraryScreen.kt
-│       ├── LibraryDestination.kt
+│       ├── LibraryCircuit.kt
 │       ├── BookCard.kt
 │       ├── BookGrid.kt         # LazyVerticalGrid(GridCells.Adaptive)
 │       └── LibraryFilterSheet.kt
@@ -105,7 +105,7 @@ features/
 │   ├── AudiobookDetailsViewModel.kt
 │   └── compose/
 │       ├── DetailsScreen.kt
-│       ├── DetailsDestination.kt
+│       ├── DetailsCircuit.kt
 │       └── ChapterList.kt
 ├── currentlyplaying/           # Mini player + full player
 │   ├── CurrentlyPlayingViewModel.kt
@@ -128,12 +128,12 @@ features/
 │   ├── SettingsViewModel.kt
 │   └── compose/
 │       ├── SettingsScreen.kt
-│       └── SettingsDestination.kt
+│       └── SettingsCircuit.kt
 └── login/                      # Login flow
     ├── LoginViewModel.kt, ChooseServerViewModel.kt, ChooseLibraryViewModel.kt, ChooseUserViewModel.kt
     └── compose/
-        ├── LoginDestination.kt
-        ├── PickerScreen.kt, PickerDestinations.kt   # Choose-server/library/user share one screen
+        ├── LoginUi.kt
+        ├── PickerScreen.kt, PickerUis.kt   # Choose-server/library/user share one screen
         └── OnboardingScaffold.kt
 ```
 
@@ -144,8 +144,8 @@ there is no Fragment layer and no RecyclerView adapter anywhere in the app
 - `ViewModel.kt` - UI state and business logic, injected via Hilt (`@HiltViewModel`)
 - `compose/<X>Screen.kt` - a pure composable function of state — no ViewModel reference, so it is
   previewable and unit-testable without Hilt or a `SavedStateHandle`
-- `compose/<X>Destination.kt` - the thin composable that calls `hiltViewModel()`, collects the
-  ViewModel's `StateFlow`, and passes state + callbacks into the `Screen`
+- `compose/<X>Circuit.kt` - the screen key, a sealed `<X>Event` hierarchy, the presenter that
+  resolves the ViewModel and collects its `StateFlow`, and the `<X>Ui` that renders the `Screen`
 
 ### `/injection` - Dependency Injection (Dagger 2 via Hilt)
 ```
@@ -169,13 +169,16 @@ lines above are Hilt's own component types (`dagger.hilt.android.components.*`),
 ### `/navigation` - Navigation
 ```
 navigation/
-├── Destination.kt               # Every route, framework-free (no Android imports)
-└── compose/
-    └── ChronicleNavHost.kt       # The NavHost graph
+├── Screens.kt                       # Every screen key, framework-free (no Android imports)
+└── circuit/
+    ├── ChronicleCircuit.kt          # The graph: presenterFor + uiFor
+    ├── ScreenKeySaver.kt            # Back stack <-> JSON, so keys need no Parcelable
+    └── RecordScopedViewModels.kt    # recordViewModel(): record store + the Activity's Hilt factory
 ```
 
-**Purpose**: Define the app's routes and build the Navigation Compose graph from them. Replaces
-`Navigator.kt` (deleted), which drove `FragmentManager` transactions by hand.
+**Purpose**: Define the app's screen keys and build the Circuit graph from them ([[decision-27]]).
+Replaces `ChronicleNavHost.kt` and `Destination.kt`, which addressed screens by **string route** —
+and before them `Navigator.kt`, which drove `FragmentManager` transactions by hand.
 
 ### `/util` - Utilities
 ```
@@ -275,7 +278,7 @@ This is typical for small to medium Android apps. As the app grows, it could be 
 **To find a specific screen:**
 1. Look in `features/` directory
 2. Find the feature name (e.g., `home`, `library`, `bookdetails`)
-3. The ViewModel is directly in that folder; the `Screen.kt`/`Destination.kt` pair is in its `compose/` subfolder
+3. The ViewModel is directly in that folder; the `Screen.kt`/`Circuit.kt` pair is in its `compose/` subfolder
 
 **To find data logic:**
 1. Look in `data/` directory
@@ -289,6 +292,6 @@ This is typical for small to medium Android apps. As the app grows, it could be 
 
 **To modify UI:**
 1. Find the screen in `features/<feature>/compose/` — `<X>Screen.kt` for the composable content,
-   `<X>Destination.kt` for how it gets its ViewModel and its route arguments
+   `<X>Circuit.kt` for its events, how it gets its ViewModel, and where it navigates
 2. Strings in `res/values/strings.xml`
 

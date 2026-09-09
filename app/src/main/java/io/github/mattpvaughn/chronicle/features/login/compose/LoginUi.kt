@@ -39,7 +39,7 @@ import io.github.mattpvaughn.chronicle.util.compose.ToastEffect
 import timber.log.Timber
 
 /**
- * The sign-in screen, as a navigation destination.
+ * The sign-in screen, as a Circuit screen.
  *
  * One of the three screens the earlier Compose migrations never reached — it was still pure Views,
  * so this is a real migration rather than a shell swap. Three `View.visibility` writes and a
@@ -52,7 +52,7 @@ import timber.log.Timber
  * equivalent of the Fragment's `onResume`.
  */
 @Composable
-fun LoginDestination(
+fun LoginUi(
   prefsRepo: PrefsRepo,
   modifier: Modifier = Modifier,
   viewModel: LoginViewModel = hiltViewModel(),
