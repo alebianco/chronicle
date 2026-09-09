@@ -184,14 +184,18 @@ android {
           apiLevel = 27
           // AOSP has no Play Services; nothing here needs them, and the images are smaller.
           systemImageSource = "aosp"
-          // Stated rather than defaulted. On CI the setup task installed the API 27 image and then
-          // died with "Cannot query the value of this property because it has no value available",
-          // after warning that the ABI was unspecified. At API 27 the AOSP image is 32-bit x86 with
-          // no arm64 variant, and AGP could not pick for us.
+          // Forces a 64-bit image, which is what makes this device work on an x86_64 CI runner.
           //
-          // AGP warns that the unspecified default is "x86" today and becomes "arm64-v8a" in 9.0,
-          // so naming it here also survives cu-214 stage 3 rather than breaking on it.
-          require64Bit = false
+          // The previous `false` here was reasoned from a wrong premise — that API 27 offers only
+          // 32-bit x86 off arm64. `sdkmanager --list` says otherwise:
+          // `system-images;android-27;default;x86_64` is published, alongside `x86` and `arm64-v8a`.
+          //
+          // With `false`, an x86_64 runner resolved the plain 32-bit `x86` image and `api27Setup`
+          // then failed with "Cannot query the value of this property because it has no value
+          // available". It never reproduced on an Apple-silicon dev machine, which resolves
+          // `arm64-v8a` and never touches the x86 path — the host CPU is the difference, not
+          // whether the image was pre-installed.
+          require64Bit = true
         }
         // A recent level, close to compileSdk 36. "aosp" rather than "aosp-atd": the plain image
         // is the one already installed and licensed on the owner's machine, so a local run needs
@@ -211,34 +215,33 @@ android {
           targetDevices.add(localDevices["api27"])
           targetDevices.add(localDevices["api35"])
         }
-        // What CI runs. api27 is deliberately absent, and **re-adding it has been measured, not
-        // assumed**: on a GitHub runner AGP installs the API 27 AOSP x86 image successfully and then
-        // fails `api27Setup` with "Cannot query the value of this property because it has no value
-        // available", having warned that the device's ABI is unspecified. It does not reproduce
-        // locally, because the image is already present and the failing path never runs.
+        // What CI runs. api27 is here on probation, under `require64Bit = true` (see the device
+        // above) — if the runner still fails `api27Setup`, drop this line, not the flag.
         //
-        // Re-measured on AGP 9.4.0 with no image cache — run 34341471957, 2026-09-09 — and the
-        // failure is identical to the original 8.13.2 evidence. So it is neither a cache artefact
-        // nor an AGP-version artefact, and the AGP 9 upgrade did not fix it.
+        // History, so the loop is not re-run blindly: `api27Setup` failed on a GitHub runner with
+        // "Cannot query the value of this property because it has no value available", at AGP
+        // 8.13.2 and again — identically — on 9.4.0 with no image cache (run 34341471957). So the
+        // failure is neither a cache nor an AGP-version artefact.
         //
-        // The cost of leaving api27 here is worse than losing api27: setup dies in ~75 s and **no
-        // androidTest results are produced at all**, so api35 loses its coverage too.
+        // What it *is* attributable to is the host CPU. An x86_64 runner resolved API 27's 32-bit
+        // `x86` image; an Apple-silicon dev machine resolves `arm64-v8a` and never takes that path,
+        // which is why this never reproduced locally. `require64Bit = true` selects the published
+        // `x86_64` image instead. That is the hypothesis under test here, not a proven fix.
         //
-        // `testedAbi`, which the warning names, is **not settable from here at any AGP version this
-        // project can use**: verified with `javap` on AGP 9.4.0, where
+        // The stake is real: when `api27Setup` dies, **no androidTest results are produced at all**,
+        // so api35 loses its coverage too and the gate tests nothing.
+        //
+        // `testedAbi`, which AGP's warning names, is **not settable from here at any AGP version
+        // this project can use**: verified with `javap` on AGP 9.4.0, where
         // `com.android.build.api.dsl.ManagedVirtualDevice` exposes `device`, `apiLevel`,
         // `sdkVersion`, `systemImageSource`, `require64Bit` and `pageAlignment` — and no
-        // `testedAbi`. It exists only on AGP's internal implementation class, at 8.13.2 and 9.4.0
-        // alike, so the AGP 9 upgrade did not open that door.
+        // `testedAbi`. It exists only on AGP's internal implementation class, so the AGP 9 upgrade
+        // did not open that door.
         //
-        // Do not re-add api27 expecting a different result, and note the `SettingsDataStore`
-        // lost-write fix is unrelated: `api27Setup` fails before any test runs, so that fix neither
-        // addresses nor masks this.
-        //
-        // api35 alone still gives the gate its whole point — the launch crash this exists to catch
-        // is API-independent. Losing the minSdk floor on CI is a real gap, tracked rather than
-        // hidden: see cu-222.
+        // Note the `SettingsDataStore` lost-write fix is unrelated: `api27Setup` fails before any
+        // test runs, so that fix neither addresses nor masks this. See cu-222.
         create("ciCheckGroup") {
+          targetDevices.add(localDevices["api27"])
           targetDevices.add(localDevices["api35"])
         }
       }
