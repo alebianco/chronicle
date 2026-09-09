@@ -13,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -288,11 +290,43 @@ class KtorDownloaderTest {
       assertEquals("book-1", completed.bookId)
     }
 
-  /** Subscribes before anything is enqueued; the event flow has no replay. */
-  private fun CoroutineScope.collectEvents(
+  /**
+   * Subscribes to [Downloader.events] and **does not return until the collector is really
+   * attached**.
+   *
+   * The `launch` alone was not enough, and CI proved it. `launch` only *schedules* the coroutine:
+   * under `runBlocking` the caller keeps the thread, so the very next statement — `d.enqueue(...)` —
+   * could run first. The flow is a `MutableSharedFlow(replay = 0)`, so an event emitted before the
+   * collector attaches is dropped permanently, and the subsequent poll waits its full timeout for
+   * something that can never arrive. That is the `collected: []` failure, and it is likelier on a
+   * fast download: the 416 case completes without touching the network at all.
+   *
+   * `onSubscription` is deterministic, unlike a `yield()` or a sleep, which only narrow the window
+   * instead of closing it.
+   */
+  private suspend fun CoroutineScope.collectEvents(
     d: Downloader,
     into: MutableList<DownloadEvent>,
-  ) = launch { d.events.collect { into.add(it) } }
+  ): Job {
+    // `onSubscription` runs after the collector is registered on the SharedFlow and before any
+    // emission can reach it, which is exactly the guarantee this needs.
+    //
+    // The cast is checked deliberately: `Downloader.events` is typed as a plain `Flow`, and
+    // `onSubscription` is a `SharedFlow` operator. If the production type ever stops being a
+    // SharedFlow this must fail loudly here rather than silently reintroduce the race, so it is
+    // asserted rather than done with `as?` and a null-safe fallback.
+    val subscribed = CompletableDeferred<Unit>()
+    val shared =
+      requireNotNull(d.events as? SharedFlow<DownloadEvent>) {
+        "events must be a SharedFlow for subscription to be awaitable; got ${d.events::class}"
+      }
+    val job =
+      launch {
+        shared.onSubscription { subscribed.complete(Unit) }.collect { into.add(it) }
+      }
+    subscribed.await()
+    return job
+  }
 
   /**
    * Waits for an event matching [predicate], then cancels [collector].
