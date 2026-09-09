@@ -1,7 +1,7 @@
 ---
 id: cu-222
 title: "CI lost the minSdk floor when api27 would not start"
-status: In Progress
+status: In Review
 assignee: []
 created_date: '2026-09-07'
 labels:
@@ -254,18 +254,28 @@ than quietly accepted.
 - [x] `MockPlexMode.enable` investigated on a first-boot emulator, and **cleared**: the logcat shows
       it seeding correctly every time. The fault was one layer down, in the settings store the seed
       writes through
-- [ ] `api27` runs in CI again, **or** an alternative gives minSdk coverage. **Still open, and now
-      the only thing between CI and the minSdk floor** — fault 2 was the reason the suite was
+- [x] `api27` runs in CI again, **or** an alternative gives minSdk coverage. **Resolved to "no",
+      measured**: re-added to `ciCheckGroup` and run on AGP 9.4.0 without the image cache (run
+      34341471957, 2026-09-09), and `api27Setup` failed identically to the 8.13.2 evidence. Worse,
+      it produced *no* androidTest results, so api35 lost coverage too — hence the revert. No
+      alternative is available either: `aosp-atd` has no image below API 30 and `testedAbi` is
+      unsettable at every usable AGP version. A different near-floor API level, or a lint /
+      API-desugaring check catching the same defect class, is future work — not this task.
+      Original note: **was the only thing between CI and the minSdk floor** — fault 2 was the reason the suite was
       unreliable even locally, and that is gone. Whether fault 1 still blocks a GitHub runner can
       only be answered by a CI run; it does not reproduce on this machine — noting that
       **`aosp-atd` is impossible here**: no ATD image is published below API 30, checked against
       `sdkmanager --list`. That leaves a different API level near the floor, or a
       lint/API-desugaring check that catches the same defect class
-- [ ] If no fix is found, the decision to run CI at API 35 only is recorded with its reasoning, and
-      `ciCheckGroup` keeps its comment explaining the gap
+- [x] If no fix is found, the decision to run CI at API 35 only is recorded with its reasoning, and
+      `ciCheckGroup` keeps its comment explaining the gap — done: the comment now records the
+      re-measurement, the run id, the reason re-adding api27 is worse than the gap it closes, and an
+      explicit "do not re-add expecting a different result"
 - [x] `instrumentedCheckGroup` still runs both levels locally — unchanged, `app/build.gradle.kts`
       still adds both `api27` and `api35` to that group
-- [ ] Verified by a real CI run, not by local success — local is where this already passes
+- [x] Verified by a real CI run, not by local success — local is where this already passes. Run
+      34341471957 is that run, and it is what converted fault 1 from "might be fixed by AGP 9 or the
+      cache removal" into a measured no
 
 ## api27 is back in `ciCheckGroup` as a probe — pushed 2026-09-09
 
@@ -279,15 +289,43 @@ from before the emulator image cache was removed — the two changes most likely
 installation — and api27 has not run on a GitHub runner since either landed. It does not reproduce
 locally at all, because the image is already installed here, so the failing path never executes.
 
-So api27 was added back to `ciCheckGroup` to measure it, which is the only instrument that can:
+So api27 was added back to `ciCheckGroup` to measure it, which is the only instrument that can.
 
-- **Green** → fault 1 is gone; keep it, tick the remaining criteria, close the task.
-- **Still "no value available"** → revert to api35-only and take the fallback criterion below,
-  recording the decision with its reasoning. The revert is one line.
+### Answer: fault 1 survives, byte-for-byte — run 34341471957, 2026-09-09
 
-A red run on `feature/agentic-dev` is acceptable and expected as a possible outcome; this is a
-measurement, not a fix. Note the build-script half was verified locally only as far as it can be:
-`./gradlew tasks` configures and `ciCheckGroupGroupDebugAndroidTest` still resolves.
+```
+> Task :app:api27Setup
+The device "api27" does not specify a "testedAbi".
+explicitly set the ABI: testedAbi = "x86"
+> Task :app:api27Setup FAILED
+   > Cannot query the value of this property because it has no value available.
+```
+
+`api27Setup` failed in 1m 15s and **no androidTest results were produced at all** — the emulators
+never ran, so api35 lost its coverage too. That is the concrete cost of leaving api27 in the group:
+it does not merely fail its own device, it takes the whole gate down with it.
+
+Neither of the two changes that raised the hope moved it: this is AGP **9.4.0**, with no image
+cache, and the failure is identical to the 8.13.2 evidence — same ABI warning, same
+"no value available". Fault 1 is not a cache artefact and not an AGP-version artefact.
+
+**So api27 is reverted out of `ciCheckGroup`**, and the remaining criteria resolve to the fallback:
+record the API-35-only decision with its reasoning. `aosp-atd` is already ruled out (no ATD image
+below API 30), and `testedAbi` is ruled out at every usable AGP version. What is left, for a future
+task rather than this one, is a different API level near the floor, or a lint/API-desugaring check
+catching the same defect class without an emulator.
+
+Note the build-script half was verified locally as far as local can go — `./gradlew tasks`
+configures and `ciCheckGroupGroupDebugAndroidTest` resolves — which is precisely why it took a CI
+run to learn anything.
+
+### Unrelated, found in the same run
+
+`RawDurationFormatTest > no player source contains a literal raw duration pair` failed with
+`java.lang.StackOverflowError at Pattern.java:4847`. It passes locally on `--rerun-tasks` and
+predates this probe (the test last changed in 50095985); a runner's smaller default thread stack
+exposes catastrophic backtracking in the guard's regex. **Not part of cu-222** — filed separately,
+since it fails `verify.sh` on CI independently of anything here.
 
 ## Notes
 
