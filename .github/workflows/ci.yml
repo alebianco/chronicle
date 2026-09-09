@@ -115,25 +115,54 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # No cache for the emulator system images. Revisit this only with the note below in mind.
+      # Emulator system images live outside ~/.gradle, so without this every run refetches them:
+      # ~32 s for the API 27 x86_64 image and ~16 s for API 35, measured on run 34350392813.
       #
-      # Caching them looked free — they live outside ~/.gradle, so each run refetched ~1.7 GB. But a
-      # restored system-images directory made `api35Setup` fail with "Cannot query the value of this
-      # property because it has no value available", and the run that first restored the cache is
-      # exactly the run that broke.
+      # This cache was removed once, in 50fb9df2, because the first run that restored it is the run
+      # where `api35Setup` began failing with "Cannot query the value of this property because it
+      # has no value available". That was read as the cache corrupting something AGP resolves at
+      # install time. **That reading was wrong.** The cause was the unguarded
+      # `getEmulatorDirectoryProvider().get()` described in the pre-install step below: with images
+      # already present, api35 became the *first* device to reach that call, before the emulator
+      # package existed. The cache changed install *ordering*; it corrupted nothing (cu-222).
       #
-      # That was originally read as "AGP resolves something at install time that unpacking a cached
-      # directory does not reconstruct". That reading was **wrong**. It is the same unguarded
-      # `getEmulatorDirectoryProvider().get()` described in the pre-install step below: with the
-      # images already cached, api35 became the *first* device to reach that call, before the
-      # emulator package had been installed. The cache did not corrupt anything — it changed the
-      # ordering.
+      # Safe to cache now only because the emulator package is installed before Gradle runs. If that
+      # step is ever removed, this cache will appear to break the gate again — and it will not be
+      # this cache's fault.
       #
-      # So caching may well be safe now that the emulator is installed up front. It is left off
-      # because that is unmeasured, and a ~40 s download is not worth risking the gate on a guess.
-      #
+      # Keyed on the *device declarations*, not on the whole build file. The original key hashed
+      # `app/build.gradle.kts`, which discarded 1.7 GB whenever any unrelated line in that 800-line
+      # file changed — including a comment. This greps the apiLevel/systemImageSource/require64Bit
+      # lines out of the managedDevices block instead, so the key moves when a device does and
+      # stays put otherwise. Derived from the build file rather than duplicated in a checked-in
+      # file, which would silently drift out of sync.
+      - name: Compute the emulator image cache key
+        id: avd-key
+        run: |
+          devices=$(grep -E '^\s*(create\("api|apiLevel|systemImageSource|require64Bit|device =)' \
+            app/build.gradle.kts | tr -d ' ' | sort)
+          echo "$devices"
+          # Fail loudly rather than hash an empty string: a rename in the managedDevices block would
+          # otherwise produce one constant key forever, so a device change would silently restore
+          # the wrong images — the kind of fault that looks like a flaky gate.
+          if [ "$(printf '%s' "$devices" | grep -c apiLevel)" -lt 2 ]; then
+            echo "::error::Could not extract both device declarations from app/build.gradle.kts — the cache key would be meaningless. Update the grep in this step."
+            exit 1
+          fi
+          echo "hash=$(printf '%s' "$devices" | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache emulator system images
+        uses: actions/cache@v6
+        with:
+          path: |
+            /usr/local/lib/android/sdk/system-images
+            /usr/local/lib/android/sdk/platforms
+          key: ${{ runner.os }}-avd-images-${{ steps.avd-key.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-avd-images-
+
       # Do not "revisit under AGP 9" for `testedAbi` — this project is on AGP 9.4.0 and it is still
-      # absent from the public DSL, so that escape hatch was never there.
+      # absent from the public DSL, so that escape hatch was never there (cu-222).
 
       # Gradle Managed Devices boot a real emulator, which needs KVM. The ubuntu-latest image
       # ships /dev/kvm but leaves it root-owned, so without this the devices fail to start —
