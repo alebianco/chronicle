@@ -105,6 +105,78 @@ One more correction to the record above: this machine's installed API 27 image i
 arm64-v8a image (`system-images/android-27/default/arm64-v8a`). The original "no arm64 variant"
 claim was specific to `aosp`.
 
+## Measured again, 2026-09-09 — the second fault is a **race**, not a deterministic failure
+
+The table above records the suite failing on a fresh AVD and passing on a reused one. Re-measured on
+AGP 9.4.0 with the api35 AVD **deleted from disk** between runs, which is stricter than
+`--rerun-tasks`:
+
+| run | fresh AVD | failures |
+|---|---|---|
+| 1 | `--rerun-tasks` only, AVD kept | **0** — 10/10 pass |
+| 2 | AVD deleted | **4** |
+| 3 | AVD deleted | 0 |
+| 4 | AVD deleted | 0 |
+| 5 | AVD deleted | **4** |
+| 6 | AVD deleted | 0 |
+
+**Two corrections to the record above:**
+
+- **`--rerun-tasks` alone does not reproduce it.** Run 1 passed 10/10 with the flag the table names
+  as the trigger. The AVD has to be *gone*, not merely re-set-up.
+- **It is not reproducible on a fresh AVD either — it is ~2 in 5.** The earlier reading of
+  "reproducible" came from a smaller sample. That matters for how it is debugged: a fix cannot be
+  confirmed by one green run.
+
+Always the same four tests, and the root cause is one fact: **`MockPlexMode.isRunning` is false**, so
+`mockPlexModeIsActive` fails outright and the other three fail downstream of a logged-out app.
+
+### What the logcat says
+
+The failing run's media session carries:
+
+```
+error=No user chosen. Please return to Chronicle and finish logging in
+```
+
+which is `LOGGED_IN_NO_USER_CHOSEN`. `MockPlexMode.enable` seeds `accountAuthToken`, `server` and
+`library` but **not** `user` — and that is fine, because `determineLoginState`'s
+`server != null && library != null -> LOGGED_IN_FULLY` branch is evaluated **before** the
+`user == null` one. So reaching "no user chosen" means `server` or `library` read back **null** at
+that moment, even though `SharedPreferencesPlexPrefsRepo` writes both with `commit()`.
+
+### The likely mechanism, not yet proven
+
+`ChronicleApplication.setupNetwork` registers a `registerDefaultNetworkCallback` whose `onAvailable`
+calls `connectToServer()` — **asynchronously, on a system thread**. On a first-boot emulator network
+availability arrives late and at an unpredictable moment, which fits all three observations: it never
+happens on a warm AVD, it happens on roughly two fresh boots in five, and it happens identically at
+both API levels.
+
+`DebugHooks.onApplicationCreate` is ordered before `setupNetwork` deliberately, and that ordering is
+correct — but it only guarantees the *seed* happens first, not that a later async callback cannot
+act on a half-initialised config.
+
+**This is where the next session should start**, and it is a narrower question than the ticket
+began with: what `connectToServer()` does to a seeded mock session when it fires before the mock
+server's `/identity` is reachable. Confirming it needs instrumentation plus several emulator cycles
+at ~2 minutes each.
+
+## The `testedAbi` escape hatch is closed on AGP 9 too — checked 2026-09-09
+
+The note at the bottom of this file says to check whether AGP 9 fixes the **setup** half, since
+`testedAbi` is the property its warning names. It does not, and that is now measured rather than
+assumed: on **AGP 9.4.0**, `testedAbi = "x86"` is still `Unresolved reference`, and
+`javap` on `gradle-api-9.4.0.jar` confirms `com.android.build.api.dsl.ManagedVirtualDevice`
+exposes `device`, `apiLevel`, `sdkVersion`, `systemImageSource`, `require64Bit` and `pageAlignment`
+— **no `testedAbi` at all**.
+
+So the property exists only on AGP's internal implementation class, at 8.13.2 and at 9.4.0 alike.
+The build script cannot set it, and no version bump available to this project changes that.
+
+That note also says cu-214 "measured AGP 9 and **skipped** it". That is now stale: cu-214 landed
+**AGP 9.4.0**.
+
 ## Why it matters
 
 The minSdk floor is not decoration. `api27` was chosen because *"a new API called without a version
@@ -117,6 +189,14 @@ than quietly accepted.
 
 ## Acceptance Criteria
 
+- [x] **Both faults re-measured on AGP 9.4.0**, and the record corrected: fault 2 is a **~2-in-5
+      race on a first boot**, not a deterministic fresh-AVD failure, and `--rerun-tasks` alone does
+      not trigger it. Root cause narrowed to `MockPlexMode.isRunning == false` with the app in
+      `LOGGED_IN_NO_USER_CHOSEN`; the suspect is `setupNetwork`'s async
+      `registerDefaultNetworkCallback` → `connectToServer()`
+- [x] **Fault 1's named escape hatch is closed for good**: `testedAbi` is absent from the
+      `ManagedVirtualDevice` DSL interface on **AGP 9.4.0** as well as 8.13.2, verified with
+      `javap`. No available AGP version lets the build script set it
 - [ ] **Two separate faults, and they must not be conflated.** The `api27Setup` failure ("no value
       available", after the unspecified-ABI warning) is one. The *suite* failing on a freshly
       created AVD at **both** API levels is the other, measured 2026-09-08 and reproducible — it is
@@ -138,9 +218,12 @@ than quietly accepted.
 
 Closing status **In Review**: dropping a test target is a judgement about acceptable risk.
 
-Check whether AGP 9 fixes the **setup** half — its `testedAbi` is the property the warning points
-at. cu-214 measured AGP 9 and **skipped** it (five incompatibilities, three silent), so that escape
-hatch is closed for now rather than merely pending.
+~~Check whether AGP 9 fixes the setup half — its `testedAbi` is the property the warning points
+at.~~ **Answered 2026-09-09: it does not.** `testedAbi` is absent from the `ManagedVirtualDevice`
+DSL interface at AGP 9.4.0 as well as at 8.13.2 — verified with `javap`, not inferred. This note
+also said cu-214 "skipped" AGP 9; that is stale, cu-214 landed **AGP 9.4.0**.
 
 It would not address the second fault regardless: a fresh AVD fails the suite on api35 too, where
-setup succeeds and no ABI warning appears.
+setup succeeds and no ABI warning appears. That half is now known to be a **race** — see the
+2026-09-09 section above — so a fix for it must be confirmed over repeated runs, never one green
+one.
