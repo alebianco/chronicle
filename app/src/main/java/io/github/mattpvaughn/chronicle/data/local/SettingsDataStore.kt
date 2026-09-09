@@ -29,8 +29,8 @@ import timber.log.Timber
  * `ExoPlayer.skipSilenceEnabled` while configuring playback. DataStore is `suspend`/`Flow` only by
  * design, so those sites have three options: become `suspend` (they cannot; there is no coroutine
  * at an ExoPlayer setter), block on I/O (worse than the `SharedPreferences` in-memory read it
- * replaces), or read a snapshot kept current by a collector. The third is the only one that does
- * not make playback worse, so that is what this does.
+ * replaces), or read an in-memory snapshot. The third is the only one that does not make playback
+ * worse, so that is what this does.
  *
  * The snapshot is **not a cache in front of a slow store** — that framing is what makes this look
  * like a workaround. It is the same arrangement `SharedPreferences` already had: an in-memory map

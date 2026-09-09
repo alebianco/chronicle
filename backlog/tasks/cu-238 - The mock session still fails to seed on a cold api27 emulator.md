@@ -1,7 +1,7 @@
 ---
 id: cu-238
 title: "The mock session still fails to seed on a cold api27 emulator"
-status: To Do
+status: In Review
 assignee: []
 labels:
   - testing
@@ -283,15 +283,122 @@ today. The remaining criteria — reproduction on a cold api27 AVD and confirmat
 derived from the ~14 % device rate — still need the instrumented job. This task stays open until
 then; a passing unit suite is what cu-222 mistook for a fix.
 
+## The remaining cause: the SAME bug in CredentialStore
+
+Fixing `SettingsDataStore` was necessary and not sufficient. The local reproduction below still
+failed at ~8 % afterwards, which is what forced the read path to be traced the rest of the way
+rather than the rate to be re-measured.
+
+`SharedPreferencesPlexPrefsRepo.server` returns null unless name, token **and** connections all read
+back. Three of those go through `SettingsDataStore` — but the **access token goes to
+`CredentialStore`**, a third store in `no_backup/` that had not been examined. It carried the
+identical collector, with no in-flight protection at all:
+
+```kotlin
+scope.launch { dataStore.data.collect { snapshot.value = it } }   // whole snapshot, every emission
+```
+
+`put()` moves the snapshot and then writes; an emission whose file read began before the write can
+be delivered after it and drop the value. On a cold start that is precisely the login path: the file
+does not exist yet so the first read is slow, while sign-in (and `MockPlexMode`) writes the account
+token and then the server token back to back during `Application.onCreate`. A dropped server token
+reads as `server == null` — a signed-in app that looks signed out, i.e. the empty browse root.
+
+### Measured
+
+Stale-but-faithful emitter racing one `put`, 400 attempts each:
+
+```
+with the collector      16 / 400 lost
+without (the fix)        0 / 400 lost
+control, race disabled   0 / 400 lost
+```
+
+The emitter preserves the keys it read, so a loss is the store dropping the write rather than the
+probe deleting it — the property the retracted probe lacked.
+
+### Why it hid through two rounds of fixing
+
+**`CredentialStoreTest` did not exist.** The same mechanism lived in two files and only one was
+under test, so two correct-looking fixes to the settings store never touched the token path. The
+class now exists with four tests; both race tests fail when the collector is restored
+(sabotage-verified), and the two unrelated ones correctly do not.
+
+Audited for a third occurrence: `dataStore.data` is now read exactly once, via `.first()`, in both
+stores, and no other class collects a `DataStore` into a snapshot.
+
+Fix: `1f6fa87c`. Same structural shape as the settings store — read once at init, nothing re-applies
+it. Writes here were already synchronous, so snapshot and disk cannot diverge, and the file is in
+`no_backup/`, excluded from backup and transfer by construction.
+
+## Local reproduction and confirmation on device
+
+Harness: `cold-api27.sh`, deleting the gradle-managed AVD between every run so each is genuinely
+cold — `clearPackageData` is not set, so removing the AVD is what makes the *app data* cold too,
+which is the condition the fault needs. It asserts on `TEST-api27.xml` contents, not the exit code
+(a managed-device task that boots nothing exits 0), and fails a run as `ERROR` if fewer than two
+test classes appear.
+
+**That last guard exists because the first version of this harness was wrong.** A comma-separated
+`runnerArguments.class` list silently ran only the *first* class, so it sampled `AutoBrowseTreeTest`
+alone and never ran `LoggedInLaunchTest` — which holds two of the four failing tests. Five "PASS"
+results were collected over half the surface before this was caught, and discarded. A green harness
+was the defect twice on this task; the class-count assertion is what stops a third time.
+
+```
+pre-fix  (SettingsDataStore fix only)   1 fail / 12 cold runs   (~8 %)
+post-fix (both fixes)                   0 fail / 60 cold runs
+```
+
+The pre-fix failure was exact — all four tests this task names, with its verbatim assertion
+`a seeded session must yield a real browse root, got 'empty root'`. `mockPlexModeIsActive` passed in
+both classes on that run, so the fixture server *was* up and seeding *did* run: what failed is the
+seeded values surviving to the read. The tests that passed alongside it walk the tree off whatever
+root exists, and one of them expects empty — a pattern consistent with a lost seed and not with a
+broken fixture.
+
+### The arithmetic, stated both ways
+
+```
+pre-fix point estimate      8.3 %  -> P(60 clean | unfixed) =  0.54 %
+pre-fix 95 % lower bound    1.5 %  -> P(60 clean | unfixed) = 40.7 %
+```
+
+**So 60 clean runs clear the point estimate and do not clear the conservative bound.** Reaching 99 %
+against the lower bound needs ~308 runs (~5 h), and that number is driven by the 12-run control
+being unable to distinguish a 1.5 % fault from a 30 % one — not by anything about the fix.
+
+This is recorded plainly because the temptation to round it away is exactly what closed cu-222.
+Green-counting is the weakest evidence here and gets weaker the rarer the fault is; the confirmation
+rests on the mechanism, with the run count as corroboration:
+
+- both faults reproduced deterministically in-process (60/60 and 16/400) and driven to zero
+- both sabotage-verified — restoring the collector returns each probe to failing
+- controls that *can* fail for the reason under test (faithful emitters, 0/400 and 0/600 with the
+  race disabled)
+- the lossy code path no longer exists in either store, and no third store has it
+
+Note also that arm64 (local) reproduced a fault only ever seen on x86_64 CI, so the harness is
+sampling the real thing rather than a local artefact. Docker was considered for an arch-matched
+run and rejected: macOS has no `/dev/kvm` and gives containers no nested KVM, so an x86_64 emulator
+there falls back to software CPU emulation — impractically slow, and a *third* timing environment
+rather than a closer match to CI's KVM.
+
 ## Acceptance Criteria
 
-- [ ] The failure is **reproduced locally** before any fix — a cold/deleted AVD at api27, and enough
+- [x] The failure is **reproduced locally** before any fix — a cold/deleted AVD at api27, and enough
       runs to see it at the measured rate. A single green run proves nothing here
-- [ ] The remaining cause is identified by measurement (logcat or instrumentation), not inferred
-- [ ] Fixed, with a test that fails when the fix is reverted
-- [ ] **Confirmed over a run count derived from the measured rate**, not an arbitrary 3 or 5. At
-      ~14%, ten consecutive passes still leave ~22% chance of a fluke — state the arithmetic used
-      and pick a number that makes a fluke genuinely unlikely
+      — 1 fail / 12 cold runs, all four named tests, verbatim assertion
+- [x] The remaining cause is identified by measurement (logcat or instrumentation), not inferred
+      — instrumented `_snapshot.value` trace for the first cause, then the read path traced to
+      `CredentialStore` and probed (16/400 with the race, 0/400 control)
+- [x] Fixed, with a test that fails when the fix is reverted — both stores, both sabotage-verified.
+      `CredentialStoreTest` is new; its absence is why this survived two rounds of fixing
+- [~] **Confirmed over a run count derived from the measured rate.** 60 clean cold runs against a
+      measured pre-fix rate of 1/12. Arithmetic stated both ways in the section above: 0.54 % fluke
+      against the point estimate, 40.7 % against the 95 % lower bound. **Clears the point estimate,
+      not the conservative bound** — ~308 runs would, and the limit is the 12-run control, not the
+      fix. Left open deliberately rather than rounded to a pass
 - [ ] cu-222's fault-2 criterion updated to point here, and closed only when this is
 
 ## Notes
