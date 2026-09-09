@@ -30,65 +30,31 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # Scoped deliberately, not `~/.gradle/caches` wholesale. Measured on a dev machine, that
-      # directory is 8.6 GB and only ~1.6 GB of it is worth carrying between runs:
+      # Gradle's own action, with the MIT-licensed cache provider. `enhanced` is the default and is
+      # a 2.3 MB proprietary bundle under gradle.com terms — declined for a GPLv3 project that takes
+      # no money (D9), not for technical reasons.
       #
-      #   caches/9.7.1/transforms   2.7 GB   dexed/jetified AAR outputs — rebuildable, and keyed to
-      #                                      one Gradle version, so it is dead weight after a bump
-      #   caches/<version>/*        6.9 GB   Gradle internals (javaCompile, fileHashes, kotlin-dsl)
-      #   caches/modules-2          1.5 GB   the downloaded dependencies — the part that matters
-      #   caches/build-cache-1      57 MB    task outputs, tiny and high-value
+      # This replaced a hand-rolled `actions/cache` setup that scoped the paths narrowly
+      # (`modules-2` + `build-cache-1`, 671 MiB against basic's 1.32 GiB). **Measured head-to-head,
+      # both restoring from a warm cache, all 10 verify.sh stages:**
       #
-      # Uploading the version dirs costs restore time on every run and buys nothing: they are
-      # per-Gradle-version scratch space. `modules-2` and `build-cache-1` are what actually skip
-      # work, at a fraction of the size.
+      #   hand-rolled, scoped   9m42s   32 tasks FROM-CACHE   (run 34365288691)
+      #   setup-gradle basic    1m27s   78 tasks FROM-CACHE   (run 34374248832)
       #
-      # Two keys, because the two halves change at different rates: dependencies move only when the
-      # version catalog does, while task outputs move on every source edit. `restore-keys` lets the
-      # build cache start from the newest prior entry instead of empty.
+      # 6.7x, far outside this runner's ~25 % variance. The scoping optimised the wrong variable:
+      # dropping `caches/<version>/transforms` looked free locally, where those outputs already
+      # exist on disk, but on a fresh runner they do not — so caching Gradle User Home wholesale
+      # skips 78 tasks where the tidy 671 MiB archive skipped 32. Smaller cache, less work avoided.
+      # `testDebugUnitTest` alone went 3m32s -> 12s.
       #
-      # On **growth**: Gradle's local build cache keeps every entry keyed by task inputs, not just
-      # the newest, and evicts by last-access age (7 days by default). On CI nothing is ever 7 days
-      # old, so that eviction never fires. It cannot be capped from this repo either — Gradle 9
-      # rejects `caches { createdResources { ... } }` outside an init script, and
-      # `buildCache.local.removeUnusedEntriesAfterDays` no longer exists.
-      #
-      # What bounds it here is the key: `github.sha` makes each run write a *new* entry rather than
-      # growing one, and GitHub evicts entries LRU against a 10 GB per-repo limit. So the directory
-      # a single run uploads stays roughly one build's worth (measured locally: 57 MB -> 92 MB over
-      # an afternoon of builds), and old shas fall off on their own.
-      #
-      # Watch the restore/save times if that assumption ever stops holding: this is exactly how the
-      # emulator image cache became a net loss.
-      #
-      # **Measured against `gradle/actions/setup-gradle` with `cache-provider: basic`** (the only
-      # MIT-licensed provider; `enhanced` is a 2.3 MB proprietary bundle under gradle.com terms,
-      # a poor fit for GPLv3 + D9). Runs 34365288691 (this) and 34365259771 (basic):
-      #
-      #   this, restoring     671 MiB in ~4 s   32 tasks FROM-CACHE, assembleDebug 1m16s -> 5s
-      #   basic               caches `~/.gradle/caches` wholesale — 2.74 GiB equivalent
-      #
-      # `basic` also sets **no restore-keys at all** (a deliberate choice in cache-service-basic.ts),
-      # so any change matching `**/*.gradle*` is a total miss rather than a partial restore. Its own
-      # docs recommend against hand-rolled caching, and for most projects that is right — the reason
-      # to keep this one is the 76 % smaller archive, which is measured, not assumed.
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v6
+      # `cache-read-only` must be false here: the action defaults it to true off the repository
+      # default branch, so on feature/agentic-dev — where all task work lands (decision-23) — a run
+      # would otherwise never populate the cache and every run would pay full cost.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.3.0
         with:
-          path: |
-            ~/.gradle/caches/modules-2
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-deps-${{ hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-deps-
-
-      - name: Cache Gradle build outputs
-        uses: actions/cache@v6
-        with:
-          path: ~/.gradle/caches/build-cache-1
-          key: ${{ runner.os }}-gradle-build-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-build-
+          cache-provider: basic
+          cache-read-only: false
 
       - name: Grant execute permissions
         run: chmod +x gradlew verify.sh coverage-ratchet.sh
@@ -155,65 +121,31 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # Scoped deliberately, not `~/.gradle/caches` wholesale. Measured on a dev machine, that
-      # directory is 8.6 GB and only ~1.6 GB of it is worth carrying between runs:
+      # Gradle's own action, with the MIT-licensed cache provider. `enhanced` is the default and is
+      # a 2.3 MB proprietary bundle under gradle.com terms — declined for a GPLv3 project that takes
+      # no money (D9), not for technical reasons.
       #
-      #   caches/9.7.1/transforms   2.7 GB   dexed/jetified AAR outputs — rebuildable, and keyed to
-      #                                      one Gradle version, so it is dead weight after a bump
-      #   caches/<version>/*        6.9 GB   Gradle internals (javaCompile, fileHashes, kotlin-dsl)
-      #   caches/modules-2          1.5 GB   the downloaded dependencies — the part that matters
-      #   caches/build-cache-1      57 MB    task outputs, tiny and high-value
+      # This replaced a hand-rolled `actions/cache` setup that scoped the paths narrowly
+      # (`modules-2` + `build-cache-1`, 671 MiB against basic's 1.32 GiB). **Measured head-to-head,
+      # both restoring from a warm cache, all 10 verify.sh stages:**
       #
-      # Uploading the version dirs costs restore time on every run and buys nothing: they are
-      # per-Gradle-version scratch space. `modules-2` and `build-cache-1` are what actually skip
-      # work, at a fraction of the size.
+      #   hand-rolled, scoped   9m42s   32 tasks FROM-CACHE   (run 34365288691)
+      #   setup-gradle basic    1m27s   78 tasks FROM-CACHE   (run 34374248832)
       #
-      # Two keys, because the two halves change at different rates: dependencies move only when the
-      # version catalog does, while task outputs move on every source edit. `restore-keys` lets the
-      # build cache start from the newest prior entry instead of empty.
+      # 6.7x, far outside this runner's ~25 % variance. The scoping optimised the wrong variable:
+      # dropping `caches/<version>/transforms` looked free locally, where those outputs already
+      # exist on disk, but on a fresh runner they do not — so caching Gradle User Home wholesale
+      # skips 78 tasks where the tidy 671 MiB archive skipped 32. Smaller cache, less work avoided.
+      # `testDebugUnitTest` alone went 3m32s -> 12s.
       #
-      # On **growth**: Gradle's local build cache keeps every entry keyed by task inputs, not just
-      # the newest, and evicts by last-access age (7 days by default). On CI nothing is ever 7 days
-      # old, so that eviction never fires. It cannot be capped from this repo either — Gradle 9
-      # rejects `caches { createdResources { ... } }` outside an init script, and
-      # `buildCache.local.removeUnusedEntriesAfterDays` no longer exists.
-      #
-      # What bounds it here is the key: `github.sha` makes each run write a *new* entry rather than
-      # growing one, and GitHub evicts entries LRU against a 10 GB per-repo limit. So the directory
-      # a single run uploads stays roughly one build's worth (measured locally: 57 MB -> 92 MB over
-      # an afternoon of builds), and old shas fall off on their own.
-      #
-      # Watch the restore/save times if that assumption ever stops holding: this is exactly how the
-      # emulator image cache became a net loss.
-      #
-      # **Measured against `gradle/actions/setup-gradle` with `cache-provider: basic`** (the only
-      # MIT-licensed provider; `enhanced` is a 2.3 MB proprietary bundle under gradle.com terms,
-      # a poor fit for GPLv3 + D9). Runs 34365288691 (this) and 34365259771 (basic):
-      #
-      #   this, restoring     671 MiB in ~4 s   32 tasks FROM-CACHE, assembleDebug 1m16s -> 5s
-      #   basic               caches `~/.gradle/caches` wholesale — 2.74 GiB equivalent
-      #
-      # `basic` also sets **no restore-keys at all** (a deliberate choice in cache-service-basic.ts),
-      # so any change matching `**/*.gradle*` is a total miss rather than a partial restore. Its own
-      # docs recommend against hand-rolled caching, and for most projects that is right — the reason
-      # to keep this one is the 76 % smaller archive, which is measured, not assumed.
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v6
+      # `cache-read-only` must be false here: the action defaults it to true off the repository
+      # default branch, so on feature/agentic-dev — where all task work lands (decision-23) — a run
+      # would otherwise never populate the cache and every run would pay full cost.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.3.0
         with:
-          path: |
-            ~/.gradle/caches/modules-2
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-deps-${{ hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-deps-
-
-      - name: Cache Gradle build outputs
-        uses: actions/cache@v6
-        with:
-          path: ~/.gradle/caches/build-cache-1
-          key: ${{ runner.os }}-gradle-build-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-build-
+          cache-provider: basic
+          cache-read-only: false
 
       # No cache for the emulator system images — **measured, twice, and it loses**.
       #
