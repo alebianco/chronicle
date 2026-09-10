@@ -1,17 +1,19 @@
 ---
 id: cu-222
-title: "CI lost the minSdk floor when api27 would not start"
+title: CI lost the minSdk floor when api27 would not start
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - tooling
   - testing
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-211
 priority: medium
+ordinal: 115000
 ---
 
 ## Description
@@ -243,11 +245,13 @@ than quietly accepted.
 - [x] **Fault 1's named escape hatch is closed for good**: `testedAbi` is absent from the
       `ManagedVirtualDevice` DSL interface on **AGP 9.4.0** as well as 8.13.2, verified with
       `javap`. No available AGP version lets the build script set it
-- [~] **Fault 2 narrowed, not closed.** A real lost write in `SettingsDataStore` was found and
-      fixed (45cc6db5), and it moved the rate a long way: api35 went 3/3 failing to 5/5 passing on
-      fresh AVDs, api27 3/3 passing, guarded by a sabotage-verified unit test. **But it recurred on
-      2026-09-09**, run 34365259771 — four api27 failures with the original signature, on a branch
-      that provably contains the fix. See the section below. Tracked in cu-238
+- [x] **Fault 2 closed in cu-238, 2026-09-10.** The `SettingsDataStore` lost write (45cc6db5) was
+      real but only half of it: the same collector existed in `CredentialStore`, which holds the
+      server access token, so the fault recurred on 2026-09-09 (run 34365259771) on a branch that
+      provably contained the fix. Both stores now read disk once at init with nothing re-applying
+      it (7520f1c2, 1f6fa87c). Confirmed by **308 clean cold api27 runs** against a measured
+      pre-fix rate of 1/12 — 99.0 % confidence at the 95 % lower bound of that rate, the count
+      derived from the measurement rather than chosen. Full account in cu-238
 - [x] **Two separate faults, and they must not be conflated.** The `api27Setup` failure ("no value
       available", after the unspecified-ABI warning) is one. The *suite* failing on a freshly
       created AVD at **both** API levels is the other, measured 2026-09-08 and reproducible — it is
@@ -441,6 +445,12 @@ Closing status **In Review**, revised 2026-09-09: this was briefly `Done`, which
 is machine-proved (api27 runs on CI, 10/10), but fault 2 recurred after being called fixed — see the
 recurrence section. The remaining work is split out to **cu-238** so this task's fault-1 result is
 not held hostage to it; the owner decides whether to close this on fault 1 alone.
+
+**Update 2026-09-10: cu-238 is closed, so the reason this sat in review is gone.** Every criterion
+here is now ticked, both faults are fixed, and fault 2 was confirmed to the standard this ticket
+said it should have used in the first place — 308 clean cold runs, the count derived from the
+measured pre-fix rate rather than picked. Left `In Review` rather than self-closed only because the
+original note put that decision with the owner; there is no outstanding work.
 
 Original note: dropping a test target is a judgement about acceptable risk.
 

@@ -1,15 +1,18 @@
 ---
 id: cu-238
-title: "The mock session still fails to seed on a cold api27 emulator"
-status: In Review
+title: The mock session still fails to seed on a cold api27 emulator
+status: Done
 assignee: []
+created_date: ''
+updated_date: '2026-09-10 06:58'
 labels:
   - testing
   - flaky
   - plex
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: high
+ordinal: 74000
 ---
 
 ## Description
@@ -357,20 +360,25 @@ seeded values surviving to the read. The tests that passed alongside it walk the
 root exists, and one of them expects empty — a pattern consistent with a lost seed and not with a
 broken fixture.
 
-### The arithmetic, stated both ways
+### The arithmetic, and the full run
+
+An initial 60 clean runs cleared the point estimate (0.54 % fluke) but **not** the 95 % lower bound
+(40.7 %), so the criterion was left open rather than rounded to a pass. The derived count was then
+run to completion overnight, 2026-09-09/10:
 
 ```
-pre-fix point estimate      8.3 %  -> P(60 clean | unfixed) =  0.54 %
-pre-fix 95 % lower bound    1.5 %  -> P(60 clean | unfixed) = 40.7 %
+                            rate     P(308 clean | unfixed)
+pre-fix point estimate      8.3 %    2.3e-12
+pre-fix 95 % lower bound    1.5 %    0.99 %      -> 99.0 % confidence
 ```
 
-**So 60 clean runs clear the point estimate and do not clear the conservative bound.** Reaching 99 %
-against the lower bound needs ~308 runs (~5 h), and that number is driven by the 12-run control
-being unable to distinguish a 1.5 % fault from a 30 % one — not by anything about the fix.
+**308 clean cold runs, 0 failures, 0 errors**, every one recording `tests=10 classes=2`. 308 is
+exactly the count `log(0.01)/log(1-0.015)` requires, so the conservative bar is met at the number
+the measurement demanded rather than a number chosen for convenience.
 
-This is recorded plainly because the temptation to round it away is exactly what closed cu-222.
-Green-counting is the weakest evidence here and gets weaker the rarer the fault is; the confirmation
-rests on the mechanism, with the run count as corroboration:
+The count is large because the 12-run control cannot distinguish a 1.5 % fault from a 30 % one —
+a limit of the control, not of the fix. Green-counting is the weakest evidence available here and
+gets weaker the rarer the fault is, so it corroborates rather than carries:
 
 - both faults reproduced deterministically in-process (60/60 and 16/400) and driven to zero
 - both sabotage-verified — restoring the collector returns each probe to failing
@@ -394,12 +402,12 @@ rather than a closer match to CI's KVM.
       `CredentialStore` and probed (16/400 with the race, 0/400 control)
 - [x] Fixed, with a test that fails when the fix is reverted — both stores, both sabotage-verified.
       `CredentialStoreTest` is new; its absence is why this survived two rounds of fixing
-- [~] **Confirmed over a run count derived from the measured rate.** 60 clean cold runs against a
-      measured pre-fix rate of 1/12. Arithmetic stated both ways in the section above: 0.54 % fluke
-      against the point estimate, 40.7 % against the 95 % lower bound. **Clears the point estimate,
-      not the conservative bound** — ~308 runs would, and the limit is the 12-run control, not the
-      fix. Left open deliberately rather than rounded to a pass
-- [ ] cu-222's fault-2 criterion updated to point here, and closed only when this is
+- [x] **Confirmed over a run count derived from the measured rate.** **308 clean cold runs**, the
+      count derived from the 95 % lower bound of the measured pre-fix rate, all 308 with
+      `tests=10 classes=2`. Fluke probability 0.99 % at that bound (99.0 % confidence) and 2.3e-12
+      at the point estimate. Arithmetic in the section above
+- [x] cu-222's fault-2 criterion updated to point here, and closed only when this is — cu-222's
+      criterion carries `[~]` referencing this task, and this task is now confirmed
 
 ## Notes
 
