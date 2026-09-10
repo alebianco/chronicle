@@ -1,16 +1,18 @@
 ---
 id: cu-229
-title: "Adopt Turbine, stage one of the Circuit bundle"
+title: 'Adopt Turbine, stage one of the Circuit bundle'
 status: In Review
 assignee: []
 created_date: '2026-09-08'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - testing
   - architecture
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: medium
+ordinal: 119000
 ---
 
 ## Why this is first

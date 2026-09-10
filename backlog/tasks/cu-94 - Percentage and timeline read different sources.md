@@ -2,11 +2,17 @@
 id: cu-94
 title: Progress percentage updates before the timeline position
 status: Done
-labels: [R2, comfort, bug]
+assignee:
+  - claude
+created_date: ''
+labels:
+  - R2
+  - comfort
+  - bug
+milestone: m-2
 dependencies: []
 priority: medium
-assignee: [claude]
-milestone: m-2
+ordinal: 94000
 ---
 
 ## Description

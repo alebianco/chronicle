@@ -5,10 +5,14 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-31'
-labels: [R2, architecture]
-dependencies: [cu-11]
-priority: low
+labels:
+  - R2
+  - architecture
 milestone: m-2
+dependencies:
+  - cu-11
+priority: low
+ordinal: 88000
 ---
 
 > **Draft id note.** Filed as `DRAFT-75` so the Backlog.md drafts view can see it —

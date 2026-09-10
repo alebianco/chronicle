@@ -1,6 +1,6 @@
 ---
 id: cu-204
-title: "Coverage ratchet: guard against a stale JaCoCo report"
+title: 'Coverage ratchet: guard against a stale JaCoCo report'
 status: Done
 assignee: []
 created_date: '2026-09-06'
@@ -10,6 +10,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: medium
+ordinal: 70000
 ---
 
 ## Description

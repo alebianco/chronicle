@@ -1,18 +1,20 @@
 ---
 id: cu-218
-title: "Okio across the download and cache subsystem"
+title: Okio across the download and cache subsystem
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - architecture
   - testing
-milestone: m-3
-dependencies: 
+milestone: m-2
+dependencies:
   - cu-210
   - cu-195
 priority: medium
+ordinal: 112000
 ---
 
 ## Description

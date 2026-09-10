@@ -1,18 +1,20 @@
 ---
 id: cu-215
-title: "detekt in verify.sh: complexity, potential bugs and coroutine misuse"
+title: 'detekt in verify.sh: complexity, potential bugs and coroutine misuse'
 status: Done
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - tooling
   - maintainability
-milestone: m-3
-dependencies: 
+milestone: m-2
+dependencies:
   - cu-210
   - cu-214
 priority: medium
+ordinal: 101000
 ---
 
 ## Description

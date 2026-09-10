@@ -1,15 +1,17 @@
 ---
 id: cu-235
-title: "Move off the deprecated hiltViewModel package"
+title: Move off the deprecated hiltViewModel package
 status: Done
 assignee: []
 created_date: '2026-09-09'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - debt
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: low
+ordinal: 98000
 ---
 
 ## Description

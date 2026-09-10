@@ -5,10 +5,15 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-03'
-labels: [R2, ux, downloads]
-dependencies: [cu-126]
-priority: medium
+labels:
+  - R2
+  - ux
+  - downloads
 milestone: m-2
+dependencies:
+  - cu-126
+priority: medium
+ordinal: 85000
 ---
 
 ## Decision taken, 2026-09-05

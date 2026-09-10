@@ -7,9 +7,10 @@ created_date: ''
 labels:
   - R2
   - polish
+milestone: m-2
 dependencies: []
 priority: low
-milestone: m-2
+ordinal: 73000
 ---
 
 ## Description

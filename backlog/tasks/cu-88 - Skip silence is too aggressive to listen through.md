@@ -2,11 +2,17 @@
 id: cu-88
 title: Skip silence is too aggressive to listen through
 status: In Review
-labels: [R2, playback, bug]
+assignee:
+  - claude
+created_date: ''
+labels:
+  - R2
+  - playback
+  - bug
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
-assignee: [claude]
+ordinal: 64000
 ---
 
 ## Description

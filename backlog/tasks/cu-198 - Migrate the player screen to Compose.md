@@ -8,10 +8,11 @@ labels:
   - R2
   - architecture
   - ui
+milestone: m-2
 dependencies:
   - cu-187
 priority: high
-milestone: m-2
+ordinal: 96000
 ---
 
 ## Description

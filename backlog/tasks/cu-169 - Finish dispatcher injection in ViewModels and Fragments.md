@@ -1,6 +1,6 @@
 ---
 id: cu-169
-title: 'Finish dispatcher injection in ViewModels and Fragments'
+title: Finish dispatcher injection in ViewModels and Fragments
 status: Done
 assignee:
   - '@claude'
@@ -13,7 +13,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: medium
-ordinal: 1000
+ordinal: 3000
 ---
 
 ## Description

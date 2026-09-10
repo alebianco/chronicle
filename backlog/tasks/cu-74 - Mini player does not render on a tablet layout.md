@@ -5,10 +5,13 @@ status: In Review
 assignee: []
 created_date: '2026-08-31'
 updated_date: '2026-09-03'
-labels: [R2, ui]
+labels:
+  - R2
+  - ui
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 79000
 ---
 
 ## Description

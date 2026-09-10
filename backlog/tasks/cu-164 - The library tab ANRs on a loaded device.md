@@ -3,12 +3,14 @@ id: cu-164
 title: The library tab ANRs on a loaded device
 status: In Review
 assignee: []
+created_date: ''
 labels:
   - R2
   - performance
-dependencies: []
 milestone: m-2
+dependencies: []
 priority: medium
+ordinal: 66000
 ---
 
 ## Description

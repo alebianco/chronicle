@@ -1,16 +1,18 @@
 ---
 id: cu-224
-title: "test_release_build.sh always fails its install step"
+title: test_release_build.sh always fails its install step
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - tooling
   - bug
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: low
+ordinal: 117000
 ---
 
 ## Description

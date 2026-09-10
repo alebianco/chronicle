@@ -8,11 +8,12 @@ labels:
   - R2
   - performance
   - comfort
+milestone: m-2
 dependencies:
   - cu-143
   - cu-150
-milestone: m-2
 priority: medium
+ordinal: 72000
 ---
 
 ## Description

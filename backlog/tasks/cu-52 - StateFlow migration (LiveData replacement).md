@@ -4,10 +4,14 @@ title: StateFlow migration (LiveData replacement)
 status: In Review
 assignee: []
 created_date: '2026-07-13'
-labels: [R2, architecture, trust]
+labels:
+  - R2
+  - architecture
+  - trust
+milestone: m-2
 dependencies: []
 priority: high
-milestone: m-2
+ordinal: 76000
 ---
 
 ## Blocker cleared (2026-08-31)

@@ -2,12 +2,17 @@
 id: cu-101
 title: Extract the logic out of makePreferences
 status: Done
-assignee: [claude]
+assignee:
+  - claude
 created_date: '2026-09-01'
-labels: [R2, architecture, debt]
+labels:
+  - R2
+  - architecture
+  - debt
+milestone: m-2
 dependencies: []
 priority: high
-milestone: m-2
+ordinal: 85000
 ---
 
 ## Description

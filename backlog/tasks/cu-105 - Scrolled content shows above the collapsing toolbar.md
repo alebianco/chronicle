@@ -2,12 +2,17 @@
 id: cu-105
 title: Scrolled content shows above the collapsing toolbar
 status: In Review
-assignee: [claude]
+assignee:
+  - claude
 created_date: '2026-09-02'
-labels: [R2, ui, bug]
+labels:
+  - R2
+  - ui
+  - bug
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 82000
 ---
 
 ## Description

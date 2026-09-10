@@ -1,17 +1,19 @@
 ---
 id: cu-210
-title: "Toolchain and OSS adoption programme"
+title: Toolchain and OSS adoption programme
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:58'
 labels:
   - R3
   - architecture
   - tooling
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-195
 priority: high
+ordinal: 103000
 ---
 
 ## Description

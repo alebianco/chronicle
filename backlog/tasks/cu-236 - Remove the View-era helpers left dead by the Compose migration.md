@@ -1,15 +1,17 @@
 ---
 id: cu-236
-title: "Remove the View-era helpers left dead by the Compose migration"
+title: Remove the View-era helpers left dead by the Compose migration
 status: Done
 assignee: []
 created_date: '2026-09-09'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - debt
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: low
+ordinal: 99000
 ---
 
 ## Description

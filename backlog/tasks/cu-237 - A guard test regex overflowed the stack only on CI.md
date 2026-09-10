@@ -1,15 +1,18 @@
 ---
 id: cu-237
-title: "A guard test's comment regex overflowed the stack only on CI"
+title: A guard test's comment regex overflowed the stack only on CI
 status: Done
 assignee: []
+created_date: ''
+updated_date: '2026-09-10 07:00'
 labels:
   - testing
   - tooling
   - ci
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: medium
+ordinal: 104000
 ---
 
 ## Description

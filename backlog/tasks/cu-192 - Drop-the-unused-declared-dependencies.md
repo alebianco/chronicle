@@ -7,9 +7,10 @@ created_date: '2026-09-06'
 labels:
   - R2
   - debt
+milestone: m-2
 dependencies: []
 priority: low
-milestone: m-2
+ordinal: 68000
 ---
 
 ## Description

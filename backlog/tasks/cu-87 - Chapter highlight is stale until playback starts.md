@@ -2,11 +2,18 @@
 id: cu-87
 title: Chapter highlight is stale until playback starts
 status: Done
-labels: [R2, comfort, bug]
-dependencies: [cu-13]
-priority: medium
+assignee:
+  - claude
+created_date: ''
+labels:
+  - R2
+  - comfort
+  - bug
 milestone: m-2
-assignee: [claude]
+dependencies:
+  - cu-13
+priority: medium
+ordinal: 93000
 ---
 
 ## Description

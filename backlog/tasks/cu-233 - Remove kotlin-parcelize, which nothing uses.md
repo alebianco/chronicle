@@ -1,6 +1,6 @@
 ---
 id: cu-233
-title: "Remove kotlin-parcelize, which nothing uses"
+title: 'Remove kotlin-parcelize, which nothing uses'
 status: Done
 assignee: []
 created_date: '2026-09-08'
@@ -10,6 +10,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: low
+ordinal: 65000
 ---
 
 ## Description

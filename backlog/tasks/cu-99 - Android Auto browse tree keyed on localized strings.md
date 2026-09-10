@@ -2,12 +2,17 @@
 id: cu-99
 title: Android Auto browse tree keyed on localized strings
 status: In Review
-assignee: [claude]
+assignee:
+  - claude
 created_date: '2026-09-01'
-labels: [R2, bug, comfort]
+labels:
+  - R2
+  - bug
+  - comfort
+milestone: m-2
 dependencies: []
 priority: high
-milestone: m-2
+ordinal: 80000
 ---
 
 ## Description

@@ -4,14 +4,16 @@ title: Migrate the fixture servers to mockwebserver3
 status: Done
 assignee: []
 created_date: '2026-09-04'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - hygiene
   - testing
+milestone: m-2
 dependencies:
   - cu-66
-milestone: m-3
 priority: low
+ordinal: 103000
 ---
 
 ## Description

@@ -1,18 +1,20 @@
 ---
 id: cu-220
-title: "Circuit, Molecule and Turbine as one decision, or not at all"
+title: 'Circuit, Molecule and Turbine as one decision, or not at all'
 status: Done
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - architecture
   - ui
-milestone: m-3
-dependencies: 
+milestone: m-2
+dependencies:
   - cu-210
   - cu-214
 priority: low
+ordinal: 102000
 ---
 
 ## Description

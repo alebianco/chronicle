@@ -1,16 +1,18 @@
 ---
 id: cu-230
-title: "Adopt Molecule, stage two of the Circuit bundle"
+title: 'Adopt Molecule, stage two of the Circuit bundle'
 status: In Review
 assignee: []
 created_date: '2026-09-08'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - architecture
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-229
 priority: medium
+ordinal: 120000
 ---
 
 ## Why this is second

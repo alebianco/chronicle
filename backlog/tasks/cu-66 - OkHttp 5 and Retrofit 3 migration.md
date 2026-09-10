@@ -4,10 +4,16 @@ title: OkHttp 5 and Retrofit 3 migration
 status: Done
 assignee: []
 created_date: '2026-08-31'
-labels: [R2, hygiene]
-dependencies: [cu-9, cu-10, cu-11]
-priority: low
+labels:
+  - R2
+  - hygiene
 milestone: m-2
+dependencies:
+  - cu-9
+  - cu-10
+  - cu-11
+priority: low
+ordinal: 86000
 ---
 
 > **Draft id note.** Filed as `DRAFT-66` so the Backlog.md drafts view can see it —

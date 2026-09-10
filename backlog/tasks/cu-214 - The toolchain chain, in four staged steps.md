@@ -1,18 +1,20 @@
 ---
 id: cu-214
-title: "The toolchain chain, in four staged steps"
+title: 'The toolchain chain, in four staged steps'
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - debt
   - tooling
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-210
   - cu-211
 priority: high
+ordinal: 109000
 ---
 
 ## Description

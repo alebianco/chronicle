@@ -1,17 +1,19 @@
 ---
 id: cu-212
-title: "CI and dependency hygiene, automated"
+title: 'CI and dependency hygiene, automated'
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - tooling
   - trust
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-210
 priority: medium
+ordinal: 108000
 ---
 
 ## Description

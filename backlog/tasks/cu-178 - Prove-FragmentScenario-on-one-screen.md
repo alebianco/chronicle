@@ -7,9 +7,10 @@ created_date: ''
 labels:
   - R2
   - maintainability
+milestone: m-2
 dependencies: []
 priority: high
-milestone: m-2
+ordinal: 70000
 ---
 
 ## Description

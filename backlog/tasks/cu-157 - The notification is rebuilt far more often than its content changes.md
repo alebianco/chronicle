@@ -7,10 +7,11 @@ created_date: '2026-09-04'
 labels:
   - R2
   - performance
+milestone: m-2
 dependencies:
   - cu-50
-milestone: m-2
 priority: low
+ordinal: 73000
 ---
 
 ## Description

@@ -1,6 +1,6 @@
 ---
 id: cu-226
-title: "The account-revoked banner covers the top app bar on every sub-screen"
+title: The account-revoked banner covers the top app bar on every sub-screen
 status: In Review
 assignee: []
 created_date: '2026-09-07'
@@ -12,6 +12,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: high
+ordinal: 104000
 ---
 
 ## What was found

@@ -1,15 +1,16 @@
 ---
 id: cu-197
-title: Collections are written with an unresolvable source, so the tab never appears
+title: 'Collections are written with an unresolvable source, so the tab never appears'
 status: Done
 assignee: []
 created_date: '2026-09-06'
 labels:
   - R2
   - trust
+milestone: m-2
 dependencies: []
 priority: high
-milestone: m-2
+ordinal: 69000
 ---
 
 ## Description

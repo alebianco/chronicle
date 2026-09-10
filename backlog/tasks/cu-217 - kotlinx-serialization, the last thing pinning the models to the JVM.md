@@ -1,18 +1,20 @@
 ---
 id: cu-217
-title: "kotlinx-serialization, the last thing pinning the models to the JVM"
+title: 'kotlinx-serialization, the last thing pinning the models to the JVM'
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - architecture
   - debt
-milestone: m-3
-dependencies: 
+milestone: m-2
+dependencies:
   - cu-210
   - cu-214
 priority: medium
+ordinal: 111000
 ---
 
 ## Description

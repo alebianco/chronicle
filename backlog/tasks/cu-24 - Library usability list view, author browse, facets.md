@@ -1,14 +1,17 @@
 ---
 id: cu-24
-title: "Library usability: list view, author browse, facets"
+title: 'Library usability: list view, author browse, facets'
 status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-13'
-labels: [R2, comfort]
+labels:
+  - R2
+  - comfort
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 75000
 ---
 
 ## Description

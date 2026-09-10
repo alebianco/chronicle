@@ -8,10 +8,11 @@ created_date: '2026-09-04'
 labels:
   - R2
   - architecture
+milestone: m-2
 dependencies:
   - cu-49
-milestone: m-2
 priority: medium
+ordinal: 74000
 ---
 
 ## Description

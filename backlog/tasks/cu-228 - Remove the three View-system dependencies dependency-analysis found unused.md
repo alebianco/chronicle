@@ -1,6 +1,6 @@
 ---
 id: cu-228
-title: "Remove the three View-system dependencies dependency-analysis found unused"
+title: Remove the three View-system dependencies dependency-analysis found unused
 status: In Review
 assignee: []
 created_date: '2026-09-08'
@@ -12,6 +12,7 @@ milestone: m-2
 dependencies:
   - cu-212
 priority: low
+ordinal: 106000
 ---
 
 ## What was found

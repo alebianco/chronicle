@@ -1,18 +1,22 @@
 ---
 id: cu-219
-title: "DataStore, all three stages, with plex-session.sh moving alongside the credentials"
+title: >-
+  DataStore, all three stages, with plex-session.sh moving alongside the
+  credentials
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - architecture
   - trust
-milestone: m-3
-dependencies: 
+milestone: m-2
+dependencies:
   - cu-210
   - cu-215
 priority: medium
+ordinal: 113000
 ---
 
 ## Description

@@ -1,17 +1,18 @@
 ---
 id: cu-225
-title: "The release unit-test variant has never compiled"
+title: The release unit-test variant has never compiled
 status: In Review
 assignee: []
 created_date: '2026-09-07'
-updated_date: '2026-09-08'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - tooling
   - debt
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: high
+ordinal: 118000
 ---
 
 ## What was found

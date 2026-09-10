@@ -4,13 +4,15 @@ title: Upgrade androidx.fragment past 1.5.4
 status: In Review
 assignee: []
 created_date: '2026-09-04'
+updated_date: '2026-09-10 06:58'
 labels:
   - R3
   - hygiene
+milestone: m-2
 dependencies:
   - cu-69
-milestone: m-3
 priority: low
+ordinal: 89000
 ---
 
 ## Description

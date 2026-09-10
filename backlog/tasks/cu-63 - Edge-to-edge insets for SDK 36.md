@@ -2,12 +2,16 @@
 id: cu-63
 title: Edge-to-edge insets for SDK 36
 status: In Review
-assignee: [claude]
+assignee:
+  - claude
 created_date: '2026-08-30'
-labels: [R2, ui]
+labels:
+  - R2
+  - ui
+milestone: m-2
 dependencies: []
 priority: high
-milestone: m-2
+ordinal: 77000
 ---
 
 ## Description

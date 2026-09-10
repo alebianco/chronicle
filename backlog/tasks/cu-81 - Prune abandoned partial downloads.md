@@ -2,10 +2,17 @@
 id: cu-81
 title: Prune abandoned partial downloads
 status: Done
-labels: [R2, trust, debt]
-dependencies: [cu-76]
-priority: low
+assignee: []
+created_date: ''
+labels:
+  - R2
+  - trust
+  - debt
 milestone: m-2
+dependencies:
+  - cu-76
+priority: low
+ordinal: 91000
 ---
 
 ## Description

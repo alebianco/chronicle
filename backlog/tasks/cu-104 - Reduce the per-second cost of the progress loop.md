@@ -5,10 +5,14 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-01'
-labels: [R2, performance, trust]
+labels:
+  - R2
+  - performance
+  - trust
+milestone: m-2
 dependencies: []
 priority: high
-milestone: m-2
+ordinal: 81000
 ---
 
 ## Description

@@ -1,17 +1,19 @@
 ---
 id: cu-221
-title: "The instrumented suite regressed while nothing was running it"
+title: The instrumented suite regressed while nothing was running it
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - testing
   - trust
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-211
 priority: high
+ordinal: 114000
 ---
 
 ## Description

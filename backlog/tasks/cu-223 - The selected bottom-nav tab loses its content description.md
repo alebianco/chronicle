@@ -1,16 +1,18 @@
 ---
 id: cu-223
-title: "The selected bottom-nav tab loses its content description"
+title: The selected bottom-nav tab loses its content description
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - a11y
   - bug
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: medium
+ordinal: 116000
 ---
 
 ## Description

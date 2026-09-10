@@ -1,17 +1,19 @@
 ---
 id: cu-213
-title: "Fix Pitest's stale exclusion list, then wire it in non-blocking"
+title: 'Fix Pitest''s stale exclusion list, then wire it in non-blocking'
 status: Done
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - testing
   - tooling
-milestone: m-3
-dependencies: 
+milestone: m-2
+dependencies:
   - cu-210
 priority: medium
+ordinal: 100000
 ---
 
 ## Description

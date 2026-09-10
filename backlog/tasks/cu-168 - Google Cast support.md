@@ -1,6 +1,6 @@
 ---
 id: cu-168
-title: 'Google Cast support'
+title: Google Cast support
 status: In Review
 assignee:
   - '@claude'
@@ -13,7 +13,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: medium
-ordinal: 1000
+ordinal: 2000
 ---
 
 ## Description

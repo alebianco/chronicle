@@ -5,10 +5,15 @@ status: In Review
 assignee: []
 created_date: '2026-09-03'
 updated_date: '2026-09-03'
-labels: [R2, performance, bug]
-dependencies: [cu-110]
-priority: high
+labels:
+  - R2
+  - performance
+  - bug
 milestone: m-2
+dependencies:
+  - cu-110
+priority: high
+ordinal: 83000
 ---
 
 ## Description

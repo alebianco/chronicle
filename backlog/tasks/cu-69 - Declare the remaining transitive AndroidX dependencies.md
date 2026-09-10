@@ -4,10 +4,13 @@ title: Declare the remaining transitive AndroidX dependencies
 status: Done
 assignee: []
 created_date: '2026-08-31'
-labels: [R2, hygiene]
+labels:
+  - R2
+  - hygiene
+milestone: m-2
 dependencies: []
 priority: low
-milestone: m-2
+ordinal: 87000
 ---
 
 > Promoted from `DRAFT-69` on 2026-09-04 and closed in the same pass — every criterion is

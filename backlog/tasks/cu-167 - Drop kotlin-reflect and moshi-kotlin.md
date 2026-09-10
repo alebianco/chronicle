@@ -1,6 +1,6 @@
 ---
 id: cu-167
-title: 'Drop kotlin-reflect and moshi-kotlin from the production APK'
+title: Drop kotlin-reflect and moshi-kotlin from the production APK
 status: Done
 assignee: []
 created_date: '2026-09-05'
@@ -12,7 +12,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: medium
-ordinal: 1000
+ordinal: 2000
 ---
 
 ## Description

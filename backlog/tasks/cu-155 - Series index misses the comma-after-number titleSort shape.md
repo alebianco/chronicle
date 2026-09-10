@@ -8,10 +8,11 @@ labels:
   - R2
   - comfort
   - bug
+milestone: m-2
 dependencies:
   - cu-146
-milestone: m-2
 priority: low
+ordinal: 88000
 ---
 
 ## Description

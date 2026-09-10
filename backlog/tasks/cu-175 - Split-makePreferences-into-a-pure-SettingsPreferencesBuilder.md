@@ -7,9 +7,10 @@ created_date: ''
 labels:
   - R2
   - maintainability
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 96000
 ---
 
 ## Status note (2026-09-05): rescoped — the premise was wrong

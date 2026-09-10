@@ -2,7 +2,8 @@
 id: cu-159
 title: Drop the Audiobook.chapters column
 status: Done
-assignee: ['@claude']
+assignee:
+  - '@claude'
 created_date: '2026-09-04'
 labels:
   - R2
@@ -13,6 +14,7 @@ dependencies:
   - cu-82
   - cu-158
 priority: low
+ordinal: 75000
 ---
 
 ## Description

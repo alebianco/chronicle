@@ -1,17 +1,21 @@
 ---
 id: cu-216
-title: "A third-party licences page, and drop the Play Services plugin that was meant to build it"
+title: >-
+  A third-party licences page, and drop the Play Services plugin that was meant
+  to build it
 status: In Review
 assignee: []
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - compliance
   - ui
-milestone: m-3
-dependencies: 
+milestone: m-2
+dependencies:
   - cu-210
 priority: medium
+ordinal: 110000
 ---
 
 ## Description

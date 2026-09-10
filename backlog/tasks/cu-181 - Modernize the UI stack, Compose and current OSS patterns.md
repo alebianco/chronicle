@@ -1,6 +1,6 @@
 ---
 id: cu-181
-title: "Modernize the UI stack: Compose and current OSS patterns"
+title: 'Modernize the UI stack: Compose and current OSS patterns'
 status: In Review
 assignee: []
 created_date: '2026-09-06'
@@ -12,6 +12,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: high
+ordinal: 91000
 ---
 
 ## Description

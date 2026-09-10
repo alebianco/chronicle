@@ -2,15 +2,18 @@
 id: cu-161
 title: Cut the whole-table read out of search
 status: Done
-assignee: ['@claude']
+assignee:
+  - '@claude'
 created_date: '2026-09-04'
+updated_date: '2026-09-10 07:00'
 labels:
   - R4
   - performance
+milestone: m-2
 dependencies:
   - cu-51
-milestone: m-4
 priority: low
+ordinal: 105000
 ---
 
 ## Description

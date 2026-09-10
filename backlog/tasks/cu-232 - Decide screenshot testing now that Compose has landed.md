@@ -1,15 +1,17 @@
 ---
 id: cu-232
-title: "Decide screenshot testing now that Compose has landed"
+title: Decide screenshot testing now that Compose has landed
 status: In Review
 assignee: []
 created_date: '2026-09-08'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - testing
-milestone: m-3
+milestone: m-2
 dependencies: []
 priority: medium
+ordinal: 122000
 ---
 
 ## Why this exists separately

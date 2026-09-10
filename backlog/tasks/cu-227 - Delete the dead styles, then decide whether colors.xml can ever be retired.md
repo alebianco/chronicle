@@ -1,6 +1,6 @@
 ---
 id: cu-227
-title: "Delete the dead styles, then decide whether colors.xml can ever be retired"
+title: 'Delete the dead styles, then decide whether colors.xml can ever be retired'
 status: In Review
 assignee: []
 created_date: '2026-09-07'
@@ -12,6 +12,7 @@ labels:
 milestone: m-2
 dependencies: []
 priority: low
+ordinal: 105000
 ---
 
 ## Why this is two halves, not one task

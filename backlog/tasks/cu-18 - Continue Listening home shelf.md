@@ -12,7 +12,7 @@ milestone: m-2
 dependencies:
   - cu-9
 priority: medium
-ordinal: 2000
+ordinal: 3000
 ---
 
 ## Description

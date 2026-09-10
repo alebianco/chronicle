@@ -2,10 +2,17 @@
 id: cu-82
 title: Move chapter reads to the DB and retire Audiobook.chapters
 status: Done
-labels: [R2, architecture]
-dependencies: [cu-49, cu-158]
-priority: medium
+assignee: []
+created_date: ''
+labels:
+  - R2
+  - architecture
 milestone: m-2
+dependencies:
+  - cu-49
+  - cu-158
+priority: medium
+ordinal: 92000
 ---
 
 ## Description

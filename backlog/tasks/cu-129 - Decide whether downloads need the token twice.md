@@ -4,10 +4,16 @@ title: Decide whether downloads need the token twice
 status: Done
 assignee: []
 created_date: '2026-09-03'
-labels: [R2, security, downloads, cleanup]
-dependencies: [cu-120]
-priority: low
+labels:
+  - R2
+  - security
+  - downloads
+  - cleanup
 milestone: m-2
+dependencies:
+  - cu-120
+priority: low
+ordinal: 77000
 ---
 
 ## Description

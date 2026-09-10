@@ -1,16 +1,18 @@
 ---
 id: cu-231
-title: "Adopt Circuit, stage three, and settle the navigation question first"
+title: 'Adopt Circuit, stage three, and settle the navigation question first'
 status: In Review
 assignee: []
 created_date: '2026-09-08'
+updated_date: '2026-09-10 06:59'
 labels:
   - R3
   - architecture
-milestone: m-3
+milestone: m-2
 dependencies:
   - cu-230
 priority: medium
+ordinal: 121000
 ---
 
 ## Why this is last, and what makes it different

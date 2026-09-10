@@ -5,13 +5,15 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-07'
+updated_date: '2026-09-10 06:57'
 labels:
   - R1
   - debug
   - bug
-milestone: m-1
+milestone: m-2
 dependencies: []
 priority: medium
+ordinal: 102000
 ---
 
 ## Description

@@ -2,10 +2,17 @@
 id: cu-79
 title: Remove Injector from domain/model code
 status: Done
-labels: [R2, architecture, debt]
-dependencies: [cu-71]
-priority: medium
+assignee: []
+created_date: ''
+labels:
+  - R2
+  - architecture
+  - debt
 milestone: m-2
+dependencies:
+  - cu-71
+priority: medium
+ordinal: 89000
 ---
 
 ## Description

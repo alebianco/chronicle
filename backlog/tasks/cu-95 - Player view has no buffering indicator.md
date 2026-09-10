@@ -1,12 +1,18 @@
 ---
 id: cu-95
-title: Player view shows no buffering indicator, only play/pause
+title: 'Player view shows no buffering indicator, only play/pause'
 status: In Review
-labels: [R2, comfort, ui]
+assignee:
+  - claude
+created_date: ''
+labels:
+  - R2
+  - comfort
+  - ui
+milestone: m-2
 dependencies: []
 priority: medium
-assignee: [claude]
-milestone: m-2
+ordinal: 65000
 ---
 
 ## Description

@@ -1,6 +1,6 @@
 ---
 id: cu-202
-title: Migrate browse, facets and collection details to Compose
+title: 'Migrate browse, facets and collection details to Compose'
 status: In Review
 assignee: []
 created_date: '2026-09-06'
@@ -12,6 +12,7 @@ milestone: m-2
 dependencies:
   - cu-188
 priority: medium
+ordinal: 99000
 ---
 
 ## Description

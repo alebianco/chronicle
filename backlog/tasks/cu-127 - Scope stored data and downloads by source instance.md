@@ -2,12 +2,18 @@
 id: cu-127
 title: Scope stored data and downloads by source instance
 status: In Review
-assignee: ['@claude']
+assignee:
+  - '@claude'
 created_date: '2026-09-03'
-labels: [R2, architecture, data, multi-backend]
+labels:
+  - R2
+  - architecture
+  - data
+  - multi-backend
+milestone: m-2
 dependencies: []
 priority: medium
-milestone: m-2
+ordinal: 84000
 ---
 
 ## Decision taken, 2026-09-05 — [[decision-21]]
